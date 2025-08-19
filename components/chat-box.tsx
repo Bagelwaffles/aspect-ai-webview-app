@@ -101,6 +101,7 @@ export default function ChatBox({
     const text = input.trim()
     if (!text || loading) return
 
+    let creditUsed = true
     if (requireSubscription) {
       if (!email) {
         alert("Enter your email to verify subscription.")
@@ -110,13 +111,14 @@ export default function ChatBox({
         alert("Subscription required.")
         return
       }
-    }
-
-    if (useCredits) {
-      const r = await consumeCredit(email)
-      if (!r.ok) {
-        alert(r.error || "Unable to use credit")
-        return
+      if (useCredits) {
+        const r = await consumeCredit(email)
+        if (!r.ok) {
+          alert(r.error || "Unable to use credit")
+          return
+        }
+      } else {
+        creditUsed = false
       }
     }
 
@@ -157,7 +159,6 @@ export default function ChatBox({
     <div
       className={["w-full rounded-2xl border border-zinc-800 bg-zinc-900/90 backdrop-blur p-4", className].join(" ")}
     >
-      {/* Header */}
       <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div className="flex items-center gap-2">
           <span
@@ -190,7 +191,6 @@ export default function ChatBox({
         </div>
       </div>
 
-      {/* Messages */}
       <div
         ref={scrollRef}
         className="relative max-h-[50vh] min-h-[30vh] overflow-y-auto rounded-xl bg-black/30 border border-zinc-800 p-3 space-y-2"
@@ -225,7 +225,6 @@ export default function ChatBox({
         )}
       </div>
 
-      {/* Composer */}
       <div className="mt-3 flex items-end gap-2">
         <textarea
           value={input}
