@@ -86,7 +86,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false)
   const [showWorkflowGuide, setShowWorkflowGuide] = useState(false)
   const [showInfraGuide, setShowInfraGuide] = useState(false)
-  const [showFinalGuide, setShowFinalGuide] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -112,93 +111,6 @@ export default function DashboardPage() {
     <main className="min-h-[80vh] bg-black text-zinc-100 p-6">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-2xl font-semibold mb-4">Aspect Console</h1>
-
-        <div className="rounded-2xl border border-green-800 bg-green-950/20 p-5 mb-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-green-300">🚀 Final Deployment (5 Steps)</h2>
-            <button
-              onClick={() => setShowFinalGuide(!showFinalGuide)}
-              className="text-sm px-3 py-1.5 rounded-lg bg-green-800 hover:bg-green-700 text-white"
-            >
-              {showFinalGuide ? "Hide Checklist" : "Go Live"}
-            </button>
-          </div>
-
-          {showFinalGuide && (
-            <div className="mt-4 text-sm space-y-4">
-              <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
-                <h3 className="font-medium mb-2 text-green-300">Step 1: DNS A Record</h3>
-                <div className="bg-zinc-900 p-3 rounded font-mono text-xs space-y-1">
-                  <div>
-                    Host: <span className="text-green-400">flow</span>
-                  </div>
-                  <div>
-                    Type: <span className="text-blue-400">A</span>
-                  </div>
-                  <div>
-                    Value: <span className="text-yellow-400">&lt;YOUR_DROPLET_IP&gt;</span>
-                  </div>
-                  <div>
-                    TTL: <span className="text-purple-400">300</span>
-                  </div>
-                </div>
-                <p className="text-xs text-zinc-400 mt-2">
-                  Verify: <code>dig +short flow.aspectmarketingsolutions.app</code>
-                </p>
-              </div>
-
-              <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
-                <h3 className="font-medium mb-2 text-green-300">Step 2: Containers Up</h3>
-                <div className="bg-zinc-900 p-3 rounded font-mono text-xs space-y-1">
-                  <div>docker compose up -d</div>
-                  <div>docker compose ps</div>
-                  <div>sudo ufw allow 80,443/tcp</div>
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
-                <h3 className="font-medium mb-2 text-green-300">Step 3: Import Workflows</h3>
-                <p className="text-zinc-300 mb-2">
-                  Import both workflow JSONs above, map Postgres credentials, activate.
-                </p>
-              </div>
-
-              <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
-                <h3 className="font-medium mb-2 text-green-300">Step 4: Vercel Environment</h3>
-                <div className="bg-zinc-900 p-3 rounded font-mono text-xs space-y-1">
-                  <div>N8N_BASE_URL=https://flow.aspectmarketingsolutions.app</div>
-                  <div>N8N_WEBHOOK_PATH=/webhook/vo-app</div>
-                  <div>N8N_WEBHOOK_SECRET=********</div>
-                </div>
-                <p className="text-xs text-zinc-400 mt-2">Then redeploy Vercel app.</p>
-              </div>
-
-              <div className="rounded-lg bg-green-950/40 border border-green-900 p-4">
-                <h3 className="font-medium mb-2 text-green-300">Step 5: Smoke Tests</h3>
-                <div className="space-y-2 text-xs font-mono">
-                  <div className="text-green-300"># Health check:</div>
-                  <div className="text-zinc-300">curl -s https://flow.aspectmarketingsolutions.app/health | jq .</div>
-                  <div className="text-green-300"># App connectivity:</div>
-                  <div className="text-zinc-300">
-                    curl -s https://aspectmarketingsolutions.app/api/n8n/status | jq .
-                  </div>
-                  <div className="text-green-300"># Test webhook (use dashboard form below):</div>
-                  <div className="text-zinc-300">Use the manual trigger form at the bottom to test workflows</div>
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-blue-950/40 border border-blue-900 p-3">
-                <h3 className="font-medium text-blue-300 mb-2">🎯 Go-Live Touches</h3>
-                <ul className="text-xs text-blue-200 space-y-1">
-                  <li>• Switch Stripe to live keys + webhook</li>
-                  <li>• Set up uptime monitoring for both health endpoints</li>
-                  <li>• Rotate N8N_WEBHOOK_SECRET monthly</li>
-                  <li>• Enable Postgres backups</li>
-                </ul>
-              </div>
-            </div>
-          )}
-        </div>
 
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 mb-6">
           <div className="flex items-center justify-between">
@@ -320,7 +232,7 @@ flow.aspectmarketingsolutions.app {
               </div>
 
               <div className="rounded-lg bg-green-950/40 border border-green-900 p-3">
-                <h3 className="font-medium mb-2 text-green-300">4. Verify Setup:</h3>
+                <h3 className="font-medium text-green-300 mb-2">4. Verify Setup:</h3>
                 <div className="space-y-2 text-xs font-mono">
                   <div className="text-green-300"># Test public health endpoint (no auth):</div>
                   <div className="text-zinc-300">curl -sS https://flow.aspectmarketingsolutions.app/health | jq .</div>
@@ -356,7 +268,7 @@ flow.aspectmarketingsolutions.app {
                 </p>
                 <textarea
                   readOnly
-                  className="w-full h-32 text-xs bg-zinc-950 border border-zinc-700 rounded p-2 font-mono"
+                  className="w-full h-32 text-xs bg-zinc-900 border border-zinc-700 rounded p-2 font-mono"
                   value={HEALTH_WORKFLOW_JSON}
                 />
                 <p className="text-xs text-zinc-400 mt-2">
@@ -373,7 +285,7 @@ flow.aspectmarketingsolutions.app {
                 </p>
                 <textarea
                   readOnly
-                  className="w-full h-40 text-xs bg-zinc-950 border border-zinc-700 rounded p-2 font-mono"
+                  className="w-full h-40 text-xs bg-zinc-900 border border-zinc-700 rounded p-2 font-mono"
                   value={WORKFLOW_JSON}
                 />
               </div>
@@ -387,8 +299,8 @@ flow.aspectmarketingsolutions.app {
                 </ol>
               </div>
 
-              <div className="rounded-lg bg-green-950/40 border border-green-900 p-4">
-                <h3 className="font-medium mb-2 text-green-300">4. Test Commands:</h3>
+              <div className="rounded-lg bg-green-950/40 border border-green-900 p-3">
+                <h3 className="font-medium text-green-300 mb-2">4. Test Commands:</h3>
                 <div className="space-y-2 text-xs font-mono">
                   <div className="text-green-300"># Ping test:</div>
                   <div className="text-zinc-300 bg-zinc-900 p-2 rounded whitespace-pre-wrap">
@@ -413,8 +325,8 @@ flow.aspectmarketingsolutions.app {
 
               <div className="rounded-lg bg-blue-950/40 border border-blue-900 p-3">
                 <p className="text-blue-300 text-xs">
-                  <strong>Actions Available:</strong> status.ping, relevance.ask.app, relevance.ask.direct, credits.use,
-                  credits.add
+                  <strong>Actions Available:</strong> status.ping, relevance.ask.app, relevance.ask.direct, credits.use,{" "}
+                  <strong>credits.add</strong>
                 </p>
               </div>
             </div>
