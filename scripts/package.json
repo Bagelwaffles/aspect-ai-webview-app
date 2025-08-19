@@ -1,0 +1,12 @@
+{
+  "name": "aspect-marketing-twa-scripts",
+  "version": "1.0.0",
+  "description": "Build scripts for Aspect Marketing Solutions TWA",
+  "scripts": {
+    "generate-keystore": "bash generate-keystore.sh",
+    "build-android": "bash build-android-release.sh",
+    "build-all": "npm run generate-keystore && npm run build-android",
+    "validate-pwa": "npx lighthouse --only-categories=pwa --chrome-flags='--headless' https://aspectmarketingsolutions.app",
+    "test-manifest": "npx web-app-manifest-validator public/manifest.json"
+  }
+}

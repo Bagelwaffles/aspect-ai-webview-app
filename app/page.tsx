@@ -14,7 +14,9 @@ export default function Page() {
               </div>
               <h1 className="text-xl font-bold">Aspect Marketing Solutions</h1>
             </div>
-            <Button>Get Started</Button>
+            <Button asChild>
+              <a href="/login">Get Started</a>
+            </Button>
           </div>
         </div>
       </header>
@@ -31,8 +33,8 @@ export default function Page() {
             your business.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="text-lg px-8 py-6">
-              Start Your Consultation
+            <Button size="lg" className="text-lg px-8 py-6" asChild>
+              <a href="/login">Start Your Consultation</a>
             </Button>
             <Button variant="outline" size="lg" className="text-lg px-8 py-6 bg-transparent">
               View Our Services
@@ -185,15 +187,16 @@ export default function Page() {
             Get started with a free consultation and discover how we can transform your marketing strategy.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" variant="secondary" className="text-lg px-8 py-6">
-              Schedule Free Consultation
+            <Button size="lg" variant="secondary" className="text-lg px-8 py-6" asChild>
+              <a href="/login">Schedule Free Consultation</a>
             </Button>
             <Button
               size="lg"
               variant="outline"
               className="text-lg px-8 py-6 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary bg-transparent"
+              asChild
             >
-              Contact Us Today
+              <a href="/login">Contact Us Today</a>
             </Button>
           </div>
         </div>
