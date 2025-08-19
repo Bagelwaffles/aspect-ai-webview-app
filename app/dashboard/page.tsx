@@ -9,6 +9,7 @@ import { CreditsManagement } from "@/components/dashboard/credits-management"
 import { AIAssistant } from "@/components/dashboard/ai-assistant"
 import { WorkflowManagement } from "@/components/dashboard/workflow-management"
 import { SystemMonitoring } from "@/components/dashboard/system-monitoring"
+import { AgentsManagement } from "@/components/dashboard/agents-management"
 
 export default function DashboardPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -44,6 +45,8 @@ export default function DashboardPage() {
         return <AIAssistant />
       case "workflows":
         return <WorkflowManagement />
+      case "agents":
+        return <AgentsManagement />
       case "monitoring":
         return <SystemMonitoring />
       case "settings":

@@ -4,7 +4,19 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { LayoutDashboard, CreditCard, Bot, Workflow, Settings, LogOut, Menu, X, Zap, Activity } from "lucide-react"
+import {
+  LayoutDashboard,
+  CreditCard,
+  Bot,
+  Workflow,
+  Settings,
+  LogOut,
+  Menu,
+  X,
+  Zap,
+  Activity,
+  Users,
+} from "lucide-react"
 import { useRouter } from "next/navigation"
 
 interface SidebarProps {
@@ -27,6 +39,7 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
     { id: "billing", label: "Billing", icon: CreditCard },
     { id: "credits", label: "Credits", icon: Zap },
     { id: "assistant", label: "AI Assistant", icon: Bot },
+    { id: "agents", label: "AI Agents", icon: Users },
     { id: "workflows", label: "Workflows", icon: Workflow },
     { id: "monitoring", label: "Monitoring", icon: Activity },
     { id: "settings", label: "Settings", icon: Settings },
