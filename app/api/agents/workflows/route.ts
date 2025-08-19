@@ -5,12 +5,17 @@ export async function GET() {
   try {
     console.log("[v0] Fetching workflows from n8n")
 
-    const result = await callN8N("printify.shops.list")
+    const result = await callN8N("workflows.list")
 
     if (result.success) {
+      // n8n typically returns workflows in a 'workflows' array or directly as data
+      const workflows = result.data?.workflows || result.data || []
+
+      console.log("[v0] Raw n8n response:", JSON.stringify(result.data))
+
       return NextResponse.json({
         success: true,
-        workflows: result.data?.shops || result.data || [],
+        workflows: Array.isArray(workflows) ? workflows : [],
         message: "Workflows fetched successfully",
       })
     } else {

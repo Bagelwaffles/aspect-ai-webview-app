@@ -83,7 +83,7 @@ export async function getWorkflowStatus(workflowId: string) {
  * List available workflows
  */
 export async function listWorkflows() {
-  return callN8N("printify.shops.list")
+  return callN8N("workflows.list")
 }
 
 /**

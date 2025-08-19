@@ -18,23 +18,11 @@ export default function DashboardPage() {
 
   const checkN8nConnection = async () => {
     try {
-      console.log("[v0] Starting n8n connection check...")
       const response = await fetch("/api/n8n/status")
-      console.log("[v0] n8n status API response status:", response.status)
-
       const data = await response.json()
-      console.log("[v0] n8n status API response data:", data)
-
-      // Use the new 'connected' field from the updated API
       setN8nConnected(data.connected || false)
-
-      if (!data.connected) {
-        console.log("[v0] n8n not connected:", data.error)
-      } else {
-        console.log("[v0] n8n connected successfully!")
-      }
     } catch (error) {
-      console.error("[v0] Error checking n8n connection:", error)
+      console.error("Error checking n8n connection:", error)
       setN8nConnected(false)
     }
   }
@@ -42,23 +30,20 @@ export default function DashboardPage() {
   const fetchWorkflows = async () => {
     try {
       setLoading(true)
-      console.log("[v0] Fetching workflows from n8n")
       const response = await fetch("/api/agents/workflows")
       const data = await response.json()
 
-      if (data.success) {
-        setWorkflows(data.workflows || [])
-        console.log("[v0] Workflows fetched successfully:", data.workflows?.length || 0)
+      console.log("[v0] Workflows API response:", data)
+
+      if (data.success && Array.isArray(data.workflows)) {
+        setWorkflows(data.workflows)
       } else {
-        console.log("[v0] Failed to fetch workflows:", data.error)
-        if (data.error?.includes("n8n configuration missing")) {
-          console.log(
-            "[v0] Failed to fetch workflows: n8n configuration missing. Please set N8N_BASE_URL, N8N_WEBHOOK_PATH, and N8N_WEBHOOK_SECRET environment variables.",
-          )
-        }
+        console.log("[v0] Invalid workflows data, setting empty array")
+        setWorkflows([])
       }
     } catch (error) {
-      console.error("[v0] Error fetching workflows:", error)
+      console.error("Error fetching workflows:", error)
+      setWorkflows([])
     } finally {
       setLoading(false)
     }
@@ -66,29 +51,21 @@ export default function DashboardPage() {
 
   const fetchShops = async () => {
     try {
-      console.log("[v0] Fetching shops from n8n")
       const response = await fetch("/api/agents/shops")
       const data = await response.json()
 
-      if (data.success) {
-        setShops(data.shops || [])
-        console.log("[v0] Shops fetched successfully:", data.shops?.length || 0)
+      if (data.success && Array.isArray(data.shops)) {
+        setShops(data.shops)
       } else {
-        console.log("[v0] Failed to fetch shops:", data.error)
-        if (data.error?.includes("n8n configuration missing")) {
-          console.log(
-            "[v0] Failed to fetch shops: n8n configuration missing. Please set N8N_BASE_URL, N8N_WEBHOOK_PATH, and N8N_WEBHOOK_SECRET environment variables.",
-          )
-        }
+        setShops([])
       }
     } catch (error) {
-      console.error("[v0] Error fetching shops:", error)
+      console.error("Error fetching shops:", error)
+      setShops([])
     }
   }
 
   const handleViewWorkflows = async () => {
-    console.log("[v0] View Workflows clicked")
-
     if (n8nConnected === false) {
       alert(
         "n8n is not connected. Please add these environment variables to your Vercel project:\n\n" +
@@ -104,7 +81,7 @@ export default function DashboardPage() {
       return
     }
 
-    if (workflows.length === 0) {
+    if (!Array.isArray(workflows) || workflows.length === 0) {
       alert("No workflows found. Please check your n8n configuration.")
       return
     }
@@ -137,8 +114,6 @@ export default function DashboardPage() {
   }
 
   const handleViewProducts = () => {
-    console.log("[v0] View Products clicked")
-
     if (n8nConnected === false) {
       alert(
         "n8n is not connected. Please add these environment variables to your Vercel project:\n\n" +
@@ -149,7 +124,7 @@ export default function DashboardPage() {
       return
     }
 
-    if (shops.length === 0) {
+    if (!Array.isArray(shops) || shops.length === 0) {
       alert("No Printify shops found. Please check your n8n workflow configuration.")
       return
     }
@@ -159,7 +134,6 @@ export default function DashboardPage() {
   }
 
   const handleManageBilling = () => {
-    console.log("[v0] Manage Billing clicked")
     router.push("/pricing")
   }
 
