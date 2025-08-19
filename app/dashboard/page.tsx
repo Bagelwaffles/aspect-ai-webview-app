@@ -115,7 +115,7 @@ export default function DashboardPage() {
 
         <div className="rounded-2xl border border-green-800 bg-green-950/20 p-5 mb-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-green-300">🚀 Final Deployment (6 Steps)</h2>
+            <h2 className="text-lg font-medium text-green-300">🚀 Final Deployment (5 Steps)</h2>
             <button
               onClick={() => setShowFinalGuide(!showFinalGuide)}
               className="text-sm px-3 py-1.5 rounded-lg bg-green-800 hover:bg-green-700 text-white"
@@ -127,138 +127,74 @@ export default function DashboardPage() {
           {showFinalGuide && (
             <div className="mt-4 text-sm space-y-4">
               <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
-                <h3 className="font-medium mb-2 text-green-300">Step 1: Deploy n8n on Droplet</h3>
+                <h3 className="font-medium mb-2 text-green-300">Step 1: DNS A Record</h3>
                 <div className="bg-zinc-900 p-3 rounded font-mono text-xs space-y-1">
-                  <div className="text-green-300"># SSH to your droplet and create deployment directory:</div>
-                  <div>mkdir -p ~/n8n-deploy && cd ~/n8n-deploy</div>
-                  <div className="text-green-300"># Create docker-compose.yml:</div>
-                  <div dangerouslySetInnerHTML={{ __html: "cat &gt; docker-compose.yml &lt;&lt; 'EOF'" }} />
-                  <div>version: &quot;3.9&quot;</div>
-                  <div>services:</div>
-                  <div> n8n:</div>
-                  <div> image: n8nio/n8n:latest</div>
-                  <div> restart: unless-stopped</div>
-                  <div> environment:</div>
-                  <div> - GENERIC_TIMEZONE=America/Chicago</div>
-                  <div> - N8N_HOST=flow.aspectmarketingsolutions.app</div>
-                  <div> - N8N_PORT=5678</div>
-                  <div> - N8N_PROTOCOL=https</div>
-                  <div> - WEBHOOK_URL=https://flow.aspectmarketingsolutions.app</div>
-                  <div> volumes:</div>
-                  <div> - ./n8n_data:/home/node/.n8n</div>
-                  <div> networks: [web]</div>
-                  <div> caddy:</div>
-                  <div> image: caddy:latest</div>
-                  <div> restart: unless-stopped</div>
-                  <div> ports:</div>
-                  <div> - &quot;80:80&quot;</div>
-                  <div> - &quot;443:443&quot;</div>
-                  <div> volumes:</div>
-                  <div> - ./Caddyfile:/etc/caddy/Caddyfile:ro</div>
-                  <div> networks: [web]</div>
-                  <div>networks:</div>
-                  <div> web:</div>
-                  <div> driver: bridge</div>
-                  <div>EOF</div>
-                  <div className="text-green-300"># Generate bcrypt password hash:</div>
-                  <div>docker run --rm caddy:latest caddy hash-password --plaintext 'YourStrongPassword123!'</div>
-                  <div className="text-green-300"># Create Caddyfile (replace HASH with output above):</div>
-                  <div dangerouslySetInnerHTML={{ __html: "cat &gt; Caddyfile &lt;&lt; 'EOF'" }} />
-                  <div>flow.aspectmarketingsolutions.app {`{`}</div>
-                  <div> encode zstd gzip</div>
-                  <div> @public path /webhook* /health*</div>
-                  <div> @protected {`{`}</div>
-                  <div> not path /webhook* /health*</div>
-                  <div> {`}`}</div>
-                  <div> basicauth @protected {`{`}</div>
-                  <div> admin REPLACE_WITH_BCRYPT_HASH</div>
-                  <div> {`}`}</div>
-                  <div> reverse_proxy n8n:5678</div>
-                  <div>{`}`}</div>
-                  <div>EOF</div>
-                  <div className="text-green-300"># Start services:</div>
+                  <div>
+                    Host: <span className="text-green-400">flow</span>
+                  </div>
+                  <div>
+                    Type: <span className="text-blue-400">A</span>
+                  </div>
+                  <div>
+                    Value: <span className="text-yellow-400">&lt;YOUR_DROPLET_IP&gt;</span>
+                  </div>
+                  <div>
+                    TTL: <span className="text-purple-400">300</span>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-400 mt-2">
+                  Verify: <code>dig +short flow.aspectmarketingsolutions.app</code>
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
+                <h3 className="font-medium mb-2 text-green-300">Step 2: Containers Up</h3>
+                <div className="bg-zinc-900 p-3 rounded font-mono text-xs space-y-1">
                   <div>docker compose up -d</div>
+                  <div>docker compose ps</div>
                   <div>sudo ufw allow 80,443/tcp</div>
                 </div>
               </div>
 
               <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
-                <h3 className="font-medium mb-2 text-green-300">Step 2: Import & Activate Workflows</h3>
-                <div className="space-y-2 text-zinc-300">
-                  <p>1. Go to https://flow.aspectmarketingsolutions.app (use admin credentials)</p>
-                  <p>2. Import both workflow JSONs from sections below</p>
-                  <p>3. Configure PostgreSQL credentials in each Postgres node</p>
-                  <p>4. Activate both workflows</p>
-                  <p>
-                    5. Test health endpoint:{" "}
-                    <code className="text-yellow-400">
-                      curl -s https://flow.aspectmarketingsolutions.app/health | jq .
-                    </code>
-                  </p>
-                </div>
+                <h3 className="font-medium mb-2 text-green-300">Step 3: Import Workflows</h3>
+                <p className="text-zinc-300 mb-2">
+                  Import both workflow JSONs above, map Postgres credentials, activate.
+                </p>
               </div>
 
               <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
-                <h3 className="font-medium mb-2 text-green-300">Step 3: Update Vercel Environment Variables</h3>
+                <h3 className="font-medium mb-2 text-green-300">Step 4: Vercel Environment</h3>
                 <div className="bg-zinc-900 p-3 rounded font-mono text-xs space-y-1">
                   <div>N8N_BASE_URL=https://flow.aspectmarketingsolutions.app</div>
                   <div>N8N_WEBHOOK_PATH=/webhook/vo-app</div>
-                  <div>N8N_WEBHOOK_SECRET=your-secure-secret-key</div>
+                  <div>N8N_WEBHOOK_SECRET=********</div>
                 </div>
-                <p className="text-xs text-zinc-400 mt-2">Then redeploy your Vercel application</p>
+                <p className="text-xs text-zinc-400 mt-2">Then redeploy Vercel app.</p>
               </div>
 
-              <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
-                <h3 className="font-medium mb-2 text-green-300">Step 4: Smoke Tests</h3>
+              <div className="rounded-lg bg-green-950/40 border border-green-900 p-4">
+                <h3 className="font-medium mb-2 text-green-300">Step 5: Smoke Tests</h3>
                 <div className="space-y-2 text-xs font-mono">
-                  <div className="text-green-300"># Test n8n health:</div>
+                  <div className="text-green-300"># Health check:</div>
                   <div className="text-zinc-300">curl -s https://flow.aspectmarketingsolutions.app/health | jq .</div>
-                  <div className="text-green-300"># Test app connectivity:</div>
+                  <div className="text-green-300"># App connectivity:</div>
                   <div className="text-zinc-300">
                     curl -s https://aspectmarketingsolutions.app/api/n8n/status | jq .
                   </div>
-                  <div className="text-green-300"># Test workflow trigger:</div>
-                  <div className="text-zinc-300">
-                    Use the manual trigger form below with action: &quot;status.ping&quot;
-                  </div>
-                  <div className="text-green-300"># Test lead capture:</div>
-                  <div className="text-zinc-300">Submit form on homepage and verify n8n receives webhook</div>
-                  <div className="text-green-300"># Test chat functionality:</div>
-                  <div className="text-zinc-300">Visit /chat page and verify Relevance AI integration</div>
+                  <div className="text-green-300"># Test webhook (use dashboard form below):</div>
+                  <div className="text-zinc-300">Use the manual trigger form at the bottom to test workflows</div>
                 </div>
               </div>
 
-              <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
-                <h3 className="font-medium mb-2 text-green-300">Step 5: Switch to Live Stripe (When Ready)</h3>
-                <div className="space-y-2 text-zinc-300">
-                  <p>1. Update Vercel environment variables:</p>
-                  <div className="bg-zinc-900 p-2 rounded font-mono text-xs">
-                    <div>STRIPE_SECRET_KEY=sk_live_...</div>
-                    <div>STRIPE_PRICE_ID=price_live_...</div>
-                  </div>
-                  <p>2. Configure Stripe webhook endpoint in Stripe dashboard</p>
-                  <p>3. Test checkout flow with live keys</p>
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-blue-950/40 border border-blue-900 p-4">
-                <h3 className="font-medium text-blue-300 mb-2">Step 6: Production Monitoring & Security</h3>
+              <div className="rounded-lg bg-blue-950/40 border border-blue-900 p-3">
+                <h3 className="font-medium text-blue-300 mb-2">🎯 Go-Live Touches</h3>
                 <ul className="text-xs text-blue-200 space-y-1">
+                  <li>• Switch Stripe to live keys + webhook</li>
                   <li>• Set up uptime monitoring for both health endpoints</li>
-                  <li>• Configure log aggregation and alerting</li>
-                  <li>• Schedule regular PostgreSQL backups</li>
                   <li>• Rotate N8N_WEBHOOK_SECRET monthly</li>
-                  <li>• Monitor Stripe webhook delivery success rates</li>
-                  <li>• Set up SSL certificate auto-renewal monitoring</li>
+                  <li>• Enable Postgres backups</li>
                 </ul>
-              </div>
-
-              <div className="rounded-lg bg-green-950/40 border border-green-900 p-3">
-                <h3 className="font-medium text-green-300 mb-2">🎉 Platform Complete!</h3>
-                <p className="text-green-200 text-sm">
-                  Your Aspect Marketing Solutions platform is now fully operational with lead capture, AI chat, payment
-                  processing, and workflow automation capabilities.
-                </p>
               </div>
             </div>
           )}
