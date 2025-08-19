@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Aspect Marketing Solutions</string>
+    <string name="app_short_name">Aspect Marketing</string>
+    <string name="asset_statements" translatable="false">
+        [{
+            \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+            \"target\": {
+                \"namespace\": \"web\",
+                \"site\": \"https://aspectmarketingsolutions.app\"
+            }
+        }]
+    </string>
+</resources>

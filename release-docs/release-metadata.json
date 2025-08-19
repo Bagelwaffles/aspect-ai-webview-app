@@ -1,0 +1,70 @@
+{
+  "app": {
+    "name": "Aspect Marketing Solutions",
+    "packageName": "app.aspectmarketing.solutions",
+    "version": "1.0.0",
+    "versionCode": 1,
+    "minSdkVersion": 21,
+    "targetSdkVersion": 34,
+    "compileSdkVersion": 34
+  },
+  "playStore": {
+    "category": "BUSINESS",
+    "contentRating": "Everyone",
+    "pricing": "Free",
+    "inAppPurchases": false,
+    "ads": false,
+    "permissions": ["INTERNET", "WAKE_LOCK"]
+  },
+  "descriptions": {
+    "short": {
+      "text": "Professional marketing solutions and business growth strategies for success.",
+      "characterCount": 79,
+      "maxCharacters": 80,
+      "status": "✅ Within limit"
+    },
+    "full": {
+      "characterCount": 1247,
+      "maxCharacters": 4000,
+      "status": "✅ Within limit"
+    },
+    "releaseNotes": {
+      "characterCount": 234,
+      "maxCharacters": 500,
+      "status": "✅ Within limit"
+    }
+  },
+  "assets": {
+    "appIcon": "play-store-assets/icon-512x512-playstore.png",
+    "featureGraphic": "play-store-assets/feature-graphic-1024x500.png",
+    "screenshots": ["play-store-assets/screenshot-phone-1.png", "play-store-assets/screenshot-phone-2.png"],
+    "promoGraphic": "play-store-assets/promo-graphic-180x120.png"
+  },
+  "urls": {
+    "website": "https://aspectmarketingsolutions.app",
+    "privacyPolicy": "https://aspectmarketingsolutions.app/privacy-policy",
+    "termsOfService": "https://aspectmarketingsolutions.app/terms-of-service",
+    "supportEmail": "support@aspectmarketingsolutions.app"
+  },
+  "keywords": [
+    "marketing",
+    "business",
+    "growth",
+    "strategy",
+    "consulting",
+    "digital marketing",
+    "SEO",
+    "branding",
+    "lead generation",
+    "business development",
+    "professional services",
+    "marketing agency",
+    "business solutions",
+    "ROI",
+    "conversion optimization"
+  ],
+  "localization": {
+    "defaultLanguage": "en-US",
+    "supportedLanguages": ["en-US"]
+  }
+}
