@@ -1,190 +1,111 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
+
+type Status = { ok: boolean; n8n?: any; error?: string; target?: string }
 
 export default function DashboardPage() {
-  const router = useRouter()
-  const [workflows, setWorkflows] = useState<any[]>([])
-  const [shops, setShops] = useState<any[]>([])
+  const [status, setStatus] = useState<Status | null>(null)
   const [loading, setLoading] = useState(false)
-  const [n8nConnected, setN8nConnected] = useState<boolean | null>(null)
 
-  useEffect(() => {
-    checkN8nConnection()
-    fetchWorkflows()
-    fetchShops()
-  }, [])
-
-  const checkN8nConnection = async () => {
+  async function load() {
+    setLoading(true)
     try {
-      const response = await fetch("/api/n8n/status")
-      const data = await response.json()
-      setN8nConnected(data.connected || false)
-    } catch (error) {
-      console.error("Error checking n8n connection:", error)
-      setN8nConnected(false)
-    }
-  }
-
-  const fetchWorkflows = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch("/api/agents/workflows")
-      const data = await response.json()
-
-      console.log("[v0] Workflows API response:", data)
-
-      if (data.success && Array.isArray(data.workflows)) {
-        setWorkflows(data.workflows)
-      } else {
-        console.log("[v0] Invalid workflows data, setting empty array")
-        setWorkflows([])
-      }
-    } catch (error) {
-      console.error("Error fetching workflows:", error)
-      setWorkflows([])
+      const r = await fetch("/api/n8n/status", { cache: "no-store" })
+      const j = (await r.json()) as Status
+      setStatus(j)
+    } catch (e: any) {
+      setStatus({ ok: false, error: e?.message ?? String(e) })
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchShops = async () => {
-    try {
-      const response = await fetch("/api/agents/shops")
-      const data = await response.json()
+  useEffect(() => {
+    load()
+  }, [])
 
-      if (data.success && Array.isArray(data.shops)) {
-        setShops(data.shops)
-      } else {
-        setShops([])
-      }
-    } catch (error) {
-      console.error("Error fetching shops:", error)
-      setShops([])
-    }
-  }
-
-  const handleViewWorkflows = async () => {
-    if (n8nConnected === false) {
-      alert(
-        "n8n is not connected. Please add these environment variables to your Vercel project:\n\n" +
-          "• N8N_BASE_URL=https://flow.aspectmarketingsolutions.app\n" +
-          "• N8N_WEBHOOK_PATH=/webhook/vo-app\n" +
-          "• N8N_WEBHOOK_SECRET=<your-secret-key>",
-      )
-      return
-    }
-
-    if (n8nConnected === null) {
-      alert("Checking n8n connection status...")
-      return
-    }
-
-    if (!Array.isArray(workflows) || workflows.length === 0) {
-      alert("No workflows found. Please check your n8n configuration.")
-      return
-    }
-
-    const workflowList = workflows.map((w) => `• ${w.name || w.id}`).join("\n")
-    const shouldTrigger = confirm(`Available workflows:\n${workflowList}\n\nWould you like to trigger a workflow?`)
-
-    if (shouldTrigger && workflows.length > 0) {
-      try {
-        const response = await fetch("/api/agents/workflows", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            workflowId: workflows[0].id,
-            action: "trigger",
-            data: { source: "dashboard" },
-          }),
-        })
-
-        const result = await response.json()
-        if (result.success) {
-          alert("Workflow triggered successfully!")
-        } else {
-          alert(`Failed to trigger workflow: ${result.error}`)
-        }
-      } catch (error) {
-        alert("Error triggering workflow")
-      }
-    }
-  }
-
-  const handleViewProducts = () => {
-    if (n8nConnected === false) {
-      alert(
-        "n8n is not connected. Please add these environment variables to your Vercel project:\n\n" +
-          "• N8N_BASE_URL=https://flow.aspectmarketingsolutions.app\n" +
-          "• N8N_WEBHOOK_PATH=/webhook/vo-app\n" +
-          "• N8N_WEBHOOK_SECRET=<your-secret-key>",
-      )
-      return
-    }
-
-    if (!Array.isArray(shops) || shops.length === 0) {
-      alert("No Printify shops found. Please check your n8n workflow configuration.")
-      return
-    }
-
-    const shopList = shops.map((s) => `• ${s.title || s.name || s.id}`).join("\n")
-    alert(`Connected Printify shops:\n${shopList}`)
-  }
-
-  const handleManageBilling = () => {
-    router.push("/pricing")
-  }
+  const ok = status?.ok
+  const dot = ok ? "bg-green-500" : "bg-red-500"
 
   return (
-    <main className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
-          <p className="text-gray-600">Manage your workflows and integrations</p>
-        </div>
+    <main className="min-h-[80vh] bg-black text-zinc-100 p-6">
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-2xl font-semibold mb-4">Aspect Console</h1>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xl font-semibold">n8n Workflows</h3>
-              <div
-                className={`w-3 h-3 rounded-full ${
-                  n8nConnected === true ? "bg-green-500" : n8nConnected === false ? "bg-red-500" : "bg-yellow-500"
-                }`}
-                title={n8nConnected === true ? "Connected" : n8nConnected === false ? "Not Connected" : "Checking..."}
-              ></div>
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className={`inline-block h-3 w-3 rounded-full ${dot}`} />
+              <h2 className="text-lg font-medium">n8n Connectivity</h2>
             </div>
-            <p className="text-gray-600 mb-4">Trigger and manage your automation workflows</p>
             <button
-              onClick={handleViewWorkflows}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+              onClick={load}
+              className="text-sm px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700"
+              disabled={loading}
             >
-              View Workflows
+              {loading ? "Checking…" : "Retry"}
             </button>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-xl font-semibold mb-3">Printify Products</h3>
-            <p className="text-gray-600 mb-4">Manage your print-on-demand products</p>
-            <button
-              onClick={handleViewProducts}
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
-            >
-              View Products
-            </button>
+          <div className="mt-4 text-sm space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-400">Target:</span>
+              <code className="text-zinc-300">{status?.target ?? "—"}</code>
+            </div>
+
+            {ok ? (
+              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg bg-zinc-950 p-3 text-xs text-zinc-300">
+                {JSON.stringify(status?.n8n, null, 2)}
+              </pre>
+            ) : (
+              <div className="mt-2 rounded-lg bg-red-950/40 border border-red-900 p-3 text-red-300">
+                {status?.error ?? "Unknown error"}
+              </div>
+            )}
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-xl font-semibold mb-3">Billing</h3>
-            <p className="text-gray-600 mb-4">View your subscription and billing details</p>
-            <button
-              onClick={handleManageBilling}
-              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors"
+          <div className="mt-6">
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                const form = e.currentTarget as HTMLFormElement & {
+                  action: { value: string }
+                  json: { value: string }
+                }
+                try {
+                  const payload = form.json.value ? JSON.parse(form.json.value) : {}
+                  const res = await fetch("/api/n8n/trigger", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ action: form.action.value, ...payload }),
+                  })
+                  const out = await res.json()
+                  alert(res.ok ? "Triggered OK" : `Error: ${out.error}`)
+                } catch (err: any) {
+                  alert(`Invalid JSON or request failed: ${err?.message ?? err}`)
+                }
+              }}
+              className="space-y-3"
             >
-              Manage Billing
-            </button>
+              <div className="flex gap-2">
+                <input
+                  name="action"
+                  placeholder='action (e.g., "status.ping")'
+                  className="flex-1 rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm"
+                  defaultValue="status.ping"
+                />
+                <button type="submit" className="rounded-lg bg-white/10 hover:bg-white/20 px-4 text-sm">
+                  Trigger
+                </button>
+              </div>
+              <textarea
+                name="json"
+                placeholder='Optional JSON payload (e.g., {"from":"dashboard"})'
+                className="w-full h-28 rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm"
+                defaultValue='{"from":"dashboard"}'
+              />
+            </form>
           </div>
         </div>
       </div>

@@ -66,6 +66,16 @@ export default function Navbar() {
         </li>
         <li>
           <Link
+            href="/chat"
+            className={`font-medium transition-colors ${
+              isActive("/chat") ? "text-blue-600" : "text-gray-700 hover:text-blue-600"
+            }`}
+          >
+            Chat
+          </Link>
+        </li>
+        <li>
+          <Link
             href="/contact"
             className={`font-medium transition-colors ${
               isActive("/contact") ? "text-blue-600" : "text-gray-700 hover:text-blue-600"

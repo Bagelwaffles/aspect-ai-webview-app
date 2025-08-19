@@ -1,35 +1,13 @@
-import { callN8N } from "@/lib/n8n"
+import { callN8N, n8nTarget } from "@/lib/n8n"
 
 export const runtime = "nodejs"
 
 export async function GET() {
+  const target = n8nTarget()
   try {
-    const result = await callN8N("status.ping", { from: "vo.app" })
-
-    if (result.success) {
-      return Response.json({
-        ok: true,
-        connected: true,
-        n8n: result.data ?? null,
-      })
-    } else {
-      return Response.json(
-        {
-          ok: false,
-          connected: false,
-          error: result.error ?? "Unknown error",
-        },
-        { status: 502 },
-      )
-    }
+    const data = await callN8N("status.ping", { from: "dashboard" })
+    return Response.json({ ok: true, n8n: data ?? null, target })
   } catch (e: any) {
-    return Response.json(
-      {
-        ok: false,
-        connected: false,
-        error: e.message ?? String(e),
-      },
-      { status: 502 },
-    )
+    return Response.json({ ok: false, error: e?.message ?? String(e), target }, { status: 502 })
   }
 }

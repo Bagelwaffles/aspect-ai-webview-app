@@ -12,49 +12,50 @@ interface N8nCallOptions {
   headers?: Record<string, string>
 }
 
+function assertEnv(name: string, v?: string) {
+  if (!v) throw new Error(`${name} is not set`)
+  return v
+}
+
 /**
  * Make a secure call to n8n workflow via webhook with HMAC authentication
  */
-export async function callN8N(action: string, payload: unknown = {}): Promise<N8nResponse> {
+export async function callN8N(action: string, payload: unknown = {}) {
   try {
-    // Validate required environment variables
-    const base = process.env.N8N_BASE_URL
-    const path = process.env.N8N_WEBHOOK_PATH
-    const secret = process.env.N8N_WEBHOOK_SECRET
+    const base = assertEnv("N8N_BASE_URL", process.env.N8N_BASE_URL)
+    const path = assertEnv("N8N_WEBHOOK_PATH", process.env.N8N_WEBHOOK_PATH)
+    const secret = assertEnv("N8N_WEBHOOK_SECRET", process.env.N8N_WEBHOOK_SECRET)
 
-    if (!base || !path || !secret) {
-      return {
-        success: false,
-        error:
-          "n8n configuration missing. Please set N8N_BASE_URL, N8N_WEBHOOK_PATH, and N8N_WEBHOOK_SECRET environment variables.",
-      }
+    if (!/^https?:\/\//i.test(base)) {
+      throw new Error("N8N_BASE_URL must be absolute (https://...)")
     }
 
-    // Prepare request body and HMAC signature
     const body = JSON.stringify({ action, ...payload })
     const ts = Math.floor(Date.now() / 1000).toString()
     const sig = crypto.createHmac("sha256", secret).update(`${ts}.${body}`).digest("hex")
 
-    // Make secure request with HMAC authentication
-    const res = await fetch(`${base}${path}`, {
+    const target = `${base}${path}`
+
+    const res = await fetch(target, {
       method: "POST",
       cache: "no-store",
       headers: {
         "content-type": "application/json",
-        "x-vo-secret": secret, // simple header auth
-        "x-vo-timestamp": ts, // replay guard
-        "x-vo-signature": sig, // HMAC check
+        "x-vo-secret": secret,
+        "x-vo-timestamp": ts,
+        "x-vo-signature": sig,
       },
       body,
     })
 
     const text = await res.text()
-    if (!res.ok) throw new Error(`n8n ${action} failed: ${res.status} ${text}`)
-
+    if (!res.ok) {
+      throw new Error(`n8n ${action} failed: ${res.status} ${text}`)
+    }
     try {
-      return { success: true, data: JSON.parse(text) }
+      return JSON.parse(text)
     } catch {
-      return { success: true, data: { raw: text } }
+      return { raw: text }
     }
   } catch (error) {
     console.error("[n8n] Call failed:", error)
@@ -95,4 +96,10 @@ export async function checkN8nConnection(): Promise<boolean> {
   const secret = process.env.N8N_WEBHOOK_SECRET
 
   return !!(base && path && secret)
+}
+
+export function n8nTarget() {
+  const base = process.env.N8N_BASE_URL
+  const path = process.env.N8N_WEBHOOK_PATH
+  return base && path ? `${base}${path}` : null
 }

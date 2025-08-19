@@ -1,5 +1,6 @@
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
+import LeadCapture from "@/components/lead-capture"
 import Link from "next/link"
 
 export default function HomePage() {
@@ -24,6 +25,18 @@ export default function HomePage() {
           >
             Learn More
           </Link>
+        </div>
+      </section>
+
+      <section className="py-16 px-8 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">Get Your Free Marketing Consultation</h2>
+            <p className="text-lg text-gray-600">
+              Discover how our AI-powered marketing solutions can transform your business growth.
+            </p>
+          </div>
+          <LeadCapture />
         </div>
       </section>
 
@@ -59,12 +72,20 @@ export default function HomePage() {
       <section className="py-12 px-8 bg-blue-600 text-white text-center">
         <h2 className="text-3xl font-bold mb-4">Ready to Transform Your Business?</h2>
         <p className="text-lg mb-6">Contact us today to discuss how we can help you achieve your goals.</p>
-        <Link
-          href="/contact"
-          className="inline-block bg-white text-blue-600 hover:bg-gray-100 px-6 py-3 rounded font-medium transition-colors"
-        >
-          Get Started
-        </Link>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <Link
+            href="/contact"
+            className="inline-block bg-white text-blue-600 hover:bg-gray-100 px-6 py-3 rounded font-medium transition-colors"
+          >
+            Get Started
+          </Link>
+          <Link
+            href="/chat"
+            className="inline-block bg-blue-700 text-white hover:bg-blue-800 px-6 py-3 rounded font-medium transition-colors border border-blue-400"
+          >
+            Try AI Chat
+          </Link>
+        </div>
       </section>
 
       <Footer />
