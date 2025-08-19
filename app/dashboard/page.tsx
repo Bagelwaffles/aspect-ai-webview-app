@@ -18,12 +18,20 @@ export default function DashboardPage() {
 
   const checkN8nConnection = async () => {
     try {
+      console.log("[v0] Starting n8n connection check...")
       const response = await fetch("/api/n8n/status")
+      console.log("[v0] n8n status API response status:", response.status)
+
       const data = await response.json()
-      setN8nConnected(data.connected)
+      console.log("[v0] n8n status API response data:", data)
+
+      // Use the new 'connected' field from the updated API
+      setN8nConnected(data.connected || false)
 
       if (!data.connected) {
-        console.log("[v0] n8n not connected:", data.message)
+        console.log("[v0] n8n not connected:", data.error)
+      } else {
+        console.log("[v0] n8n connected successfully!")
       }
     } catch (error) {
       console.error("[v0] Error checking n8n connection:", error)

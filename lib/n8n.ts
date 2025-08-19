@@ -48,18 +48,13 @@ export async function callN8N(action: string, payload: unknown = {}): Promise<N8
       body,
     })
 
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "Unknown error")
-      return {
-        success: false,
-        error: `n8n ${action} failed: ${res.status} ${errorText}`,
-      }
-    }
+    const text = await res.text()
+    if (!res.ok) throw new Error(`n8n ${action} failed: ${res.status} ${text}`)
 
-    const result = await res.json().catch(() => ({}))
-    return {
-      success: true,
-      data: result,
+    try {
+      return { success: true, data: JSON.parse(text) }
+    } catch {
+      return { success: true, data: { raw: text } }
     }
   } catch (error) {
     console.error("[n8n] Call failed:", error)
