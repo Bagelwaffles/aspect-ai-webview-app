@@ -4,78 +4,86 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Updated design tokens to match SaaS dashboard design brief */
-  --background: #0b0d10;
-  --foreground: #ffffff;
-  --card: #1a1c20;
-  --card-foreground: #ffffff;
-  --popover: #2a2c30;
-  --popover-foreground: #ffffff;
-  --primary: #a16207;
+  /* Updated color tokens to match design brief with cyan-amber palette */
+  --background: #ffffff;
+  --foreground: #475569;
+  --card: #ecfeff;
+  --card-foreground: #164e63;
+  --popover: #ffffff;
+  --popover-foreground: #475569;
+  --primary: #164e63;
   --primary-foreground: #ffffff;
-  --secondary: #fefce8;
-  --secondary-foreground: #4b5563;
-  --muted: #4b5563;
-  --muted-foreground: #ffffff;
-  --accent: #a16207;
+  --secondary: #d97706;
+  --secondary-foreground: #ffffff;
+  --muted: #fefce8;
+  --muted-foreground: #374151;
+  --accent: #d97706;
   --accent-foreground: #ffffff;
-  --destructive: #ff3b30;
+  --destructive: #ea580c;
   --destructive-foreground: #ffffff;
-  --border: #4b5563;
-  --input: #2a2c30;
-  --ring: rgba(255, 255, 255, 0.1);
-  --chart-1: #ffcc00;
-  --chart-2: #007aff;
-  --chart-3: #ff2d55;
-  --chart-4: #4cd964;
-  --chart-5: #5856d6;
+  --border: #e5e7eb;
+  --input: #ffffff;
+  --ring: rgba(22, 78, 99, 0.5);
+  --chart-1: #d97706;
+  --chart-2: #ea580c;
+  --chart-3: #164e63;
+  --chart-4: #4b5563;
+  --chart-5: #f97316;
   --radius: 0.5rem;
-  --sidebar: #1a1c20;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #0b0d10;
+  --sidebar: #ecfeff;
+  --sidebar-foreground: #164e63;
+  --sidebar-primary: #d97706;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #a16207;
+  --sidebar-accent: #ea580c;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #4b5563;
-  --sidebar-ring: rgba(255, 255, 255, 0.2);
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: rgba(22, 78, 99, 0.5);
+  --font-open-sans: "Open Sans", sans-serif;
+  --font-work-sans: "Work Sans", sans-serif;
 }
 
 .dark {
-  --background: #0b0d10;
-  --foreground: #ffffff;
-  --card: #1a1c20;
-  --card-foreground: #ffffff;
-  --popover: #2a2c30;
-  --popover-foreground: #ffffff;
-  --primary: #a16207;
-  --primary-foreground: #ffffff;
-  --secondary: #fefce8;
-  --secondary-foreground: #4b5563;
-  --muted: #4b5563;
-  --muted-foreground: #ffffff;
-  --accent: #a16207;
-  --accent-foreground: #ffffff;
-  --destructive: #ff3b30;
-  --destructive-foreground: #ffffff;
-  --border: #4b5563;
-  --input: #2a2c30;
-  --ring: rgba(255, 255, 255, 0.1);
-  --chart-1: #ffcc00;
-  --chart-2: #007aff;
-  --chart-3: #ff2d55;
-  --chart-4: #4cd964;
-  --chart-5: #5856d6;
-  --sidebar: #1a1c20;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #0b0d10;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #a16207;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #4b5563;
-  --sidebar-ring: rgba(255, 255, 255, 0.2);
+  /* Updated dark mode tokens to complement the new color scheme */
+  --background: #0f172a;
+  --foreground: #e2e8f0;
+  --card: #1e293b;
+  --card-foreground: #e2e8f0;
+  --popover: #1e293b;
+  --popover-foreground: #e2e8f0;
+  --primary: #0ea5e9;
+  --primary-foreground: #0f172a;
+  --secondary: #f59e0b;
+  --secondary-foreground: #0f172a;
+  --muted: #334155;
+  --muted-foreground: #94a3b8;
+  --accent: #f59e0b;
+  --accent-foreground: #0f172a;
+  --destructive: #ef4444;
+  --destructive-foreground: #fef2f2;
+  --border: #334155;
+  --input: #1e293b;
+  --ring: rgba(14, 165, 233, 0.5);
+  --chart-1: #f59e0b;
+  --chart-2: #ef4444;
+  --chart-3: #0ea5e9;
+  --chart-4: #64748b;
+  --chart-5: #f97316;
+  --sidebar: #1e293b;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #f59e0b;
+  --sidebar-primary-foreground: #0f172a;
+  --sidebar-accent: #ef4444;
+  --sidebar-accent-foreground: #fef2f2;
+  --sidebar-border: #334155;
+  --sidebar-ring: rgba(14, 165, 233, 0.5);
 }
 
 @theme inline {
+  /* Updated font variables to use Work Sans and Open Sans */
+  --font-sans: var(--font-open-sans);
+  --font-serif: var(--font-work-sans);
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -119,6 +127,6 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
   }
 }
