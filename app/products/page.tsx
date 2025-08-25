@@ -17,7 +17,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Package, Plus, Upload, Eye, Edit, ExternalLink, Store, TrendingUp, DollarSign } from "lucide-react"
+import { Package, Plus, Upload, Eye, Edit, ExternalLink, Store, TrendingUp, DollarSign, RefreshCw } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface Shop {
   id: number
@@ -30,7 +31,7 @@ interface Product {
   title: string
   description: string
   tags: string[]
-  images: string[]
+  images: { src: string; alt?: string }[]
   variants: any[]
   created_at: string
   updated_at: string
@@ -41,90 +42,138 @@ interface Product {
   shop_id: number
 }
 
+interface Blueprint {
+  id: number
+  title: string
+  description: string
+  brand: string
+  model: string
+  images: string[]
+}
+
 export default function ProductsPage() {
   const [shops, setShops] = useState<Shop[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [blueprints, setBlueprints] = useState<Blueprint[]>([])
   const [selectedShop, setSelectedShop] = useState<number | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [uploadedImages, setUploadedImages] = useState<string[]>([])
+  const { toast } = useToast()
 
-  // Mock data for demonstration
   useEffect(() => {
-    // Simulate API calls
-    setShops([
-      { id: 1, title: "Main Store", sales_channel: "etsy" },
-      { id: 2, title: "Premium Collection", sales_channel: "storefront" },
-      { id: 3, title: "Seasonal Items", sales_channel: "etsy" },
-    ])
-
-    setProducts([
-      {
-        id: "1",
-        title: "Custom T-Shirt Design",
-        description: "High-quality cotton t-shirt with custom print",
-        tags: ["apparel", "custom", "cotton"],
-        images: ["/placeholder-d5aye.png"],
-        variants: [
-          { id: 1, title: "Small", price: 2499 },
-          { id: 2, title: "Medium", price: 2499 },
-        ],
-        created_at: "2024-01-15T10:30:00Z",
-        updated_at: "2024-01-20T14:45:00Z",
-        visible: true,
-        is_locked: false,
-        blueprint_id: 5,
-        print_provider_id: 1,
-        shop_id: 1,
-      },
-      {
-        id: "2",
-        title: "Motivational Poster",
-        description: "Inspirational wall art for home and office",
-        tags: ["poster", "motivational", "wall-art"],
-        images: ["/placeholder-ne3w4.png"],
-        variants: [
-          { id: 3, title: "12x16", price: 1999 },
-          { id: 4, title: "18x24", price: 2999 },
-        ],
-        created_at: "2024-01-10T09:15:00Z",
-        updated_at: "2024-01-18T16:20:00Z",
-        visible: true,
-        is_locked: false,
-        blueprint_id: 2,
-        print_provider_id: 1,
-        shop_id: 2,
-      },
-      {
-        id: "3",
-        title: "Coffee Mug Collection",
-        description: "Ceramic mugs with unique designs",
-        tags: ["mug", "ceramic", "coffee"],
-        images: ["/placeholder-wujfc.png"],
-        variants: [
-          { id: 5, title: "11oz", price: 1499 },
-          { id: 6, title: "15oz", price: 1699 },
-        ],
-        created_at: "2024-01-05T11:00:00Z",
-        updated_at: "2024-01-22T13:30:00Z",
-        visible: false,
-        is_locked: true,
-        blueprint_id: 3,
-        print_provider_id: 2,
-        shop_id: 1,
-      },
-    ])
+    loadShops()
+    loadCatalog()
   }, [])
 
+  useEffect(() => {
+    if (selectedShop) {
+      loadProducts(selectedShop)
+    }
+  }, [selectedShop])
+
+  const loadShops = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch("/api/printify/shops")
+      if (!response.ok) throw new Error("Failed to load shops")
+
+      const data = await response.json()
+      setShops(data)
+
+      // Auto-select first shop
+      if (data.length > 0) {
+        setSelectedShop(data[0].id)
+      }
+    } catch (error) {
+      console.error("Failed to load shops:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load Printify shops",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const loadProducts = async (shopId: number) => {
+    try {
+      setIsLoading(true)
+      const response = await fetch(`/api/printify/products?shopId=${shopId}`)
+      if (!response.ok) throw new Error("Failed to load products")
+
+      const data = await response.json()
+      setProducts(data.data || [])
+    } catch (error) {
+      console.error("Failed to load products:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load products",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const loadCatalog = async () => {
+    try {
+      const response = await fetch("/api/printify/catalog")
+      if (!response.ok) throw new Error("Failed to load catalog")
+
+      const data = await response.json()
+      setBlueprints(data.data || [])
+    } catch (error) {
+      console.error("Failed to load catalog:", error)
+    }
+  }
+
   const handleCreateProduct = async (formData: FormData) => {
+    if (!selectedShop) {
+      toast({
+        title: "Error",
+        description: "Please select a shop first",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
     try {
-      // Simulate API call to create product
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const productData = {
+        shopId: selectedShop,
+        title: formData.get("title"),
+        description: formData.get("description"),
+        blueprint_id: Number.parseInt(formData.get("blueprint") as string),
+        print_provider_id: 1, // Default print provider
+        variants: [], // Will be populated based on blueprint
+        images: uploadedImages,
+      }
+
+      const response = await fetch("/api/printify/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productData),
+      })
+
+      if (!response.ok) throw new Error("Failed to create product")
+
+      toast({
+        title: "Success",
+        description: "Product created successfully",
+      })
+
       setIsCreateDialogOpen(false)
-      // Refresh products list
+      setUploadedImages([])
+      loadProducts(selectedShop)
     } catch (error) {
       console.error("Failed to create product:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create product",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -133,12 +182,41 @@ export default function ProductsPage() {
   const handleImageUpload = async (file: File) => {
     setIsLoading(true)
     try {
-      // Simulate image upload
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      const mockImageUrl = `/placeholder.svg?height=200&width=200&query=${file.name}`
-      setUploadedImages((prev) => [...prev, mockImageUrl])
+      // Convert file to base64
+      const base64Data = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result as string
+          resolve(result.split(",")[1]) // Remove data:image/...;base64, prefix
+        }
+        reader.readAsDataURL(file)
+      })
+
+      const response = await fetch("/api/printify/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          base64Data,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Failed to upload image")
+
+      const result = await response.json()
+      setUploadedImages((prev) => [...prev, result.id])
+
+      toast({
+        title: "Success",
+        description: "Image uploaded successfully",
+      })
     } catch (error) {
       console.error("Failed to upload image:", error)
+      toast({
+        title: "Error",
+        description: "Failed to upload image",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -155,114 +233,97 @@ export default function ProductsPage() {
             <Package className="h-6 w-6 text-primary" />
             <div>
               <h1 className="text-2xl font-bold text-card-foreground font-[family-name:var(--font-work-sans)]">
-                Product Management
+                Printify Product Management
               </h1>
               <p className="text-sm text-muted-foreground">Manage your print-on-demand products</p>
             </div>
           </div>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Product
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Create New Product</DialogTitle>
-                <DialogDescription>Add a new product to your print-on-demand catalog</DialogDescription>
-              </DialogHeader>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  const formData = new FormData(e.currentTarget)
-                  handleCreateProduct(formData)
-                }}
-              >
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="title">Product Title</Label>
-                    <Input id="title" name="title" placeholder="Enter product title" required />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea id="description" name="description" placeholder="Product description" rows={3} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => selectedShop && loadProducts(selectedShop)} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button disabled={!selectedShop}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Product
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Create New Printify Product</DialogTitle>
+                  <DialogDescription>Add a new product to your Printify catalog</DialogDescription>
+                </DialogHeader>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const formData = new FormData(e.currentTarget)
+                    handleCreateProduct(formData)
+                  }}
+                >
+                  <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="shop">Shop</Label>
-                      <Select name="shop" required>
+                      <Label htmlFor="title">Product Title</Label>
+                      <Input id="title" name="title" placeholder="Enter product title" required />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea id="description" name="description" placeholder="Product description" rows={3} />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="blueprint">Product Type</Label>
+                      <Select name="blueprint" required>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select shop" />
+                          <SelectValue placeholder="Select product type" />
                         </SelectTrigger>
                         <SelectContent>
-                          {shops.map((shop) => (
-                            <SelectItem key={shop.id} value={shop.id.toString()}>
-                              {shop.title}
+                          {blueprints.map((blueprint) => (
+                            <SelectItem key={blueprint.id} value={blueprint.id.toString()}>
+                              {blueprint.title}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="blueprint">Product Type</Label>
-                      <Select name="blueprint" required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="5">T-Shirt</SelectItem>
-                          <SelectItem value="2">Poster</SelectItem>
-                          <SelectItem value="3">Mug</SelectItem>
-                          <SelectItem value="7">Hoodie</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Product Images</Label>
-                    <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        id="image-upload"
-                        onChange={(e) => {
-                          const files = Array.from(e.target.files || [])
-                          files.forEach(handleImageUpload)
-                        }}
-                      />
-                      <label htmlFor="image-upload" className="cursor-pointer">
-                        <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">Click to upload images or drag and drop</p>
-                      </label>
-                    </div>
-                    {uploadedImages.length > 0 && (
-                      <div className="grid grid-cols-4 gap-2 mt-2">
-                        {uploadedImages.map((image, index) => (
-                          <img
-                            key={index}
-                            src={image || "/placeholder.svg"}
-                            alt={`Upload ${index + 1}`}
-                            className="w-full h-20 object-cover rounded border"
-                          />
-                        ))}
+                      <Label>Product Images</Label>
+                      <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          id="image-upload"
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || [])
+                            files.forEach(handleImageUpload)
+                          }}
+                        />
+                        <label htmlFor="image-upload" className="cursor-pointer">
+                          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">Click to upload images or drag and drop</p>
+                        </label>
                       </div>
-                    )}
+                      {uploadedImages.length > 0 && (
+                        <div className="text-sm text-muted-foreground">
+                          {uploadedImages.length} image(s) uploaded successfully
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={isLoading}>
-                    {isLoading ? "Creating..." : "Create Product"}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={isLoading}>
+                      {isLoading ? "Creating..." : "Create Product"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </div>
 
@@ -283,14 +344,13 @@ export default function ProductsPage() {
               <CardContent>
                 <div className="flex gap-4">
                   <Select
-                    value={selectedShop?.toString() || "all"}
-                    onValueChange={(value) => setSelectedShop(value === "all" ? null : Number.parseInt(value))}
+                    value={selectedShop?.toString() || ""}
+                    onValueChange={(value) => setSelectedShop(value ? Number.parseInt(value) : null)}
                   >
                     <SelectTrigger className="w-48">
-                      <SelectValue placeholder="All Shops" />
+                      <SelectValue placeholder="Select Shop" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Shops</SelectItem>
                       {shops.map((shop) => (
                         <SelectItem key={shop.id} value={shop.id.toString()}>
                           {shop.title}
@@ -304,56 +364,63 @@ export default function ProductsPage() {
             </Card>
 
             {/* Products Grid */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {filteredProducts.map((product) => (
-                <Card key={product.id} className="overflow-hidden">
-                  <div className="aspect-square relative">
-                    <img
-                      src={product.images[0] || "/placeholder.svg"}
-                      alt={product.title}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute top-2 right-2 flex gap-1">
-                      {product.visible ? (
-                        <Badge variant="default">Visible</Badge>
-                      ) : (
-                        <Badge variant="secondary">Hidden</Badge>
-                      )}
-                      {product.is_locked && <Badge variant="destructive">Locked</Badge>}
-                    </div>
-                  </div>
-                  <CardHeader>
-                    <CardTitle className="text-lg">{product.title}</CardTitle>
-                    <CardDescription className="line-clamp-2">{product.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-1 mb-4">
-                      {product.tags.map((tag) => (
-                        <Badge key={tag} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">
-                        {product.variants.length} variant{product.variants.length !== 1 ? "s" : ""}
-                      </div>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2">Loading products...</span>
+              </div>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {filteredProducts.map((product) => (
+                  <Card key={product.id} className="overflow-hidden">
+                    <div className="aspect-square relative">
+                      <img
+                        src={product.images[0]?.src || "/placeholder.svg"}
+                        alt={product.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-2 right-2 flex gap-1">
+                        {product.visible ? (
+                          <Badge variant="default">Visible</Badge>
+                        ) : (
+                          <Badge variant="secondary">Hidden</Badge>
+                        )}
+                        {product.is_locked && <Badge variant="destructive">Locked</Badge>}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    <CardHeader>
+                      <CardTitle className="text-lg">{product.title}</CardTitle>
+                      <CardDescription className="line-clamp-2">{product.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-1 mb-4">
+                        {product.tags.map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-muted-foreground">
+                          {product.variants.length} variant{product.variants.length !== 1 ? "s" : ""}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="sm">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm">
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="shops" className="space-y-6">
@@ -453,7 +520,7 @@ export default function ProductsPage() {
                     <div key={product.id} className="flex items-center gap-4">
                       <div className="text-sm font-medium text-muted-foreground w-6">#{index + 1}</div>
                       <img
-                        src={product.images[0] || "/placeholder.svg"}
+                        src={product.images[0]?.src || "/placeholder.svg"}
                         alt={product.title}
                         className="w-12 h-12 rounded object-cover"
                       />

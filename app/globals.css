@@ -4,84 +4,84 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Updated color tokens to match design brief with cyan-amber palette */
+  /* Updated color tokens to match AI command center design brief */
   --background: #ffffff;
-  --foreground: #475569;
-  --card: #ecfeff;
-  --card-foreground: #164e63;
-  --popover: #ffffff;
-  --popover-foreground: #475569;
-  --primary: #164e63;
+  --foreground: #4b5563;
+  --card: #f9fafb;
+  --card-foreground: #4b5563;
+  --popover: rgba(255, 255, 255, 0.9);
+  --popover-foreground: #4b5563;
+  --primary: #0891b2;
   --primary-foreground: #ffffff;
-  --secondary: #d97706;
+  --secondary: #10b981;
   --secondary-foreground: #ffffff;
-  --muted: #fefce8;
-  --muted-foreground: #374151;
-  --accent: #d97706;
+  --muted: #f1f5f9;
+  --muted-foreground: #4b5563;
+  --accent: #10b981;
   --accent-foreground: #ffffff;
-  --destructive: #ea580c;
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #e5e7eb;
-  --input: #ffffff;
-  --ring: rgba(22, 78, 99, 0.5);
-  --chart-1: #d97706;
-  --chart-2: #ea580c;
-  --chart-3: #164e63;
+  --border: #e2e8f0;
+  --input: #f9fafb;
+  --ring: rgba(8, 145, 178, 0.5);
+  --chart-1: #059669;
+  --chart-2: #10b981;
+  --chart-3: #1f2937;
   --chart-4: #4b5563;
-  --chart-5: #f97316;
+  --chart-5: #8b5cf6;
   --radius: 0.5rem;
-  --sidebar: #ecfeff;
-  --sidebar-foreground: #164e63;
-  --sidebar-primary: #d97706;
+  --sidebar: #f1f5f9;
+  --sidebar-foreground: #4b5563;
+  --sidebar-primary: #0891b2;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #ea580c;
+  --sidebar-accent: #10b981;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #e5e7eb;
-  --sidebar-ring: rgba(22, 78, 99, 0.5);
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: rgba(8, 145, 178, 0.5);
+  --font-montserrat: "Montserrat", sans-serif;
   --font-open-sans: "Open Sans", sans-serif;
-  --font-work-sans: "Work Sans", sans-serif;
 }
 
 .dark {
-  /* Updated dark mode tokens to complement the new color scheme */
+  /* Updated dark mode tokens for AI command center theme */
   --background: #0f172a;
   --foreground: #e2e8f0;
   --card: #1e293b;
   --card-foreground: #e2e8f0;
-  --popover: #1e293b;
+  --popover: rgba(30, 41, 59, 0.95);
   --popover-foreground: #e2e8f0;
   --primary: #0ea5e9;
   --primary-foreground: #0f172a;
-  --secondary: #f59e0b;
+  --secondary: #10b981;
   --secondary-foreground: #0f172a;
   --muted: #334155;
   --muted-foreground: #94a3b8;
-  --accent: #f59e0b;
+  --accent: #10b981;
   --accent-foreground: #0f172a;
   --destructive: #ef4444;
   --destructive-foreground: #fef2f2;
   --border: #334155;
   --input: #1e293b;
   --ring: rgba(14, 165, 233, 0.5);
-  --chart-1: #f59e0b;
-  --chart-2: #ef4444;
-  --chart-3: #0ea5e9;
-  --chart-4: #64748b;
-  --chart-5: #f97316;
+  --chart-1: #059669;
+  --chart-2: #10b981;
+  --chart-3: #64748b;
+  --chart-4: #94a3b8;
+  --chart-5: #8b5cf6;
   --sidebar: #1e293b;
   --sidebar-foreground: #e2e8f0;
-  --sidebar-primary: #f59e0b;
+  --sidebar-primary: #0ea5e9;
   --sidebar-primary-foreground: #0f172a;
-  --sidebar-accent: #ef4444;
-  --sidebar-accent-foreground: #fef2f2;
+  --sidebar-accent: #10b981;
+  --sidebar-accent-foreground: #0f172a;
   --sidebar-border: #334155;
   --sidebar-ring: rgba(14, 165, 233, 0.5);
 }
 
 @theme inline {
-  /* Updated font variables to use Work Sans and Open Sans */
+  /* Updated font variables to use Montserrat and Open Sans */
   --font-sans: var(--font-open-sans);
-  --font-serif: var(--font-work-sans);
+  --font-serif: var(--font-montserrat);
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   --color-background: var(--background);
@@ -129,4 +129,37 @@
   body {
     @apply bg-background text-foreground font-sans;
   }
+}
+
+/* Added custom animations for AI command center */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(8, 145, 178, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(8, 145, 178, 0.8), 0 0 30px rgba(16, 185, 129, 0.4);
+  }
+}
+
+@keyframes data-flow {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.data-flow {
+  animation: data-flow 3s ease-in-out infinite;
 }

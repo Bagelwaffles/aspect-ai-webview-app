@@ -1,10 +1,14 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   BarChart3,
   Package,
@@ -20,10 +24,36 @@ import {
   DollarSign,
   Eye,
   MoreHorizontal,
+  Brain,
+  Bot,
+  Sparkles,
+  Globe,
+  Send,
+  MessageSquare,
+  Minimize2,
 } from "lucide-react"
+
+interface ChatMessage {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  timestamp: Date
+}
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview")
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    {
+      id: "1",
+      role: "assistant",
+      content:
+        "Hi! I'm your AI assistant. I can help you with your print-on-demand business, answer questions about orders, products, or workflows. How can I assist you today?",
+      timestamp: new Date(),
+    },
+  ])
+  const [chatInput, setChatInput] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleNavigation = (tab: string) => {
     if (tab === "products") {
@@ -34,8 +64,77 @@ export default function Dashboard() {
       window.location.href = "/workflows"
     } else if (tab === "billing") {
       window.location.href = "/billing"
+    } else if (tab === "ai-command") {
+      window.location.href = "/ai-command"
+    } else if (tab === "agents") {
+      window.location.href = "/agents"
+    } else if (tab === "relevance") {
+      window.location.href = "/relevance"
+    } else if (tab === "grok-chat") {
+      window.location.href = "/grok-chat"
+    } else if (tab === "deployments") {
+      window.location.href = "/deployments"
     } else {
       setActiveTab(tab)
+    }
+  }
+
+  const sendMessage = async () => {
+    if (!chatInput.trim()) return
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: "user",
+      content: chatInput,
+      timestamp: new Date(),
+    }
+
+    setChatMessages((prev) => [...prev, userMessage])
+    setChatInput("")
+    setIsLoading(true)
+
+    try {
+      const response = await fetch("/api/grok/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agentId: "grok-support",
+          message: chatInput,
+          conversationHistory: chatMessages.slice(-6).map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+        }),
+      })
+
+      const data = await response.json()
+
+      const assistantMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.response || "I'm here to help! Could you please rephrase your question?",
+        timestamp: new Date(),
+      }
+
+      setChatMessages((prev) => [...prev, assistantMessage])
+    } catch (error) {
+      console.error("Failed to send message:", error)
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment.",
+        timestamp: new Date(),
+      }
+      setChatMessages((prev) => [...prev, errorMessage])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
     }
   }
 
@@ -51,7 +150,7 @@ export default function Dashboard() {
                 <Package className="h-5 w-5 text-sidebar-primary-foreground" />
               </div>
               <span className="text-xl font-bold text-sidebar-foreground font-[family-name:var(--font-work-sans)]">
-                VO.app
+                Aspect Marketing Solutions
               </span>
             </div>
           </div>
@@ -60,6 +159,11 @@ export default function Dashboard() {
           <nav className="flex-1 space-y-1 px-3 py-4">
             {[
               { id: "overview", label: "Overview", icon: BarChart3 },
+              { id: "ai-command", label: "AI Command", icon: Brain },
+              { id: "agents", label: "Agents", icon: Bot },
+              { id: "relevance", label: "Relevance AI", icon: Brain },
+              { id: "grok-chat", label: "Grok Chat", icon: Sparkles },
+              { id: "deployments", label: "Deployments", icon: Globe }, // Added deployments navigation
               { id: "products", label: "Products", icon: Package },
               { id: "workflows", label: "Workflows", icon: Workflow },
               { id: "billing", label: "Billing", icon: CreditCard },
@@ -346,6 +450,84 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </main>
+      </div>
+
+      {/* AI Chat Widget */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {!isChatOpen ? (
+          <Button
+            onClick={() => setIsChatOpen(true)}
+            className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-shadow"
+            size="sm"
+          >
+            <MessageSquare className="h-6 w-6" />
+          </Button>
+        ) : (
+          <Card className="w-80 h-96 shadow-2xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+                  <Bot className="h-4 w-4 text-primary-foreground" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm">AI Assistant</CardTitle>
+                  <CardDescription className="text-xs">Always here to help</CardDescription>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setIsChatOpen(false)}>
+                <Minimize2 className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0 flex flex-col h-80">
+              <ScrollArea className="flex-1 p-4">
+                <div className="space-y-4">
+                  {chatMessages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[80%] p-2 rounded-lg text-sm ${
+                          message.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        <p>{message.content}</p>
+                        <p className="text-xs opacity-70 mt-1">{message.timestamp.toLocaleTimeString()}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-muted text-muted-foreground p-2 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <div className="animate-spin h-3 w-3 border-2 border-primary border-t-transparent rounded-full" />
+                          <span className="text-sm">Thinking...</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+              <div className="p-4 border-t border-border">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Ask me anything..."
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    disabled={isLoading}
+                    className="flex-1 text-sm"
+                  />
+                  <Button onClick={sendMessage} disabled={isLoading || !chatInput.trim()} size="sm">
+                    <Send className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )
