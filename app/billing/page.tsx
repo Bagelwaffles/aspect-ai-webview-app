@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { BillingActionButton } from "@/components/billing-actions"
 import { getBillingSnapshot } from "@/lib/billing"
 
 export const dynamic = "force-dynamic"
@@ -82,7 +83,9 @@ export default async function BillingPage() {
           <Button asChild>
             <Link href="/">Return to dashboard</Link>
           </Button>
-          <Button asChild variant="outline">
+          <BillingActionButton label="Manage subscription" endpoint="/api/billing/portal" variant="outline" />
+          <BillingActionButton label="Start checkout" endpoint="/api/billing/checkout" />
+          <Button asChild variant="ghost">
             <Link href="/billing/success">Review checkout success page</Link>
           </Button>
         </div>

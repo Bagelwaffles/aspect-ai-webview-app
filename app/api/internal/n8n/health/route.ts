@@ -1,4 +1,7 @@
-import { NextResponse } from "next/server";
+import crypto from "node:crypto";
+import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 
 /**
  * Internal n8n Health Endpoint
@@ -8,6 +11,29 @@ import { NextResponse } from "next/server";
 
 const N8N_BASE_URL = process.env.N8N_BASE_URL;
 const N8N_WEBHOOK_SECRET = process.env.N8N_WEBHOOK_SECRET;
+
+function verifyN8nSignature(headerSecret: string | null): boolean {
+  if (!N8N_WEBHOOK_SECRET) {
+    return false;
+  }
+
+  if (!headerSecret) {
+    return false;
+  }
+
+  const expected = Buffer.from(N8N_WEBHOOK_SECRET);
+  const actual = Buffer.from(headerSecret);
+
+  if (expected.length !== actual.length) {
+    return false;
+  }
+
+  try {
+    return crypto.timingSafeEqual(actual, expected);
+  } catch {
+    return false;
+  }
+}
 
 function sanitizeBaseUrl(raw?: string) {
   if (!raw) return null;
@@ -78,13 +104,20 @@ async function checkN8nHealth(): Promise<{
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    /**
-     * IMPORTANT:
-     * Add existing internal auth check here if this file is not already
-     * protected by middleware/wrapper.
-     */
+    const secret = request.headers.get("x-vo-secret");
+    if (!verifyN8nSignature(secret)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          status: "unauthorized",
+          error: "Internal authentication required",
+          timestamp: new Date().toISOString(),
+        },
+        { status: 401 }
+      );
+    }
 
     const health = await checkN8nHealth();
     const sanitizedUrl = sanitizeBaseUrl(N8N_BASE_URL);

@@ -74,6 +74,8 @@ export default function Dashboard() {
       window.location.href = "/grok-chat"
     } else if (tab === "deployments") {
       window.location.href = "/deployments"
+    } else if (tab === "pricing") {
+      window.location.href = "/pricing"
     } else {
       setActiveTab(tab)
     }
@@ -164,6 +166,7 @@ export default function Dashboard() {
               { id: "relevance", label: "Relevance AI", icon: Brain },
               { id: "grok-chat", label: "Grok Chat", icon: Sparkles },
               { id: "deployments", label: "Deployments", icon: Globe }, // Added deployments navigation
+              { id: "pricing", label: "Pricing", icon: CreditCard },
               { id: "products", label: "Products", icon: Package },
               { id: "workflows", label: "Workflows", icon: Workflow },
               { id: "billing", label: "Billing", icon: CreditCard },
@@ -528,6 +531,15 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         )}
+        <footer className="border-t border-border px-6 py-4 text-sm text-muted-foreground">
+          <div className="flex flex-wrap gap-4">
+            <a href="/pricing" className="hover:text-foreground">Pricing</a>
+            <a href="/billing" className="hover:text-foreground">Billing</a>
+            <a href="/terms" className="hover:text-foreground">Terms</a>
+            <a href="/privacy" className="hover:text-foreground">Privacy</a>
+            <a href="/refund" className="hover:text-foreground">Refund</a>
+          </div>
+        </footer>
       </div>
     </div>
   )
