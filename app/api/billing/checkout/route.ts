@@ -33,14 +33,14 @@ export async function POST(request: NextRequest) {
         metadata: {
           organizationId,
           userId
-        }
+        },
+        trial_period_days: 14
       },
       success_url: new URL("/billing/success", baseUrl).toString(),
       cancel_url: new URL("/billing", baseUrl).toString(),
       allow_promotion_codes: false,
       billing_address_collection: "auto",
-      automatic_tax: { enabled: false },
-      trial_period_days: 14
+      automatic_tax: { enabled: false }
     });
 
     return NextResponse.json({ ok: true, sessionId: session.id, url: session.url });
