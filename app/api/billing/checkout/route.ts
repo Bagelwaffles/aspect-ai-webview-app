@@ -11,11 +11,14 @@ const SAFE_USER_ID = "cmrgmpccu0000iqyo2p2stz99";
 
 export async function POST(request: NextRequest) {
   try {
-    if (!STRIPE_SECRET_KEY || !STRIPE_PRICE_ID) {
+    const stripeSecretKey = STRIPE_SECRET_KEY?.trim();
+    const stripePriceId = STRIPE_PRICE_ID?.trim();
+
+    if (!stripeSecretKey || !stripePriceId) {
       return NextResponse.json({ error: "Billing checkout not configured" }, { status: 503 });
     }
 
-    const stripe = new Stripe(STRIPE_SECRET_KEY);
+    const stripe = new Stripe(stripeSecretKey);
     const body = await request.json().catch(() => ({}));
     const organizationId = typeof body.organizationId === "string" ? body.organizationId : SAFE_ORG_ID;
     const userId = typeof body.userId === "string" ? body.userId : SAFE_USER_ID;
@@ -24,7 +27,7 @@ export async function POST(request: NextRequest) {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       client_reference_id: organizationId,
-      line_items: [{ price: STRIPE_PRICE_ID, quantity: 1 }],
+      line_items: [{ price: stripePriceId, quantity: 1 }],
       metadata: {
         organizationId,
         userId
