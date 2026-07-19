@@ -1,8 +1,9 @@
 import Link from "next/link"
-import { ArrowRight, CreditCard, ShieldCheck, Sparkles } from "lucide-react"
+import { ArrowRight, Bot, CreditCard, ShieldCheck, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BillingActionButton } from "@/components/billing-actions"
+import { ETHICAL_OFFERS } from "@/lib/ethical-agent-farm"
 
 export default function PricingPage() {
   return (
@@ -14,6 +15,63 @@ export default function PricingPage() {
           <p className="max-w-2xl text-muted-foreground">
             Choose a plan, start subscription checkout, and manage billing from the live app without leaving the platform.
           </p>
+          <div className="flex flex-wrap gap-3">
+            <Button asChild variant="outline">
+              <Link href="/ethical-agent-farm">
+                <Bot className="mr-2 h-4 w-4" />
+                View ethical agent farm
+              </Link>
+            </Button>
+            <Button asChild variant="ghost">
+              <Link href="/products">View products</Link>
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Ethical Agent Farm</p>
+            <h2 className="text-2xl font-bold">Pricing for the new agents</h2>
+            <p className="max-w-2xl text-muted-foreground">
+              One-time agent offers stay request-driven until dedicated one-time Stripe price IDs exist. Monthly support continues through the live Stripe checkout.
+            </p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {ETHICAL_OFFERS.map((offer) => (
+              <Card key={offer.id} className={offer.featured ? "border-primary shadow-sm md:col-span-2 xl:col-span-1" : ""}>
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <CardTitle>{offer.name}</CardTitle>
+                      <CardDescription>{offer.billingLabel}</CardDescription>
+                    </div>
+                    {offer.featured ? <Sparkles className="h-5 w-5 text-primary" /> : null}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-4xl font-bold">{offer.price}</div>
+                  <p className="text-sm text-muted-foreground">{offer.summary}</p>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    {offer.deliverables.map((item) => (
+                      <li key={item}>• {item}</li>
+                    ))}
+                  </ul>
+                  <div className="flex flex-wrap gap-3">
+                    {offer.featured ? (
+                      <BillingActionButton label={offer.cta} endpoint="/api/billing/checkout" />
+                    ) : (
+                      <Button asChild>
+                        <Link href={`/ethical-agent-farm/offers/${offer.id}`}>{offer.cta}</Link>
+                      </Button>
+                    )}
+                    <Button asChild variant="outline">
+                      <Link href="/ethical-agent-farm">View details</Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
