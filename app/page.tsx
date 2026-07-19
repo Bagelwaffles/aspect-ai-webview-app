@@ -398,6 +398,81 @@ export default function Dashboard() {
 
         {/* Dashboard Content */}
         <main className="p-6">
+          <section className="mb-8 overflow-hidden rounded-2xl border border-border bg-card/80 p-6 shadow-lg backdrop-blur-sm lg:p-8">
+            <div className="grid gap-8 lg:grid-cols-[1.4fr_0.9fr] lg:items-center">
+              <div className="space-y-5">
+                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Premium AI marketing SaaS command center
+                </div>
+                <div className="space-y-3">
+                  <h1 className="max-w-3xl text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
+                    Aspect Marketing Solutions keeps your agents, billing, and workflows in one live command center.
+                  </h1>
+                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+                    Monitor live data, manage ethical offers, review billing, and launch compliant marketing systems without fake claims or dead-end tools.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Link href="/pricing">View pricing</Link>
+                  </Button>
+                  <Button asChild variant="outline" className="border-border bg-background/50">
+                    <Link href="/ethical-agent-farm">Explore ethical agent farm</Link>
+                  </Button>
+                  <Button asChild variant="ghost">
+                    <Link href="/request-access">Request access</Link>
+                  </Button>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {[
+                    { label: "Live agents", value: loadingLiveData ? "…" : String(agents.length) },
+                    { label: "Live deployments", value: loadingLiveData ? "…" : String(deployments.length) },
+                    { label: "Billing ready", value: "Yes" },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-xl border border-border bg-background/40 p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.label}</p>
+                      <p className="mt-1 text-2xl font-semibold text-foreground">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-4">
+                <Card className="border-border bg-background/50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Platform status</CardTitle>
+                    <CardDescription>Live production signals, no fake filler.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                      <span className="text-muted-foreground">Agents</span>
+                      <span className="font-medium text-foreground">{loadingLiveData ? "Loading..." : `${agents.length} connected`}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                      <span className="text-muted-foreground">Deployments</span>
+                      <span className="font-medium text-foreground">{loadingLiveData ? "Loading..." : `${deployments.length} live`}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                      <span className="text-muted-foreground">Billing</span>
+                      <span className="font-medium text-emerald-400">Ready</span>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-border bg-background/50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Compliance-first funnel</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm text-muted-foreground">
+                    <p>Ethical Agent Farm offers use honest request flows or live checkout where configured.</p>
+                    <p>Protected admin areas stay private.</p>
+                    <p>Reviewer access never exposes real leads.</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </section>
+
           {/* Stats Cards */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
             <Card>

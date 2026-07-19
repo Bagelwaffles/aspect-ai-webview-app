@@ -80,6 +80,8 @@ export default function RelevancePage() {
   const totalRuns = agents.reduce((sum, agent) => sum + agent.metrics.totalRuns, 0)
   const averageSuccessRate =
     agents.length > 0 ? agents.reduce((sum, agent) => sum + agent.metrics.successRate, 0) / agents.length : 0
+  const hasLiveAgents = agents.length > 0
+  const hasLiveWorkflows = workflows.length > 0
 
   return (
     <div className="min-h-screen bg-background">
@@ -188,118 +190,130 @@ export default function RelevancePage() {
 
           <TabsContent value="agents" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {agents.map((agent) => (
-                <Card key={agent.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Brain className="h-5 w-5 text-primary" />
+              {!hasLiveAgents ? (
+                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground md:col-span-2 lg:col-span-3">
+                  No live Relevance agents are connected yet.
+                </div>
+              ) : (
+                agents.map((agent) => (
+                  <Card key={agent.id}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Brain className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-base">{agent.name}</CardTitle>
+                            <CardDescription className="text-sm">{agent.description}</CardDescription>
+                          </div>
                         </div>
-                        <div>
-                          <CardTitle className="text-base">{agent.name}</CardTitle>
-                          <CardDescription className="text-sm">{agent.description}</CardDescription>
+                        <div className="flex items-center gap-2">
+                          {getStatusIcon(agent.status)}
+                          <Badge variant={agent.status === "active" ? "default" : "secondary"}>{agent.status}</Badge>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(agent.status)}
-                        <Badge variant={agent.status === "active" ? "default" : "secondary"}>{agent.status}</Badge>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex flex-wrap gap-1">
-                        {agent.capabilities.map((capability) => (
-                          <Badge key={capability} variant="outline" className="text-xs">
-                            {capability}
-                          </Badge>
-                        ))}
-                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex flex-wrap gap-1">
+                          {agent.capabilities.map((capability) => (
+                            <Badge key={capability} variant="outline" className="text-xs">
+                              {capability}
+                            </Badge>
+                          ))}
+                        </div>
 
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Total Runs</p>
-                          <p className="font-medium">{agent.metrics.totalRuns.toLocaleString()}</p>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Total Runs</p>
+                            <p className="font-medium">{agent.metrics.totalRuns.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Success Rate</p>
+                            <p className="font-medium">{agent.metrics.successRate.toFixed(1)}%</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Avg Runtime</p>
+                            <p className="font-medium">{agent.metrics.averageRunTime.toFixed(1)}s</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Model</p>
+                            <p className="font-medium">{agent.model}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-muted-foreground">Success Rate</p>
-                          <p className="font-medium">{agent.metrics.successRate.toFixed(1)}%</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Avg Runtime</p>
-                          <p className="font-medium">{agent.metrics.averageRunTime.toFixed(1)}s</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Model</p>
-                          <p className="font-medium">{agent.model}</p>
-                        </div>
-                      </div>
 
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => runAgent(agent.id, { test: true })} className="flex-1">
-                          <Play className="h-3 w-3 mr-1" />
-                          Run Test
-                        </Button>
-                        <Button size="sm" variant="outline">
-                          <Settings className="h-3 w-3" />
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => runAgent(agent.id, { test: true })} className="flex-1">
+                            <Play className="h-3 w-3 mr-1" />
+                            Run Test
+                          </Button>
+                          <Button size="sm" variant="outline">
+                            <Settings className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
           </TabsContent>
 
           <TabsContent value="workflows" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {workflows.map((workflow) => (
-                <Card key={workflow.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                          <Workflow className="h-5 w-5 text-accent" />
+              {!hasLiveWorkflows ? (
+                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground md:col-span-2 lg:col-span-3">
+                  No live Relevance workflows are connected yet.
+                </div>
+              ) : (
+                workflows.map((workflow) => (
+                  <Card key={workflow.id}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                            <Workflow className="h-5 w-5 text-accent" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-base">{workflow.name}</CardTitle>
+                            <CardDescription className="text-sm">{workflow.description}</CardDescription>
+                          </div>
                         </div>
+                        <Badge variant={workflow.status === "active" ? "default" : "secondary"}>{workflow.status}</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
                         <div>
-                          <CardTitle className="text-base">{workflow.name}</CardTitle>
-                          <CardDescription className="text-sm">{workflow.description}</CardDescription>
+                          <p className="text-sm text-muted-foreground mb-2">Triggers</p>
+                          <div className="flex flex-wrap gap-1">
+                            {workflow.triggers.map((trigger, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {trigger}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-sm text-muted-foreground">Steps: {workflow.steps?.length || 0}</p>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button size="sm" className="flex-1">
+                            <Play className="h-3 w-3 mr-1" />
+                            Trigger
+                          </Button>
+                          <Button size="sm" variant="outline">
+                            <Settings className="h-3 w-3" />
+                          </Button>
                         </div>
                       </div>
-                      <Badge variant={workflow.status === "active" ? "default" : "secondary"}>{workflow.status}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2">Triggers</p>
-                        <div className="flex flex-wrap gap-1">
-                          {workflow.triggers.map((trigger, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {trigger}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <p className="text-sm text-muted-foreground">Steps: {workflow.steps?.length || 0}</p>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button size="sm" className="flex-1">
-                          <Play className="h-3 w-3 mr-1" />
-                          Trigger
-                        </Button>
-                        <Button size="sm" variant="outline">
-                          <Settings className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
           </TabsContent>
         </Tabs>

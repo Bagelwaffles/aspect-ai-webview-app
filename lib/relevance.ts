@@ -72,37 +72,7 @@ class RelevanceClient {
       return data.agents || []
     } catch (error) {
       console.error("Failed to fetch Relevance agents:", error)
-      // Return mock data for development
-      return [
-        {
-          id: "rel-1",
-          name: "Content Generator",
-          description: "Generates marketing content and product descriptions",
-          status: "active",
-          model: "gpt-4",
-          capabilities: ["Content Generation", "SEO Optimization", "Brand Voice"],
-          metrics: {
-            totalRuns: 1543,
-            successRate: 96.8,
-            averageRunTime: 2.3,
-            lastRun: new Date(),
-          },
-        },
-        {
-          id: "rel-2",
-          name: "Lead Qualifier",
-          description: "Qualifies and scores incoming leads",
-          status: "active",
-          model: "gpt-3.5-turbo",
-          capabilities: ["Lead Scoring", "Intent Analysis", "CRM Integration"],
-          metrics: {
-            totalRuns: 892,
-            successRate: 94.2,
-            averageRunTime: 1.8,
-            lastRun: new Date(),
-          },
-        },
-      ]
+      return []
     }
   }
 

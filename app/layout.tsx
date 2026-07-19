@@ -18,8 +18,8 @@ const openSans = Open_Sans({
 })
 
 export const metadata: Metadata = {
-  title: "Aspect Marketing Solutions - AI Command Center",
-  description: "AI-powered print-on-demand automation with intelligent workflows and market analysis",
+  title: "Aspect Marketing Solutions | AI Marketing SaaS Command Center",
+  description: "Premium AI marketing SaaS for workflows, billing, agents, and compliant business growth.",
   generator: "v0.app",
 }
 
@@ -29,8 +29,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${montserrat.variable} ${openSans.variable}`}>
-      <body className="font-sans antialiased">{children}</body>
+    <html lang="en" className={`${montserrat.variable} ${openSans.variable} dark`}>
+      <body className="min-h-screen bg-background font-sans antialiased">{children}</body>
     </html>
   )
 }

@@ -4,78 +4,78 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Updated color tokens to match AI command center design brief */
-  --background: #ffffff;
-  --foreground: #4b5563;
-  --card: #f9fafb;
-  --card-foreground: #4b5563;
-  --popover: rgba(255, 255, 255, 0.9);
-  --popover-foreground: #4b5563;
-  --primary: #0891b2;
+  /* Premium dark SaaS command-center palette */
+  --background: #07111f;
+  --foreground: #e5eef9;
+  --card: rgba(10, 18, 34, 0.92);
+  --card-foreground: #e5eef9;
+  --popover: rgba(8, 15, 28, 0.98);
+  --popover-foreground: #e5eef9;
+  --primary: #38bdf8;
   --primary-foreground: #ffffff;
-  --secondary: #10b981;
+  --secondary: #818cf8;
   --secondary-foreground: #ffffff;
-  --muted: #f1f5f9;
-  --muted-foreground: #4b5563;
-  --accent: #10b981;
+  --muted: #102033;
+  --muted-foreground: #9fb1c7;
+  --accent: #22d3ee;
   --accent-foreground: #ffffff;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #e2e8f0;
-  --input: #f9fafb;
-  --ring: rgba(8, 145, 178, 0.5);
-  --chart-1: #059669;
-  --chart-2: #10b981;
-  --chart-3: #1f2937;
-  --chart-4: #4b5563;
-  --chart-5: #8b5cf6;
-  --radius: 0.5rem;
-  --sidebar: #f1f5f9;
-  --sidebar-foreground: #4b5563;
-  --sidebar-primary: #0891b2;
+  --border: rgba(148, 163, 184, 0.18);
+  --input: rgba(15, 23, 42, 0.85);
+  --ring: rgba(56, 189, 248, 0.5);
+  --chart-1: #38bdf8;
+  --chart-2: #818cf8;
+  --chart-3: #22d3ee;
+  --chart-4: #60a5fa;
+  --chart-5: #10b981;
+  --radius: 0.75rem;
+  --sidebar: rgba(8, 15, 28, 0.96);
+  --sidebar-foreground: #e5eef9;
+  --sidebar-primary: #38bdf8;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #10b981;
+  --sidebar-accent: #22d3ee;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: rgba(8, 145, 178, 0.5);
+  --sidebar-border: rgba(148, 163, 184, 0.18);
+  --sidebar-ring: rgba(56, 189, 248, 0.5);
   --font-montserrat: "Montserrat", sans-serif;
   --font-open-sans: "Open Sans", sans-serif;
 }
 
 .dark {
-  /* Updated dark mode tokens for AI command center theme */
-  --background: #0f172a;
-  --foreground: #e2e8f0;
-  --card: #1e293b;
-  --card-foreground: #e2e8f0;
-  --popover: rgba(30, 41, 59, 0.95);
-  --popover-foreground: #e2e8f0;
-  --primary: #0ea5e9;
-  --primary-foreground: #0f172a;
-  --secondary: #10b981;
-  --secondary-foreground: #0f172a;
-  --muted: #334155;
-  --muted-foreground: #94a3b8;
-  --accent: #10b981;
-  --accent-foreground: #0f172a;
+  /* Keep dark mode aligned to the primary brand palette */
+  --background: #07111f;
+  --foreground: #e5eef9;
+  --card: rgba(10, 18, 34, 0.92);
+  --card-foreground: #e5eef9;
+  --popover: rgba(8, 15, 28, 0.98);
+  --popover-foreground: #e5eef9;
+  --primary: #38bdf8;
+  --primary-foreground: #03101d;
+  --secondary: #818cf8;
+  --secondary-foreground: #03101d;
+  --muted: #102033;
+  --muted-foreground: #9fb1c7;
+  --accent: #22d3ee;
+  --accent-foreground: #03101d;
   --destructive: #ef4444;
   --destructive-foreground: #fef2f2;
-  --border: #334155;
-  --input: #1e293b;
-  --ring: rgba(14, 165, 233, 0.5);
-  --chart-1: #059669;
-  --chart-2: #10b981;
-  --chart-3: #64748b;
-  --chart-4: #94a3b8;
-  --chart-5: #8b5cf6;
-  --sidebar: #1e293b;
-  --sidebar-foreground: #e2e8f0;
-  --sidebar-primary: #0ea5e9;
-  --sidebar-primary-foreground: #0f172a;
-  --sidebar-accent: #10b981;
-  --sidebar-accent-foreground: #0f172a;
-  --sidebar-border: #334155;
-  --sidebar-ring: rgba(14, 165, 233, 0.5);
+  --border: rgba(148, 163, 184, 0.18);
+  --input: rgba(15, 23, 42, 0.85);
+  --ring: rgba(56, 189, 248, 0.5);
+  --chart-1: #38bdf8;
+  --chart-2: #818cf8;
+  --chart-3: #22d3ee;
+  --chart-4: #60a5fa;
+  --chart-5: #10b981;
+  --sidebar: rgba(8, 15, 28, 0.96);
+  --sidebar-foreground: #e5eef9;
+  --sidebar-primary: #38bdf8;
+  --sidebar-primary-foreground: #03101d;
+  --sidebar-accent: #22d3ee;
+  --sidebar-accent-foreground: #03101d;
+  --sidebar-border: rgba(148, 163, 184, 0.18);
+  --sidebar-ring: rgba(56, 189, 248, 0.5);
 }
 
 @theme inline {
@@ -128,6 +128,11 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
+    background-image:
+      radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 28%),
+      radial-gradient(circle at top right, rgba(129, 140, 248, 0.1), transparent 30%),
+      linear-gradient(180deg, #09111d 0%, #07111f 100%);
+    background-attachment: fixed;
   }
 }
 
