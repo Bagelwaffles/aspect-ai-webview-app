@@ -3,7 +3,59 @@ import { ArrowRight, Bot, CreditCard, ShieldCheck, Sparkles } from "lucide-react
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BillingActionButton } from "@/components/billing-actions"
-import { ETHICAL_OFFERS } from "@/lib/ethical-agent-farm"
+
+const ETHICAL_OFFERS = [
+  {
+    id: "quick-marketing-audit",
+    name: "Quick Marketing Audit",
+    price: "$49",
+    billingLabel: "One-time",
+    summary: "A fast, practical audit with the top issues and the first fixes that matter.",
+    deliverables: ["5 problems", "5 fixes", "sample headline", "sample offer", "sample post"],
+    cta: "Request audit",
+    featured: false,
+  },
+  {
+    id: "social-content-pack",
+    name: "Social Content Pack",
+    price: "$99",
+    billingLabel: "One-time",
+    summary: "Ready-to-use posts and hooks for a small business that needs consistent content.",
+    deliverables: ["10 post ideas", "5 ready posts", "CTA set", "light brand angle"],
+    cta: "Request content pack",
+    featured: false,
+  },
+  {
+    id: "website-profile-review",
+    name: "Website / Google Profile Review",
+    price: "$199",
+    billingLabel: "One-time",
+    summary: "A stronger review that focuses on conversion, clarity, and local trust signals.",
+    deliverables: ["site critique", "Google profile notes", "conversion fixes", "priority checklist"],
+    cta: "Request review",
+    featured: false,
+  },
+  {
+    id: "business-cleanup-plan",
+    name: "Business Cleanup Plan",
+    price: "$297",
+    billingLabel: "One-time",
+    summary: "A practical cleanup plan for businesses that need sharper positioning and a cleaner funnel.",
+    deliverables: ["offer cleanup", "homepage fixes", "content priorities", "next 7-day plan"],
+    cta: "Request cleanup plan",
+    featured: false,
+  },
+  {
+    id: "monthly-marketing-support",
+    name: "Marketing Support",
+    price: "$497/month",
+    billingLabel: "Monthly",
+    summary: "Ongoing support for content, audits, and lightweight marketing execution.",
+    deliverables: ["monthly audit", "content support", "offer tuning", "analytics review"],
+    cta: "Start support checkout",
+    featured: true,
+  },
+] as const
 
 export default function PricingPage() {
   return (
