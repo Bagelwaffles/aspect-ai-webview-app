@@ -7,7 +7,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -163,6 +163,30 @@ export default function Dashboard() {
                 ? "Needs attention"
                 : "Inactive",
         amount: `${deployment.analytics?.conversionRate?.toFixed(1) || "0.0"}% conversion`,
+      })),
+    [deployments],
+  )
+
+  const liveWorkflowCards = useMemo(
+    () =>
+      deployments.slice(0, 6).map((deployment) => ({
+        id: deployment.id,
+        name: deployment.name || "Live deployment",
+        status:
+          deployment.status === "active"
+            ? "Running"
+            : deployment.status === "deploying"
+              ? "Deploying"
+              : deployment.status === "error"
+                ? "Needs attention"
+                : "Paused",
+        lastRun: deployment.analytics?.totalInteractions
+          ? `${deployment.analytics.totalInteractions.toLocaleString()} interactions`
+          : "No recent live interaction data",
+        success:
+          deployment.analytics?.conversionRate !== undefined
+            ? Math.round(deployment.analytics.conversionRate * 100)
+            : 0,
       })),
     [deployments],
   )
@@ -325,7 +349,6 @@ export default function Dashboard() {
           <div className="border-t border-sidebar-border p-4">
             <div className="flex items-center gap-3">
               <Avatar className="h-8 w-8">
-                <AvatarImage src="/placeholder.svg?key=cx84q" />
                 <AvatarFallback>AMS</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
@@ -466,7 +489,6 @@ export default function Dashboard() {
                       >
                         <div className="flex items-center gap-4">
                           <Avatar className="h-9 w-9">
-                            <AvatarImage src="/placeholder.svg?key=ams-live-summary" />
                             <AvatarFallback>
                               {order.customer
                                 .split(" ")
@@ -537,38 +559,41 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {[
-                  { name: "Product Sync", status: "Running", lastRun: "2 minutes ago", success: 98 },
-                  { name: "Order Processing", status: "Running", lastRun: "5 minutes ago", success: 95 },
-                  { name: "Inventory Update", status: "Paused", lastRun: "1 hour ago", success: 87 },
-                  { name: "Customer Notifications", status: "Running", lastRun: "30 seconds ago", success: 99 },
-                  { name: "Analytics Sync", status: "Running", lastRun: "10 minutes ago", success: 92 },
-                  { name: "Backup Process", status: "Scheduled", lastRun: "6 hours ago", success: 100 },
-                ].map((workflow) => (
-                  <div key={workflow.name} className="p-4 border border-border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium">{workflow.name}</h4>
-                      <Badge
-                        variant={
-                          workflow.status === "Running"
-                            ? "default"
-                            : workflow.status === "Paused"
-                              ? "secondary"
-                              : "outline"
-                        }
-                      >
-                        {workflow.status}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">Last run: {workflow.lastRun}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Success rate: {workflow.success}%</span>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </div>
+                {loadingLiveData ? (
+                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground lg:col-span-3">
+                    Loading live workflow summaries...
                   </div>
-                ))}
+                ) : liveWorkflowCards.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground lg:col-span-3">
+                    No live workflow summaries are connected yet.
+                  </div>
+                ) : (
+                  liveWorkflowCards.map((workflow) => (
+                    <div key={workflow.id} className="p-4 border border-border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium">{workflow.name}</h4>
+                        <Badge
+                          variant={
+                            workflow.status === "Running"
+                              ? "default"
+                              : workflow.status === "Deploying"
+                                ? "secondary"
+                                : "outline"
+                          }
+                        >
+                          {workflow.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-2">Last run: {workflow.lastRun}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">Success rate: {workflow.success}%</span>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
