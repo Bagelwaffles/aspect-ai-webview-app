@@ -13,7 +13,7 @@ const ETHICAL_OFFERS = [
     billingLabel: "One-time",
     summary: "A fast, practical audit with the top issues and the first fixes that matter.",
     deliverables: ["5 problems", "5 fixes", "sample headline", "sample offer", "sample post"],
-    cta: "Request audit",
+    cta: "Buy on Stripe",
     featured: false,
   },
   {
@@ -23,7 +23,7 @@ const ETHICAL_OFFERS = [
     billingLabel: "One-time",
     summary: "Ready-to-use posts and hooks for a small business that needs consistent content.",
     deliverables: ["10 post ideas", "5 ready posts", "CTA set", "light brand angle"],
-    cta: "Request content pack",
+    cta: "Buy on Stripe",
     featured: false,
   },
   {
@@ -33,7 +33,7 @@ const ETHICAL_OFFERS = [
     billingLabel: "One-time",
     summary: "A stronger review that focuses on conversion, clarity, and local trust signals.",
     deliverables: ["site critique", "Google profile notes", "conversion fixes", "priority checklist"],
-    cta: "Request review",
+    cta: "Buy on Stripe",
     featured: false,
   },
   {
@@ -43,7 +43,7 @@ const ETHICAL_OFFERS = [
     billingLabel: "One-time",
     summary: "A practical cleanup plan for businesses that need sharper positioning and a cleaner funnel.",
     deliverables: ["offer cleanup", "homepage fixes", "content priorities", "next 7-day plan"],
-    cta: "Request cleanup plan",
+    cta: "Buy on Stripe",
     featured: false,
   },
   {
