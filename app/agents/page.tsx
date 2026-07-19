@@ -119,6 +119,14 @@ export default function AgentsPage() {
       ? agents.reduce((sum, agent) => sum + (agent.metrics?.userSatisfaction || 0), 0) / agents.length
       : 0
 
+  const templateCards = Object.entries(AGENT_TEMPLATES).map(([key, template]) => ({
+    key,
+    name: template.name,
+    description: template.description,
+    capabilities: template.capabilities,
+    type: key,
+  }))
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -290,9 +298,56 @@ export default function AgentsPage() {
         </div>
 
         {/* Agents Grid */}
+        <div className="mb-10">
+          <Card>
+            <CardHeader>
+              <CardTitle>Available Agent Templates</CardTitle>
+              <CardDescription>
+                These are the real agent roles the platform can launch. If no active records exist yet, this is the honest catalog instead of a fake list.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {templateCards.map((template) => (
+                  <div key={template.key} className="rounded-lg border p-4">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-medium">{template.name}</h3>
+                        <p className="text-sm text-muted-foreground">{template.description}</p>
+                      </div>
+                      <Badge variant="secondary">{template.type}</Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {template.capabilities.map((capability) => (
+                        <Badge key={capability} variant="outline" className="text-xs">
+                          {capability}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Live Agent Records</h2>
+            <p className="text-sm text-muted-foreground">
+              These are the active records fetched from production data. If there are none yet, we show that plainly.
+            </p>
+          </div>
+        </div>
+
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {agents.map((agent) => (
-            <Card key={agent.id} className="relative">
+          {agents.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground md:col-span-2 lg:col-span-3">
+              No live agents are connected yet. The template catalog above shows what can be launched.
+            </div>
+          ) : (
+            agents.map((agent) => (
+              <Card key={agent.id} className="relative">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -371,7 +426,8 @@ export default function AgentsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>
