@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie";
 
 type RequestItem = {
   id: string;
@@ -67,7 +68,9 @@ function statusTone(status: RequestItem["status"]) {
 export default async function EthicalAgentFarmRequestsAdminPage() {
   const cookieStore = await cookies();
   const adminAccess = cookieStore.get("ams_internal_admin_access")?.value;
-  if (adminAccess !== "verified") {
+  const expectedSecret = process.env.INTERNAL_ADMIN_SECRET?.trim();
+  const hasAccess = expectedSecret ? await verifyInternalAdminCookie(adminAccess, expectedSecret) : null;
+  if (!hasAccess) {
     redirect("/admin/login?next=/admin/ethical-agent-farm-requests");
   }
 

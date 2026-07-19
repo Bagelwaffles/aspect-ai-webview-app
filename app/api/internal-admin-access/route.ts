@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { createInternalAdminCookie } from "@/app/lib/internal-admin-cookie";
+
 const DEFAULT_ADMIN_EMAIL = "internal-admin@aspectmarketingsolutions.app";
 
 function normalize(value: unknown) {
@@ -26,13 +28,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_admin_credentials" }, { status: 401 });
   }
 
+  const adminToken = await createInternalAdminCookie(expectedEmail, expectedCode);
   const response = NextResponse.json({
     ok: true,
     adminEmail: expectedEmail,
     accessScope: ["admin", "ethical-agent-farm-requests"]
   });
 
-  response.cookies.set("ams_internal_admin_access", "verified", {
+  response.cookies.set("ams_internal_admin_access", adminToken, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

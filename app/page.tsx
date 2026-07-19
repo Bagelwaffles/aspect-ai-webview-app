@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -43,6 +44,7 @@ interface ChatMessage {
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: "1",
@@ -56,7 +58,15 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false)
 
   const handleNavigation = (tab: string) => {
-    if (tab === "products") {
+    if (tab === "overview") {
+      window.location.href = "/"
+    } else if (tab === "settings") {
+      window.location.href = "/settings"
+    } else if (tab === "notifications") {
+      window.location.href = "/notifications"
+    } else if (tab === "relevance") {
+      window.location.href = "/relevance-ai"
+    } else if (tab === "products") {
       window.location.href = "/products"
     } else if (tab === "analytics") {
       window.location.href = "/analytics"
@@ -66,16 +76,18 @@ export default function Dashboard() {
       window.location.href = "/billing"
     } else if (tab === "ai-command") {
       window.location.href = "/ai-command"
+    } else if (tab === "content-agent") {
+      window.location.href = "/content-agent"
     } else if (tab === "agents") {
       window.location.href = "/agents"
-    } else if (tab === "relevance") {
-      window.location.href = "/relevance"
     } else if (tab === "grok-chat") {
       window.location.href = "/grok-chat"
     } else if (tab === "deployments") {
       window.location.href = "/deployments"
     } else if (tab === "pricing") {
       window.location.href = "/pricing"
+    } else if (tab === "ethical-agent-farm") {
+      window.location.href = "/ethical-agent-farm"
     } else {
       setActiveTab(tab)
     }
@@ -140,6 +152,12 @@ export default function Dashboard() {
     }
   }
 
+  const handleSearchSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    const value = searchQuery.trim()
+    window.location.href = value ? `/products?query=${encodeURIComponent(value)}` : "/products"
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Sidebar */}
@@ -162,11 +180,13 @@ export default function Dashboard() {
             {[
               { id: "overview", label: "Overview", icon: BarChart3 },
               { id: "ai-command", label: "AI Command", icon: Brain },
+              { id: "content-agent", label: "Content Agent", icon: Sparkles },
               { id: "agents", label: "Agents", icon: Bot },
               { id: "relevance", label: "Relevance AI", icon: Brain },
               { id: "grok-chat", label: "Grok Chat", icon: Sparkles },
-              { id: "deployments", label: "Deployments", icon: Globe }, // Added deployments navigation
+              { id: "deployments", label: "Deployments", icon: Globe },
               { id: "pricing", label: "Pricing", icon: CreditCard },
+              { id: "ethical-agent-farm", label: "Agent Farm", icon: Bot },
               { id: "products", label: "Products", icon: Package },
               { id: "workflows", label: "Workflows", icon: Workflow },
               { id: "billing", label: "Billing", icon: CreditCard },
@@ -213,22 +233,31 @@ export default function Dashboard() {
         <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex h-16 items-center gap-4 px-6">
             <div className="flex-1">
-              <div className="relative max-w-md">
+              <form onSubmit={handleSearchSubmit} className="relative max-w-md">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search products, orders, workflows..."
                   className="w-full rounded-lg border border-input bg-input pl-10 pr-4 py-2 text-sm placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
                 />
-              </div>
+              </form>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => handleNavigation("products")}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Product
+              <Button asChild variant="outline" size="sm">
+                <Link href="/reviewer-access">Reviewer Access</Link>
               </Button>
-              <Button variant="ghost" size="sm">
-                <Bell className="h-4 w-4" />
+              <Button asChild variant="outline" size="sm">
+                <Link href="/products/new">
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Product
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/notifications" aria-label="Notifications">
+                  <Bell className="h-4 w-4" />
+                </Link>
               </Button>
             </div>
           </div>
@@ -389,21 +418,29 @@ export default function Dashboard() {
                 <CardDescription>Manage your business efficiently</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button className="w-full justify-start bg-transparent" variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create New Product
+                <Button asChild className="w-full justify-start bg-transparent" variant="outline">
+                  <Link href="/products/new">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create New Product
+                  </Link>
                 </Button>
-                <Button className="w-full justify-start bg-transparent" variant="outline">
-                  <Workflow className="h-4 w-4 mr-2" />
-                  Setup Workflow
+                <Button asChild className="w-full justify-start bg-transparent" variant="outline">
+                  <Link href="/workflows/new">
+                    <Workflow className="h-4 w-4 mr-2" />
+                    Setup Workflow
+                  </Link>
                 </Button>
-                <Button className="w-full justify-start bg-transparent" variant="outline">
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  View Analytics
+                <Button asChild className="w-full justify-start bg-transparent" variant="outline">
+                  <Link href="/analytics">
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    View Analytics
+                  </Link>
                 </Button>
-                <Button className="w-full justify-start bg-transparent" variant="outline">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Billing Settings
+                <Button asChild className="w-full justify-start bg-transparent" variant="outline">
+                  <Link href="/billing">
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Billing Settings
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
@@ -533,6 +570,8 @@ export default function Dashboard() {
         )}
         <footer className="border-t border-border px-6 py-4 text-sm text-muted-foreground">
           <div className="flex flex-wrap gap-4">
+            <a href="/ethical-agent-farm" className="hover:text-foreground">Agent Farm</a>
+            <a href="/request-access" className="hover:text-foreground">Request Access</a>
             <a href="/pricing" className="hover:text-foreground">Pricing</a>
             <a href="/billing" className="hover:text-foreground">Billing</a>
             <a href="/terms" className="hover:text-foreground">Terms</a>

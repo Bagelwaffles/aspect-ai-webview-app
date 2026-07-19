@@ -95,7 +95,11 @@ export async function POST(request: NextRequest) {
     const businessName = typeof body.businessName === "string" ? body.businessName.trim() : "";
     const websiteOrFacebook = typeof body.websiteOrFacebook === "string" ? body.websiteOrFacebook.trim() : "";
     const selectedOffer = typeof body.selectedOffer === "string" ? body.selectedOffer.trim() : "";
-    const notesOrGoals = typeof body.notesOrGoals === "string" ? body.notesOrGoals.trim() : "";
+    const notesOrGoals = typeof body.notesOrGoals === "string"
+      ? body.notesOrGoals.trim()
+      : typeof body.notes === "string"
+        ? body.notes.trim()
+        : "";
     const consent = Boolean(body.consent);
 
     if (!name || !email || !businessName || !selectedOffer || !consent) {
