@@ -5,7 +5,7 @@
 The ethical agent farm now has two buy path types:
 
 1. Monthly support through live Stripe checkout
-2. One-time offers through dedicated request forms
+2. One-time offers through configurable Stripe checkout, with request-form fallback when a price ID is not set
 
 ## Monthly Support
 
@@ -33,9 +33,22 @@ Paths:
 Behavior:
 
 - Each page explains the offer clearly
-- Each page routes to a request form
-- No payment is charged on the request form
+- Each page uses a Stripe checkout button when its price ID is configured
+- Each page falls back to the request form when a price ID is missing
 - No fake revenue claims are shown
+
+Checkout route:
+
+- `POST /api/ethical-agent-farm/checkout`
+
+Environment variables for live one-time Stripe checkout:
+
+- `ETHICAL_AGENT_QUICK_MARKETING_AUDIT_PRICE_ID`
+- `ETHICAL_AGENT_SOCIAL_CONTENT_PACK_PRICE_ID`
+- `ETHICAL_AGENT_WEBSITE_PROFILE_REVIEW_PRICE_ID`
+- `ETHICAL_AGENT_BUSINESS_CLEANUP_PLAN_PRICE_ID`
+
+If any of those are missing, the page will still work and send the visitor to the compliant request form instead.
 
 ## Request Form Fields
 
@@ -81,6 +94,14 @@ One-time offer requests are now stored server-side and can be reviewed internall
   - `lost`
 - Email notification remains `not_configured` unless an email provider is explicitly wired later.
 
+## Production Verification
+
+- Public request submissions are saving successfully in production.
+- A production smoke request returned `saved: true` with `emailNotificationStatus: not_configured`.
+- Empty requests return a controlled validation error instead of a server crash.
+- Monthly support checkout continues to return a live Stripe Checkout Session URL.
+- The internal requests page redirects unauthenticated users to `/admin/login` and keeps real lead data behind the internal admin flow.
+
 ## Confirmation State
 
 After submission, the user sees:
@@ -91,7 +112,7 @@ After submission, the user sees:
 
 ## Future Upgrade Path
 
-When dedicated one-time Stripe prices exist, each one-time offer can be mapped to its own checkout session.
+When dedicated one-time Stripe prices exist, each one-time offer can be mapped to its own checkout session. The code already supports that path now.
 
 Suggested future mapping:
 
@@ -100,4 +121,4 @@ Suggested future mapping:
 - one checkout session
 - one confirmation page
 
-Until then, the request form is the compliant default.
+Until then, the request form remains the compliant default fallback.

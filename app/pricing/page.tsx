@@ -3,6 +3,7 @@ import { ArrowRight, Bot, CreditCard, ShieldCheck, Sparkles } from "lucide-react
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BillingActionButton } from "@/components/billing-actions"
+import { EthicalOfferCheckoutButton } from "@/components/ethical-offer-checkout-button"
 
 const ETHICAL_OFFERS = [
   {
@@ -85,7 +86,7 @@ export default function PricingPage() {
             <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Ethical Agent Farm</p>
             <h2 className="text-2xl font-bold">Pricing for the new agents</h2>
             <p className="max-w-2xl text-muted-foreground">
-              One-time agent offers stay request-driven until dedicated one-time Stripe price IDs exist. Monthly support continues through the live Stripe checkout.
+              One-time agent offers can use Stripe checkout when the corresponding price IDs are configured, and they fall back to request flow when they are not. Monthly support continues through the live Stripe checkout.
             </p>
           </div>
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -112,9 +113,11 @@ export default function PricingPage() {
                     {offer.featured ? (
                       <BillingActionButton label={offer.cta} endpoint="/api/billing/checkout" />
                     ) : (
-                      <Button asChild>
-                        <Link href={`/ethical-agent-farm/offers/${offer.id}`}>{offer.cta}</Link>
-                      </Button>
+                      <EthicalOfferCheckoutButton
+                        label={offer.cta}
+                        offerSlug={offer.id}
+                        fallbackHref={`/ethical-agent-farm/request?offer=${offer.id}`}
+                      />
                     )}
                     <Button asChild variant="outline">
                       <Link href="/ethical-agent-farm">View details</Link>
