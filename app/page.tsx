@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -41,6 +41,34 @@ interface ChatMessage {
   timestamp: Date
 }
 
+type LiveAgent = {
+  id: string
+  name: string
+  status?: string
+  description?: string
+  metrics?: {
+    totalInteractions?: number
+    revenueAttributed?: number
+    userSatisfaction?: number
+  }
+}
+
+type LiveDeployment = {
+  id: string
+  name: string
+  agentName?: string
+  status?: string
+  analytics?: {
+    totalInteractions?: number
+    uniqueVisitors?: number
+    conversionRate?: number
+  }
+  config?: {
+    position?: string
+    theme?: string
+  }
+}
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -56,6 +84,88 @@ export default function Dashboard() {
   ])
   const [chatInput, setChatInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [agents, setAgents] = useState<LiveAgent[]>([])
+  const [deployments, setDeployments] = useState<LiveDeployment[]>([])
+  const [loadingLiveData, setLoadingLiveData] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadLiveData() {
+      try {
+        const [agentsResponse, deploymentsResponse] = await Promise.all([
+          fetch("/api/agents", { cache: "no-store" }),
+          fetch("/api/deployments", { cache: "no-store" }),
+        ])
+
+        const agentsData = await agentsResponse.json().catch(() => null)
+        const deploymentsData = await deploymentsResponse.json().catch(() => null)
+
+        if (!mounted) return
+        setAgents(Array.isArray(agentsData?.agents) ? agentsData.agents : [])
+        setDeployments(Array.isArray(deploymentsData?.deployments) ? deploymentsData.deployments : [])
+      } catch (error) {
+        console.error("Failed to load live dashboard data:", error)
+        if (mounted) {
+          setAgents([])
+          setDeployments([])
+        }
+      } finally {
+        if (mounted) {
+          setLoadingLiveData(false)
+        }
+      }
+    }
+
+    void loadLiveData()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const totalRevenue = useMemo(
+    () => agents.reduce((sum, agent) => sum + (agent.metrics?.revenueAttributed || 0), 0),
+    [agents],
+  )
+
+  const totalProducts = useMemo(() => {
+    if (deployments.length > 0) return deployments.length
+    return agents.length
+  }, [agents.length, deployments.length])
+
+  const totalOrders = useMemo(
+    () =>
+      deployments.reduce(
+        (sum, deployment) => sum + (deployment.analytics?.totalInteractions || 0),
+        0,
+      ),
+    [deployments],
+  )
+
+  const activeWorkflows = useMemo(
+    () => deployments.filter((deployment) => deployment.status === "active").length,
+    [deployments],
+  )
+
+  const recentCards = useMemo(
+    () =>
+      deployments.slice(0, 5).map((deployment, index) => ({
+        id: deployment.id || String(index),
+        customer: deployment.agentName || deployment.name || "Live deployment",
+        product: `${deployment.config?.position || "unspecified"} • ${deployment.config?.theme || "unspecified"}`,
+        status:
+          deployment.status === "active"
+            ? "Active"
+            : deployment.status === "deploying"
+              ? "Deploying"
+              : deployment.status === "error"
+                ? "Needs attention"
+                : "Inactive",
+        amount: `${deployment.analytics?.conversionRate?.toFixed(1) || "0.0"}% conversion`,
+      })),
+    [deployments],
+  )
 
   const handleNavigation = (tab: string) => {
     if (tab === "overview") {
@@ -273,9 +383,11 @@ export default function Dashboard() {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-primary">$45,231.89</div>
+                <div className="text-2xl font-bold text-primary">
+                  {loadingLiveData ? "Loading..." : `$${totalRevenue.toLocaleString()}`}
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  <span className="text-accent">+20.1%</span> from last month
+                  {loadingLiveData ? "Pulling live data from connected APIs" : "Live agent-attributed revenue"}
                 </p>
               </CardContent>
             </Card>
@@ -286,9 +398,11 @@ export default function Dashboard() {
                 <Package className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-primary">2,350</div>
+                <div className="text-2xl font-bold text-primary">
+                  {loadingLiveData ? "Loading..." : totalProducts.toLocaleString()}
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  <span className="text-accent">+180</span> new this month
+                  {loadingLiveData ? "Collecting live counts" : "Live connected products / deployments"}
                 </p>
               </CardContent>
             </Card>
@@ -299,9 +413,11 @@ export default function Dashboard() {
                 <ShoppingCart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-primary">12,234</div>
+                <div className="text-2xl font-bold text-primary">
+                  {loadingLiveData ? "Loading..." : totalOrders.toLocaleString()}
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  <span className="text-accent">+19%</span> from last month
+                  {loadingLiveData ? "Collecting live interactions" : "Live interaction count across deployments"}
                 </p>
               </CardContent>
             </Card>
@@ -312,9 +428,11 @@ export default function Dashboard() {
                 <Activity className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-primary">573</div>
+                <div className="text-2xl font-bold text-primary">
+                  {loadingLiveData ? "Loading..." : activeWorkflows.toLocaleString()}
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  <span className="text-accent">+201</span> since last hour
+                  {loadingLiveData ? "Checking live workflow state" : "Active live deployments"}
                 </p>
               </CardContent>
             </Card>
@@ -326,87 +444,52 @@ export default function Dashboard() {
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle className="font-[family-name:var(--font-work-sans)]">Recent Orders</CardTitle>
-                <CardDescription>You have 256 orders this month.</CardDescription>
+                <CardDescription>
+                  {loadingLiveData
+                    ? "Loading live deployment summaries."
+                    : deployments.length > 0
+                      ? `${deployments.length} live deployments connected.`
+                      : "No live deployments are connected yet."}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {[
-                    {
-                      id: "#3210",
-                      customer: "Olivia Martin",
-                      product: "Custom T-Shirt",
-                      status: "Processing",
-                      amount: "$79.00",
-                    },
-                    {
-                      id: "#3209",
-                      customer: "Jackson Lee",
-                      product: "Hoodie Design",
-                      status: "Shipped",
-                      amount: "$39.00",
-                    },
-                    {
-                      id: "#3208",
-                      customer: "Isabella Nguyen",
-                      product: "Mug Print",
-                      status: "Delivered",
-                      amount: "$299.00",
-                    },
-                    {
-                      id: "#3207",
-                      customer: "William Kim",
-                      product: "Poster Set",
-                      status: "Processing",
-                      amount: "$99.00",
-                    },
-                    {
-                      id: "#3206",
-                      customer: "Sofia Davis",
-                      product: "Phone Case",
-                      status: "Shipped",
-                      amount: "$39.00",
-                    },
-                  ].map((order) => (
-                    <div
-                      key={order.id}
-                      className="flex items-center justify-between p-4 border border-border rounded-lg"
-                    >
-                      <div className="flex items-center gap-4">
-                        <Avatar className="h-9 w-9">
-                          <AvatarImage
-                            src={`/abstract-geometric-shapes.png?height=36&width=36&query=${order.customer.replace(" ", "+")}`}
-                          />
-                          <AvatarFallback>
-                            {order.customer
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="text-sm font-medium">{order.customer}</p>
-                          <p className="text-sm text-muted-foreground">{order.product}</p>
+                  {recentCards.length === 0 ? (
+                    <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                      No live deployment summaries are available yet.
+                    </div>
+                  ) : (
+                    recentCards.map((order) => (
+                      <div
+                        key={order.id}
+                        className="flex items-center justify-between p-4 border border-border rounded-lg"
+                      >
+                        <div className="flex items-center gap-4">
+                          <Avatar className="h-9 w-9">
+                            <AvatarImage src="/placeholder.svg?key=ams-live-summary" />
+                            <AvatarFallback>
+                              {order.customer
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .slice(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-medium">{order.customer}</p>
+                            <p className="text-sm text-muted-foreground">{order.product}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <Badge variant={order.status === "Active" ? "default" : "outline"}>{order.status}</Badge>
+                          <p className="text-sm font-medium">{order.amount}</p>
+                          <Button variant="ghost" size="sm">
+                            <Eye className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <Badge
-                          variant={
-                            order.status === "Delivered"
-                              ? "default"
-                              : order.status === "Shipped"
-                                ? "secondary"
-                                : "outline"
-                          }
-                        >
-                          {order.status}
-                        </Badge>
-                        <p className="text-sm font-medium">{order.amount}</p>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -415,7 +498,7 @@ export default function Dashboard() {
             <Card>
               <CardHeader>
                 <CardTitle className="font-[family-name:var(--font-work-sans)]">Quick Actions</CardTitle>
-                <CardDescription>Manage your business efficiently</CardDescription>
+                <CardDescription>Manage the live site and connected services efficiently</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Button asChild className="w-full justify-start bg-transparent" variant="outline">
