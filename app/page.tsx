@@ -326,11 +326,11 @@ export default function Dashboard() {
             <div className="flex items-center gap-3">
               <Avatar className="h-8 w-8">
                 <AvatarImage src="/placeholder.svg?key=cx84q" />
-                <AvatarFallback>JD</AvatarFallback>
+                <AvatarFallback>AMS</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">John Doe</p>
-                <p className="text-xs text-muted-foreground truncate">john@example.com</p>
+                <p className="text-sm font-medium text-sidebar-foreground truncate">Live workspace</p>
+                <p className="text-xs text-muted-foreground truncate">Connected to production data</p>
               </div>
             </div>
           </div>
