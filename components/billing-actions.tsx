@@ -31,6 +31,12 @@ export function BillingActionButton({
         body: JSON.stringify(plan ? { plan } : {}),
       })
 
+      if (response.status === 401) {
+        const next = encodeURIComponent(window.location.pathname)
+        window.location.assign(`/login?next=${next}`)
+        return
+      }
+
       const payload = await response.json().catch(() => null)
       const url = payload?.url
       if (response.ok && typeof url === "string") {
