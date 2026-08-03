@@ -1,149 +1,249 @@
-import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
+import { NextRequest, NextResponse } from "next/server"
+import Stripe from "stripe"
 
-export const runtime = "nodejs";
+import {
+  claimStripeEvent,
+  completeStripeEvent,
+  grantAgentEntitlement,
+  grantTopupCredits,
+  isEntitlementStoreConfigured,
+  releaseStripeEvent,
+  setPlanEntitlement,
+  setSubscriptionStatus,
+  type PlanSlug,
+  type SubscriptionStatus,
+} from "@/lib/server/entitlements"
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
-const AMS_FULFILLMENT_BACKEND_URL = process.env.AMS_FULFILLMENT_BACKEND_URL;
-const AMS_STRIPE_FULFILLMENT_SECRET = process.env.AMS_STRIPE_FULFILLMENT_SECRET;
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
-const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
-
-const FORWARDED_EVENT_TYPES = new Set([
+const HANDLED_EVENT_TYPES = new Set([
   "checkout.session.completed",
   "invoice.payment_succeeded",
   "invoice.payment_failed",
   "customer.subscription.created",
   "customer.subscription.updated",
-  "customer.subscription.deleted"
-]);
+  "customer.subscription.deleted",
+])
 
 function redactId(id: string): string {
-  return `${id.substring(0, 8)}...`;
+  return `${id.slice(0, 8)}...`
 }
 
-async function forwardFulfillment(event: Stripe.Event) {
-  if (!AMS_FULFILLMENT_BACKEND_URL || !AMS_STRIPE_FULFILLMENT_SECRET) {
-    return {
-      ok: false,
-      status: 503,
-      body: {
-        received: true,
-        forwarded: false,
-        reason: "FULFILLMENT_BACKEND_NOT_CONFIGURED"
-      }
-    };
+function normalizeEmail(value: unknown): string | null {
+  if (typeof value !== "string") return null
+  const email = value.trim().toLowerCase()
+  return email.includes("@") ? email : null
+}
+
+function planFromMetadata(metadata: Stripe.Metadata | null | undefined): PlanSlug | null {
+  const plan = metadata?.plan?.trim().toLowerCase()
+  return plan === "starter" || plan === "growth" || plan === "pro" ? plan : null
+}
+
+function statusFromStripe(status: Stripe.Subscription.Status): SubscriptionStatus {
+  if (status === "active") return "active"
+  if (status === "trialing") return "trialing"
+  if (status === "past_due" || status === "unpaid" || status === "incomplete") return "past_due"
+  if (status === "canceled" || status === "incomplete_expired") return "canceled"
+  return "inactive"
+}
+
+async function customerEmail(stripe: Stripe, customer: string | Stripe.Customer | Stripe.DeletedCustomer | null) {
+  if (!customer) return null
+  if (typeof customer !== "string") {
+    return "email" in customer ? normalizeEmail(customer.email) : null
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
+  const record = await stripe.customers.retrieve(customer)
+  return "email" in record ? normalizeEmail(record.email) : null
+}
 
-  try {
-    const response = await fetch(AMS_FULFILLMENT_BACKEND_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-ams-fulfillment-secret": AMS_STRIPE_FULFILLMENT_SECRET
-      },
-      body: JSON.stringify({
-        source: "aspect-ai-webview-app",
-        stripeEventId: event.id,
-        eventType: event.type,
-        created: event.created,
-        livemode: event.livemode,
-        event
-      }),
-      signal: controller.signal
-    });
+async function subscriptionFromInvoice(stripe: Stripe, invoice: Stripe.Invoice) {
+  const subscription = invoice.subscription
+  if (!subscription) return null
+  return typeof subscription === "string" ? stripe.subscriptions.retrieve(subscription) : subscription
+}
 
-    const text = await response.text();
-    let parsed: Record<string, unknown> | string | null = null;
-    if (text) {
-      try {
-        parsed = JSON.parse(text) as Record<string, unknown>;
-      } catch {
-        parsed = text;
-      }
+async function applySubscription(
+  stripe: Stripe,
+  subscription: Stripe.Subscription,
+  options: { resetPlanCredits: boolean; forcedStatus?: SubscriptionStatus },
+) {
+  const plan = planFromMetadata(subscription.metadata)
+  const email =
+    normalizeEmail(subscription.metadata.userEmail) ??
+    (await customerEmail(stripe, subscription.customer))
+
+  if (!plan || !email) {
+    throw new Error("SUBSCRIPTION_METADATA_INCOMPLETE")
+  }
+
+  await setPlanEntitlement({
+    email,
+    plan,
+    subscriptionStatus: options.forcedStatus ?? statusFromStripe(subscription.status),
+    stripeCustomerId:
+      typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id,
+    stripeSubscriptionId: subscription.id,
+    resetPlanCredits: options.resetPlanCredits,
+  })
+}
+
+async function processCheckoutSession(stripe: Stripe, session: Stripe.Checkout.Session) {
+  const email =
+    normalizeEmail(session.metadata?.userEmail) ??
+    normalizeEmail(session.customer_details?.email) ??
+    normalizeEmail(session.customer_email)
+
+  if (!email) throw new Error("CHECKOUT_EMAIL_MISSING")
+
+  const plan = planFromMetadata(session.metadata)
+  if (session.mode === "subscription" && plan) {
+    if (!session.subscription) throw new Error("CHECKOUT_SUBSCRIPTION_MISSING")
+    const subscription =
+      typeof session.subscription === "string"
+        ? await stripe.subscriptions.retrieve(session.subscription)
+        : session.subscription
+
+    const metadata = {
+      ...subscription.metadata,
+      userEmail: subscription.metadata.userEmail || email,
+      plan: subscription.metadata.plan || plan,
     }
 
-    if (!response.ok) {
-      return {
-        ok: false,
-        status: response.status,
-        body: {
-          received: true,
-          forwarded: false,
-          reason: "BACKEND_UNAVAILABLE"
-        }
-      };
+    await setPlanEntitlement({
+      email,
+      plan,
+      subscriptionStatus: statusFromStripe(subscription.status),
+      stripeCustomerId:
+        typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id,
+      stripeSubscriptionId: subscription.id,
+      resetPlanCredits: true,
+    })
+
+    if (metadata.userEmail !== subscription.metadata.userEmail || metadata.plan !== subscription.metadata.plan) {
+      await stripe.subscriptions.update(subscription.id, { metadata })
+    }
+    return
+  }
+
+  const agentSlug = session.metadata?.agentSlug?.trim().toLowerCase()
+  if (agentSlug) {
+    await grantAgentEntitlement(email, agentSlug)
+  }
+
+  const topupCredits = Number.parseInt(session.metadata?.topupCredits ?? "0", 10)
+  if (Number.isFinite(topupCredits) && topupCredits > 0) {
+    await grantTopupCredits(email, topupCredits)
+  }
+
+  if (!agentSlug && !(topupCredits > 0)) {
+    throw new Error("CHECKOUT_FULFILLMENT_METADATA_MISSING")
+  }
+}
+
+async function processStripeEvent(stripe: Stripe, event: Stripe.Event) {
+  switch (event.type) {
+    case "checkout.session.completed":
+      await processCheckoutSession(stripe, event.data.object as Stripe.Checkout.Session)
+      return
+
+    case "customer.subscription.created":
+      await applySubscription(stripe, event.data.object as Stripe.Subscription, { resetPlanCredits: true })
+      return
+
+    case "customer.subscription.updated":
+      await applySubscription(stripe, event.data.object as Stripe.Subscription, { resetPlanCredits: false })
+      return
+
+    case "customer.subscription.deleted":
+      await applySubscription(stripe, event.data.object as Stripe.Subscription, {
+        resetPlanCredits: false,
+        forcedStatus: "canceled",
+      })
+      return
+
+    case "invoice.payment_succeeded": {
+      const subscription = await subscriptionFromInvoice(stripe, event.data.object as Stripe.Invoice)
+      if (!subscription) throw new Error("INVOICE_SUBSCRIPTION_MISSING")
+      await applySubscription(stripe, subscription, { resetPlanCredits: true })
+      return
     }
 
-    return {
-      ok: true,
-      status: 200,
-      body: {
-        received: true,
-        forwarded: true,
-        backend: parsed ?? undefined
-      }
-    };
-  } finally {
-    clearTimeout(timeout);
+    case "invoice.payment_failed": {
+      const invoice = event.data.object as Stripe.Invoice
+      const subscription = await subscriptionFromInvoice(stripe, invoice)
+      if (!subscription) throw new Error("INVOICE_SUBSCRIPTION_MISSING")
+      const email =
+        normalizeEmail(subscription.metadata.userEmail) ??
+        (await customerEmail(stripe, subscription.customer))
+      if (!email) throw new Error("SUBSCRIPTION_EMAIL_MISSING")
+      await setSubscriptionStatus(email, "past_due")
+      return
+    }
   }
 }
 
 export async function POST(request: NextRequest) {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim()
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim()
+
+  if (!stripeSecretKey || !webhookSecret || !isEntitlementStoreConfigured()) {
+    return NextResponse.json(
+      { ok: false, error: "Webhook fulfillment is not configured" },
+      { status: 503 },
+    )
+  }
+
+  const signature = request.headers.get("stripe-signature")
+  if (!signature) {
+    return NextResponse.json({ ok: false, error: "Missing signature header" }, { status: 400 })
+  }
+
+  const stripe = new Stripe(stripeSecretKey)
+  const body = await request.text()
+
+  let event: Stripe.Event
   try {
-    if (!stripe || !STRIPE_WEBHOOK_SECRET) {
-      return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
-    }
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+  } catch {
+    return NextResponse.json({ ok: false, error: "Invalid signature" }, { status: 400 })
+  }
 
-    const body = await request.text();
-    const signature = request.headers.get("stripe-signature");
+  if (!HANDLED_EVENT_TYPES.has(event.type)) {
+    return NextResponse.json({ ok: true, received: true, processed: false, reason: "UNHANDLED_EVENT_TYPE" })
+  }
 
-    if (!signature) {
-      return NextResponse.json({ error: "Missing signature header" }, { status: 400 });
-    }
+  const claimed = await claimStripeEvent(event.id).catch(() => false)
+  if (!claimed) {
+    return NextResponse.json({ ok: true, received: true, processed: false, duplicate: true })
+  }
 
-    let event: Stripe.Event;
-    try {
-      event = stripe.webhooks.constructEvent(body, signature, STRIPE_WEBHOOK_SECRET);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.warn("[Stripe] Signature verification failed:", errorMessage);
-      return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
-    }
-
-    console.log(`[Stripe] Webhook received: ${event.type} (${redactId(event.id)})`);
-
-    if (!FORWARDED_EVENT_TYPES.has(event.type)) {
-      return NextResponse.json({
-        received: true,
-        forwarded: false,
-        processed: false,
-        reason: "UNHANDLED_EVENT_TYPE"
-      });
-    }
-
-    const forwarded = await forwardFulfillment(event);
-    if (!forwarded.ok) {
-      console.error(`[Stripe] Backend fulfillment unavailable for ${event.type} (${redactId(event.id)})`);
-      return NextResponse.json(forwarded.body, { status: forwarded.status });
-    }
-
-    return NextResponse.json(forwarded.body, { status: 200 });
-  } catch (error) {
-    console.error("[Stripe] Webhook fatal error:", error instanceof Error ? error.message : "Unknown error");
-    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
+  try {
+    await processStripeEvent(stripe, event)
+    await completeStripeEvent(event.id)
+    console.info(`[Stripe] Fulfilled ${event.type} (${redactId(event.id)})`)
+    return NextResponse.json({ ok: true, received: true, processed: true })
+  } catch {
+    await releaseStripeEvent(event.id)
+    console.error(`[Stripe] Fulfillment failed for ${event.type} (${redactId(event.id)})`)
+    return NextResponse.json({ ok: false, error: "Webhook fulfillment failed" }, { status: 500 })
   }
 }
 
 export async function GET() {
-  return NextResponse.json({
-    ok: true,
-    status: "listening",
-    endpoint: "/api/webhooks/stripe",
-    configured: Boolean(STRIPE_SECRET_KEY && STRIPE_WEBHOOK_SECRET)
-  });
+  return NextResponse.json(
+    {
+      ok: true,
+      status: "listening",
+      endpoint: "/api/webhooks/stripe",
+      configured: Boolean(
+        process.env.STRIPE_SECRET_KEY?.trim() &&
+          process.env.STRIPE_WEBHOOK_SECRET?.trim() &&
+          isEntitlementStoreConfigured(),
+      ),
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  )
 }
