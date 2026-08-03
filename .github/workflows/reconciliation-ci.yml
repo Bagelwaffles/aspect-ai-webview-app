@@ -7,7 +7,7 @@ on:
     branches: [feat/ams-controlled-reconciliation]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ams-reconciliation-${{ github.ref }}
@@ -34,18 +34,7 @@ jobs:
         run: corepack prepare pnpm@10.28.0 --activate
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Commit generated lockfile
-        if: github.event_name == 'push'
-        run: |
-          if ! git diff --quiet -- pnpm-lock.yaml; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add pnpm-lock.yaml
-            git commit -m "build: refresh pnpm lockfile"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
-          fi
+        run: pnpm install --frozen-lockfile
 
       - name: Dependency audit
         run: pnpm audit --audit-level=high
