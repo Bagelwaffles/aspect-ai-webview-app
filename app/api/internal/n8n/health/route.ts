@@ -1,160 +1,97 @@
-import crypto from "node:crypto";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server"
 
-export const dynamic = "force-dynamic";
+import { constantTimeStringEqual } from "@/lib/server/internal-api-auth"
 
-/**
- * Internal n8n Health Endpoint
- * Protected by internal auth middleware/pattern.
- * Does not expose secrets.
- */
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
-const N8N_BASE_URL = process.env.N8N_BASE_URL;
-const N8N_WEBHOOK_SECRET = process.env.N8N_WEBHOOK_SECRET;
-
-function verifyN8nSignature(headerSecret: string | null): boolean {
-  if (!N8N_WEBHOOK_SECRET) {
-    return false;
-  }
-
-  if (!headerSecret) {
-    return false;
-  }
-
-  const expected = Buffer.from(N8N_WEBHOOK_SECRET);
-  const actual = Buffer.from(headerSecret);
-
-  if (expected.length !== actual.length) {
-    return false;
-  }
-
-  try {
-    return crypto.timingSafeEqual(actual, expected);
-  } catch {
-    return false;
-  }
+function isAuthorized(request: NextRequest): boolean {
+  const expected = process.env.N8N_WEBHOOK_SECRET?.trim()
+  const supplied = request.headers.get("x-vo-secret")?.trim()
+  return Boolean(expected && supplied && constantTimeStringEqual(supplied, expected))
 }
 
 function sanitizeBaseUrl(raw?: string) {
-  if (!raw) return null;
+  if (!raw) return null
 
   try {
-    const url = new URL(raw);
+    const url = new URL(raw)
     return {
       protocol: url.protocol.replace(":", ""),
       host: url.hostname,
       port: url.port || null,
-      localOnly:
-        url.hostname === "localhost" ||
-        url.hostname === "127.0.0.1" ||
-        url.hostname === "host.docker.internal",
-    };
+      localOnly: ["localhost", "127.0.0.1", "host.docker.internal"].includes(url.hostname),
+    }
   } catch {
     return {
       protocol: null,
       host: "invalid",
       port: null,
       localOnly: false,
-    };
+    }
   }
 }
 
-async function checkN8nHealth(): Promise<{
-  online: boolean;
-  latencyMs: number;
-  statusCode?: number;
-  error?: string;
-}> {
-  if (!N8N_BASE_URL) {
-    return {
-      online: false,
-      latencyMs: 0,
-      error: "N8N_BASE_URL not configured",
-    };
+async function checkN8nHealth() {
+  const baseUrl = process.env.N8N_BASE_URL?.trim()
+  if (!baseUrl) {
+    return { online: false, latencyMs: 0, error: "N8N_BASE_URL not configured" }
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 5000)
 
   try {
-    const start = Date.now();
-
-    const response = await fetch(`${N8N_BASE_URL.replace(/\/$/, "")}/healthz`, {
+    const startedAt = Date.now()
+    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/healthz`, {
       method: "GET",
       cache: "no-store",
       signal: controller.signal,
-    });
+    })
 
     return {
       online: response.ok,
-      latencyMs: Date.now() - start,
+      latencyMs: Date.now() - startedAt,
       statusCode: response.status,
-    };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unable to reach n8n instance";
-
-    return {
-      online: false,
-      latencyMs: 0,
-      error: message,
-    };
+    }
+  } catch {
+    return { online: false, latencyMs: 0, error: "Unable to reach n8n instance" }
   } finally {
-    clearTimeout(timeout);
+    clearTimeout(timeout)
   }
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    const secret = request.headers.get("x-vo-secret");
-    if (!verifyN8nSignature(secret)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          status: "unauthorized",
-          error: "Internal authentication required",
-          timestamp: new Date().toISOString(),
-        },
-        { status: 401 }
-      );
-    }
+  if (!isAuthorized(request)) {
+    return NextResponse.json(
+      { ok: false, status: "unauthorized", error: "Internal authentication required" },
+      { status: 401 },
+    )
+  }
 
-    const health = await checkN8nHealth();
-    const sanitizedUrl = sanitizeBaseUrl(N8N_BASE_URL);
+  const baseUrl = process.env.N8N_BASE_URL?.trim()
+  const health = await checkN8nHealth()
+  const sanitizedUrl = sanitizeBaseUrl(baseUrl)
 
-    return NextResponse.json({
+  return NextResponse.json(
+    {
       ok: health.online,
       status: health.online ? "healthy" : "unhealthy",
       n8n: {
-        configured: Boolean(N8N_BASE_URL),
+        configured: Boolean(baseUrl),
         online: health.online,
         latencyMs: health.latencyMs,
-        statusCode: health.statusCode ?? null,
+        statusCode: "statusCode" in health ? health.statusCode : null,
         error: health.error ?? null,
         endpoint: sanitizedUrl,
       },
       webhook: {
-        configured: Boolean(N8N_WEBHOOK_SECRET),
-        path: "/webhook/vo-app",
+        configured: Boolean(process.env.N8N_WEBHOOK_SECRET?.trim()),
+        path: "/api/webhooks/n8n",
       },
-      warnings: sanitizedUrl?.localOnly
-        ? [
-            "N8N_BASE_URL is local-only. This works locally but will not work from Vercel production unless n8n has a reachable public/internal URL.",
-          ]
-        : [],
+      warnings: sanitizedUrl?.localOnly ? ["N8N_BASE_URL is local-only and unavailable from Vercel."] : [],
       timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("[n8n] Status check error:", error);
-
-    return NextResponse.json(
-      {
-        ok: false,
-        status: "error",
-        error: "Failed to check n8n status",
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 }
-    );
-  }
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  )
 }
