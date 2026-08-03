@@ -36,6 +36,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Preserve generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: reconciliation-pnpm-lock
+          path: pnpm-lock.yaml
+          retention-days: 1
+          if-no-files-found: error
+
       - name: Dependency audit
         run: pnpm audit --audit-level=high
 
