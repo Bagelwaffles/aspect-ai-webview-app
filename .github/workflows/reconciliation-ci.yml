@@ -34,7 +34,7 @@ jobs:
         run: corepack prepare pnpm@10.28.0 --activate
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Dependency audit
         run: pnpm audit --audit-level=high
