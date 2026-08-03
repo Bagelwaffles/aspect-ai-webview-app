@@ -1,28 +1,37 @@
-import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
+import { NextRequest, NextResponse } from "next/server"
+import Stripe from "stripe"
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+import {
+  isInternalApiAuthorized,
+  unauthorizedInternalApiResponse,
+} from "@/lib/server/internal-api-auth"
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID;
-const SAFE_ORG_ID = "cmrgmpcd50001iqyo57iirzo6";
-const SAFE_USER_ID = "cmrgmpccu0000iqyo2p2stz99";
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
 export async function POST(request: NextRequest) {
-  try {
-    const stripeSecretKey = STRIPE_SECRET_KEY?.trim();
-    const stripePriceId = STRIPE_PRICE_ID?.trim();
+  if (!isInternalApiAuthorized(request)) {
+    return unauthorizedInternalApiResponse()
+  }
 
-    if (!stripeSecretKey || !stripePriceId) {
-      return NextResponse.json({ error: "Billing checkout not configured" }, { status: 503 });
+  try {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim()
+    const stripePriceId = process.env.STRIPE_PRICE_ID?.trim()
+    const organizationId = process.env.AMS_DEFAULT_ORGANIZATION_ID?.trim()
+    const userId = process.env.AMS_DEFAULT_USER_ID?.trim()
+
+    if (!stripeSecretKey || !stripePriceId || !organizationId || !userId) {
+      return NextResponse.json(
+        {
+          error: "Authenticated subscription checkout is not configured",
+          code: "SUBSCRIPTION_CHECKOUT_NOT_CONFIGURED",
+        },
+        { status: 503 },
+      )
     }
 
-    const stripe = new Stripe(stripeSecretKey);
-    const body = await request.json().catch(() => ({}));
-    const organizationId = typeof body.organizationId === "string" ? body.organizationId : SAFE_ORG_ID;
-    const userId = typeof body.userId === "string" ? body.userId : SAFE_USER_ID;
-    const baseUrl = request.nextUrl.origin;
+    const stripe = new Stripe(stripeSecretKey)
+    const baseUrl = request.nextUrl.origin
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -30,27 +39,26 @@ export async function POST(request: NextRequest) {
       line_items: [{ price: stripePriceId, quantity: 1 }],
       metadata: {
         organizationId,
-        userId
+        userId,
+        source: "ams-internal-subscription-checkout",
       },
       subscription_data: {
         metadata: {
           organizationId,
-          userId
+          userId,
+          source: "ams-internal-subscription-checkout",
         },
-        trial_period_days: 14
+        trial_period_days: 14,
       },
       success_url: new URL("/billing/success", baseUrl).toString(),
       cancel_url: new URL("/billing", baseUrl).toString(),
       allow_promotion_codes: false,
       billing_address_collection: "auto",
-      automatic_tax: { enabled: false }
-    });
+      automatic_tax: { enabled: false },
+    })
 
-    return NextResponse.json({ ok: true, sessionId: session.id, url: session.url });
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Checkout failed" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: true, sessionId: session.id, url: session.url })
+  } catch {
+    return NextResponse.json({ error: "Checkout failed" }, { status: 500 })
   }
 }
