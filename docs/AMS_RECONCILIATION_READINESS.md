@@ -45,7 +45,7 @@ Commit `bc3c440439a188d4ce7e0b54ebf9335c581aab51` is not reachable from either G
 - `pnpm install --frozen-lockfile`: pass.
 - `pnpm audit --audit-level=high`: pass, no known vulnerabilities.
 - `pnpm exec tsc --noEmit`: pass.
-- `pnpm lint`: pass with five legacy warnings and no errors.
+- `pnpm lint`: pass with seven legacy warning instances and no errors.
 - `pnpm test`: pass, 102 assertions and 0 failures.
 - `pnpm run build`: pass; 32 static pages generated and dynamic/API routes compiled.
 - `git diff --check`: pass; only Windows line-ending notices.
