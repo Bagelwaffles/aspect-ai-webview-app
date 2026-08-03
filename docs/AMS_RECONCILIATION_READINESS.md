@@ -17,15 +17,14 @@ Date: 2026-08-03
 - Draft PR #14 and its source branch: accessible and writable.
 - Existing PR CI result before this reconciliation commit: successful.
 
-## Missing recovery evidence
+## Recovered Phase 1A evidence and architecture decision
 
-The following artifacts were not found in the AMS workspace or Codex attachments:
-
-- `staging-branch.bundle`
-- Phase 0 final audit report
-- Phase 1A Safe Staging Bootstrap report
-
-Commit `bc3c440439a188d4ce7e0b54ebf9335c581aab51` is not reachable from either GitHub repository. No Phase 1A changes were recreated or applied by assumption.
+- The preserved bundle and patch were recovered and verified.
+- Phase 1A commit: `bc3c440439a188d4ce7e0b54ebf9335c581aab51`.
+- Phase 1A parent: Overlord commit `698282e7f2d1bd873bd6b6a7ceb5ece379576e2d`.
+- Phase 1A remains Overlord-specific and was not cherry-picked into this PR.
+- Only compatible concepts were adapted: isolated containers, persistent Redis, an Upstash-compatible REST proxy, and dependency-aware readiness.
+- PostgreSQL and wsproxy remain excluded until AMS approves a relational schema.
 
 ## Implemented controls
 
@@ -39,6 +38,10 @@ Commit `bc3c440439a188d4ce7e0b54ebf9335c581aab51` is not reachable from either G
 - One-time Ethical Agent Farm checkout disabled with HTTP 410; public offers are request-only.
 - Unfinished agent, deployment, Relevance, analytics, and command surfaces are either authenticated `NOT_IMPLEMENTED` endpoints or honest unavailable pages.
 - Current-tree credential redaction and a provider-side rotation checklist for credentials still present in Git history.
+- Webview-native staging Compose stack with pinned web, Redis, and Redis REST proxy versions.
+- No host-published datastore ports; the web port binds to loopback only.
+- Redis readiness uses a real `PING` and returns HTTP 503 when configuration or connectivity is unavailable.
+- Approved Sites marketing source integrated as page-scoped frontend code without replacing secure SaaS routes.
 
 ## Verification run
 
@@ -46,10 +49,12 @@ Commit `bc3c440439a188d4ce7e0b54ebf9335c581aab51` is not reachable from either G
 - `pnpm audit --audit-level=high`: pass, no known vulnerabilities.
 - `pnpm exec tsc --noEmit`: pass.
 - `pnpm lint`: pass with seven legacy warning instances and no errors.
-- `pnpm test`: pass, 102 assertions and 0 failures.
+- `pnpm test`: pass, 107 tests and 0 failures. The test script now uses Node's native runner with the `tsx` import hook and does not require a local IPC socket.
 - `pnpm run build`: pass; 32 static pages generated and dynamic/API routes compiled.
 - `git diff --check`: pass; only Windows line-ending notices.
-- Built-server runtime smoke: pass for health, empty unfinished agent catalog, customer/internal authentication gates, disabled one-time checkout, Content Agent page, and reviewer page.
+- Built-server runtime smoke: homepage, login, pricing, Content Agent, and auth-session routes return HTTP 200. With Redis intentionally absent, readiness returns HTTP 503 with `redis.status: missing`.
+- Screenshot-level browser verification: not completed in this workspace because the required browser automation binary is unavailable.
+- Docker runtime verification: not completed in this workspace because the Docker engine is unavailable. Compose and real Redis REST behavior must be exercised by GitHub CI and the isolated staging host.
 - Current tracked and intended-new-file credential scan: clean.
 - Historical credential scan: rotation required for Relevance credentials in prior `README.md` content.
 - Database generation/migration: not applicable. This repository has no Prisma schema or relational database client; the reconciled state uses Upstash/KV.
@@ -105,8 +110,8 @@ Relevance credentials are not required for this launch candidate and must remain
 - Ready to merge: no.
 - Ready for production: no.
 
-Merge remains blocked by provider-side Relevance credential rotation and completion of the real ten-step staging sequence. Missing Phase 0/1A evidence remains an explicit recovery gap.
+Merge remains blocked by provider-side Relevance credential rotation and completion of the real ten-step staging sequence. Phase 1A evidence is preserved as an Overlord-specific reference and must not be cherry-picked.
 
 ## Next highest-value action
 
-Rotate the exposed Relevance credentials, then deploy this draft branch to an isolated test-mode staging environment and execute the full ten-step sequence with real Google sign-in, Stripe test events, Upstash/KV persistence, and the configured xAI provider.
+Run GitHub CI for the webview-native staging changes. Then configure an isolated test-mode staging host and execute the full ten-step sequence with real Google sign-in, Stripe test events, the private Redis REST stack, and the configured xAI provider.

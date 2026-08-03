@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { isEntitlementStoreConfigured } from "@/lib/server/entitlements"
+import { checkRedisReadiness } from "@/lib/server/redis-readiness"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -11,17 +11,25 @@ function configured(...names: string[]): boolean {
 
 export async function GET() {
   const environment = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown"
+  const redis = await checkRedisReadiness()
+  const ready = redis.state === "ready"
 
   return NextResponse.json(
     {
-      ok: true,
-      status: "ok",
+      ok: ready,
+      status: ready ? "ready" : "not_ready",
       service: "ams-web",
       environment,
       commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? "unknown",
       persistence: {
-        database: "not_configured_in_web_shell",
-        entitlements: isEntitlementStoreConfigured() ? "configured" : "missing",
+        redis: {
+          required: true,
+          status: redis.state,
+          configured: redis.configured,
+          checked: redis.checked,
+          latencyMs: redis.latencyMs,
+        },
+        relationalDatabase: "not_approved",
       },
       dependencies: {
         customerAuth: configured(
@@ -54,11 +62,13 @@ export async function GET() {
         n8n: configured("N8N_WEBHOOK_SECRET") ? "configured" : "missing",
         internalApiAuth: configured("AMS_INTERNAL_API_KEY") ? "configured" : "missing",
       },
-      dependencyConnectionsTested: false,
-      productionDependenciesUsed: false,
+      dependencyConnectionsTested: {
+        redis: redis.checked,
+      },
       timestamp: new Date().toISOString(),
     },
     {
+      status: ready ? 200 : 503,
       headers: {
         "Cache-Control": "no-store",
       },

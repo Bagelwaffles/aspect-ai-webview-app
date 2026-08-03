@@ -16,10 +16,41 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      redis:
+        image: redis:7.4.10-alpine3.21
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+      redis-rest:
+        image: hiett/serverless-redis-http:0.0.10
+        env:
+          SRH_MODE: env
+          SRH_TOKEN: ci-only-redis-rest-token
+          SRH_CONNECTION_STRING: redis://redis:6379
+          SRH_MAX_CONNECTIONS: 10
+        ports:
+          - 8079:80
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate isolated staging topology
+        run: |
+          cp .env.staging.example .env.staging
+          docker compose --env-file .env.staging -f docker-compose.staging.yml config --format json > /tmp/ams-compose.json
+          node -e '
+            const config = require("/tmp/ams-compose.json");
+            const names = Object.keys(config.services).sort();
+            if (JSON.stringify(names) !== JSON.stringify(["redis", "redis-rest", "web"])) process.exit(1);
+            if (config.services.redis.ports || config.services["redis-rest"].ports) process.exit(1);
+            if (!config.services.redis.volumes?.length) process.exit(1);
+            if (!config.services.web.ports?.every((port) => port.host_ip === "127.0.0.1")) process.exit(1);
+            if (Object.values(config.services).some((service) => service.image?.endsWith(":latest"))) process.exit(1);
+          '
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -54,6 +85,8 @@ jobs:
         env:
           NEXTAUTH_SECRET: ci-only-placeholder-secret-not-for-production
           NEXTAUTH_URL: http://127.0.0.1:3000
+          UPSTASH_REDIS_REST_URL: http://127.0.0.1:8079
+          UPSTASH_REDIS_REST_TOKEN: ci-only-redis-rest-token
         run: |
           pnpm start > /tmp/ams-next.log 2>&1 &
           APP_PID=$!
@@ -66,7 +99,7 @@ jobs:
             sleep 1
           done
 
-          node -e 'const value=require("/tmp/health.json"); if(value.ok!==true||value.status!=="ok") process.exit(1)'
+          node -e 'const value=require("/tmp/health.json"); if(value.ok!==true||value.status!=="ready"||value.persistence?.redis?.status!=="ready") process.exit(1)'
           curl --fail --silent http://127.0.0.1:3000/api/agents > /tmp/agents.json
           node -e 'const value=require("/tmp/agents.json"); if(!Array.isArray(value.agents)||value.agents.length!==0) process.exit(1)'
           curl --fail --silent http://127.0.0.1:3000/api/deployments > /tmp/deployments.json

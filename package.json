@@ -8,9 +8,9 @@
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start",
-    "test": "tsx --test tests/*.test.ts",
-    "test:content-agent": "tsx --test tests/content-agent.test.ts",
-    "test:credit-ledger": "tsx --test tests/credit-ledger.test.ts"
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:content-agent": "node --import tsx --test tests/content-agent.test.ts",
+    "test:credit-ledger": "node --import tsx --test tests/credit-ledger.test.ts"
   },
   "dependencies": {
     "@ai-sdk/xai": "latest",

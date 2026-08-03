@@ -1,237 +1,314 @@
-import Link from "next/link"
-import {
-  ArrowRight,
-  BarChart3,
-  Bot,
-  CheckCircle2,
-  FileText,
-  LockKeyhole,
-  Megaphone,
-  ShieldCheck,
-  Sparkles,
-  Target,
-  Workflow,
-} from "lucide-react"
+import styles from "./marketing.module.css"
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-
-const launchAgents = [
+const agentCards = [
   {
-    slug: "content",
-    name: "Content Agent",
-    icon: FileText,
-    description: "Creates practical marketing copy, product descriptions, email drafts, and social content.",
+    number: "01",
+    status: "Launch focus",
+    title: "Content Agent",
+    copy: "Turn one clear brief into channel-ready marketing content with structured outputs, saved runs, and honest execution status.",
+    accent: "lime",
   },
   {
-    slug: "outreach",
-    name: "Outreach Agent",
-    icon: Target,
-    description: "Builds focused lead qualification, offers, and one-message outreach drafts without spam tactics.",
+    number: "02",
+    status: "Queued next",
+    title: "Lead Magnet Agent",
+    copy: "Build a useful offer, positioning angle, and conversion path around a specific audience problem.",
+    accent: "violet",
   },
   {
-    slug: "analytics",
-    name: "Analytics Agent",
-    icon: BarChart3,
-    description: "Turns supplied business data into clear findings, priorities, and next-step recommendations.",
+    number: "03",
+    status: "Queued next",
+    title: "Nurture Agent",
+    copy: "Shape follow-up sequences that keep leads moving without sounding automated or generic.",
+    accent: "orange",
   },
 ]
 
-const safeguards = [
-  "Customer sign-in before paid AI access",
-  "Signed Stripe webhook fulfillment",
-  "Persistent plan credits and agent access",
-  "Rate limits on paid AI routes",
-  "No fabricated revenue or interaction metrics",
+const principles = [
+  ["One real agent first", "We finish the paid Content Agent flow before expanding the catalog."],
+  ["Proof over theater", "No fake revenue, mock activity, or placeholder success responses."],
+  [
+    "Built to compound",
+    "Every completed agent connects to one customer account, credit system, and saved-run history.",
+  ],
 ]
+
+const capabilities = [
+  ["01", "Brand strategy", "Positioning, offers, and campaign direction built around a real customer problem."],
+  ["02", "Content systems", "Channel-ready copy, campaigns, and reusable content engines that keep the brand moving."],
+  ["03", "Search + discovery", "SEO planning, market research, and competitive intelligence that uncover demand."],
+  ["04", "Social growth", "Structured publishing workflows for social, video, and community channels."],
+  ["05", "Lead nurture", "Email and follow-up systems designed to turn attention into qualified conversations."],
+  ["06", "Commerce operations", "Shopify-focused product, fulfillment, and customer workflows built for clean handoffs."],
+  ["07", "Performance insight", "Clear reporting that shows what worked, what failed, and what to do next."],
+]
+
+const roadmapGroups = [
+  {
+    label: "Create",
+    agents: ["Content Agent", "SEO Writer", "Email Campaign", "Lead Magnet"],
+  },
+  {
+    label: "Grow",
+    agents: ["Nurture Agent", "Social Publisher", "Affiliate Manager", "Competitive Intel"],
+  },
+  {
+    label: "Publish",
+    agents: ["YouTube Publisher", "Video Editor", "Clip Generator", "Stream Assistant"],
+  },
+  {
+    label: "Operate",
+    agents: ["Shopify Operations", "CRM Follow-up", "Customer Support", "Analytics Agent"],
+  },
+]
+
+function classes(...names: string[]) {
+  return names.map((name) => styles[name]).filter(Boolean).join(" ")
+}
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen overflow-hidden bg-background text-foreground">
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.18),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(126,34,206,0.16),transparent_30%),linear-gradient(to_bottom,#050816,#090d1a_50%,#050816)]" />
+    <main className={styles.marketingSite}>
+      <div className={classes("ambient", "ambient-one")} aria-hidden="true" />
+      <div className={classes("ambient", "ambient-two")} aria-hidden="true" />
 
-      <header className="border-b border-border/70 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/30 bg-primary/15 text-primary">
-              <Bot className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="font-semibold tracking-tight">Aspect Marketing Solutions</div>
-              <div className="text-xs text-muted-foreground">AI marketing platform</div>
-            </div>
-          </Link>
+      <header className={styles["site-header"]}>
+        <a className={styles.brand} href="#top" aria-label="Aspect Marketing Solutions home">
+          <span className={styles["brand-mark"]}>A</span>
+          <span className={styles["brand-name"]}>
+            ASPECT<span>/</span>AMS
+          </span>
+        </a>
 
-          <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
-            <Link href="/agents" className="transition hover:text-foreground">Agents</Link>
-            <Link href="/pricing" className="transition hover:text-foreground">Pricing</Link>
-            <Link href="/ethical-agent-farm" className="transition hover:text-foreground">Services</Link>
-          </nav>
+        <nav className={styles["desktop-nav"]} aria-label="Primary navigation">
+          <a href="#capabilities">Capabilities</a>
+          <a href="#agents">Agents</a>
+          <a href="#method">How it works</a>
+          <a href="#launch">Launch plan</a>
+        </nav>
 
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/login">Sign in</Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link href="/pricing">Get started</Link>
-            </Button>
-          </div>
-        </div>
+        <a className={styles["header-cta"]} href="#launch">
+          Enter the system <span aria-hidden="true">↗</span>
+        </a>
       </header>
 
-      <section className="relative">
-        <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-          <div className="space-y-7">
-            <Badge variant="outline" className="border-cyan-400/30 bg-cyan-400/10 text-cyan-200">
-              <Sparkles className="mr-2 h-3.5 w-3.5" />
-              Built for practical marketing execution
-            </Badge>
+      <section className={styles.hero} id="top">
+        <div className={classes("eyebrow", "reveal-one")}>
+          <span className={styles.pulse} />
+          SaaS platform // controlled launch
+        </div>
 
-            <div className="space-y-5">
-              <h1 className="max-w-4xl text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl">
-                Turn marketing work into a repeatable system.
-              </h1>
-              <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-                AMS combines secure customer accounts, usage-based AI agents, Stripe billing, and focused marketing services in one mobile-first platform.
-              </p>
+        <h1 className={styles["reveal-two"]}>
+          Build demand.
+          <br />
+          Automate the work.
+          <br />
+          <span>Own the growth.</span>
+        </h1>
+
+        <div className={classes("hero-bottom", "reveal-three")}>
+          <p>
+            Aspect Marketing Solutions turns focused AI agents into an operating system for
+            small-business growth—content first, then the full revenue machine.
+          </p>
+          <div className={styles["hero-actions"]}>
+            <a className={classes("button", "button-primary")} href="#agents">
+              Explore the agents <span aria-hidden="true">↓</span>
+            </a>
+            <a className={styles["text-link"]} href="#method">
+              See how we build <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </div>
+
+        <div className={styles["hero-stamp"]} aria-hidden="true">
+          <span>AMS</span>
+          <small>EST. 2026</small>
+        </div>
+      </section>
+
+      <section className={styles["signal-bar"]} aria-label="Platform principles">
+        <span>BUILDING REAL EXECUTION</span>
+        <i>✦</i>
+        <span>HONEST METRICS</span>
+        <i>✦</i>
+        <span>TENANT-SAFE</span>
+        <i>✦</i>
+        <span>BUILT TO SELL</span>
+      </section>
+
+      <section className={classes("section", "capabilities-section")} id="capabilities">
+        <div className={styles["capabilities-heading"]}>
+          <p className={styles["section-kicker"]}>What AMS is built to deliver</p>
+          <h2>
+            Strategy outside.
+            <br />
+            Automation inside.
+          </h2>
+          <p>
+            The recovered AMS materials contained a strong service blueprint. We kept the useful
+            business capabilities and rebuilt the presentation around the product we are actually
+            launching.
+          </p>
+        </div>
+
+        <div className={styles["capability-grid"]}>
+          {capabilities.map(([number, title, copy]) => (
+            <article className={styles.capability} key={title}>
+              <span>{number}</span>
+              <h3>{title}</h3>
+              <p>{copy}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className={classes("section", "agents-section")} id="agents">
+        <div className={styles["section-intro"]}>
+          <p className={styles["section-kicker"]}>The first strike team</p>
+          <h2>
+            Agents with a job.
+            <br />
+            Not a gimmick.
+          </h2>
+          <p className={styles["section-copy"]}>
+            We are launching in a deliberate order: one paid workflow that works end to end,
+            followed by the agents that multiply its value.
+          </p>
+        </div>
+
+        <div className={styles["agent-grid"]}>
+          {agentCards.map((agent) => (
+            <article className={classes("agent-card", agent.accent)} key={agent.title}>
+              <div className={styles["card-topline"]}>
+                <span>{agent.number}</span>
+                <span className={styles["status-pill"]}>{agent.status}</span>
+              </div>
+              <div className={styles["agent-glyph"]} aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
+              <h3>{agent.title}</h3>
+              <p>{agent.copy}</p>
+              <a href="#launch" aria-label={`View the ${agent.title} launch plan`}>
+                View launch plan <span aria-hidden="true">↗</span>
+              </a>
+            </article>
+          ))}
+        </div>
+
+        <div className={styles["roadmap-panel"]}>
+          <div className={styles["roadmap-proof"]}>
+            <p className={styles["section-kicker"]}>Recovered agent inventory</p>
+            <strong>32</strong>
+            <p>
+              Historical agent concepts were audited. They are a backlog—not a claim that 32
+              products are already live.
+            </p>
+          </div>
+
+          <div className={styles["roadmap-content"]}>
+            <div className={styles["roadmap-header"]}>
+              <div>
+                <span>Product roadmap</span>
+                <h3>The strongest concepts, organized to ship.</h3>
+              </div>
+              <span className={styles["status-pill"]}>Planned // not live</span>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button asChild size="lg">
-                <Link href="/pricing">
-                  View plans
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link href="/ethical-agent-farm">Request scoped services</Link>
-              </Button>
-            </div>
-
-            <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
-              {safeguards.slice(0, 4).map((item) => (
-                <div key={item} className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                  <span>{item}</span>
-                </div>
+            <div className={styles["roadmap-grid"]}>
+              {roadmapGroups.map((group) => (
+                <article key={group.label}>
+                  <h4>{group.label}</h4>
+                  <ul>
+                    {group.agents.map((agent) => (
+                      <li key={agent}>{agent}</li>
+                    ))}
+                  </ul>
+                </article>
               ))}
             </div>
           </div>
-
-          <Card className="border-primary/25 bg-card/80 shadow-2xl shadow-primary/10 backdrop-blur-xl">
-            <CardHeader>
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-                <Workflow className="h-6 w-6" />
-              </div>
-              <CardTitle className="text-2xl">Revenue-first launch stack</CardTitle>
-              <CardDescription>
-                The first release is deliberately narrow: three useful agents, honest account state, and verified billing fulfillment.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {launchAgents.map((agent) => {
-                const Icon = agent.icon
-                return (
-                  <div key={agent.slug} className="flex gap-3 rounded-xl border border-border/70 bg-background/50 p-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="font-semibold">{agent.name}</div>
-                      <p className="mt-1 text-sm leading-6 text-muted-foreground">{agent.description}</p>
-                    </div>
-                  </div>
-                )
-              })}
-            </CardContent>
-          </Card>
         </div>
       </section>
 
-      <section className="border-y border-border/70 bg-card/30">
-        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8">
-          <div className="grid gap-6 lg:grid-cols-3">
-            <Card className="bg-background/60">
-              <CardHeader>
-                <LockKeyhole className="mb-3 h-6 w-6 text-primary" />
-                <CardTitle>Account-gated AI</CardTitle>
-                <CardDescription>
-                  Paid routes require authenticated customer identity or a protected internal system key.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-            <Card className="bg-background/60">
-              <CardHeader>
-                <ShieldCheck className="mb-3 h-6 w-6 text-primary" />
-                <CardTitle>Verified fulfillment</CardTitle>
-                <CardDescription>
-                  Browser redirects never grant access. Signed Stripe events update plans, credits, and agent entitlements.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-            <Card className="bg-background/60">
-              <CardHeader>
-                <Megaphone className="mb-3 h-6 w-6 text-primary" />
-                <CardTitle>Honest marketing</CardTitle>
-                <CardDescription>
-                  AMS does not display invented revenue, fabricated interactions, or fake deployment success.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
+      <section className={classes("section", "method-section")} id="method">
+        <div className={styles["method-label"]}>
+          <p className={styles["section-kicker"]}>Our operating rule</p>
+          <span>03 / principles</span>
+        </div>
+        <div className={styles["principle-list"]}>
+          {principles.map(([title, copy], index) => (
+            <article className={styles.principle} key={title}>
+              <span className={styles["principle-number"]}>0{index + 1}</span>
+              <h3>{title}</h3>
+              <p>{copy}</p>
+            </article>
+          ))}
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8">
-        <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
-          <div className="space-y-4">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Launch scope</p>
-            <h2 className="text-3xl font-bold sm:text-4xl">Finish the core. Then expand.</h2>
-            <p className="leading-7 text-muted-foreground">
-              AMS starts with the functions most likely to save time or produce revenue. Additional agents remain disabled until their integrations and execution paths are real.
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {safeguards.map((item) => (
-              <div key={item} className="flex items-start gap-3 rounded-xl border border-border/70 bg-card/50 p-4">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
-                <span className="text-sm leading-6">{item}</span>
-              </div>
-            ))}
-          </div>
+      <section className={classes("section", "launch-section")} id="launch">
+        <div className={styles["launch-copy"]}>
+          <p className={styles["section-kicker"]}>Current mission</p>
+          <h2>
+            From recovered code
+            <br />
+            to paid product.
+          </h2>
+          <p>
+            AMS is being rebuilt in controlled milestones. The public experience grows as
+            authentication, subscriptions, credits, and real agent execution pass verification.
+          </p>
         </div>
+
+        <ol className={styles["launch-track"]}>
+          <li className={styles.active}>
+            <span>01</span>
+            <div>
+              <strong>Public SaaS foundation</strong>
+              <small>Integrated checkpoint</small>
+            </div>
+          </li>
+          <li>
+            <span>02</span>
+            <div>
+              <strong>Secure paid Content Agent</strong>
+              <small>Staging verification next</small>
+            </div>
+          </li>
+          <li>
+            <span>03</span>
+            <div>
+              <strong>Agent expansion + Android</strong>
+              <small>After the core flow passes</small>
+            </div>
+          </li>
+        </ol>
       </section>
 
-      <section className="border-t border-border/70 bg-primary/5">
-        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-5 py-14 sm:px-8 lg:flex-row lg:items-center">
-          <div>
-            <h2 className="text-3xl font-bold">Start with a plan or a scoped request.</h2>
-            <p className="mt-2 max-w-2xl text-muted-foreground">
-              Subscription plans use the verified recurring checkout. Scoped service requests are reviewed before any payment or work begins.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button asChild size="lg">
-              <Link href="/pricing">Compare pricing</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/login">Customer sign in</Link>
-            </Button>
-          </div>
-        </div>
+      <section className={styles.closing}>
+        <p>THE SYSTEM IS COMING ONLINE.</p>
+        <h2>
+          Build once.
+          <br />
+          <span>Compound forever.</span>
+        </h2>
+        <a className={classes("button", "button-primary")} href="#top">
+          Back to command <span aria-hidden="true">↑</span>
+        </a>
       </section>
 
-      <footer className="border-t border-border/70">
-        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 px-5 py-8 text-sm text-muted-foreground sm:px-8 md:flex-row">
-          <span>© 2026 Aspect Marketing Solutions</span>
-          <div className="flex gap-5">
-            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
-            <Link href="/terms" className="hover:text-foreground">Terms</Link>
-            <Link href="/contact" className="hover:text-foreground">Contact</Link>
-          </div>
-        </div>
+      <footer className={styles.footer}>
+        <a className={styles.brand} href="#top" aria-label="Aspect Marketing Solutions home">
+          <span className={styles["brand-mark"]}>A</span>
+          <span className={styles["brand-name"]}>
+            ASPECT<span>/</span>AMS
+          </span>
+        </a>
+        <p>Aspect Marketing Solutions © 2026</p>
+        <p>Kentucky built. Global ambition.</p>
       </footer>
     </main>
   )

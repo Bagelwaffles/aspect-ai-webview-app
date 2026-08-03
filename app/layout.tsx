@@ -18,9 +18,9 @@ const openSans = Open_Sans({
 })
 
 export const metadata: Metadata = {
-  title: "Aspect Marketing Solutions | AI Marketing SaaS Command Center",
-  description: "Premium AI marketing SaaS for workflows, billing, agents, and compliant business growth.",
-  generator: "v0.app",
+  title: "Aspect Marketing Solutions | AI Agents Built to Work",
+  description:
+    "Aspect Marketing Solutions builds focused AI agents and automation systems for small-business growth.",
 }
 
 export default function RootLayout({
