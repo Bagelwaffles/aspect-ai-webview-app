@@ -18,7 +18,7 @@ export function CustomerLoginButton({ callbackUrl }: { callbackUrl: string }) {
         setLoading(false)
       }}
     >
-      {loading ? "Connecting…" : "Continue with Google"}
+      {loading ? "Connecting..." : "Continue with Google"}
     </Button>
   )
 }

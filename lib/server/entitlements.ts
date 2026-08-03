@@ -13,6 +13,7 @@ import {
   UpstashStripeEntitlementWriter,
   type StripeEntitlementApplyResult,
   type StripeEntitlementMutation,
+  type StripeSubscriptionRevocation,
 } from "./stripe-entitlements"
 
 export type PlanSlug = "starter" | "growth" | "pro"
@@ -298,6 +299,14 @@ export async function applyStripeSubscriptionEntitlement(
   const redis = getRedis()
   if (!redis) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
   return new UpstashStripeEntitlementWriter(redis).apply(input)
+}
+
+export async function revokeStripeSubscriptionEntitlement(
+  input: StripeSubscriptionRevocation,
+): Promise<StripeEntitlementApplyResult> {
+  const redis = getRedis()
+  if (!redis) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
+  return new UpstashStripeEntitlementWriter(redis).revoke(input)
 }
 
 export async function claimStripeEvent(eventId: string): Promise<StripeEventClaim> {

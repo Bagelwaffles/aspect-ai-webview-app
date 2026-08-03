@@ -237,6 +237,125 @@ async function refundAndFail(input: {
   return safeError(input.responseCode, input.responseMessage, input.responseStatus)
 }
 
+async function recoverStaleQueuedRun(input: {
+  dependencies: ContentAgentRouteDependencies
+  store: ContentAgentRunStore
+  ownerSubject: string
+  idempotencyKey: string
+}) {
+  const ledgerKey = `content-agent:${input.idempotencyKey}`
+  let reservation: Awaited<ReturnType<typeof reserveCredits>>
+  try {
+    reservation = await input.dependencies.reserve({
+      subject: input.ownerSubject,
+      units: 1,
+      idempotencyKey: ledgerKey,
+    })
+  } catch {
+    await recordReconciliation({
+      store: input.store,
+      ownerSubject: input.ownerSubject,
+      idempotencyKey: input.idempotencyKey,
+      expectedStatuses: ["queued"],
+      errorCode: "STALE_RUN_RECONCILIATION_REQUIRED",
+    })
+    return safeError(
+      "CONTENT_RUN_RECONCILIATION_REQUIRED",
+      "The stale queued run could not be reconciled with its credit reservation",
+      503,
+    )
+  }
+
+  if (reservation.state === "reserved") {
+    return refundAndFail({
+      dependencies: input.dependencies,
+      store: input.store,
+      ownerSubject: input.ownerSubject,
+      idempotencyKey: input.idempotencyKey,
+      ledgerKey,
+      expectedStatuses: ["queued"],
+      errorCode: "STALE_QUEUED_RUN_REFUNDED",
+      responseCode: "STALE_QUEUED_RUN_REFUNDED",
+      responseMessage: "The stale queued run was closed and its credit was refunded",
+      responseStatus: 409,
+    })
+  }
+
+  if (reservation.state === "refunded") {
+    try {
+      const refunded = await input.store.transition({
+        ownerSubject: input.ownerSubject,
+        idempotencyKey: input.idempotencyKey,
+        expectedStatuses: ["queued"],
+        status: "refunded",
+        creditState: "refunded",
+        pendingOutput: null,
+        output: null,
+        errorCode: "STALE_QUEUED_RUN_REFUNDED",
+      })
+      return safeError(
+        "STALE_QUEUED_RUN_REFUNDED",
+        "The stale queued run was already refunded",
+        409,
+        toPublicContentAgentRun(refunded),
+      )
+    } catch {
+      await recordReconciliation({
+        store: input.store,
+        ownerSubject: input.ownerSubject,
+        idempotencyKey: input.idempotencyKey,
+        expectedStatuses: ["queued"],
+        errorCode: "STALE_RUN_RECONCILIATION_REQUIRED",
+      })
+      return safeError(
+        "CONTENT_RUN_RECONCILIATION_REQUIRED",
+        "The refunded stale run could not be safely persisted",
+        503,
+      )
+    }
+  }
+
+  if (reservation.state === "rejected") {
+    try {
+      const rejected = await input.store.transition({
+        ownerSubject: input.ownerSubject,
+        idempotencyKey: input.idempotencyKey,
+        expectedStatuses: ["queued"],
+        status: "failed",
+        creditState: "rejected",
+        pendingOutput: null,
+        output: null,
+        errorCode: "CREDITS_REQUIRED",
+      })
+      return safeError(
+        "CREDITS_REQUIRED",
+        "The stale queued run has no reserved credit",
+        402,
+        toPublicContentAgentRun(rejected),
+      )
+    } catch {
+      return safeError(
+        "CONTENT_RUN_STORE_UNAVAILABLE",
+        "The stale queued run could not be safely persisted",
+        503,
+      )
+    }
+  }
+
+  await recordReconciliation({
+    store: input.store,
+    ownerSubject: input.ownerSubject,
+    idempotencyKey: input.idempotencyKey,
+    expectedStatuses: ["queued"],
+    errorCode: "STALE_RUN_RECONCILIATION_REQUIRED",
+  })
+  return safeError(
+    "CONTENT_RUN_RECONCILIATION_REQUIRED",
+    "The stale queued run has an ambiguous terminal credit state",
+    503,
+  )
+}
+
 async function recoverExistingRun(input: {
   dependencies: ContentAgentRouteDependencies
   store: ContentAgentRunStore
@@ -244,10 +363,31 @@ async function recoverExistingRun(input: {
   idempotencyKey: string
   record: Awaited<ReturnType<ContentAgentRunStore["claim"]>>["record"]
 }) {
+  if (input.record.status === "queued") {
+    if (!input.store.isLeaseExpired(input.record)) {
+      return existingRunResponse(toPublicContentAgentRun(input.record))
+    }
+    return recoverStaleQueuedRun(input)
+  }
+
   if (input.record.status !== "running") {
     return existingRunResponse(toPublicContentAgentRun(input.record))
   }
   if (!input.record.pendingOutput) {
+    if (input.store.isLeaseExpired(input.record)) {
+      await recordReconciliation({
+        store: input.store,
+        ownerSubject: input.ownerSubject,
+        idempotencyKey: input.idempotencyKey,
+        expectedStatuses: ["running"],
+        errorCode: "STALE_RUN_RECONCILIATION_REQUIRED",
+      })
+      return safeError(
+        "CONTENT_RUN_RECONCILIATION_REQUIRED",
+        "The provider execution lease expired without recoverable output",
+        503,
+      )
+    }
     return existingRunResponse(toPublicContentAgentRun(input.record))
   }
 

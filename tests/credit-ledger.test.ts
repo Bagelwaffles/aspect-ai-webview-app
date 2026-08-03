@@ -17,6 +17,7 @@ type StoredReservation = {
   amount: number
   planUnits: number
   topupUnits: number
+  planCycle: string
   state: CreditReservationState
 }
 
@@ -28,12 +29,22 @@ type LedgerEntry = {
 
 class FakeAtomicCreditLedgerAdapter implements CreditLedgerAdapter {
   private readonly balances = new Map<string, { planCredits: number; topupCredits: number }>()
+  private readonly planCycles = new Map<string, string>()
   private readonly reservations = new Map<string, StoredReservation>()
   readonly ledger: LedgerEntry[] = []
   failNextOperation: CreditLedgerStorageCommand["operation"] | null = null
 
-  seed(account: string, planCredits: number, topupCredits: number) {
-    this.balances.set(account.trim().toLowerCase(), { planCredits, topupCredits })
+  seed(account: string, planCredits: number, topupCredits: number, planCycle = "") {
+    const normalized = account.trim().toLowerCase()
+    this.balances.set(normalized, { planCredits, topupCredits })
+    this.planCycles.set(normalized, planCycle)
+  }
+
+  resetPlanCycle(account: string, planCredits: number, planCycle: string) {
+    const normalized = account.trim().toLowerCase()
+    const current = this.balances.get(normalized) ?? { planCredits: 0, topupCredits: 0 }
+    this.balances.set(normalized, { ...current, planCredits })
+    this.planCycles.set(normalized, planCycle)
   }
 
   snapshot(account: string) {
@@ -75,6 +86,7 @@ class FakeAtomicCreditLedgerAdapter implements CreditLedgerAdapter {
           amount: command.amount,
           planUnits: 0,
           topupUnits: 0,
+          planCycle: this.planCycles.get(command.account) ?? "",
           state: "rejected",
         }
         this.reservations.set(command.keys.reservation, rejected)
@@ -94,6 +106,7 @@ class FakeAtomicCreditLedgerAdapter implements CreditLedgerAdapter {
         amount: command.amount,
         planUnits,
         topupUnits,
+        planCycle: this.planCycles.get(command.account) ?? "",
         state: "reserved",
       }
       const updated = {
@@ -136,8 +149,10 @@ class FakeAtomicCreditLedgerAdapter implements CreditLedgerAdapter {
       return { status: "terminal_conflict", state: existing.state }
     }
 
+    const currentPlanCycle = this.planCycles.get(command.account) ?? ""
+    const restoredPlanUnits = existing.planCycle === currentPlanCycle ? existing.planUnits : 0
     const refundedBalance = {
-      planCredits: current.planCredits + existing.planUnits,
+      planCredits: current.planCredits + restoredPlanUnits,
       topupCredits: current.topupCredits + existing.topupUnits,
     }
     existing.state = "refunded"
@@ -261,6 +276,26 @@ test("refund is terminal, idempotent, and restores each credit pool exactly once
   )
   assert.ok(results.every((result) => result.state === "refunded"))
   assert.deepEqual(adapter.snapshot(account), { planCredits: 2, topupCredits: 2 })
+  assert.equal(adapter.ledger.filter((entry) => entry.action === "refunded").length, 1)
+})
+
+test("refund does not mint prior-cycle plan credits after a billing-cycle reset", async () => {
+  const account = "cycle-race@example.com"
+  const adapter = new FakeAtomicCreditLedgerAdapter()
+  adapter.seed(account, 2, 2, "sub_cycle:100")
+  const ledger = new CreditLedger(adapter, () => new Date("2026-08-03T12:00:00.000Z"))
+
+  await ledger.reserve({ account, amount: 3, idempotencyKey: "cycle-bound-reservation" })
+  assert.deepEqual(adapter.snapshot(account), { planCredits: 0, topupCredits: 1 })
+
+  adapter.resetPlanCycle(account, 10, "sub_cycle:200")
+  const refunded = await ledger.refund({
+    account,
+    idempotencyKey: "cycle-bound-reservation",
+  })
+
+  assert.equal(refunded.state, "refunded")
+  assert.deepEqual(adapter.snapshot(account), { planCredits: 10, topupCredits: 2 })
   assert.equal(adapter.ledger.filter((entry) => entry.action === "refunded").length, 1)
 })
 

@@ -7,6 +7,7 @@ import {
   completeStripeEvent,
   isEntitlementStoreConfigured,
   releaseStripeEvent,
+  revokeStripeSubscriptionEntitlement,
 } from "@/lib/server/entitlements"
 import {
   assertStripeSecretKeyMatchesMode,
@@ -30,7 +31,10 @@ export const POST = createStripeWebhookPostHandler({
     processStripeLifecycleEvent({
       event,
       gateway: createStripeReadGateway(stripe),
-      writer: { apply: applyStripeSubscriptionEntitlement },
+      writer: {
+        apply: applyStripeSubscriptionEntitlement,
+        revoke: revokeStripeSubscriptionEntitlement,
+      },
       config,
     }),
 })

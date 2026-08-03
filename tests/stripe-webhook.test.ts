@@ -14,7 +14,9 @@ import {
   type StripeEntitlementConfig,
   type StripeEntitlementMutation,
   type StripeEntitlementWriter,
+  StripeFulfillmentError,
   type StripeReadGateway,
+  type StripeSubscriptionRevocation,
 } from "../lib/server/stripe-entitlements"
 import type { StripeEventClaim } from "../lib/server/entitlements"
 
@@ -186,10 +188,19 @@ class FakeGateway implements StripeReadGateway {
 
 class MemoryEntitlementWriter implements StripeEntitlementWriter {
   readonly states = new Map<string, StoredStripeEntitlementState>()
+  readonly subscriptionOwners = new Map<string, string>()
   readonly mutations: StripeEntitlementMutation[] = []
   resetCount = 0
 
   async apply(input: StripeEntitlementMutation): Promise<StripeEntitlementApplyResult> {
+    const mappedSubject = this.subscriptionOwners.get(input.stripeSubscriptionId)
+    if (mappedSubject && mappedSubject !== input.subject) {
+      throw new StripeFulfillmentError(
+        "STRIPE_SUBSCRIPTION_OWNER_CONFLICT",
+        "simulated immutable ownership conflict",
+      )
+    }
+    this.subscriptionOwners.set(input.stripeSubscriptionId, input.subject)
     const key = input.subject
     this.mutations.push(input)
     const decision = decideStripeEntitlementTransition(this.states.get(key) ?? null, input)
@@ -198,6 +209,55 @@ class MemoryEntitlementWriter implements StripeEntitlementWriter {
       if (decision.creditsReset) this.resetCount += 1
     }
     return decision
+  }
+
+  async revoke(input: StripeSubscriptionRevocation): Promise<StripeEntitlementApplyResult> {
+    const subject = this.subscriptionOwners.get(input.stripeSubscriptionId)
+    if (!subject) {
+      throw new StripeFulfillmentError(
+        "STRIPE_SUBSCRIPTION_OWNER_MISSING",
+        "simulated missing immutable ownership",
+      )
+    }
+    const current = this.states.get(subject)
+    if (!current || current.stripeSubscriptionId !== input.stripeSubscriptionId) {
+      return {
+        applied: false,
+        idempotent: false,
+        creditsReset: false,
+        reason: "UNRELATED_SUBSCRIPTION",
+      }
+    }
+    if (current.stripeLastEventId === input.stripeEventId) {
+      return { applied: false, idempotent: true, creditsReset: false, reason: "IDEMPOTENT" }
+    }
+    if (current.subscriptionStatus === "canceled") {
+      return {
+        applied: false,
+        idempotent: false,
+        creditsReset: false,
+        reason: "TERMINAL_SUBSCRIPTION",
+      }
+    }
+    if (
+      input.stripeEventCreated < current.stripeLastEventCreated &&
+      input.subscriptionStatus !== "canceled"
+    ) {
+      return {
+        applied: false,
+        idempotent: false,
+        creditsReset: false,
+        reason: "STALE_EVENT",
+      }
+    }
+
+    this.states.set(subject, {
+      ...current,
+      subscriptionStatus: input.subscriptionStatus,
+      stripeLastEventId: input.stripeEventId,
+      stripeLastEventCreated: Math.max(current.stripeLastEventCreated, input.stripeEventCreated),
+    })
+    return { applied: true, idempotent: false, creditsReset: false, reason: "APPLIED" }
   }
 }
 
@@ -473,6 +533,139 @@ test("entitlement lifecycle state is isolated across stable customer subjects", 
   assert.equal(writer.states.get(secondarySubject)?.stripeSubscriptionId, secondary.id)
 })
 
+test("cancellation uses immutable subscription ownership after price, metadata, and email drift", async () => {
+  const gateway = new FakeGateway()
+  const writer = new MemoryEntitlementWriter()
+  const active = subscription({ id: "sub_drift_safe", status: "active" })
+  gateway.subscriptions.set(active.id, active)
+
+  await processStripeLifecycleEvent({
+    event: stripeEvent("customer.subscription.created", active, {
+      id: "evt_drift_owner_recorded",
+      created: 200,
+    }),
+    gateway,
+    writer,
+    config: config(),
+  })
+
+  const canceledWithDrift = {
+    ...subscription({
+      id: active.id,
+      status: "canceled",
+      priceId: "price_retired_from_allowlist",
+      email: "changed@example.com",
+    }),
+    metadata: {},
+    customer: {
+      id: "cus_changed",
+      object: "customer",
+      email: "changed@example.com",
+    },
+  } as unknown as Stripe.Subscription
+  const result = await processStripeLifecycleEvent({
+    event: stripeEvent("customer.subscription.deleted", canceledWithDrift, {
+      id: "evt_drift_canceled",
+      created: 300,
+    }),
+    gateway,
+    writer,
+    config: config(),
+  })
+
+  assert.equal(result.applied, true)
+  assert.equal(writer.subscriptionOwners.get(active.id), accountSubject)
+  assert.equal(writer.states.get(accountSubject)?.subscriptionStatus, "canceled")
+  assert.equal(writer.states.get(accountSubject)?.stripeLastEventId, "evt_drift_canceled")
+})
+
+test("past-due revocation uses immutable ownership after subscription field drift", async () => {
+  const gateway = new FakeGateway()
+  const writer = new MemoryEntitlementWriter()
+  const active = subscription({ id: "sub_past_due_drift", status: "active" })
+  gateway.subscriptions.set(active.id, active)
+  await processStripeLifecycleEvent({
+    event: stripeEvent("customer.subscription.created", active, {
+      id: "evt_past_due_owner_recorded",
+      created: 200,
+    }),
+    gateway,
+    writer,
+    config: config(),
+  })
+
+  const pastDueWithDrift = {
+    ...subscription({
+      id: active.id,
+      status: "past_due",
+      priceId: "price_retired_from_allowlist",
+      email: "changed@example.com",
+    }),
+    metadata: {},
+    customer: {
+      id: "cus_changed",
+      object: "customer",
+      email: "changed@example.com",
+    },
+  } as unknown as Stripe.Subscription
+  gateway.subscriptions.set(active.id, pastDueWithDrift)
+
+  const result = await processStripeLifecycleEvent({
+    event: stripeEvent("customer.subscription.updated", pastDueWithDrift, {
+      id: "evt_past_due_drift",
+      created: 300,
+    }),
+    gateway,
+    writer,
+    config: config(),
+  })
+
+  assert.equal(result.applied, true)
+  assert.equal(writer.states.get(accountSubject)?.subscriptionStatus, "past_due")
+  assert.equal(writer.states.get(accountSubject)?.stripeLastEventId, "evt_past_due_drift")
+})
+
+test("subscription ownership mapping is immutable across customer subjects", async () => {
+  const gateway = new FakeGateway()
+  const writer = new MemoryEntitlementWriter()
+  const primary = subscription({ id: "sub_immutable_owner", subject: accountSubject, status: "active" })
+  gateway.subscriptions.set(primary.id, primary)
+  await processStripeLifecycleEvent({
+    event: stripeEvent("customer.subscription.created", primary, {
+      id: "evt_immutable_primary",
+      created: 200,
+    }),
+    gateway,
+    writer,
+    config: config(),
+  })
+
+  const conflicting = subscription({
+    id: primary.id,
+    subject: secondarySubject,
+    status: "active",
+    created: 300,
+  })
+  gateway.subscriptions.set(conflicting.id, conflicting)
+
+  await assert.rejects(
+    processStripeLifecycleEvent({
+      event: stripeEvent("customer.subscription.updated", conflicting, {
+        id: "evt_immutable_conflict",
+        created: 310,
+      }),
+      gateway,
+      writer,
+      config: config(),
+    }),
+    (error: unknown) =>
+      error instanceof StripeFulfillmentError &&
+      error.code === "STRIPE_SUBSCRIPTION_OWNER_CONFLICT",
+  )
+  assert.equal(writer.subscriptionOwners.get(primary.id), accountSubject)
+  assert.equal(writer.states.has(secondarySubject), false)
+})
+
 test("completion-marker failure retries safely without another credit reset", async () => {
   const fixture = webhookFixture()
   const session = checkoutSession()
@@ -744,4 +937,71 @@ test("failed payment removes access while a recovered current subscription is no
     ["active", "trialing"].includes(writer.states.get(accountSubject)?.subscriptionStatus ?? ""),
     false,
   )
+})
+
+test("stale payment failure cannot revoke newer access while cancellation remains terminal", async () => {
+  const gateway = new FakeGateway()
+  const writer = new MemoryEntitlementWriter()
+  const active = subscription({ id: "sub_ordered", status: "active", created: 100 })
+  gateway.subscriptions.set(active.id, active)
+
+  await processStripeLifecycleEvent({
+    event: stripeEvent("customer.subscription.created", active, {
+      id: "evt_newer_active",
+      created: 300,
+    }),
+    gateway,
+    writer,
+    config: config(),
+  })
+
+  const pastDue = subscription({ id: active.id, status: "past_due", created: 100 })
+  gateway.subscriptions.set(pastDue.id, pastDue)
+  const staleFailure = await processStripeLifecycleEvent({
+    event: stripeEvent(
+      "invoice.payment_failed",
+      invoice({ subscriptionId: active.id, paid: false, status: "open" }),
+      { id: "evt_older_payment_failed", created: 200 },
+    ),
+    gateway,
+    writer,
+    config: config(),
+  })
+
+  assert.equal(staleFailure.applied, false)
+  assert.equal(staleFailure.reason, "STALE_EVENT")
+  assert.equal(writer.states.get(accountSubject)?.subscriptionStatus, "active")
+  assert.equal(writer.states.get(accountSubject)?.stripeLastEventId, "evt_newer_active")
+  assert.equal(writer.states.get(accountSubject)?.stripeLastEventCreated, 300)
+
+  const canceled = subscription({ id: active.id, status: "canceled", created: 100 })
+  const staleCancellation = await processStripeLifecycleEvent({
+    event: stripeEvent("customer.subscription.deleted", canceled, {
+      id: "evt_older_terminal_cancellation",
+      created: 150,
+    }),
+    gateway,
+    writer,
+    config: config(),
+  })
+
+  assert.equal(staleCancellation.applied, true)
+  assert.equal(staleCancellation.reason, "APPLIED")
+  assert.equal(writer.states.get(accountSubject)?.subscriptionStatus, "canceled")
+  assert.equal(writer.states.get(accountSubject)?.stripeLastEventCreated, 300)
+
+  gateway.subscriptions.set(active.id, active)
+  const attemptedReactivation = await processStripeLifecycleEvent({
+    event: stripeEvent("customer.subscription.updated", active, {
+      id: "evt_later_reactivation",
+      created: 400,
+    }),
+    gateway,
+    writer,
+    config: config(),
+  })
+
+  assert.equal(attemptedReactivation.applied, false)
+  assert.equal(attemptedReactivation.reason, "TERMINAL_SUBSCRIPTION")
+  assert.equal(writer.states.get(accountSubject)?.subscriptionStatus, "canceled")
 })

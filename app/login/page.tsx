@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
 import { ShieldCheck } from "lucide-react"
 
+import { safeRelativeCallbackPath } from "@/app/lib/safe-relative-callback"
 import { CustomerLoginButton } from "@/components/customer-login-button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { authOptions, isCustomerAuthConfigured } from "@/lib/auth"
@@ -12,14 +13,9 @@ type LoginPageProps = {
   searchParams?: Promise<{ next?: string; error?: string }>
 }
 
-function safeCallbackPath(value?: string): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/grok-chat"
-  return value
-}
-
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = (await searchParams) ?? {}
-  const callbackUrl = safeCallbackPath(params.next)
+  const callbackUrl = safeRelativeCallbackPath(params.next, "/grok-chat")
   const session = isCustomerAuthConfigured() ? await getServerSession(authOptions).catch(() => null) : null
 
   if (session?.user?.email) {

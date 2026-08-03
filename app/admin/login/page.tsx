@@ -6,21 +6,21 @@ import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { safeRelativeCallbackPath } from "@/app/lib/safe-relative-callback"
 
 const ADMIN_EMAIL = "internal-admin@aspectmarketingsolutions.app"
 
 export default function AdminLoginPage() {
   const searchParams = useSearchParams()
   const nextPath = useMemo(() => {
-    const candidate = searchParams.get("next")?.trim()
-    if (!candidate || !candidate.startsWith("/")) {
-      return "/admin/ethical-agent-farm-requests"
-    }
-    return candidate
+    return safeRelativeCallbackPath(
+      searchParams.get("next"),
+      "/admin/ethical-agent-farm-requests",
+    )
   }, [searchParams])
 
   const [email, setEmail] = useState(ADMIN_EMAIL)
-  const [code, setCode] = useState("")
+  const [password, setPassword] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
 
@@ -32,7 +32,7 @@ export default function AdminLoginPage() {
       const response = await fetch("/api/internal-admin-access", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, code })
+        body: JSON.stringify({ email, password })
       })
 
       const payload = await response.json().catch(() => null)
@@ -68,7 +68,7 @@ export default function AdminLoginPage() {
           <CardHeader>
             <CardTitle className="text-xl sm:text-2xl">Open internal admin tools</CardTitle>
             <CardDescription className="text-sm sm:text-base">
-              Enter the internal admin email and code configured for the production environment.
+              Enter the internal admin email and password configured for this environment.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -86,22 +86,22 @@ export default function AdminLoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="admin-code">
-                Admin code
+              <label className="text-sm font-medium" htmlFor="admin-password">
+                Admin password
               </label>
               <Input
-                id="admin-code"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="Internal admin code"
+                id="admin-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Internal admin password"
                 type="password"
-                autoComplete="one-time-code"
+                autoComplete="current-password"
                 className="h-12 text-base"
               />
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <Button onClick={submit} disabled={busy || !code.trim()} className="w-full sm:w-auto">
+              <Button onClick={submit} disabled={busy || !password} className="w-full sm:w-auto">
                 {busy ? "Opening..." : "Enter admin access"}
               </Button>
               <Button asChild variant="ghost" className="w-full sm:w-auto">

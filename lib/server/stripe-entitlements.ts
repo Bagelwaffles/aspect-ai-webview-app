@@ -34,8 +34,16 @@ export type StripeEntitlementApplyResult = {
   reason: "APPLIED" | "IDEMPOTENT" | "STALE_EVENT" | "UNRELATED_SUBSCRIPTION" | "TERMINAL_SUBSCRIPTION"
 }
 
+export type StripeSubscriptionRevocation = {
+  stripeSubscriptionId: string
+  stripeEventId: string
+  stripeEventCreated: number
+  subscriptionStatus: Exclude<SubscriptionStatus, "active" | "trialing">
+}
+
 export interface StripeEntitlementWriter {
   apply(input: StripeEntitlementMutation): Promise<StripeEntitlementApplyResult>
+  revoke(input: StripeSubscriptionRevocation): Promise<StripeEntitlementApplyResult>
 }
 
 export interface StripeReadGateway {
@@ -84,6 +92,8 @@ export type StripeFulfillmentErrorCode =
   | "STRIPE_SUBSCRIPTION_EMAIL_MISSING"
   | "STRIPE_SUBSCRIPTION_EMAIL_INVALID"
   | "STRIPE_SUBSCRIPTION_EMAIL_MISMATCH"
+  | "STRIPE_SUBSCRIPTION_OWNER_MISSING"
+  | "STRIPE_SUBSCRIPTION_OWNER_CONFLICT"
   | "STRIPE_INVOICE_STATE_INVALID"
 
 export class StripeFulfillmentError extends Error {
@@ -120,6 +130,14 @@ const APPLY_STRIPE_ENTITLEMENT_SCRIPT = `
   local newCycle = ARGV[11]
   local shouldReset = ARGV[12] == '1'
   local hasAccess = newStatus == 'active' or newStatus == 'trialing'
+
+  local mappedSubject = redis.call('GET', KEYS[3])
+  if mappedSubject and mappedSubject ~= ARGV[1] then
+    return {'conflict', 'SUBSCRIPTION_OWNER_CONFLICT', '0'}
+  end
+  if not mappedSubject then
+    redis.call('SET', KEYS[3], ARGV[1], 'NX')
+  end
 
   if currentEventId == newEventId then
     return {'ignored', 'IDEMPOTENT', '0'}
@@ -164,11 +182,52 @@ const APPLY_STRIPE_ENTITLEMENT_SCRIPT = `
   local creditsReset = '0'
   if hasAccess and shouldReset and newCycle ~= '' and newCycle ~= currentCycle then
     redis.call('SET', KEYS[2], ARGV[13])
+    redis.call('SET', KEYS[4], newCycle)
     redis.call('HSET', KEYS[1], 'stripeCreditCycle', newCycle)
     creditsReset = '1'
   end
 
   return {'applied', 'APPLIED', creditsReset}
+`
+
+const REVOKE_STRIPE_ENTITLEMENT_SCRIPT = `
+  local mappedSubject = redis.call('GET', KEYS[1])
+  if not mappedSubject then
+    return {'owner_missing'}
+  end
+  if mappedSubject ~= ARGV[1] then
+    return {'owner_conflict'}
+  end
+
+  local currentSubscriptionId = redis.call('HGET', KEYS[2], 'stripeSubscriptionId') or ''
+  if currentSubscriptionId ~= ARGV[2] then
+    return {'ignored', 'UNRELATED_SUBSCRIPTION', '0'}
+  end
+
+  local currentEventId = redis.call('HGET', KEYS[2], 'stripeLastEventId') or ''
+  local currentStatus = redis.call('HGET', KEYS[2], 'subscriptionStatus') or 'inactive'
+  if currentEventId == ARGV[3] then
+    return {'ignored', 'IDEMPOTENT', '0'}
+  end
+  if currentStatus == 'canceled' then
+    return {'ignored', 'TERMINAL_SUBSCRIPTION', '0'}
+  end
+
+  local currentEventCreated = tonumber(redis.call('HGET', KEYS[2], 'stripeLastEventCreated') or '-1')
+  local newEventCreated = tonumber(ARGV[4])
+  local isTerminalRevocation = ARGV[5] == 'canceled'
+  if newEventCreated < currentEventCreated and not isTerminalRevocation then
+    return {'ignored', 'STALE_EVENT', '0'}
+  end
+
+  redis.call(
+    'HSET', KEYS[2],
+    'subscriptionStatus', ARGV[5],
+    'stripeLastEventId', ARGV[3],
+    'stripeLastEventCreated', tostring(math.max(currentEventCreated, newEventCreated)),
+    'updatedAt', ARGV[6]
+  )
+  return {'applied', 'APPLIED', '0'}
 `
 
 function normalizeEmail(value: unknown): string | null {
@@ -181,7 +240,9 @@ function customerId(customer: string | Stripe.Customer | Stripe.DeletedCustomer)
   return typeof customer === "string" ? customer : customer.id
 }
 
-function hasSubscriptionAccess(status: SubscriptionStatus): boolean {
+function hasSubscriptionAccess(
+  status: SubscriptionStatus,
+): status is Extract<SubscriptionStatus, "active" | "trialing"> {
   return status === "active" || status === "trialing"
 }
 
@@ -376,8 +437,19 @@ export function decideStripeEntitlementTransition(
   }
 }
 
+function subscriptionOwnerKey(subscriptionId: string): string {
+  const id = subscriptionId.trim()
+  if (!id) {
+    throw new StripeFulfillmentError(
+      "STRIPE_SUBSCRIPTION_OWNER_MISSING",
+      "Stripe subscription ownership is unavailable",
+    )
+  }
+  return `ams:stripe:subscription-owner:${id}`
+}
+
 export class UpstashStripeEntitlementWriter implements StripeEntitlementWriter {
-  constructor(private readonly redis: Pick<Redis, "eval">) {}
+  constructor(private readonly redis: Pick<Redis, "eval" | "get">) {}
 
   async apply(input: StripeEntitlementMutation): Promise<StripeEntitlementApplyResult> {
     const subject = input.subject.trim()
@@ -397,9 +469,11 @@ export class UpstashStripeEntitlementWriter implements StripeEntitlementWriter {
 
     const profileKey = `ams:entitlements:profile:${subject}`
     const planCreditsKey = `ams:credits:plan:${subject}`
+    const ownerKey = subscriptionOwnerKey(input.stripeSubscriptionId)
+    const planCycleKey = `ams:credits:cycle:${subject}`
     const raw = await this.redis.eval(
       APPLY_STRIPE_ENTITLEMENT_SCRIPT,
-      [profileKey, planCreditsKey],
+      [profileKey, planCreditsKey, ownerKey, planCycleKey],
       [
         subject,
         billingEmail,
@@ -422,6 +496,13 @@ export class UpstashStripeEntitlementWriter implements StripeEntitlementWriter {
       throw new Error("Invalid Stripe entitlement datastore response")
     }
 
+    if (raw[0] === "conflict" && raw[1] === "SUBSCRIPTION_OWNER_CONFLICT") {
+      throw new StripeFulfillmentError(
+        "STRIPE_SUBSCRIPTION_OWNER_CONFLICT",
+        "Stripe subscription ownership conflicts with an existing customer",
+      )
+    }
+
     const reason = raw[1] as StripeEntitlementApplyResult["reason"]
     if (raw[0] === "ignored") {
       if (!["IDEMPOTENT", "STALE_EVENT", "UNRELATED_SUBSCRIPTION", "TERMINAL_SUBSCRIPTION"].includes(reason)) {
@@ -442,6 +523,82 @@ export class UpstashStripeEntitlementWriter implements StripeEntitlementWriter {
       applied: true,
       idempotent: false,
       creditsReset: raw[2] === "1",
+      reason: "APPLIED",
+    }
+  }
+
+  async revoke(input: StripeSubscriptionRevocation): Promise<StripeEntitlementApplyResult> {
+    const ownerKey = subscriptionOwnerKey(input.stripeSubscriptionId)
+    const mappedSubject = await this.redis.get<string>(ownerKey)
+    if (!mappedSubject) {
+      throw new StripeFulfillmentError(
+        "STRIPE_SUBSCRIPTION_OWNER_MISSING",
+        "Stripe subscription ownership has not been recorded",
+      )
+    }
+    if (!isStableCustomerSubject(mappedSubject)) {
+      throw new StripeFulfillmentError(
+        "STRIPE_SUBSCRIPTION_OWNER_CONFLICT",
+        "Stripe subscription ownership is invalid",
+      )
+    }
+
+    const profileKey = `ams:entitlements:profile:${mappedSubject}`
+    const raw = await this.redis.eval(
+      REVOKE_STRIPE_ENTITLEMENT_SCRIPT,
+      [ownerKey, profileKey],
+      [
+        mappedSubject,
+        input.stripeSubscriptionId.trim(),
+        input.stripeEventId.trim(),
+        input.stripeEventCreated,
+        input.subscriptionStatus,
+        new Date().toISOString(),
+      ],
+    )
+
+    if (!Array.isArray(raw) || typeof raw[0] !== "string") {
+      throw new Error("Invalid Stripe entitlement revocation response")
+    }
+    if (raw[0] === "owner_missing") {
+      throw new StripeFulfillmentError(
+        "STRIPE_SUBSCRIPTION_OWNER_MISSING",
+        "Stripe subscription ownership has not been recorded",
+      )
+    }
+    if (raw[0] === "owner_conflict") {
+      throw new StripeFulfillmentError(
+        "STRIPE_SUBSCRIPTION_OWNER_CONFLICT",
+        "Stripe subscription ownership conflicts with an existing customer",
+      )
+    }
+
+    const reason = raw[1] as StripeEntitlementApplyResult["reason"]
+    if (raw[0] === "ignored") {
+      if (
+        ![
+          "IDEMPOTENT",
+          "STALE_EVENT",
+          "UNRELATED_SUBSCRIPTION",
+          "TERMINAL_SUBSCRIPTION",
+        ].includes(reason)
+      ) {
+        throw new Error("Invalid Stripe entitlement revocation ignore result")
+      }
+      return {
+        applied: false,
+        idempotent: reason === "IDEMPOTENT",
+        creditsReset: false,
+        reason,
+      }
+    }
+    if (raw[0] !== "applied" || reason !== "APPLIED") {
+      throw new Error("Invalid Stripe entitlement revocation result")
+    }
+    return {
+      applied: true,
+      idempotent: false,
+      creditsReset: false,
       reason: "APPLIED",
     }
   }
@@ -657,6 +814,26 @@ async function applySubscription(input: {
   }
 }
 
+async function revokeSubscription(input: {
+  event: Stripe.Event
+  subscriptionId: string
+  writer: StripeEntitlementWriter
+  status: Exclude<SubscriptionStatus, "active" | "trialing">
+}): Promise<StripeEventProcessingResult> {
+  const result = await input.writer.revoke({
+    stripeSubscriptionId: input.subscriptionId,
+    stripeEventId: input.event.id,
+    stripeEventCreated: input.event.created,
+    subscriptionStatus: input.status,
+  })
+  return {
+    processed: true,
+    applied: result.applied,
+    creditsReset: false,
+    reason: result.reason,
+  }
+}
+
 async function retrieveCurrentSubscription(
   gateway: StripeReadGateway,
   subscription: string | Stripe.Subscription,
@@ -745,6 +922,16 @@ export async function processStripeLifecycleEvent(input: {
       const eventSubscription = event.data.object as Stripe.Subscription
       ensureLivemode(eventSubscription.livemode, config)
       const subscription = await gateway.retrieveSubscription(eventSubscription.id)
+      ensureLivemode(subscription.livemode, config)
+      const status = statusFromStripe(subscription.status)
+      if (!hasSubscriptionAccess(status)) {
+        return revokeSubscription({
+          event,
+          subscriptionId: subscription.id,
+          writer,
+          status,
+        })
+      }
       return applySubscription({
         event,
         subscription,
@@ -760,14 +947,12 @@ export async function processStripeLifecycleEvent(input: {
 
     case "customer.subscription.deleted": {
       const subscription = event.data.object as Stripe.Subscription
-      return applySubscription({
+      ensureLivemode(subscription.livemode, config)
+      return revokeSubscription({
         event,
-        subscription,
-        gateway,
+        subscriptionId: subscription.id,
         writer,
-        config,
         status: "canceled",
-        resetPlanCredits: false,
       })
     }
 
@@ -800,22 +985,26 @@ export async function processStripeLifecycleEvent(input: {
 
       const subscription = await retrieveCurrentSubscription(gateway, invoice.subscription)
       const currentStatus = statusFromStripe(subscription.status)
-      if (
-        event.type === "invoice.payment_failed" &&
-        (currentStatus === "active" || currentStatus === "trialing")
-      ) {
-        return {
-          processed: false,
-          applied: false,
-          creditsReset: false,
-          reason: "RECOVERED_SUBSCRIPTION_IGNORED",
+      if (event.type === "invoice.payment_failed") {
+        if (hasSubscriptionAccess(currentStatus)) {
+          return {
+            processed: false,
+            applied: false,
+            creditsReset: false,
+            reason: "RECOVERED_SUBSCRIPTION_IGNORED",
+          }
         }
+        return revokeSubscription({
+          event,
+          subscriptionId: subscription.id,
+          writer,
+          status: currentStatus,
+        })
       }
 
       const resetPlanCredits =
-        event.type === "invoice.payment_succeeded" &&
-        (invoice.billing_reason === "subscription_create" ||
-          invoice.billing_reason === "subscription_cycle")
+        invoice.billing_reason === "subscription_create" ||
+        invoice.billing_reason === "subscription_cycle"
 
       return applySubscription({
         event,
@@ -824,7 +1013,6 @@ export async function processStripeLifecycleEvent(input: {
         writer,
         config,
         emailCandidates: [invoice.customer_email],
-        status: event.type === "invoice.payment_failed" ? currentStatus : undefined,
         resetPlanCredits,
       })
     }

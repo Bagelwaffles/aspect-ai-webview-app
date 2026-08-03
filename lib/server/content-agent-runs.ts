@@ -36,10 +36,13 @@ export const contentAgentRunErrorCodeSchema = z.enum([
   "RUN_STAGE_FAILED_REFUNDED",
   "RUN_STAGE_AND_REFUND_FAILED",
   "FINAL_PERSISTENCE_FAILED",
+  "STALE_QUEUED_RUN_REFUNDED",
+  "STALE_RUN_RECONCILIATION_REQUIRED",
 ])
 
 const MAX_RUN_HISTORY = 20
-const RUN_RETENTION_SECONDS = 60 * 60 * 24 * 90
+export const CONTENT_AGENT_RUN_RETENTION_SECONDS = 60 * 60 * 24 * 90
+export const CONTENT_AGENT_RUN_LEASE_SECONDS = 60 * 15
 
 const creditStateSchema = z.enum([
   "not_reserved",
@@ -66,6 +69,7 @@ const runRecordSchema = z
     revision: z.number().int().nonnegative(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
+    leaseExpiresAt: z.string().datetime().nullable().default(null),
   })
   .strict()
   .superRefine((record, context) => {
@@ -107,6 +111,9 @@ const runRecordSchema = z
     if (record.status === "reconciliation" && record.creditState !== "reconciliation") {
       context.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid reconciliation state" })
     }
+    if (!["queued", "running"].includes(record.status) && record.leaseExpiresAt !== null) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "Unexpected run lease" })
+    }
     if (
       record.status === "failed" &&
       !["not_reserved", "rejected"].includes(record.creditState)
@@ -119,6 +126,12 @@ export type ContentAgentRunStatus = z.infer<typeof contentAgentRunStatusSchema>
 export type ContentAgentRunErrorCode = z.infer<typeof contentAgentRunErrorCodeSchema>
 export type ContentAgentCreditState = z.infer<typeof creditStateSchema>
 export type ContentAgentRunRecord = z.infer<typeof runRecordSchema>
+
+export function hasUnresolvedContentAgentFinancialState(
+  status: ContentAgentRunStatus,
+): boolean {
+  return status === "queued" || status === "running" || status === "reconciliation"
+}
 
 export type PublicContentAgentRun = {
   id: string
@@ -157,7 +170,6 @@ export type ContentAgentRunClaimCommand = {
   listMember: string
   runKeyPrefix: string
   maxHistory: number
-  retentionSeconds: number
   score: number
   record: ContentAgentRunRecord
 }
@@ -173,9 +185,13 @@ export type ContentAgentRunGetCommand = {
 
 export type ContentAgentRunTransitionCommand = {
   runKey: string
+  listKey: string
+  runKeyPrefix: string
+  maxHistory: number
   ownerSubject: string
   expectedRevision: number
   expectedStatuses: ContentAgentRunStatus[]
+  retentionSeconds: number
   record: ContentAgentRunRecord
 }
 
@@ -207,20 +223,42 @@ const CLAIM_RUN_SCRIPT = `
     if decoded['inputFingerprint'] ~= ARGV[1] or decoded['idempotencyKey'] ~= ARGV[2] then
       return {'conflict', existing}
     end
+    local existingStatus = decoded['status']
+    if existingStatus == 'queued' or existingStatus == 'running' or existingStatus == 'reconciliation' then
+      redis.call('PERSIST', KEYS[1])
+      redis.call('ZADD', KEYS[2], ARGV[4], ARGV[5])
+      redis.call('PERSIST', KEYS[2])
+    end
     return {'existing', existing}
   end
 
-  redis.call('SET', KEYS[1], ARGV[3], 'EX', ARGV[8])
+  redis.call('SET', KEYS[1], ARGV[3])
   redis.call('ZADD', KEYS[2], ARGV[4], ARGV[5])
-  local overflow = redis.call('ZCARD', KEYS[2]) - tonumber(ARGV[7])
-  if overflow > 0 then
-    local expired = redis.call('ZRANGE', KEYS[2], 0, overflow - 1)
-    for _, member in ipairs(expired) do
-      redis.call('DEL', ARGV[6] .. member)
+
+  local resolvedKept = 0
+  local members = redis.call('ZREVRANGE', KEYS[2], 0, -1)
+  for _, member in ipairs(members) do
+    local runKey = ARGV[6] .. member
+    local raw = redis.call('GET', runKey)
+    if not raw then
       redis.call('ZREM', KEYS[2], member)
+    else
+      local ok, record = pcall(cjson.decode, raw)
+      if ok then
+        local status = record['status']
+        local unresolved = status == 'queued' or status == 'running' or status == 'reconciliation'
+        if not unresolved then
+          resolvedKept = resolvedKept + 1
+          if resolvedKept > tonumber(ARGV[7]) then
+            redis.call('DEL', runKey)
+            redis.call('ZREM', KEYS[2], member)
+          end
+        end
+      end
     end
   end
-  redis.call('EXPIRE', KEYS[2], ARGV[8])
+
+  redis.call('PERSIST', KEYS[2])
   return {'created', ARGV[3]}
 `
 
@@ -251,7 +289,41 @@ const TRANSITION_RUN_SCRIPT = `
     return {'transition_conflict', existing}
   end
 
-  redis.call('SET', KEYS[1], ARGV[4], 'KEEPTTL')
+  local nextOk, nextRecord = pcall(cjson.decode, ARGV[4])
+  if not nextOk then
+    return {'corrupt'}
+  end
+
+  redis.call('SET', KEYS[1], ARGV[4])
+  local nextStatus = nextRecord['status']
+  local unresolved = nextStatus == 'queued' or nextStatus == 'running' or nextStatus == 'reconciliation'
+  if not unresolved then
+    redis.call('EXPIRE', KEYS[1], ARGV[5])
+  end
+
+  local resolvedKept = 0
+  local members = redis.call('ZREVRANGE', KEYS[2], 0, -1)
+  for _, member in ipairs(members) do
+    local runKey = ARGV[6] .. member
+    local raw = redis.call('GET', runKey)
+    if not raw then
+      redis.call('ZREM', KEYS[2], member)
+    else
+      local ok, record = pcall(cjson.decode, raw)
+      if ok then
+        local status = record['status']
+        local unresolvedRecord = status == 'queued' or status == 'running' or status == 'reconciliation'
+        if not unresolvedRecord then
+          resolvedKept = resolvedKept + 1
+          if resolvedKept > tonumber(ARGV[7]) then
+            redis.call('DEL', runKey)
+            redis.call('ZREM', KEYS[2], member)
+          end
+        end
+      end
+    end
+  end
+  redis.call('PERSIST', KEYS[2])
   return {'updated', ARGV[4]}
 `
 
@@ -308,7 +380,6 @@ export class UpstashContentAgentRunAdapter implements ContentAgentRunAdapter {
           command.listMember,
           command.runKeyPrefix,
           command.maxHistory,
-          command.retentionSeconds,
         ],
       ),
     )
@@ -332,12 +403,15 @@ export class UpstashContentAgentRunAdapter implements ContentAgentRunAdapter {
     const raw = parseEvalResult(
       await this.redis.eval(
         TRANSITION_RUN_SCRIPT,
-        [command.runKey],
+        [command.runKey, command.listKey],
         [
           command.ownerSubject,
           command.expectedRevision,
           command.expectedStatuses.join(","),
           JSON.stringify(command.record),
+          command.retentionSeconds,
+          command.runKeyPrefix,
+          command.maxHistory,
         ],
       ),
     )
@@ -422,6 +496,14 @@ export class ContentAgentRunStore {
     private readonly createId: () => string = randomUUID,
   ) {}
 
+  isLeaseExpired(record: ContentAgentRunRecord): boolean {
+    if (record.status !== "queued" && record.status !== "running") return false
+    const explicitExpiry = record.leaseExpiresAt ? Date.parse(record.leaseExpiresAt) : Number.NaN
+    const fallbackExpiry = Date.parse(record.updatedAt) + CONTENT_AGENT_RUN_LEASE_SECONDS * 1_000
+    const expiresAt = Number.isFinite(explicitExpiry) ? explicitExpiry : fallbackExpiry
+    return this.now().getTime() >= expiresAt
+  }
+
   async claim(input: {
     ownerSubject: string
     idempotencyKey: string
@@ -453,6 +535,9 @@ export class ContentAgentRunStore {
       revision: 0,
       createdAt: timestamp.toISOString(),
       updatedAt: timestamp.toISOString(),
+      leaseExpiresAt: new Date(
+        timestamp.getTime() + CONTENT_AGENT_RUN_LEASE_SECONDS * 1_000,
+      ).toISOString(),
     })
 
     let result: ContentAgentRunClaimResult
@@ -463,7 +548,6 @@ export class ContentAgentRunStore {
         listMember: keys.listMember,
         runKeyPrefix: keys.runKeyPrefix,
         maxHistory: MAX_RUN_HISTORY,
-        retentionSeconds: RUN_RETENTION_SECONDS,
         score: timestamp.getTime(),
         record,
       })
@@ -529,6 +613,11 @@ export class ContentAgentRunStore {
       throw new ContentAgentRunStoreError("CONTENT_RUN_NOT_FOUND", "Content run was not found")
     }
     const current = ownedRun(currentRaw, input.ownerSubject)
+    const timestamp = this.now()
+    const leaseExpiresAt =
+      input.status === "queued" || input.status === "running"
+        ? new Date(timestamp.getTime() + CONTENT_AGENT_RUN_LEASE_SECONDS * 1_000).toISOString()
+        : null
     const next = runRecordSchema.parse({
       ...current,
       status: input.status,
@@ -537,16 +626,21 @@ export class ContentAgentRunStore {
       output: input.output,
       errorCode: input.errorCode,
       revision: current.revision + 1,
-      updatedAt: this.now().toISOString(),
+      updatedAt: timestamp.toISOString(),
+      leaseExpiresAt,
     })
 
     let result: ContentAgentRunTransitionResult
     try {
       result = await this.adapter.compareAndSet({
         runKey: keys.runKey,
+        listKey: keys.listKey,
+        runKeyPrefix: keys.runKeyPrefix,
+        maxHistory: MAX_RUN_HISTORY,
         ownerSubject: input.ownerSubject,
         expectedRevision: current.revision,
         expectedStatuses: input.expectedStatuses,
+        retentionSeconds: CONTENT_AGENT_RUN_RETENTION_SECONDS,
         record: next,
       })
     } catch (error) {

@@ -47,22 +47,35 @@ Date: 2026-08-03
 ## Verification run
 
 - `pnpm install --frozen-lockfile`: pass.
-- `pnpm audit --audit-level=high`: pass, no known vulnerabilities.
+- `pnpm audit --prod --audit-level high`: pass, no known vulnerabilities.
 - `pnpm exec tsc --noEmit`: pass.
 - `pnpm lint`: pass with seven legacy warning instances and no errors.
-- `pnpm test`: pass, 107 tests and 0 failures. The test script now uses Node's native runner with the `tsx` import hook and does not require a local IPC socket.
-- `pnpm run build`: pass; 32 static pages generated and dynamic/API routes compiled.
+- `pnpm test`: pass, 113 tests discovered, 112 passed, one real-Redis integration test intentionally skipped in the normal suite, and zero failures. The test script uses Node's native runner with the `tsx` import hook and does not require a local IPC socket.
+- Linux Docker production image build: pass; 32 static pages generated and dynamic/API routes compiled.
+- `pnpm staging:preflight .env.staging`: pass without printing credential values.
 - `git diff --check`: pass; only Windows line-ending notices.
-- Built-server runtime smoke: homepage, login, pricing, Content Agent, and auth-session routes return HTTP 200. With Redis intentionally absent, readiness returns HTTP 503 with `redis.status: missing`.
-- Screenshot-level browser verification: not completed in this workspace because the required browser automation binary is unavailable.
-- Staging container runtime smoke: required in CI and isolated staging. It must build the Dockerfile-backed Compose stack, prove Redis readiness, prove Redis fail-closed behavior, and prove Redis persistence across restart.
+- Isolated Compose runtime: web, Redis, and Redis REST proxy are healthy; Redis is not published to the host and the web service binds to loopback.
+- Public HTTPS runtime smoke: health, login, pricing, billing, and Content Agent pages return HTTP 200 without loopback URL leaks.
+- Redis fail-closed and recovery proof: readiness returned HTTP 503 while Redis was stopped, returned HTTP 200 after restart, and a persistence marker survived the restart.
+- Protected-route smoke: unauthenticated checkout and Content Agent requests return HTTP 401; an unsigned Stripe webhook returns HTTP 400.
+- Internal admin runtime: valid authentication returns HTTP 200 with secure HttpOnly cookies; repeated invalid attempts are throttled with HTTP 429.
+- Real Redis cycle-race integration test: pass; a refund restores top-up credits but does not mint plan credits from an earlier billing cycle.
 - Current tracked and intended-new-file credential scan: clean.
 - Historical credential scan: rotation required for Relevance credentials in prior `README.md` content.
 - Database generation/migration: not applicable. This repository has no Prisma schema or relational database client; the reconciled state uses Upstash/KV.
 
 ## Staging sequence status
 
-The required ten-step sign-in, Stripe test checkout, signed webhook, entitlement, Content Agent execution, saved-run isolation, refund, and cancellation sequence has **not** been executed against a deployed staging environment. Deterministic local tests cover those state transitions, but they are not a substitute for the real staging sequence.
+The isolated HTTPS staging environment executed the following real provider-backed checks:
+
+- Two distinct allowlisted Google test accounts completed OAuth and returned to the staging application.
+- A Stripe test-mode subscription Checkout Session used a recurring test price, stable customer metadata, and staging HTTPS return URLs.
+- Stripe test checkout completed without a real charge. The signed webhook processed `invoice.payment_succeeded`, `customer.subscription.created`, and `checkout.session.completed`.
+- Redis reflected the active Starter entitlement, 2,000 cycle-bound plan credits, and immutable subscription ownership.
+- A signed replay returned the duplicate-safe result without granting access twice.
+- Test subscription cancellation was processed and revoked access.
+
+The full ten-step sequence remains incomplete at the provider execution step. A dedicated 90-day xAI staging key and model are configured, but the dedicated staging team has zero credits/licenses and the provider returns HTTP 403. No credits were purchased. Real successful Content Agent execution and live saved-run isolation therefore remain blocked; deterministic tests cover provider failure, exact-once refund, retry, reconciliation, and account isolation without claiming a live provider success.
 
 ## Required staging environment names
 
@@ -106,13 +119,13 @@ Relevance credentials are not required for this launch candidate and must remain
 
 ## Readiness decision
 
-- Ready to update draft PR #14: yes, after the new commit passes GitHub CI.
-- Ready for isolated test-mode staging: yes, after CI and staging secrets are configured by name in an isolated environment.
+- Ready to update draft PR #14: yes, after the reconciliation commit passes GitHub CI.
+- Ready for isolated test-mode staging: yes; the stack and dedicated test credentials are configured and verified.
 - Ready to merge: no.
 - Ready for production: no.
 
-Merge remains blocked by provider-side Relevance credential rotation and completion of the real ten-step staging sequence. Phase 1A evidence is preserved as an Overlord-specific reference and must not be cherry-picked.
+Merge remains blocked by provider-side Relevance credential rotation and completion of the real Content Agent provider execution sequence. Phase 1A evidence is preserved as an Overlord-specific reference and must not be cherry-picked. The separately requested `staging-branch.bundle` was not available in this workspace and was not reconstructed or used.
 
 ## Next highest-value action
 
-Run GitHub CI for the webview-native staging changes. Then configure an isolated test-mode staging host and execute the full ten-step sequence with real Google sign-in, Stripe test events, the private Redis REST stack, and the configured xAI provider.
+Push the isolated reconciliation commit and let draft PR #14 run GitHub CI. After separate owner approval to fund the xAI staging team, execute one successful Content Agent run plus the invalid-key refund/retry and two-account saved-run isolation checks. Keep the PR draft and unmerged until that evidence and the Relevance credential rotation are complete.

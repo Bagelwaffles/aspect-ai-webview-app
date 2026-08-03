@@ -18,14 +18,16 @@ PostgreSQL and Neon wsproxy are not included. No relational schema has been appr
 
 1. Create an isolated staging host or VM that does not share production credentials or data.
 2. Copy `.env.staging.example` to `.env.staging`.
-3. Replace every placeholder with dedicated staging/test values.
+3. Replace every placeholder with dedicated staging/test values. The three public URL values must use the same real HTTPS staging origin; loopback is valid only for the infrastructure health checks below, not checkout or OAuth.
 4. Keep Relevance and n8n unset until their credentials and flows are independently approved.
 5. Configure a host reverse proxy only after the stack is healthy. Forward it to the loopback-only web port; never expose Redis or Redis REST.
+6. Register `https://<staging-host>/api/auth/callback/google` on the dedicated staging Google OAuth client and `https://<staging-host>/api/webhooks/stripe` on the Stripe test-mode webhook endpoint.
 
 Validate configuration without starting containers:
 
 ```bash
-docker compose --env-file .env.staging -f docker-compose.staging.yml config
+pnpm staging:preflight .env.staging
+docker compose --env-file .env.staging -f docker-compose.staging.yml config --quiet
 ```
 
 Start the stack:
@@ -40,14 +42,15 @@ docker compose --env-file .env.staging -f docker-compose.staging.yml ps
 Readiness must return HTTP 200 and report Redis as `ready`:
 
 ```bash
-curl --fail --silent http://127.0.0.1:3000/api/health
+STAGING_WEB_PORT="${AMS_STAGING_WEB_PORT:-3000}"
+curl --fail --silent "http://127.0.0.1:${STAGING_WEB_PORT}/api/health"
 ```
 
 Prove fail-closed behavior:
 
 ```bash
 docker compose --env-file .env.staging -f docker-compose.staging.yml stop redis
-curl --silent --output /tmp/ams-health-down.json --write-out '%{http_code}\n' http://127.0.0.1:3000/api/health
+curl --silent --output /tmp/ams-health-down.json --write-out '%{http_code}\n' "http://127.0.0.1:${STAGING_WEB_PORT}/api/health"
 docker compose --env-file .env.staging -f docker-compose.staging.yml start redis
 ```
 
@@ -82,6 +85,8 @@ Record timestamps, test account identity, Stripe test object IDs, HTTP results, 
 | 10. Failed payment | Stripe test failed-payment lifecycle removes access and does not reset credits |
 
 PR #14 is not ready to merge until all ten steps pass in this deployed stack.
+
+For step 7, use a unique run idempotency key, temporarily replace only the staging `XAI_API_KEY` with an invalid staging value, recreate the `web` service, and execute one Content Agent request. Verify that the run is recorded as refunded and the available balance is restored exactly once. Restore the dedicated staging key without logging it, recreate `web`, and prove a new request succeeds. Do not add a public fault-injection route or reuse a production provider key.
 
 ## Content Agent reconciliation repair
 

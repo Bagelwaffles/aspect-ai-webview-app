@@ -77,6 +77,7 @@ export class CreditLedgerError extends Error {
 type CreditLedgerKeys = {
   plan: string
   topup: string
+  cycle: string
   reservation: string
   ledger: string
 }
@@ -151,6 +152,7 @@ const RESERVE_SCRIPT = `
   local amount = tonumber(ARGV[1])
   local plan = tonumber(redis.call('GET', KEYS[1]) or '0')
   local topup = tonumber(redis.call('GET', KEYS[2]) or '0')
+  local planCycle = redis.call('GET', KEYS[5]) or ''
   if plan < 0 or topup < 0 then
     return {'corrupt', tostring(plan), tostring(topup)}
   end
@@ -164,6 +166,7 @@ const RESERVE_SCRIPT = `
       'amount', ARGV[1],
       'planUnits', '0',
       'topupUnits', '0',
+      'planCycle', planCycle,
       'state', 'rejected',
       'createdAt', ARGV[5],
       'updatedAt', ARGV[5]
@@ -197,6 +200,7 @@ const RESERVE_SCRIPT = `
     'amount', ARGV[1],
     'planUnits', tostring(fromPlan),
     'topupUnits', tostring(fromTopup),
+    'planCycle', planCycle,
     'state', 'reserved',
     'createdAt', ARGV[5],
     'updatedAt', ARGV[5]
@@ -288,6 +292,8 @@ const REFUND_SCRIPT = `
   local amount = redis.call('HGET', KEYS[1], 'amount') or '0'
   local planUnits = tonumber(redis.call('HGET', KEYS[1], 'planUnits') or '0')
   local topupUnits = tonumber(redis.call('HGET', KEYS[1], 'topupUnits') or '0')
+  local reservedPlanCycle = redis.call('HGET', KEYS[1], 'planCycle') or ''
+  local currentPlanCycle = redis.call('GET', KEYS[5]) or ''
 
   if state == 'refunded' then
     return {
@@ -304,7 +310,12 @@ const REFUND_SCRIPT = `
     return {'terminal_conflict', state}
   end
 
-  local newPlan = plan + planUnits
+  local restoredPlanUnits = 0
+  if reservedPlanCycle == currentPlanCycle then
+    restoredPlanUnits = planUnits
+  end
+
+  local newPlan = plan + restoredPlanUnits
   local newTopup = topup + topupUnits
   redis.call('SET', KEYS[3], newPlan)
   redis.call('SET', KEYS[4], newTopup)
@@ -315,7 +326,10 @@ const REFUND_SCRIPT = `
     'reservationId', ARGV[2],
     'amount', amount,
     'planUnits', tostring(planUnits),
+    'planUnitsRestored', tostring(restoredPlanUnits),
     'topupUnits', tostring(topupUnits),
+    'reservedPlanCycle', reservedPlanCycle,
+    'currentPlanCycle', currentPlanCycle,
     'availablePlan', tostring(newPlan),
     'availableTopup', tostring(newTopup),
     'at', ARGV[3]
@@ -345,6 +359,7 @@ export function creditBalanceKeys(account: string) {
   return {
     plan: `ams:credits:plan:${normalizedAccount}`,
     topup: `ams:credits:topup:${normalizedAccount}`,
+    cycle: `ams:credits:cycle:${normalizedAccount}`,
   }
 }
 
@@ -418,7 +433,13 @@ export class UpstashCreditLedgerAdapter implements CreditLedgerAdapter {
     if (command.operation === "reserve") {
       const raw = await this.redis.eval(
         RESERVE_SCRIPT,
-        [command.keys.plan, command.keys.topup, command.keys.reservation, command.keys.ledger],
+        [
+          command.keys.plan,
+          command.keys.topup,
+          command.keys.reservation,
+          command.keys.ledger,
+          command.keys.cycle,
+        ],
         [command.amount, command.accountHash, command.bindingHash, command.reservationId, command.timestamp],
       )
       return parseStorageResult(raw)
@@ -427,7 +448,13 @@ export class UpstashCreditLedgerAdapter implements CreditLedgerAdapter {
     const script = command.operation === "commit" ? COMMIT_SCRIPT : REFUND_SCRIPT
     const raw = await this.redis.eval(
       script,
-      [command.keys.reservation, command.keys.ledger, command.keys.plan, command.keys.topup],
+      [
+        command.keys.reservation,
+        command.keys.ledger,
+        command.keys.plan,
+        command.keys.topup,
+        command.keys.cycle,
+      ],
       [command.accountHash, command.reservationId, command.timestamp],
     )
     return parseStorageResult(raw)
