@@ -4,7 +4,7 @@ export interface Agent {
   type: "chat" | "workflow" | "analytics" | "customer-service" | "sales"
   status: "active" | "inactive" | "training" | "error"
   description: string
-  capabilities: string[]
+  capabilities: readonly string[]
   model: "grok" | "relevance" | "custom"
   config: AgentConfig
   metrics: AgentMetrics
