@@ -1,42 +1,54 @@
-import type { NextRequest } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+
+import {
+  isInternalApiAuthorized,
+  unauthorizedInternalApiResponse,
+} from "@/lib/server/internal-api-auth"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  // Mock implementation - would fetch from database
-  const agent = {
-    id: params.id,
-    name: "Customer Service Pro",
-    type: "customer-service",
-    status: "active",
-    // ... other agent properties
-  }
+type RouteContext = { params: Promise<{ id: string }> }
 
-  return Response.json({ agent })
+export async function GET(_request: NextRequest, context: RouteContext) {
+  const { id } = await context.params
+  return NextResponse.json(
+    {
+      ok: false,
+      error: "Agent not found",
+      code: "AGENT_NOT_FOUND",
+      id,
+    },
+    { status: 404, headers: { "Cache-Control": "no-store" } },
+  )
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const updates = await req.json()
-
-    // Mock update - would update in database
-    const updatedAgent = {
-      id: params.id,
-      ...updates,
-      updatedAt: new Date(),
-    }
-
-    return Response.json({ agent: updatedAgent })
-  } catch (error) {
-    return Response.json({ error: "Failed to update agent" }, { status: 500 })
+export async function PUT(request: NextRequest, _context: RouteContext) {
+  if (!isInternalApiAuthorized(request)) {
+    return unauthorizedInternalApiResponse()
   }
+
+  return NextResponse.json(
+    {
+      ok: false,
+      error: "Persistent agent storage is not configured",
+      code: "AGENT_STORE_NOT_CONFIGURED",
+    },
+    { status: 501 },
+  )
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    // Mock deletion - would delete from database
-    return Response.json({ success: true })
-  } catch (error) {
-    return Response.json({ error: "Failed to delete agent" }, { status: 500 })
+export async function DELETE(request: NextRequest, _context: RouteContext) {
+  if (!isInternalApiAuthorized(request)) {
+    return unauthorizedInternalApiResponse()
   }
+
+  return NextResponse.json(
+    {
+      ok: false,
+      error: "Persistent agent storage is not configured",
+      code: "AGENT_STORE_NOT_CONFIGURED",
+    },
+    { status: 501 },
+  )
 }
