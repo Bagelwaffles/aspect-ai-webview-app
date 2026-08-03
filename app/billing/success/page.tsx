@@ -12,35 +12,33 @@ function statusTone(status?: string | null) {
   return "secondary"
 }
 
-type BillingSuccessSearchParams = Promise<{ session_id?: string }>
+type PageProps = {
+  searchParams?: Promise<{ session_id?: string }>
+}
 
-export default async function BillingSuccessPage({
-  searchParams,
-}: {
-  searchParams?: BillingSuccessSearchParams
-}) {
+export default async function BillingSuccessPage({ searchParams }: PageProps) {
   const snapshot = await getBillingSnapshot()
-  const org = snapshot.organization
-  const status = org?.subscriptionStatus ?? "locked"
-  const params = searchParams ? await searchParams : {}
+  const organization = snapshot.organization
+  const status = organization?.subscriptionStatus ?? "unverified"
+  const params = (await searchParams) ?? {}
 
   return (
     <main className="min-h-screen bg-background px-6 py-10">
       <div className="mx-auto max-w-4xl space-y-6">
         <div>
           <Badge variant={statusTone(status)} className="capitalize">
-            Checkout complete
+            Checkout returned
           </Badge>
-          <h1 className="mt-3 text-3xl font-bold">Billing success</h1>
+          <h1 className="mt-3 text-3xl font-bold">Billing confirmation</h1>
           <p className="text-muted-foreground">
-            The checkout return route is live and now resolves to a real billing state view.
+            The payment provider returned to AMS. Access is enabled only after verified fulfillment updates the billing record.
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Safe org status</CardTitle>
-            <CardDescription>{org?.organizationSlug ?? "ams-stripe-test-org"}</CardDescription>
+            <CardTitle>Verified billing state</CardTitle>
+            <CardDescription>{organization?.organizationSlug ?? "No organization linked"}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="rounded-lg border p-4">
@@ -49,32 +47,33 @@ export default async function BillingSuccessPage({
             </div>
             <div className="rounded-lg border p-4">
               <div className="text-sm text-muted-foreground">Access</div>
-              <div className="text-xl font-semibold">{org?.accessEnabled ? "Enabled" : "Locked"}</div>
+              <div className="text-xl font-semibold">{organization?.accessEnabled ? "Enabled" : "Not verified"}</div>
             </div>
             <div className="rounded-lg border p-4">
               <div className="text-sm text-muted-foreground">Current period end</div>
-              <div className="text-xl font-semibold">{org?.currentPeriodEnd ?? "Unavailable"}</div>
+              <div className="text-xl font-semibold">{organization?.currentPeriodEnd ?? "Unavailable"}</div>
             </div>
             <div className="rounded-lg border p-4">
-              <div className="text-sm text-muted-foreground">Stripe session</div>
-              <div className="break-all text-xl font-semibold">
-                {params.session_id ?? "No session id in return URL"}
-              </div>
+              <div className="text-sm text-muted-foreground">Stripe session reference</div>
+              <div className="break-all text-sm font-semibold">{params.session_id ?? "Not provided"}</div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Next step</CardTitle>
-            <CardDescription>Return to the dashboard now that the checkout return route is working.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link href="/">Back to dashboard</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        {snapshot.error && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Fulfillment pending</CardTitle>
+              <CardDescription>
+                AMS could not verify the entitlement record yet. No access has been granted automatically.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+
+        <Button asChild>
+          <Link href="/billing">Return to billing</Link>
+        </Button>
       </div>
     </main>
   )
