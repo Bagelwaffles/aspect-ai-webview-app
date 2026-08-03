@@ -1,6 +1,8 @@
 import { xai } from "@ai-sdk/xai"
 import { generateText, streamText } from "ai"
 
+export type GrokAgentPersonality = "professional" | "friendly" | "technical" | "sales" | "support" | "witty"
+
 export interface GrokAgent {
   id: string
   name: string
@@ -11,6 +13,7 @@ export interface GrokAgent {
   maxTokens: number
   capabilities: string[]
   status: "active" | "inactive" | "training"
+  personality: GrokAgentPersonality
   createdAt: Date
   updatedAt: Date
 }
@@ -42,6 +45,7 @@ Guidelines:
     maxTokens: 500,
     capabilities: ["Order tracking", "Product information", "Issue resolution", "General support"],
     status: "active",
+    personality: "support",
     createdAt: new Date("2024-01-15"),
     updatedAt: new Date(),
   },
@@ -69,6 +73,7 @@ Guidelines:
     maxTokens: 400,
     capabilities: ["Lead qualification", "Product recommendations", "Pricing guidance", "Demo scheduling"],
     status: "active",
+    personality: "sales",
     createdAt: new Date("2024-01-20"),
     updatedAt: new Date(),
   },
@@ -96,6 +101,7 @@ Guidelines:
     maxTokens: 800,
     capabilities: ["API support", "Integration help", "Troubleshooting", "Code assistance"],
     status: "active",
+    personality: "technical",
     createdAt: new Date("2024-01-25"),
     updatedAt: new Date(),
   },
@@ -123,6 +129,7 @@ Guidelines:
     maxTokens: 600,
     capabilities: ["Data analysis", "Trend identification", "Report generation", "Business insights"],
     status: "active",
+    personality: "professional",
     createdAt: new Date("2024-02-01"),
     updatedAt: new Date(),
   },
@@ -150,6 +157,7 @@ Guidelines:
     maxTokens: 700,
     capabilities: ["Marketing copy", "Product descriptions", "Social media", "SEO content"],
     status: "active",
+    personality: "friendly",
     createdAt: new Date("2024-02-05"),
     updatedAt: new Date(),
   },
