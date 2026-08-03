@@ -4,6 +4,12 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { grokAgentManager } from "@/lib/grok-agents"
 import { authorizePaidApiRequest } from "@/lib/server/customer-api-auth"
+import {
+  agentSlugForRuntimeAgent,
+  consumeCredits,
+  getEntitlementSnapshot,
+  snapshotHasAgentAccess,
+} from "@/lib/server/entitlements"
 import { consumeAiRateLimit } from "@/lib/server/rate-limit"
 
 export const runtime = "nodejs"
@@ -25,9 +31,35 @@ export async function POST(request: NextRequest) {
   const message = body && typeof body === "object" ? body.message : undefined
   const conversationHistory = body && typeof body === "object" ? body.conversationHistory : undefined
   const agent = typeof agentId === "string" ? grokAgentManager.getAgent(agentId) : undefined
+  const agentSlug = typeof agentId === "string" ? agentSlugForRuntimeAgent(agentId) : null
 
-  if (!agent) {
-    return NextResponse.json({ ok: false, error: "Unknown agent" }, { status: 400 })
+  if (!agent || !agentSlug) {
+    return NextResponse.json(
+      { ok: false, error: "This agent is not enabled for customer execution", code: "AGENT_NOT_LAUNCHED" },
+      { status: 404 },
+    )
+  }
+
+  if (principal.kind === "customer") {
+    const snapshot = await getEntitlementSnapshot(principal.email).catch(() => null)
+    if (!snapshot?.configured) {
+      return NextResponse.json(
+        { ok: false, error: "Entitlement service is not configured", code: "ENTITLEMENTS_NOT_CONFIGURED" },
+        { status: 503 },
+      )
+    }
+    if (!snapshotHasAgentAccess(snapshot, agentSlug)) {
+      return NextResponse.json(
+        { ok: false, error: "This agent is not included in the account plan", code: "AGENT_ACCESS_REQUIRED" },
+        { status: 402 },
+      )
+    }
+    if (snapshot.totalCredits < 1) {
+      return NextResponse.json(
+        { ok: false, error: "No AI credits remain", code: "CREDITS_REQUIRED" },
+        { status: 402 },
+      )
+    }
   }
 
   if (typeof message !== "string" || !message.trim() || message.length > 4000) {
@@ -93,6 +125,11 @@ export async function POST(request: NextRequest) {
       prompt,
       temperature: agent.temperature,
       maxOutputTokens: agent.maxTokens,
+      onFinish: async () => {
+        if (principal.kind === "customer") {
+          await consumeCredits(principal.email, 1).catch(() => null)
+        }
+      },
     })
 
     return result.toTextStreamResponse({
