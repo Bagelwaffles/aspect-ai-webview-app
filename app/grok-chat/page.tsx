@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -89,39 +90,17 @@ export default function GrokChatPage() {
     setIsLoading(true)
 
     try {
-      const conversationHistory = messages.slice(-10).map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }))
-
-      const response = await fetch("/api/grok/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({
-          agentId: selectedAgent,
-          message: currentMessage,
-          conversationHistory,
-        }),
-      })
-
-      const data = await response.json()
-      if (!response.ok || typeof data.response !== "string" || !data.response.trim()) {
-        setRequestError(data.error || `The Content Agent request failed (${response.status}).`)
-        return
-      }
-
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.response,
+        content:
+          "Grok chat is disabled for the first launch. Use the Content Agent page so credits, saved runs, retries, and refunds stay on the controlled path.",
         timestamp: new Date(),
         agentId: selectedAgent,
       }
 
       setMessages((prev) => [...prev, assistantMessage])
+      setRequestError("Open Content Agent to run a paid AI request.")
     } catch {
       setRequestError("The Content Agent request could not be completed. Please try again.")
     } finally {
@@ -169,7 +148,7 @@ export default function GrokChatPage() {
               </div>
               <div>
                 <h1 className="text-xl font-bold font-serif">Grok Chat Agents</h1>
-                <p className="text-sm text-muted-foreground">AI-powered conversations with specialized agents</p>
+                <p className="text-sm text-muted-foreground">Quarantined preview; paid execution runs through Content Agent</p>
               </div>
             </div>
           </div>
@@ -183,6 +162,9 @@ export default function GrokChatPage() {
             )}
             <Button variant="outline" onClick={() => (window.location.href = "/")}>
               Dashboard
+            </Button>
+            <Button asChild>
+              <Link href="/content-agent">Content Agent</Link>
             </Button>
           </div>
         </div>

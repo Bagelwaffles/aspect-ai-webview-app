@@ -26,11 +26,6 @@ type ChatMessage = {
   content: string
 }
 
-type AiChatPayload = {
-  response?: unknown
-  code?: unknown
-}
-
 const systemStates = [
   {
     title: "AI guidance",
@@ -73,22 +68,8 @@ const navigation = [
   },
 ] as const
 
-const apiErrorMessages: Record<string, string> = {
-  CUSTOMER_AUTH_REQUIRED: "Sign in before using AI guidance.",
-  SUBSCRIPTION_REQUIRED: "An active plan is required before using AI guidance.",
-  CREDITS_REQUIRED: "No AI credits remain on this account.",
-  ENTITLEMENTS_NOT_CONFIGURED: "The entitlement service is not configured.",
-  AI_PROVIDER_NOT_CONFIGURED: "The AI provider is not configured.",
-  RATE_LIMITED: "The request limit has been reached. Try again later.",
-}
-
 function createMessageId(prefix: string) {
   return `${prefix}-${Date.now()}`
-}
-
-function describeApiError(status: number, payload: AiChatPayload | null) {
-  const code = typeof payload?.code === "string" ? payload.code : ""
-  return apiErrorMessages[code] ?? `The AI request returned HTTP ${status}.`
 }
 
 export default function AICommandCenter() {
@@ -97,7 +78,7 @@ export default function AICommandCenter() {
       id: "ai-command-welcome",
       type: "ai",
       content:
-        "Ask for practical marketing or automation guidance. This screen does not have connected live business metrics and does not start workflows.",
+        "AI Command is quarantined for launch. Use the Content Agent for saved, credit-accounted content generation.",
     },
   ])
   const [chatInput, setChatInput] = useState("")
@@ -124,53 +105,16 @@ export default function AICommandCenter() {
     ])
     setChatInput("")
     setIsLoading(true)
-
-    try {
-      const response = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
-      })
-      const payload = (await response.json().catch(() => null)) as AiChatPayload | null
-
-      if (!response.ok) {
-        const reason = describeApiError(response.status, payload)
-        setChatMessages((current) => [
-          ...current,
-          {
-            id: createMessageId("error"),
-            type: "error",
-            content: `${reason} No live analysis or workflow was started.`,
-          },
-        ])
-        return
-      }
-
-      const responseText = typeof payload?.response === "string" ? payload.response.trim() : ""
-      if (!responseText) {
-        throw new Error("EMPTY_AI_RESPONSE")
-      }
-
-      setChatMessages((current) => [
-        ...current,
-        {
-          id: createMessageId("assistant"),
-          type: "ai",
-          content: responseText,
-        },
-      ])
-    } catch {
-      setChatMessages((current) => [
-        ...current,
-        {
-          id: createMessageId("network-error"),
-          type: "error",
-          content: "The AI request could not be completed. No live analysis or workflow was started.",
-        },
-      ])
-    } finally {
-      setIsLoading(false)
-    }
+    setChatMessages((current) => [
+      ...current,
+      {
+        id: createMessageId("legacy-route-disabled"),
+        type: "error",
+        content:
+          "AI Command is disabled for the first launch so credits, saved runs, and refunds stay inside the Content Agent flow. Open Content Agent to run a paid AI request.",
+      },
+    ])
+    setIsLoading(false)
   }
 
   return (

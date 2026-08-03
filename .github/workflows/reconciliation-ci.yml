@@ -81,6 +81,50 @@ jobs:
       - name: Production build
         run: pnpm run build
 
+      - name: Staging container runtime smoke tests
+        run: |
+          cp .env.staging.example .env.staging
+          docker compose --env-file .env.staging -f docker-compose.staging.yml up --build -d
+
+          cleanup() {
+            docker compose --env-file .env.staging -f docker-compose.staging.yml logs --no-color || true
+            docker compose --env-file .env.staging -f docker-compose.staging.yml down || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /tmp/compose-health.json; then
+              break
+            fi
+            sleep 2
+          done
+
+          node -e 'const value=require("/tmp/compose-health.json"); if(value.ok!==true||value.persistence?.redis?.status!=="ready") process.exit(1)'
+
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T redis redis-cli SET ams:ci:persistence-check verified
+          docker compose --env-file .env.staging -f docker-compose.staging.yml restart redis
+          for attempt in $(seq 1 60); do
+            if docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T redis redis-cli PING | grep -q PONG; then
+              break
+            fi
+            sleep 1
+          done
+          test "$(docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T redis redis-cli GET ams:ci:persistence-check)" = "verified"
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T redis redis-cli DEL ams:ci:persistence-check
+
+          docker compose --env-file .env.staging -f docker-compose.staging.yml stop redis
+          test "$(curl --silent --output /tmp/compose-health-down.json --write-out '%{http_code}' http://127.0.0.1:3000/api/health)" = "503"
+          node -e 'const value=require("/tmp/compose-health-down.json"); if(value.ok!==false||value.persistence?.redis?.status==="ready") process.exit(1)'
+
+          docker compose --env-file .env.staging -f docker-compose.staging.yml start redis
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /tmp/compose-health-restored.json; then
+              break
+            fi
+            sleep 2
+          done
+          node -e 'const value=require("/tmp/compose-health-restored.json"); if(value.ok!==true||value.persistence?.redis?.status!=="ready") process.exit(1)'
+
       - name: Runtime security smoke tests
         env:
           NEXTAUTH_SECRET: ci-only-placeholder-secret-not-for-production

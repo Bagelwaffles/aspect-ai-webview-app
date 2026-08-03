@@ -83,6 +83,23 @@ Record timestamps, test account identity, Stripe test object IDs, HTTP results, 
 
 PR #14 is not ready to merge until all ten steps pass in this deployed stack.
 
+## Content Agent reconciliation repair
+
+The Content Agent can intentionally quarantine a run as `reconciliation` when credit state and run persistence cannot be proven consistent. Treat this as a financial hold, not a normal application error.
+
+Required operator actions:
+
+1. Pause production merge and keep the affected environment in test mode.
+2. Capture the redacted account subject, run idempotency key, ledger idempotency key, Stripe test object IDs, HTTP status, response code, and timestamp.
+3. Inspect the Redis run record and credit reservation record from inside the private staging network. Do not expose Redis or copy secrets into logs.
+4. If the reservation is `reserved` and no output was released, refund the reservation once and mark the run `refunded`.
+5. If the reservation is `committed` and staged output exists, release the staged output once and mark the run `succeeded`.
+6. If the reservation is `committed` and no recoverable output exists, do not invent output. Record the loss, add a compensating credit top-up, and keep the run failed.
+7. If the reservation and run disagree in any other way, keep the account blocked from automated repair and escalate before merge.
+8. Add a regression test for the exact failure mode before retrying the ten-step staging sequence.
+
+PR #14 is not merge-ready while any reconciliation state lacks a documented resolution and regression test.
+
 ## Stop without deleting persistent data
 
 ```bash

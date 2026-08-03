@@ -36,6 +36,7 @@ Date: 2026-08-03
 - Subscription-only checkout with server-side price allowlists, identity metadata, and return URLs.
 - Stripe signature verification, mode checks, object re-fetching, identity agreement, event claims, lifecycle updates, cancellation/failed-payment revocation, and once-per-cycle credit reset.
 - One-time Ethical Agent Farm checkout disabled with HTTP 410; public offers are request-only.
+- Legacy paid AI chat and Grok chat execution routes are disabled with HTTP 410 after customer authentication so launch traffic is forced through the saved Content Agent route.
 - Unfinished agent, deployment, Relevance, analytics, and command surfaces are either authenticated `NOT_IMPLEMENTED` endpoints or honest unavailable pages.
 - Current-tree credential redaction and a provider-side rotation checklist for credentials still present in Git history.
 - Webview-native staging Compose stack with pinned web, Redis, and Redis REST proxy versions.
@@ -54,7 +55,7 @@ Date: 2026-08-03
 - `git diff --check`: pass; only Windows line-ending notices.
 - Built-server runtime smoke: homepage, login, pricing, Content Agent, and auth-session routes return HTTP 200. With Redis intentionally absent, readiness returns HTTP 503 with `redis.status: missing`.
 - Screenshot-level browser verification: not completed in this workspace because the required browser automation binary is unavailable.
-- Docker runtime verification: not completed in this workspace because the Docker engine is unavailable. Compose and real Redis REST behavior must be exercised by GitHub CI and the isolated staging host.
+- Staging container runtime smoke: required in CI and isolated staging. It must build the Dockerfile-backed Compose stack, prove Redis readiness, prove Redis fail-closed behavior, and prove Redis persistence across restart.
 - Current tracked and intended-new-file credential scan: clean.
 - Historical credential scan: rotation required for Relevance credentials in prior `README.md` content.
 - Database generation/migration: not applicable. This repository has no Prisma schema or relational database client; the reconciled state uses Upstash/KV.
