@@ -15,6 +15,8 @@ export interface GrokAgent {
   updatedAt: Date
 }
 
+export type GrokAgentConfig = GrokAgent
+
 export const DEFAULT_GROK_AGENTS: GrokAgent[] = [
   {
     id: "grok-support",
@@ -157,9 +159,7 @@ export class GrokAgentManager {
   private agents = new Map<string, GrokAgent>()
 
   constructor() {
-    DEFAULT_GROK_AGENTS.forEach((agent) => {
-      this.agents.set(agent.id, agent)
-    })
+    DEFAULT_GROK_AGENTS.forEach((agent) => this.agents.set(agent.id, agent))
   }
 
   getAllAgents(): GrokAgent[] {
@@ -171,28 +171,22 @@ export class GrokAgentManager {
   }
 
   createAgent(agentData: Omit<GrokAgent, "id" | "createdAt" | "updatedAt">): GrokAgent {
-    const id = `grok-${Date.now()}`
     const agent: GrokAgent = {
       ...agentData,
-      id,
+      id: `grok-${Date.now()}`,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
-    this.agents.set(id, agent)
+    this.agents.set(agent.id, agent)
     return agent
   }
 
   updateAgent(id: string, updates: Partial<GrokAgent>): GrokAgent | null {
     const agent = this.agents.get(id)
     if (!agent) return null
-
-    const updatedAgent = {
-      ...agent,
-      ...updates,
-      updatedAt: new Date(),
-    }
-    this.agents.set(id, updatedAgent)
-    return updatedAgent
+    const updated = { ...agent, ...updates, updatedAt: new Date() }
+    this.agents.set(id, updated)
+    return updated
   }
 
   deleteAgent(id: string): boolean {
@@ -205,20 +199,16 @@ export class GrokAgentManager {
     conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>,
   ): Promise<string> {
     const agent = this.getAgent(agentId)
-    if (!agent) {
-      throw new Error(`Agent ${agentId} not found`)
-    }
+    if (!agent) throw new Error(`Agent ${agentId} not found`)
 
-    let prompt = agent.systemPrompt + "\n\n"
-
-    if (conversationHistory && conversationHistory.length > 0) {
+    let prompt = `${agent.systemPrompt}\n\n`
+    if (conversationHistory?.length) {
       prompt += "Previous conversation:\n"
-      conversationHistory.slice(-6).forEach((msg) => {
-        prompt += `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}\n`
+      conversationHistory.slice(-6).forEach((entry) => {
+        prompt += `${entry.role === "user" ? "User" : "Assistant"}: ${entry.content}\n`
       })
       prompt += "\n"
     }
-
     prompt += `Current user message: ${message}\n\nProvide a helpful response based on your role and expertise:`
 
     const { text } = await generateText({
@@ -227,7 +217,6 @@ export class GrokAgentManager {
       temperature: agent.temperature,
       maxOutputTokens: agent.maxTokens,
     })
-
     return text
   }
 
@@ -237,20 +226,16 @@ export class GrokAgentManager {
     conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>,
   ) {
     const agent = this.getAgent(agentId)
-    if (!agent) {
-      throw new Error(`Agent ${agentId} not found`)
-    }
+    if (!agent) throw new Error(`Agent ${agentId} not found`)
 
-    let prompt = agent.systemPrompt + "\n\n"
-
-    if (conversationHistory && conversationHistory.length > 0) {
+    let prompt = `${agent.systemPrompt}\n\n`
+    if (conversationHistory?.length) {
       prompt += "Previous conversation:\n"
-      conversationHistory.slice(-6).forEach((msg) => {
-        prompt += `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}\n`
+      conversationHistory.slice(-6).forEach((entry) => {
+        prompt += `${entry.role === "user" ? "User" : "Assistant"}: ${entry.content}\n`
       })
       prompt += "\n"
     }
-
     prompt += `Current user message: ${message}\n\nProvide a helpful response based on your role and expertise:`
 
     return streamText({
