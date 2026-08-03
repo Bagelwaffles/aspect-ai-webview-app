@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { grokAgentManager } from "@/lib/grok-agents"
+import { grokAgentManager, type GrokAgentConfig } from "@/lib/grok-agents"
 import { authorizePaidApiRequest } from "@/lib/server/customer-api-auth"
 import {
-  agentSlugForRuntimeAgent,
   getEntitlementSnapshot,
   snapshotHasAgentAccess,
 } from "@/lib/server/entitlements"
@@ -11,58 +10,86 @@ import {
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
+type GrokAgentsDependencies = {
+  authorize: typeof authorizePaidApiRequest
+  getEntitlements: typeof getEntitlementSnapshot
+  hasAgentAccess: typeof snapshotHasAgentAccess
+  getAgents: () => GrokAgentConfig[]
+  getProviderModel: () => string
+}
+
+type GrokAgentsTestGlobals = typeof globalThis & {
+  __amsGrokAgentsTestDependencies?: Partial<GrokAgentsDependencies>
+}
+
+function testDependencies(): Partial<GrokAgentsDependencies> {
+  if (process.env.NODE_ENV === "production") return {}
+  return (globalThis as GrokAgentsTestGlobals).__amsGrokAgentsTestDependencies ?? {}
+}
+
+function createGrokAgentsHandler(overrides: Partial<GrokAgentsDependencies> = {}) {
+  const dependencies: GrokAgentsDependencies = {
+    authorize: authorizePaidApiRequest,
+    getEntitlements: getEntitlementSnapshot,
+    hasAgentAccess: snapshotHasAgentAccess,
+    getAgents: () => grokAgentManager.getAllAgents(),
+    getProviderModel: () => process.env.XAI_MODEL?.trim() ?? "not_configured",
+    ...overrides,
+  }
+
+  return async function GET(request: NextRequest) {
+    const principal = await dependencies.authorize(request)
+    if (!principal || principal.kind !== "customer") {
+      return NextResponse.json(
+        { ok: false, error: "A customer session is required", code: "CUSTOMER_SESSION_REQUIRED" },
+        { status: 401, headers: { "Cache-Control": "no-store" } },
+      )
+    }
+
+    const snapshot = await dependencies.getEntitlements(principal.subject).catch(() => null)
+    if (!snapshot?.configured) {
+      return NextResponse.json(
+        { ok: false, error: "Entitlement service is not configured", code: "ENTITLEMENTS_NOT_CONFIGURED" },
+        { status: 503, headers: { "Cache-Control": "no-store" } },
+      )
+    }
+
+    const contentAgent = dependencies.getAgents().find((agent) => agent.id === "grok-content")
+    const entitled = dependencies.hasAgentAccess(snapshot, "content")
+    const agents = contentAgent
+      ? [
+          {
+            id: contentAgent.id,
+            slug: "content",
+            name: contentAgent.name,
+            description: contentAgent.description,
+            model: dependencies.getProviderModel(),
+            temperature: contentAgent.temperature,
+            maxTokens: contentAgent.maxTokens,
+            capabilities: contentAgent.capabilities,
+            status: contentAgent.status,
+            personality: contentAgent.personality,
+            entitled,
+            executionStatus: entitled ? "available" : "subscription_required",
+          },
+        ]
+      : []
+
+    return NextResponse.json(
+      {
+        ok: true,
+        agents,
+        account: {
+          plan: snapshot.plan,
+          subscriptionStatus: snapshot.subscriptionStatus,
+          creditsRemaining: snapshot.totalCredits,
+        },
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    )
+  }
+}
+
 export async function GET(request: NextRequest) {
-  const principal = await authorizePaidApiRequest(request)
-  if (!principal) {
-    return NextResponse.json(
-      { ok: false, error: "Authentication required", code: "CUSTOMER_AUTH_REQUIRED" },
-      { status: 401, headers: { "Cache-Control": "no-store" } },
-    )
-  }
-
-  const snapshot =
-    principal.kind === "customer"
-      ? await getEntitlementSnapshot(principal.email).catch(() => null)
-      : null
-
-  if (principal.kind === "customer" && !snapshot?.configured) {
-    return NextResponse.json(
-      { ok: false, error: "Entitlement service is not configured", code: "ENTITLEMENTS_NOT_CONFIGURED" },
-      { status: 503 },
-    )
-  }
-
-  const agents = grokAgentManager
-    .getAllAgents()
-    .map((agent) => ({ agent, slug: agentSlugForRuntimeAgent(agent.id) }))
-    .filter((entry): entry is { agent: ReturnType<typeof grokAgentManager.getAllAgents>[number]; slug: string } => Boolean(entry.slug))
-    .map(({ agent, slug }) => ({
-      id: agent.id,
-      slug,
-      name: agent.name,
-      description: agent.description,
-      model: process.env.XAI_MODEL?.trim() ?? "not_configured",
-      temperature: agent.temperature,
-      maxTokens: agent.maxTokens,
-      capabilities: agent.capabilities,
-      status: agent.status,
-      personality: agent.personality,
-      entitled: principal.kind === "internal" || Boolean(snapshot && snapshotHasAgentAccess(snapshot, slug)),
-    }))
-
-  return NextResponse.json(
-    {
-      ok: true,
-      agents,
-      account:
-        principal.kind === "customer" && snapshot
-          ? {
-              plan: snapshot.plan,
-              subscriptionStatus: snapshot.subscriptionStatus,
-              creditsRemaining: snapshot.totalCredits,
-            }
-          : { internal: true },
-    },
-    { headers: { "Cache-Control": "no-store" } },
-  )
+  return createGrokAgentsHandler(testDependencies())(request)
 }

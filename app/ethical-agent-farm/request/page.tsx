@@ -63,7 +63,7 @@ export default function OfferRequestPage() {
           <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Offer request</p>
           <h1 className="text-4xl font-bold tracking-tight">{offer.name}</h1>
           <p className="text-muted-foreground">
-            Request review for this offer. No payment has been charged yet for one-time offers.
+            Request human review for this service. No payment is accepted on this path.
           </p>
         </div>
 
@@ -80,7 +80,7 @@ export default function OfferRequestPage() {
                   <div>
                     <div className="font-semibold">Request received</div>
                     <p className="text-sm">{message}</p>
-                    <p className="mt-2 text-sm">No payment has been charged yet.</p>
+                    <p className="mt-2 text-sm">No payment was collected.</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3">

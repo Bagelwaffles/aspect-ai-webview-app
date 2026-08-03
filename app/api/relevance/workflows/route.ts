@@ -1,6 +1,5 @@
 import type { NextRequest } from "next/server"
 
-import { relevanceClient } from "@/lib/relevance"
 import {
   isInternalApiAuthorized,
   unauthorizedInternalApiResponse,
@@ -9,17 +8,26 @@ import {
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
+function relevanceWorkflowsUnavailableResponse() {
+  return Response.json(
+    {
+      ok: false,
+      error: "Relevance workflow management is unavailable during launch staging",
+      code: "NOT_IMPLEMENTED",
+    },
+    {
+      status: 501,
+      headers: { "Cache-Control": "no-store" },
+    },
+  )
+}
+
 export async function GET(request: NextRequest) {
   if (!isInternalApiAuthorized(request)) {
     return unauthorizedInternalApiResponse()
   }
 
-  try {
-    const workflows = await relevanceClient.getWorkflows()
-    return Response.json({ workflows }, { headers: { "Cache-Control": "no-store" } })
-  } catch {
-    return Response.json({ error: "Failed to fetch Relevance workflows" }, { status: 502 })
-  }
+  return relevanceWorkflowsUnavailableResponse()
 }
 
 export async function POST(request: NextRequest) {
@@ -27,11 +35,5 @@ export async function POST(request: NextRequest) {
     return unauthorizedInternalApiResponse()
   }
 
-  try {
-    const workflowData = await request.json()
-    const workflow = await relevanceClient.createWorkflow(workflowData)
-    return Response.json({ workflow }, { status: 201 })
-  } catch {
-    return Response.json({ error: "Failed to create Relevance workflow" }, { status: 502 })
-  }
+  return relevanceWorkflowsUnavailableResponse()
 }

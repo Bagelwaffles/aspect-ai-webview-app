@@ -116,7 +116,7 @@ export default async function EthicalAgentFarmRequestsAdminPage() {
             <Badge variant="outline">Internal</Badge>
           </div>
           <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
-            Request submissions from the one-time ethical agent farm offers. Review leads, update status, and follow up without exposing secrets or charging upfront.
+            Request-only Ethical Agent Farm submissions. Review leads, update status, and follow up without exposing secrets or collecting payment in the app.
           </p>
           <div className="flex flex-wrap gap-3 text-sm">
             <Link className="text-primary underline-offset-4 hover:underline" href="/ethical-agent-farm">
@@ -178,13 +178,13 @@ export default async function EthicalAgentFarmRequestsAdminPage() {
                         <td className="py-3 pr-4">{item.email}</td>
                         <td className="py-3 pr-4">{item.businessName}</td>
                         <td className="py-3 pr-4 max-w-[18rem] break-words text-muted-foreground">
-                          {item.websiteOrFacebook || "—"}
+                          {item.websiteOrFacebook || "-"}
                         </td>
                         <td className="py-3 pr-4">
                           {OFFER_LABELS[item.selectedOffer] || item.selectedOffer}
                         </td>
                         <td className="py-3 pr-4 max-w-[24rem] break-words text-muted-foreground">
-                          {item.notes || "—"}
+                          {item.notes || "-"}
                         </td>
                         <td className="py-3 pr-4">{item.consent ? "Yes" : "No"}</td>
                         <td className="py-3 pr-4">

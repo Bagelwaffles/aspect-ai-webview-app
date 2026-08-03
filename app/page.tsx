@@ -105,7 +105,7 @@ export default function HomePage() {
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline">
-                <Link href="/ethical-agent-farm">Explore one-time services</Link>
+                <Link href="/ethical-agent-farm">Request scoped services</Link>
               </Button>
             </div>
 
@@ -207,9 +207,9 @@ export default function HomePage() {
       <section className="border-t border-border/70 bg-primary/5">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-5 py-14 sm:px-8 lg:flex-row lg:items-center">
           <div>
-            <h2 className="text-3xl font-bold">Start with a plan or a one-time project.</h2>
+            <h2 className="text-3xl font-bold">Start with a plan or a scoped request.</h2>
             <p className="mt-2 max-w-2xl text-muted-foreground">
-              Choose the route that fits the business today. Unconfigured checkout paths fall back safely instead of claiming success.
+              Subscription plans use the verified recurring checkout. Scoped service requests are reviewed before any payment or work begins.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">

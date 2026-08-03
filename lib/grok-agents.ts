@@ -24,7 +24,7 @@ export const DEFAULT_GROK_AGENTS: GrokAgent[] = [
   {
     id: "grok-support",
     name: "Customer Support Agent",
-    description: "Handles customer inquiries, order status, and support requests with empathy and efficiency",
+    description: "Planned customer support role. Not available for customer execution.",
     systemPrompt: `You are a professional customer support agent for Aspect Marketing Solutions, a print-on-demand and AI automation company.
 
 Your responsibilities:
@@ -44,7 +44,7 @@ Guidelines:
     temperature: 0.7,
     maxTokens: 500,
     capabilities: ["Order tracking", "Product information", "Issue resolution", "General support"],
-    status: "active",
+    status: "inactive",
     personality: "support",
     createdAt: new Date("2024-01-15"),
     updatedAt: new Date(),
@@ -52,7 +52,7 @@ Guidelines:
   {
     id: "grok-sales",
     name: "Sales Assistant",
-    description: "Qualifies leads, provides product recommendations, and guides customers toward purchases",
+    description: "Planned sales and outreach role. Not available for customer execution.",
     systemPrompt: `You are a knowledgeable sales assistant for Aspect Marketing Solutions.
 
 Your responsibilities:
@@ -72,7 +72,7 @@ Guidelines:
     temperature: 0.8,
     maxTokens: 400,
     capabilities: ["Lead qualification", "Product recommendations", "Pricing guidance", "Demo scheduling"],
-    status: "active",
+    status: "inactive",
     personality: "sales",
     createdAt: new Date("2024-01-20"),
     updatedAt: new Date(),
@@ -80,7 +80,7 @@ Guidelines:
   {
     id: "grok-technical",
     name: "Technical Support Agent",
-    description: "Provides technical assistance for APIs, integrations, and platform issues",
+    description: "Planned technical support role. Not available for customer execution.",
     systemPrompt: `You are a technical support specialist for Aspect Marketing Solutions.
 
 Your responsibilities:
@@ -100,7 +100,7 @@ Guidelines:
     temperature: 0.3,
     maxTokens: 800,
     capabilities: ["API support", "Integration help", "Troubleshooting", "Code assistance"],
-    status: "active",
+    status: "inactive",
     personality: "technical",
     createdAt: new Date("2024-01-25"),
     updatedAt: new Date(),
@@ -108,7 +108,7 @@ Guidelines:
   {
     id: "grok-analytics",
     name: "Business Analytics Agent",
-    description: "Analyzes business data and provides actionable insights and recommendations",
+    description: "Planned analytics role. Not available for customer execution.",
     systemPrompt: `You are a business analytics expert for Aspect Marketing Solutions.
 
 Your responsibilities:
@@ -128,7 +128,7 @@ Guidelines:
     temperature: 0.4,
     maxTokens: 600,
     capabilities: ["Data analysis", "Trend identification", "Report generation", "Business insights"],
-    status: "active",
+    status: "inactive",
     personality: "professional",
     createdAt: new Date("2024-02-01"),
     updatedAt: new Date(),
@@ -136,7 +136,7 @@ Guidelines:
   {
     id: "grok-content",
     name: "Content Creation Agent",
-    description: "Creates engaging marketing content, product descriptions, and social media posts",
+    description: "First intended launch agent. Its real persisted execution flow is still in progress.",
     systemPrompt: `You are a creative content specialist for Aspect Marketing Solutions.
 
 Your responsibilities:
@@ -156,7 +156,7 @@ Guidelines:
     temperature: 0.9,
     maxTokens: 700,
     capabilities: ["Marketing copy", "Product descriptions", "Social media", "SEO content"],
-    status: "active",
+    status: "training",
     personality: "friendly",
     createdAt: new Date("2024-02-05"),
     updatedAt: new Date(),

@@ -32,7 +32,7 @@ interface Product {
   description: string
   tags: string[]
   images: { src: string; alt?: string }[]
-  variants: any[]
+  variants: unknown[]
   created_at: string
   updated_at: string
   visible: boolean

@@ -1,9 +1,9 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowRight, ShieldCheck } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { EthicalOfferCheckoutButton } from "@/components/ethical-offer-checkout-button"
 import { getEthicalOfferPage } from "@/lib/ethical-agent-farm-offers"
 
 type PageProps = {
@@ -16,6 +16,8 @@ export default async function OfferPage({ params }: PageProps) {
 
   if (!offer) notFound()
 
+  const isSubscriptionOffer = offer.slug === "monthly-marketing-support"
+
   return (
     <main className="min-h-screen bg-background px-6 py-10">
       <div className="mx-auto max-w-4xl space-y-6">
@@ -23,16 +25,18 @@ export default async function OfferPage({ params }: PageProps) {
           <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Ethical Agent Farm</p>
           <h1 className="text-4xl font-bold tracking-tight">{offer.name}</h1>
           <p className="max-w-2xl text-muted-foreground">
-            {offer.ethicalNote} Stripe checkout is used when the offer is configured with a live price ID;
-            otherwise the request path stays available as the fallback.
+            {offer.ethicalNote}{" "}
+            {isSubscriptionOffer
+              ? "Choose an AMS subscription plan through the verified recurring checkout flow."
+              : "This scoped service is request-only at launch. Submitting the intake form does not charge you."}
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-4">
+            <CardTitle className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span>{offer.name}</span>
-              <span className="text-3xl">{offer.price}</span>
+              <span className="text-xl sm:text-2xl">{offer.price}</span>
             </CardTitle>
             <CardDescription>{offer.deliveryExpectation}</CardDescription>
           </CardHeader>
@@ -52,14 +56,14 @@ export default async function OfferPage({ params }: PageProps) {
               <p className="mb-2 text-sm font-medium">What the buyer gets</p>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {offer.buyerGets.map((item) => (
-                  <li key={item}>• {item}</li>
+                  <li key={item}>- {item}</li>
                 ))}
               </ul>
             </div>
 
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground">
               <div className="flex items-start gap-2">
-                <ShieldCheck className="mt-0.5 h-4 w-4 text-primary" />
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <span>
                   Ethical note: no spam, no fake claims, no privacy abuse, no guaranteed revenue results.
                 </span>
@@ -67,19 +71,17 @@ export default async function OfferPage({ params }: PageProps) {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              {offer.slug === "monthly-marketing-support" ? (
+              {isSubscriptionOffer ? (
                 <Button asChild>
-                  <Link href="/billing">
-                    {offer.ctaLabel}
+                  <Link href="/pricing">
+                    View subscription plans
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
               ) : (
-                <EthicalOfferCheckoutButton
-                  label="Buy on Stripe"
-                  offerSlug={offer.slug}
-                  fallbackHref={offer.requestPath}
-                />
+                <Button asChild>
+                  <Link href={offer.requestPath}>{offer.ctaLabel}</Link>
+                </Button>
               )}
               <Button asChild variant="outline">
                 <Link href="/ethical-agent-farm">Back to agent farm</Link>

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { authOptions, isCustomerAuthConfigured } from "@/lib/auth"
+import { authOptions, isCustomerAuthConfigured, isStableCustomerSubject } from "@/lib/auth"
 import { getEntitlementSnapshot } from "@/lib/server/entitlements"
 
 export const dynamic = "force-dynamic"
@@ -24,10 +24,11 @@ export default async function BillingSuccessPage({ searchParams }: PageProps) {
   if (!isCustomerAuthConfigured()) redirect("/login?next=/billing/success")
 
   const session = await getServerSession(authOptions).catch(() => null)
-  const email = session?.user?.email?.trim().toLowerCase()
-  if (!email) redirect("/login?next=/billing/success")
+  const subject = session?.user?.customerSubject
+  if (!isStableCustomerSubject(subject)) redirect("/login?next=/billing/success")
 
-  const snapshot = await getEntitlementSnapshot(email).catch(() => null)
+  const snapshot = await getEntitlementSnapshot(subject).catch(() => null)
+  const billingEmail = snapshot?.billingEmail ?? session?.user?.email?.trim().toLowerCase()
   const status = snapshot?.subscriptionStatus ?? "unverified"
   const params = (await searchParams) ?? {}
   const accessEnabled = status === "active" || status === "trialing"
@@ -48,7 +49,7 @@ export default async function BillingSuccessPage({ searchParams }: PageProps) {
         <Card>
           <CardHeader>
             <CardTitle>Verified account state</CardTitle>
-            <CardDescription>{email}</CardDescription>
+            <CardDescription>{billingEmail ?? "Authenticated customer"}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="rounded-lg border p-4">

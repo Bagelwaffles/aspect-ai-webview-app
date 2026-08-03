@@ -1,43 +1,41 @@
 import Link from "next/link"
-import { BarChart3, Bot, FileText, LockKeyhole, Sparkles, Target } from "lucide-react"
+import { Bot, FileText, LockKeyhole, Sparkles } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-const launchAgents = [
+const intendedLaunchAgent = {
+  name: "Content Agent",
+  status: "In progress",
+  description: "The first intended AMS launch agent. Its real persisted execution flow is not implemented yet.",
+  plannedCapabilities: ["Marketing copy", "Product descriptions", "Email drafts", "Social content"],
+}
+
+const unavailableAgents = [
   {
-    id: "grok-content",
-    slug: "content",
-    name: "Content Agent",
-    icon: FileText,
-    status: "Launch agent",
-    description: "Creates marketing copy, product descriptions, email drafts, and social content from customer instructions.",
-    capabilities: ["Marketing copy", "Product descriptions", "Email drafts", "Social content"],
-  },
-  {
-    id: "grok-sales",
-    slug: "outreach",
     name: "Outreach Agent",
-    icon: Target,
-    status: "Launch agent",
-    description: "Develops focused offers, lead qualification, and one-message outreach drafts without spam tactics.",
-    capabilities: ["Lead qualification", "Offer positioning", "Outreach drafts", "Follow-up planning"],
+    detail: "Lead qualification, offer positioning, and outreach drafting remain unavailable.",
   },
   {
-    id: "grok-analytics",
-    slug: "analytics",
     name: "Analytics Agent",
-    icon: BarChart3,
-    status: "Launch agent",
-    description: "Analyzes supplied business data and produces plain-language findings, priorities, and next actions.",
-    capabilities: ["Data analysis", "Trend review", "Priority findings", "Action plans"],
+    detail: "Data analysis, reporting, and recommendation workflows remain unavailable.",
+  },
+  {
+    name: "Sales Agent",
+    detail: "Sales qualification and recommendation workflows remain unavailable.",
+  },
+  {
+    name: "Customer Support Agent",
+    detail: "Customer support execution and integrations remain unavailable.",
+  },
+  {
+    name: "Technical Support Agent",
+    detail: "Technical support execution and integrations remain unavailable.",
   },
 ]
 
 const deferredAgents = [
-  "Customer Support Agent",
-  "Technical Support Agent",
   "Automation Builder",
   "SEO Agent",
   "Shopify Agent",
@@ -56,18 +54,18 @@ export default function AgentsPage() {
           <div className="space-y-4">
             <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
               <Sparkles className="mr-2 h-3.5 w-3.5" />
-              AMS launch catalog
+              AMS agent roadmap
             </Badge>
             <div>
-              <h1 className="text-4xl font-black tracking-tight sm:text-5xl">Three agents. Real access controls.</h1>
+              <h1 className="text-4xl font-black tracking-tight sm:text-5xl">One intended launch agent. Still in progress.</h1>
               <p className="mt-3 max-w-3xl leading-7 text-muted-foreground">
-                The first AMS release focuses on Content, Outreach, and Analytics. Customer execution requires sign-in, an active entitlement, available credits, and a configured AI provider.
+                Content is the first intended AMS launch agent, but it is not complete or available for customer execution. Outreach, Analytics, Sales, Support, Technical, and the rest of the roadmap remain unavailable.
               </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild>
-              <Link href="/grok-chat">Open workspace</Link>
+              <Link href="/content-agent">View Content status</Link>
             </Button>
             <Button asChild variant="outline">
               <Link href="/pricing">View plans</Link>
@@ -75,36 +73,52 @@ export default function AgentsPage() {
           </div>
         </div>
 
-        <section className="grid gap-6 lg:grid-cols-3">
-          {launchAgents.map((agent) => {
-            const Icon = agent.icon
-            return (
-              <Card key={agent.id} className="border-primary/20 bg-card/80 shadow-lg">
-                <CardHeader>
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                      <Icon className="h-6 w-6" />
-                    </div>
-                    <Badge variant="secondary">{agent.status}</Badge>
+        <section className="grid gap-6 lg:grid-cols-[1.1fr_1.9fr]">
+          <Card className="border-primary/20 bg-card/80 shadow-lg">
+            <CardHeader>
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                  <FileText className="h-6 w-6" />
+                </div>
+                <Badge variant="secondary">{intendedLaunchAgent.status}</Badge>
+              </div>
+              <CardTitle className="text-xl">{intendedLaunchAgent.name}</CardTitle>
+              <CardDescription className="leading-6">{intendedLaunchAgent.description}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div>
+                <p className="mb-2 text-sm font-medium">Planned capabilities</p>
+                <div className="flex flex-wrap gap-2">
+                  {intendedLaunchAgent.plannedCapabilities.map((capability) => (
+                    <Badge key={capability} variant="outline" className="text-xs">
+                      {capability}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              <Button asChild className="w-full">
+                <Link href="/content-agent">View implementation status</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Unavailable agents</CardTitle>
+              <CardDescription>These roles are not active, executable, or included as working subscription features.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2">
+              {unavailableAgents.map((agent) => (
+                <div key={agent.name} className="rounded-lg border border-border/70 bg-muted/20 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium">{agent.name}</span>
+                    <Badge variant="outline">Unavailable</Badge>
                   </div>
-                  <CardTitle className="text-xl">{agent.name}</CardTitle>
-                  <CardDescription className="leading-6">{agent.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-5">
-                  <div className="flex flex-wrap gap-2">
-                    {agent.capabilities.map((capability) => (
-                      <Badge key={capability} variant="outline" className="text-xs">
-                        {capability}
-                      </Badge>
-                    ))}
-                  </div>
-                  <Button asChild className="w-full">
-                    <Link href="/grok-chat">Use {agent.name}</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            )
-          })}
+                  <p className="mt-2 text-sm text-muted-foreground">{agent.detail}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </section>
 
         <Card className="border-emerald-500/20 bg-emerald-500/5">
@@ -114,9 +128,9 @@ export default function AgentsPage() {
                 <LockKeyhole className="h-5 w-5" />
               </div>
               <div>
-                <CardTitle>What “available” means</CardTitle>
+                <CardTitle>Availability boundary</CardTitle>
                 <CardDescription className="mt-1 leading-6">
-                  AMS does not mark an agent active merely because a card exists. The route must authenticate the customer, verify plan access, verify remaining credits, pass the rate limit, and reach the configured provider.
+                  A page, catalog entry, subscription, or provider configuration does not make an agent available. AMS will mark an agent ready only after its authenticated execution, credit handling, persistence, failure paths, and customer experience are verified.
                 </CardDescription>
               </div>
             </div>
@@ -126,7 +140,7 @@ export default function AgentsPage() {
         <section className="space-y-5">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Deferred catalog</p>
-            <h2 className="mt-2 text-3xl font-bold">Coming after the core is proven</h2>
+            <h2 className="mt-2 text-3xl font-bold">Unavailable until verified</h2>
             <p className="mt-2 max-w-3xl text-muted-foreground">
               These roles remain disabled until their integrations and persistent execution paths are verified. They are not counted as working agents today.
             </p>
@@ -137,7 +151,7 @@ export default function AgentsPage() {
                 <Bot className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <div className="font-medium">{name}</div>
-                  <div className="text-xs text-muted-foreground">Not launched</div>
+                  <div className="text-xs text-muted-foreground">In progress - not available</div>
                 </div>
               </div>
             ))}

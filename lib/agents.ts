@@ -25,7 +25,7 @@ export interface AgentConfig {
 export interface AgentTrigger {
   type: "keyword" | "intent" | "schedule" | "webhook" | "user-action"
   value: string
-  conditions?: Record<string, any>
+  conditions?: Record<string, unknown>
 }
 
 export interface AgentMetrics {

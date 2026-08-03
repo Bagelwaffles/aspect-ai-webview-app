@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const snapshot = await getEntitlementSnapshot(principal.email).catch(() => null)
+  const snapshot = await getEntitlementSnapshot(principal.subject).catch(() => null)
   if (!snapshot?.configured) {
     return NextResponse.json(
       { ok: false, error: "Entitlement service is not configured", code: "ENTITLEMENTS_NOT_CONFIGURED" },

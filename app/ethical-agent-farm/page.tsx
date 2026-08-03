@@ -3,7 +3,6 @@ import { ArrowRight, BadgeCheck, Bot, ShieldCheck, Sparkles } from "lucide-react
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { BillingActionButton } from "@/components/billing-actions"
 import { ETHICAL_AGENT_ROLES, ETHICAL_OFFERS, FARM_OPERATING_RULES } from "@/lib/ethical-agent-farm"
 
 export default function EthicalAgentFarmPage() {
@@ -13,16 +12,18 @@ export default function EthicalAgentFarmPage() {
         <section className="grid gap-6 lg:grid-cols-[1.4fr_0.9fr]">
           <div className="space-y-4">
             <Badge variant="outline" className="w-fit">
-              Ethical Agent Farm
+              Service workflow roadmap
             </Badge>
             <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
-              Human-approved agents that sell useful work, not noise.
+              Planned service workflows with human review.
             </h1>
             <p className="max-w-2xl text-lg text-muted-foreground">
-              Aspect Marketing Solutions uses a small agent farm to create audits, content, offer drafts, and support packages that help real businesses move faster.
+              These service concepts are request-only at launch. Submitting a request does not collect payment, start work, or indicate that an automated agent is available.
             </p>
             <div className="flex flex-wrap gap-3">
-              <BillingActionButton label="Start support checkout" endpoint="/api/billing/checkout" />
+              <Button asChild>
+                <Link href="/pricing">View subscription plans</Link>
+              </Button>
               <Button asChild variant="outline">
                 <Link href="/billing">
                   View billing state
@@ -39,10 +40,10 @@ export default function EthicalAgentFarmPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5" />
-                Compliance-first by design
+                Launch guardrails
               </CardTitle>
               <CardDescription>
-                Every draft must pass human approval and the compliance gate before it goes out.
+                Any future workflow must satisfy these rules before AMS makes it available.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
@@ -58,41 +59,37 @@ export default function EthicalAgentFarmPage() {
 
         <section className="space-y-4">
           <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Sellable offers</p>
-            <h2 className="text-2xl font-bold">Simple offers the farm can sell right away</h2>
+            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Request-only services</p>
+            <h2 className="text-2xl font-bold">Service briefs for human review</h2>
+            <p className="mt-2 max-w-3xl text-muted-foreground">
+              No payment is accepted for these services in the app. Scope, price, availability, and delivery must be confirmed separately before any work begins.
+            </p>
           </div>
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {ETHICAL_OFFERS.map((offer) => (
-              <Card key={offer.id} className={offer.featured ? "border-primary shadow-sm" : ""}>
+              <Card key={offer.id}>
                 <CardHeader>
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <CardTitle>{offer.name}</CardTitle>
-                      <CardDescription>{offer.summary}</CardDescription>
+                      <CardDescription>Requested scope is reviewed by a human before availability or delivery is confirmed.</CardDescription>
                     </div>
-                    {offer.featured ? <Badge>Featured</Badge> : <Badge variant="secondary">{offer.billingLabel}</Badge>}
+                    <Badge variant="secondary">Request only</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-end gap-2">
-                    <div className="text-4xl font-bold">{offer.price}</div>
-                    <div className="pb-1 text-sm text-muted-foreground">{offer.billingLabel}</div>
-                  </div>
+                  <div className="text-lg font-semibold">No payment accepted</div>
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     {offer.deliverables.map((item) => (
                       <li key={item}>- {item}</li>
                     ))}
                   </ul>
                   <div className="flex flex-wrap gap-3">
-                    {offer.featured ? (
-                      <BillingActionButton label={offer.cta} endpoint="/api/billing/checkout" />
-                    ) : (
-                      <Button asChild>
-                        <Link href={`/ethical-agent-farm/offers/${offer.id}`}>{offer.cta}</Link>
-                      </Button>
-                    )}
+                    <Button asChild>
+                      <Link href={`/ethical-agent-farm/request?offer=${offer.id}`}>Request review</Link>
+                    </Button>
                     <Button asChild variant="outline">
-                      <Link href="/pricing">Compare pricing</Link>
+                      <Link href="/pricing">View subscriptions</Link>
                     </Button>
                   </div>
                 </CardContent>
@@ -103,8 +100,11 @@ export default function EthicalAgentFarmPage() {
 
         <section className="space-y-4">
           <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Agent system</p>
-            <h2 className="text-2xl font-bold">The nine agents behind the offers</h2>
+            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Planned roles</p>
+            <h2 className="text-2xl font-bold">Roadmap concepts, not active agents</h2>
+            <p className="mt-2 max-w-3xl text-muted-foreground">
+              Content is the first intended launch agent and remains in progress. Every role below is unavailable for customer execution.
+            </p>
           </div>
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {ETHICAL_AGENT_ROLES.map((agent) => (
@@ -114,11 +114,11 @@ export default function EthicalAgentFarmPage() {
                     <Bot className="h-5 w-5 text-primary" />
                     {agent.name}
                   </CardTitle>
-                  <CardDescription>{agent.summary}</CardDescription>
+                  <CardDescription>This role is a planning reference and is not available.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <p className="mb-2 text-sm font-medium">Responsibilities</p>
+                    <p className="mb-2 text-sm font-medium">Planned responsibilities</p>
                     <ul className="space-y-1 text-sm text-muted-foreground">
                       {agent.responsibilities.map((item) => (
                         <li key={item}>- {item}</li>
@@ -126,7 +126,7 @@ export default function EthicalAgentFarmPage() {
                     </ul>
                   </div>
                   <div>
-                    <p className="mb-2 text-sm font-medium">Guardrails</p>
+                    <p className="mb-2 text-sm font-medium">Required guardrails</p>
                     <ul className="space-y-1 text-sm text-muted-foreground">
                       {agent.guardrails.map((item) => (
                         <li key={item}>- {item}</li>
@@ -144,35 +144,32 @@ export default function EthicalAgentFarmPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
-                How it sells
+                How a service request is handled
               </CardTitle>
               <CardDescription>
-                The system is designed to win business by being useful, specific, and easy to buy.
+                This is a human review path, not an automated sale or fulfillment claim.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>1. Research a public business that clearly needs help.</p>
-              <p>2. Draft a useful mini-audit with concrete fixes.</p>
-              <p>3. Run the compliance check.</p>
-              <p>4. Get human approval.</p>
-              <p>5. Send manually or publish the approved content.</p>
-              <p>6. Track replies and sales in the revenue tracker.</p>
+              <p>1. A customer submits a request without payment.</p>
+              <p>2. A human reviews scope, availability, and delivery expectations.</p>
+              <p>3. AMS provides next steps only after that review.</p>
+              <p>4. No automated outreach, purchase, or fulfillment is implied.</p>
             </CardContent>
           </Card>
 
           <Card className="bg-muted/30">
             <CardHeader>
-              <CardTitle>Revenue target</CardTitle>
-              <CardDescription>Operating benchmark only.</CardDescription>
+              <CardTitle>Launch boundary</CardTitle>
+              <CardDescription>What this page does and does not offer.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="text-4xl font-bold">$100/day</div>
               <p className="text-sm text-muted-foreground">
-                The point is steady, ethical revenue from useful work, not hype, spam, or shortcuts.
+                This page accepts service requests only. It does not accept payment, promise revenue, start automated work, or represent unfinished agents as active.
               </p>
               <Button asChild className="w-full">
-                <Link href="/billing">
-                  Open billing
+                <Link href="/ethical-agent-farm/request">
+                  Submit a request
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>

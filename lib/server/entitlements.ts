@@ -1,11 +1,27 @@
+import { randomUUID } from "node:crypto"
+
 import { Redis } from "@upstash/redis"
+
+import { isStableCustomerSubject } from "../auth"
+import {
+  createUpstashCreditLedger,
+  creditBalanceKeys,
+  type CreditFinalizationResult,
+  type CreditReservationResult,
+} from "./credit-ledger"
+import {
+  UpstashStripeEntitlementWriter,
+  type StripeEntitlementApplyResult,
+  type StripeEntitlementMutation,
+} from "./stripe-entitlements"
 
 export type PlanSlug = "starter" | "growth" | "pro"
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled" | "inactive"
 
 export type EntitlementSnapshot = {
   configured: boolean
-  email: string
+  subject: string
+  billingEmail: string | null
   plan: PlanSlug | null
   subscriptionStatus: SubscriptionStatus
   planCredits: number
@@ -26,8 +42,18 @@ const CORE_AGENT_SLUGS = new Set(["content", "outreach", "analytics"])
 
 let redisClient: Redis | null | undefined
 
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase()
+function normalizeBillingEmail(value: unknown): string | null {
+  if (typeof value !== "string") return null
+  const email = value.trim().toLowerCase()
+  return email.includes("@") ? email : null
+}
+
+function requireStableSubject(subject: string): string {
+  const candidate = subject.trim()
+  if (!isStableCustomerSubject(candidate)) {
+    throw new Error("STABLE_CUSTOMER_SUBJECT_REQUIRED")
+  }
+  return candidate
 }
 
 function normalizeSlug(slug: string): string {
@@ -44,13 +70,14 @@ function getRedis(): Redis | null {
   return redisClient
 }
 
-function keys(email: string) {
-  const user = normalizeEmail(email)
+function keys(subject: string) {
+  const owner = requireStableSubject(subject)
+  const creditKeys = creditBalanceKeys(owner)
   return {
-    profile: `ams:entitlements:profile:${user}`,
-    agents: `ams:entitlements:agents:${user}`,
-    planCredits: `ams:credits:plan:${user}`,
-    topupCredits: `ams:credits:topup:${user}`,
+    profile: `ams:entitlements:profile:${owner}`,
+    agents: `ams:entitlements:agents:${owner}`,
+    planCredits: creditKeys.plan,
+    topupCredits: creditKeys.topup,
   }
 }
 
@@ -75,14 +102,15 @@ export function monthlyCreditsForPlan(plan: PlanSlug): number {
   return PLAN_CREDITS[plan]
 }
 
-export async function getEntitlementSnapshot(email: string): Promise<EntitlementSnapshot> {
-  const user = normalizeEmail(email)
+export async function getEntitlementSnapshot(subject: string): Promise<EntitlementSnapshot> {
+  const owner = requireStableSubject(subject)
   const redis = getRedis()
 
-  if (!redis || !user) {
+  if (!redis) {
     return {
-      configured: Boolean(redis),
-      email: user,
+      configured: false,
+      subject: owner,
+      billingEmail: null,
       plan: null,
       subscriptionStatus: "inactive",
       planCredits: 0,
@@ -94,7 +122,7 @@ export async function getEntitlementSnapshot(email: string): Promise<Entitlement
     }
   }
 
-  const key = keys(user)
+  const key = keys(owner)
   const [profile, agentSlugs, planCreditsRaw, topupCreditsRaw] = await Promise.all([
     redis.hgetall<Record<string, string>>(key.profile),
     redis.smembers<string[]>(key.agents),
@@ -111,7 +139,8 @@ export async function getEntitlementSnapshot(email: string): Promise<Entitlement
 
   return {
     configured: true,
-    email: user,
+    subject: owner,
+    billingEmail: normalizeBillingEmail(profile?.billingEmail),
     plan,
     subscriptionStatus,
     planCredits,
@@ -124,7 +153,8 @@ export async function getEntitlementSnapshot(email: string): Promise<Entitlement
 }
 
 export async function setPlanEntitlement(input: {
-  email: string
+  subject: string
+  billingEmail?: string | null
   plan: PlanSlug
   subscriptionStatus: SubscriptionStatus
   stripeCustomerId?: string | null
@@ -132,45 +162,48 @@ export async function setPlanEntitlement(input: {
   resetPlanCredits?: boolean
 }) {
   const redis = getRedis()
-  const email = normalizeEmail(input.email)
-  if (!redis || !email) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
+  const subject = requireStableSubject(input.subject)
+  const billingEmail = normalizeBillingEmail(input.billingEmail)
+  if (!redis) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
 
-  const key = keys(email)
-  await redis.hset(key.profile, {
-    email,
+  const key = keys(subject)
+  const profile: Record<string, string> = {
+    subject,
     plan: input.plan,
     subscriptionStatus: input.subscriptionStatus,
     stripeCustomerId: input.stripeCustomerId ?? "",
     stripeSubscriptionId: input.stripeSubscriptionId ?? "",
     updatedAt: new Date().toISOString(),
-  })
+  }
+  if (billingEmail) profile.billingEmail = billingEmail
+  await redis.hset(key.profile, profile)
 
   if (input.resetPlanCredits) {
     await redis.set(key.planCredits, monthlyCreditsForPlan(input.plan))
   }
 }
 
-export async function setSubscriptionStatus(email: string, status: SubscriptionStatus) {
+export async function setSubscriptionStatus(subject: string, status: SubscriptionStatus) {
   const redis = getRedis()
-  const user = normalizeEmail(email)
-  if (!redis || !user) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
-  await redis.hset(keys(user).profile, { subscriptionStatus: status, updatedAt: new Date().toISOString() })
+  const owner = requireStableSubject(subject)
+  if (!redis) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
+  await redis.hset(keys(owner).profile, { subscriptionStatus: status, updatedAt: new Date().toISOString() })
 }
 
-export async function grantAgentEntitlement(email: string, slug: string) {
+export async function grantAgentEntitlement(subject: string, slug: string) {
   const redis = getRedis()
-  const user = normalizeEmail(email)
+  const owner = requireStableSubject(subject)
   const agentSlug = normalizeSlug(slug)
-  if (!redis || !user || !agentSlug) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
-  await redis.sadd(keys(user).agents, agentSlug)
+  if (!redis || !agentSlug) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
+  await redis.sadd(keys(owner).agents, agentSlug)
 }
 
-export async function grantTopupCredits(email: string, units: number) {
+export async function grantTopupCredits(subject: string, units: number) {
   const redis = getRedis()
-  const user = normalizeEmail(email)
+  const owner = requireStableSubject(subject)
   const amount = Math.max(0, Math.floor(units))
-  if (!redis || !user || amount < 1) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
-  await redis.incrby(keys(user).topupCredits, amount)
+  if (!redis || amount < 1) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
+  await redis.incrby(keys(owner).topupCredits, amount)
 }
 
 export function agentSlugForRuntimeAgent(agentId: string): string | null {
@@ -189,52 +222,143 @@ export function snapshotHasAgentAccess(snapshot: EntitlementSnapshot, agentSlug:
   return snapshot.agentSlugs.includes(slug)
 }
 
-export async function consumeCredits(email: string, units = 1) {
+function getCreditLedger() {
   const redis = getRedis()
-  const user = normalizeEmail(email)
+  if (!redis) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
+  return createUpstashCreditLedger(redis)
+}
+
+export async function reserveCredits(input: {
+  subject: string
+  units: number
+  idempotencyKey: string
+}): Promise<CreditReservationResult> {
+  const owner = requireStableSubject(input.subject)
+  return getCreditLedger().reserve({
+    account: owner,
+    amount: input.units,
+    idempotencyKey: input.idempotencyKey,
+  })
+}
+
+export async function commitCreditReservation(input: {
+  subject: string
+  idempotencyKey: string
+}): Promise<CreditFinalizationResult> {
+  const owner = requireStableSubject(input.subject)
+  return getCreditLedger().commit({ account: owner, idempotencyKey: input.idempotencyKey })
+}
+
+export async function refundCreditReservation(input: {
+  subject: string
+  idempotencyKey: string
+}): Promise<CreditFinalizationResult> {
+  const owner = requireStableSubject(input.subject)
+  return getCreditLedger().refund({ account: owner, idempotencyKey: input.idempotencyKey })
+}
+
+export async function consumeCredits(subject: string, units = 1, idempotencyKey?: string) {
+  const owner = requireStableSubject(subject)
   const amount = Math.max(1, Math.floor(units))
-  if (!redis || !user) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
 
-  const key = keys(user)
-  const script = `
-    local plan = tonumber(redis.call('GET', KEYS[1]) or '0')
-    local topup = tonumber(redis.call('GET', KEYS[2]) or '0')
-    local units = tonumber(ARGV[1])
-    if plan + topup < units then
-      return {0, plan, topup}
-    end
-    local fromPlan = math.min(plan, units)
-    local newPlan = plan - fromPlan
-    local newTopup = topup - (units - fromPlan)
-    redis.call('SET', KEYS[1], newPlan)
-    redis.call('SET', KEYS[2], newTopup)
-    return {1, newPlan, newTopup}
-  `
+  // Compatibility path for existing callers. New provider routes should reserve
+  // before execution and explicitly commit or refund the same idempotency key.
+  const operationKey = idempotencyKey?.trim() || `legacy-consume:${randomUUID()}`
+  const ledger = getCreditLedger()
+  const reservation = await ledger.reserve({
+    account: owner,
+    amount,
+    idempotencyKey: operationKey,
+  })
 
-  const result = (await redis.eval(script, [key.planCredits, key.topupCredits], [amount])) as number[]
+  if (!reservation.reserved || reservation.state === "refunded") {
+    return {
+      consumed: false,
+      planCredits: reservation.planCredits,
+      topupCredits: reservation.topupCredits,
+    }
+  }
+
+  const result = await ledger.commit({ account: owner, idempotencyKey: operationKey })
   return {
-    consumed: Number(result?.[0]) === 1,
-    planCredits: parseNonNegativeInt(result?.[1]),
-    topupCredits: parseNonNegativeInt(result?.[2]),
+    consumed: true,
+    planCredits: result.planCredits,
+    topupCredits: result.topupCredits,
   }
 }
 
-export async function claimStripeEvent(eventId: string): Promise<boolean> {
+export type StripeEventClaim =
+  | { state: "claimed"; token: string }
+  | { state: "completed" }
+  | { state: "processing" }
+
+export async function applyStripeSubscriptionEntitlement(
+  input: StripeEntitlementMutation,
+): Promise<StripeEntitlementApplyResult> {
+  const redis = getRedis()
+  if (!redis) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
+  return new UpstashStripeEntitlementWriter(redis).apply(input)
+}
+
+export async function claimStripeEvent(eventId: string): Promise<StripeEventClaim> {
   const redis = getRedis()
   const id = eventId.trim()
   if (!redis || !id) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
-  const result = await redis.set(`ams:stripe:event:${id}`, "processing", { nx: true, ex: 600 })
-  return result === "OK"
+  const token = randomUUID()
+  const script = `
+    local current = redis.call('GET', KEYS[1])
+    if not current then
+      redis.call('SET', KEYS[1], 'processing:' .. ARGV[1], 'EX', 600)
+      return {'claimed'}
+    end
+    if current == 'done' then
+      return {'completed'}
+    end
+    return {'processing'}
+  `
+  const raw = await redis.eval(script, [`ams:stripe:event:${id}`], [token])
+  if (!Array.isArray(raw) || typeof raw[0] !== "string") {
+    throw new Error("STRIPE_EVENT_CLAIM_INVALID_RESPONSE")
+  }
+  if (raw[0] === "claimed") return { state: "claimed", token }
+  if (raw[0] === "completed" || raw[0] === "processing") return { state: raw[0] }
+  throw new Error("STRIPE_EVENT_CLAIM_INVALID_RESPONSE")
 }
 
-export async function completeStripeEvent(eventId: string) {
+export async function completeStripeEvent(eventId: string, token: string) {
   const redis = getRedis()
-  if (!redis) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
-  await redis.set(`ams:stripe:event:${eventId.trim()}`, "done", { ex: 90 * 24 * 60 * 60 })
+  const id = eventId.trim()
+  const owner = token.trim()
+  if (!redis || !id || !owner) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
+  const script = `
+    local current = redis.call('GET', KEYS[1])
+    if current == 'processing:' .. ARGV[1] then
+      redis.call('SET', KEYS[1], 'done', 'EX', 7776000)
+      return {'completed'}
+    end
+    if current == 'done' then
+      return {'completed'}
+    end
+    return {'ownership_lost'}
+  `
+  const raw = await redis.eval(script, [`ams:stripe:event:${id}`], [owner])
+  if (!Array.isArray(raw) || raw[0] !== "completed") {
+    throw new Error("STRIPE_EVENT_CLAIM_OWNERSHIP_LOST")
+  }
 }
 
-export async function releaseStripeEvent(eventId: string) {
+export async function releaseStripeEvent(eventId: string, token: string) {
   const redis = getRedis()
-  if (!redis) return
-  await redis.del(`ams:stripe:event:${eventId.trim()}`)
+  const id = eventId.trim()
+  const owner = token.trim()
+  if (!redis || !id || !owner) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
+  const script = `
+    local current = redis.call('GET', KEYS[1])
+    if current == 'processing:' .. ARGV[1] then
+      redis.call('DEL', KEYS[1])
+      return 1
+    end
+    return 0
+  `
+  await redis.eval(script, [`ams:stripe:event:${id}`], [owner])
 }

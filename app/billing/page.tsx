@@ -28,9 +28,10 @@ export default async function BillingPage() {
 
   const session = await getServerSession(authOptions).catch(() => null)
   const email = session?.user?.email?.trim().toLowerCase()
-  if (!email) redirect("/login?next=/billing")
+  const subject = session?.user?.customerSubject
+  if (!email || !subject) redirect("/login?next=/billing")
 
-  const snapshot = await getEntitlementSnapshot(email).catch(() => null)
+  const snapshot = await getEntitlementSnapshot(subject).catch(() => null)
   const configured = Boolean(snapshot?.configured)
   const status = snapshot?.subscriptionStatus ?? "inactive"
 
@@ -99,7 +100,10 @@ export default async function BillingPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">{plan.credits} per billing cycle.</p>
-                <p className="text-sm text-muted-foreground">Includes Content, Outreach, and Analytics agents.</p>
+                <p className="text-sm text-muted-foreground">
+                  Content Agent is the first planned launch capability. It becomes usable only after its authenticated
+                  route and entitlement gate are enabled for this account. Outreach and Analytics are not available.
+                </p>
                 <BillingActionButton label={`Choose ${plan.name}`} endpoint="/api/billing/checkout" plan={plan.slug} />
               </CardContent>
             </Card>

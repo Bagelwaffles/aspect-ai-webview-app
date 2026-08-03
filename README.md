@@ -40,8 +40,8 @@ N8N_WEBHOOK_PATH=/webhook/vo-app
 N8N_WEBHOOK_SECRET=your-webhook-secret
 
 # Relevance AI
-RELEVANCE_API_KEY=sk-YWM2NjExMjQtN2U1Zi00NDY3LWFiYmUtZGlyNWEyOTg3MzNm
-RELEVANCE_AUTH_TOKEN=1c756995-3667-41b6-9ff2-18abbb0e844d:sk-YWM2NjExMjQtN2U1Zi00NDY3LWFiYmUtZGlyNWEyOTg3MzNm
+- `RELEVANCE_API_KEY`: configure only in the deployment platform's encrypted environment settings; never commit a value.
+- `RELEVANCE_AUTH_TOKEN`: configure only in the deployment platform's encrypted environment settings; never commit a value.
 RELEVANCE_PROJECT_ID=1c756995-3667-41b6-9ff2-18abbb0e844d
 RELEVANCE_REGION=f1db6c
 

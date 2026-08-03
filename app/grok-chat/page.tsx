@@ -21,12 +21,26 @@ interface ChatMessage {
   agentId?: string
 }
 
+interface CustomerGrokAgent extends GrokAgentConfig {
+  slug: "content"
+  entitled: boolean
+  executionStatus: "available" | "subscription_required"
+}
+
+interface AccountSummary {
+  plan: string | null
+  subscriptionStatus: string
+  creditsRemaining: number
+}
+
 export default function GrokChatPage() {
-  const [agents, setAgents] = useState<GrokAgentConfig[]>([])
+  const [agents, setAgents] = useState<CustomerGrokAgent[]>([])
   const [selectedAgent, setSelectedAgent] = useState<string>("")
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputMessage, setInputMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [account, setAccount] = useState<AccountSummary | null>(null)
+  const [requestError, setRequestError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -41,27 +55,37 @@ export default function GrokChatPage() {
     try {
       const response = await fetch("/api/grok/agents")
       const data = await response.json()
+      if (!response.ok) {
+        setRequestError(data.error || "Customer access is required to load the Content Agent.")
+        setAgents([])
+        return
+      }
+      setRequestError(null)
       setAgents(data.agents || [])
-      if (data.agents && data.agents.length > 0) {
+      setAccount(data.account || null)
+      if (data.agents?.length > 0) {
         setSelectedAgent(data.agents[0].id)
       }
-    } catch (error) {
-      console.error("Failed to fetch Grok agents:", error)
+    } catch {
+      setRequestError("The Content Agent could not be loaded. Please try again.")
     }
   }
 
   const sendMessage = async () => {
-    if (!inputMessage.trim() || !selectedAgent) return
+    const selected = agents.find((agent) => agent.id === selectedAgent)
+    const currentMessage = inputMessage.trim()
+    if (!currentMessage || !selected?.entitled) return
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
-      content: inputMessage,
+      content: currentMessage,
       timestamp: new Date(),
     }
 
     setMessages((prev) => [...prev, userMessage])
     setInputMessage("")
+    setRequestError(null)
     setIsLoading(true)
 
     try {
@@ -72,35 +96,34 @@ export default function GrokChatPage() {
 
       const response = await fetch("/api/grok/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
         body: JSON.stringify({
           agentId: selectedAgent,
-          message: inputMessage,
+          message: currentMessage,
           conversationHistory,
         }),
       })
 
       const data = await response.json()
+      if (!response.ok || typeof data.response !== "string" || !data.response.trim()) {
+        setRequestError(data.error || `The Content Agent request failed (${response.status}).`)
+        return
+      }
 
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.response || "I apologize, but I'm having trouble processing your request right now.",
+        content: data.response,
         timestamp: new Date(),
         agentId: selectedAgent,
       }
 
       setMessages((prev) => [...prev, assistantMessage])
-    } catch (error) {
-      console.error("Failed to send message:", error)
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "I'm sorry, I encountered an error while processing your message. Please try again.",
-        timestamp: new Date(),
-        agentId: selectedAgent,
-      }
-      setMessages((prev) => [...prev, errorMessage])
+    } catch {
+      setRequestError("The Content Agent request could not be completed. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -138,7 +161,7 @@ export default function GrokChatPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm">
-        <div className="flex h-16 items-center justify-between px-6">
+        <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
@@ -155,6 +178,9 @@ export default function GrokChatPage() {
               <Zap className="h-3 w-3" />
               Powered by Grok
             </Badge>
+            {account && (
+              <Badge variant="outline">{account.creditsRemaining} credits</Badge>
+            )}
             <Button variant="outline" onClick={() => (window.location.href = "/")}>
               Dashboard
             </Button>
@@ -162,12 +188,12 @@ export default function GrokChatPage() {
         </div>
       </header>
 
-      <div className="flex h-[calc(100vh-4rem)]">
+      <div className="flex min-h-[calc(100vh-4rem)] flex-col lg:h-[calc(100vh-4rem)] lg:flex-row">
         {/* Agent Selection Sidebar */}
-        <div className="w-80 border-r border-border bg-card/30">
+        <div className="w-full border-b border-border bg-card/30 lg:w-80 lg:border-b-0 lg:border-r">
           <div className="p-4 border-b border-border">
             <h2 className="font-semibold mb-3">Select Agent</h2>
-            <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+            <Select value={selectedAgent} onValueChange={setSelectedAgent} disabled={agents.length === 0}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose an agent" />
               </SelectTrigger>
@@ -214,6 +240,9 @@ export default function GrokChatPage() {
                     <div className="text-xs text-muted-foreground">
                       <p>Model: {selectedAgentConfig.model}</p>
                       <p>Temperature: {selectedAgentConfig.temperature}</p>
+                      <p>
+                        Access: {selectedAgentConfig.entitled ? "Enabled" : "Subscription required"}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -223,10 +252,15 @@ export default function GrokChatPage() {
         </div>
 
         {/* Chat Interface */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex min-h-[34rem] flex-1 flex-col">
           {/* Messages */}
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-4 max-w-4xl mx-auto">
+              {requestError && (
+                <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                  {requestError}
+                </div>
+              )}
               {messages.length === 0 && selectedAgentConfig && (
                 <div className="text-center py-8">
                   <div
@@ -303,13 +337,13 @@ export default function GrokChatPage() {
                   placeholder={`Message ${selectedAgentConfig?.name || "agent"}...`}
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  disabled={isLoading || !selectedAgent}
+                  onKeyDown={handleKeyPress}
+                  disabled={isLoading || !selectedAgentConfig?.entitled}
                   className="flex-1"
                 />
                 <Button
                   onClick={sendMessage}
-                  disabled={isLoading || !inputMessage.trim() || !selectedAgent}
+                  disabled={isLoading || !inputMessage.trim() || !selectedAgentConfig?.entitled}
                   className="gap-2"
                 >
                   <Send className="h-4 w-4" />
