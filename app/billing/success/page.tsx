@@ -12,15 +12,17 @@ function statusTone(status?: string | null) {
   return "secondary"
 }
 
+type BillingSuccessSearchParams = Promise<{ session_id?: string }>
+
 export default async function BillingSuccessPage({
-  searchParams
+  searchParams,
 }: {
-  searchParams?: { session_id?: string }
+  searchParams?: BillingSuccessSearchParams
 }) {
   const snapshot = await getBillingSnapshot()
   const org = snapshot.organization
   const status = org?.subscriptionStatus ?? "locked"
-  const params = searchParams ?? {}
+  const params = searchParams ? await searchParams : {}
 
   return (
     <main className="min-h-screen bg-background px-6 py-10">
@@ -55,7 +57,9 @@ export default async function BillingSuccessPage({
             </div>
             <div className="rounded-lg border p-4">
               <div className="text-sm text-muted-foreground">Stripe session</div>
-              <div className="text-xl font-semibold">{params.session_id ?? "No session id in return URL"}</div>
+              <div className="break-all text-xl font-semibold">
+                {params.session_id ?? "No session id in return URL"}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -63,9 +67,7 @@ export default async function BillingSuccessPage({
         <Card>
           <CardHeader>
             <CardTitle>Next step</CardTitle>
-            <CardDescription>
-              Return to the dashboard now that the checkout return route is working.
-            </CardDescription>
+            <CardDescription>Return to the dashboard now that the checkout return route is working.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild>
