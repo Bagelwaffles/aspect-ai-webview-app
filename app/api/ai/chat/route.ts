@@ -3,6 +3,11 @@ import { generateText } from "ai"
 import { NextRequest, NextResponse } from "next/server"
 
 import { authorizePaidApiRequest } from "@/lib/server/customer-api-auth"
+import {
+  consumeCredits,
+  getEntitlementSnapshot,
+  snapshotHasAgentAccess,
+} from "@/lib/server/entitlements"
 import { consumeAiRateLimit } from "@/lib/server/rate-limit"
 
 export const runtime = "nodejs"
@@ -15,6 +20,28 @@ export async function POST(request: NextRequest) {
       { ok: false, error: "Authentication required", code: "CUSTOMER_AUTH_REQUIRED" },
       { status: 401, headers: { "Cache-Control": "no-store" } },
     )
+  }
+
+  if (principal.kind === "customer") {
+    const snapshot = await getEntitlementSnapshot(principal.email).catch(() => null)
+    if (!snapshot?.configured) {
+      return NextResponse.json(
+        { ok: false, error: "Entitlement service is not configured", code: "ENTITLEMENTS_NOT_CONFIGURED" },
+        { status: 503 },
+      )
+    }
+    if (!snapshotHasAgentAccess(snapshot, "content")) {
+      return NextResponse.json(
+        { ok: false, error: "An active AMS plan is required", code: "SUBSCRIPTION_REQUIRED" },
+        { status: 402 },
+      )
+    }
+    if (snapshot.totalCredits < 1) {
+      return NextResponse.json(
+        { ok: false, error: "No AI credits remain", code: "CREDITS_REQUIRED" },
+        { status: 402 },
+      )
+    }
   }
 
   const rateLimit = consumeAiRateLimit(`${principal.subject}:ai-chat`)
@@ -58,6 +85,16 @@ export async function POST(request: NextRequest) {
       prompt: `You are an AI assistant for Aspect Marketing Solutions. Provide concise, practical marketing and automation guidance. Never invent live metrics, revenue, customer results, or completed integrations. Clearly label assumptions.\n\nUser message: ${message.trim()}`,
       maxOutputTokens: 700,
     })
+
+    if (principal.kind === "customer") {
+      const creditResult = await consumeCredits(principal.email, 1)
+      if (!creditResult.consumed) {
+        return NextResponse.json(
+          { ok: false, error: "No AI credits remain", code: "CREDITS_REQUIRED" },
+          { status: 402 },
+        )
+      }
+    }
 
     return NextResponse.json(
       { ok: true, response: text },
