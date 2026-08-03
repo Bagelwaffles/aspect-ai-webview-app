@@ -1,25 +1,37 @@
-import { relevanceClient } from "@/lib/relevance"
 import type { NextRequest } from "next/server"
 
-export const runtime = "nodejs"
+import { relevanceClient } from "@/lib/relevance"
+import {
+  isInternalApiAuthorized,
+  unauthorizedInternalApiResponse,
+} from "@/lib/server/internal-api-auth"
 
-export async function GET() {
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
+export async function GET(request: NextRequest) {
+  if (!isInternalApiAuthorized(request)) {
+    return unauthorizedInternalApiResponse()
+  }
+
   try {
     const workflows = await relevanceClient.getWorkflows()
-    return Response.json({ workflows })
-  } catch (error) {
-    console.error("Relevance workflows API error:", error)
-    return Response.json({ error: "Failed to fetch workflows" }, { status: 500 })
+    return Response.json({ workflows }, { headers: { "Cache-Control": "no-store" } })
+  } catch {
+    return Response.json({ error: "Failed to fetch Relevance workflows" }, { status: 502 })
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
+  if (!isInternalApiAuthorized(request)) {
+    return unauthorizedInternalApiResponse()
+  }
+
   try {
-    const workflowData = await req.json()
+    const workflowData = await request.json()
     const workflow = await relevanceClient.createWorkflow(workflowData)
     return Response.json({ workflow }, { status: 201 })
-  } catch (error) {
-    console.error("Failed to create workflow:", error)
-    return Response.json({ error: "Failed to create workflow" }, { status: 500 })
+  } catch {
+    return Response.json({ error: "Failed to create Relevance workflow" }, { status: 502 })
   }
 }
