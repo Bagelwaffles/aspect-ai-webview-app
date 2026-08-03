@@ -1,31 +1,36 @@
-import { deploymentManager } from "@/lib/deployment"
 import type { NextRequest } from "next/server"
 
+import {
+  isInternalApiAuthorized,
+  unauthorizedInternalApiResponse,
+} from "@/lib/server/internal-api-auth"
+
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
 export async function GET() {
-  try {
-    const deployments = deploymentManager.getAllDeployments()
-    return Response.json({ deployments })
-  } catch (error) {
-    console.error("Failed to fetch deployments:", error)
-    return Response.json({ error: "Failed to fetch deployments" }, { status: 500 })
-  }
+  return Response.json(
+    {
+      deployments: [],
+      source: "persistent_deployment_store",
+      status: "not_configured",
+      message: "No live deployments are connected yet.",
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  )
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const { agentId, agentName, agentType, name, config } = await req.json()
-
-    if (!agentId || !agentName || !agentType || !name) {
-      return Response.json({ error: "Missing required fields" }, { status: 400 })
-    }
-
-    const deployment = deploymentManager.createDeployment(agentId, agentName, agentType, name, config)
-
-    return Response.json({ deployment }, { status: 201 })
-  } catch (error) {
-    console.error("Failed to create deployment:", error)
-    return Response.json({ error: "Failed to create deployment" }, { status: 500 })
+export async function POST(request: NextRequest) {
+  if (!isInternalApiAuthorized(request)) {
+    return unauthorizedInternalApiResponse()
   }
+
+  return Response.json(
+    {
+      ok: false,
+      error: "Persistent deployment storage is not configured",
+      code: "DEPLOYMENT_STORE_NOT_CONFIGURED",
+    },
+    { status: 501 },
+  )
 }
