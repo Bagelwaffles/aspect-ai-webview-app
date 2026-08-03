@@ -45,6 +45,9 @@ jobs:
         run: pnpm run build
 
       - name: Runtime security smoke tests
+        env:
+          NEXTAUTH_SECRET: ci-only-placeholder-secret-not-for-production
+          NEXTAUTH_URL: http://127.0.0.1:3000
         run: |
           pnpm start > /tmp/ams-next.log 2>&1 &
           APP_PID=$!
