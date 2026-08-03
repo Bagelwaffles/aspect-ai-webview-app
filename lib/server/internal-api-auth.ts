@@ -1,15 +1,16 @@
-import { timingSafeEqual } from "node:crypto"
-import type { NextRequest } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 
-function constantTimeEqual(left: string, right: string): boolean {
-  const leftBuffer = Buffer.from(left)
-  const rightBuffer = Buffer.from(right)
-
-  if (leftBuffer.length !== rightBuffer.length) {
+export function constantTimeStringEqual(left: string, right: string): boolean {
+  if (left.length !== right.length) {
     return false
   }
 
-  return timingSafeEqual(leftBuffer, rightBuffer)
+  let mismatch = 0
+  for (let index = 0; index < left.length; index += 1) {
+    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index)
+  }
+
+  return mismatch === 0
 }
 
 export function isInternalApiAuthorized(request: NextRequest): boolean {
@@ -24,11 +25,11 @@ export function isInternalApiAuthorized(request: NextRequest): boolean {
   }
 
   const supplied = authorization.slice("Bearer ".length).trim()
-  return supplied.length > 0 && constantTimeEqual(supplied, expected)
+  return supplied.length > 0 && constantTimeStringEqual(supplied, expected)
 }
 
 export function unauthorizedInternalApiResponse(): Response {
-  return Response.json(
+  return NextResponse.json(
     {
       ok: false,
       error: "Unauthorized",
