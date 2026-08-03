@@ -19,6 +19,15 @@ export async function GET() {
       commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? "unknown",
       database: "not_configured_in_web_shell",
       dependencies: {
+        customerAuth: configured(
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET",
+          "NEXTAUTH_SECRET",
+          "NEXTAUTH_URL",
+        )
+          ? "configured"
+          : "missing",
+        xai: configured("XAI_API_KEY", "XAI_MODEL") ? "configured" : "missing",
         stripe: configured("STRIPE_SECRET_KEY") ? "configured" : "missing",
         relevance: configured(
           "RELEVANCE_API_KEY",
@@ -29,7 +38,7 @@ export async function GET() {
         )
           ? "configured"
           : "missing",
-        n8n: configured("N8N_MCP_KEY") ? "configured" : "missing",
+        n8n: configured("N8N_WEBHOOK_SECRET") ? "configured" : "missing",
         internalApiAuth: configured("AMS_INTERNAL_API_KEY") ? "configured" : "missing",
       },
       dependencyConnectionsTested: false,
