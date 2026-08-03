@@ -3,15 +3,13 @@ name: AMS Reconciliation CI
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [feat/ams-controlled-reconciliation]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: ams-reconciliation-${{ github.event.pull_request.number || github.ref }}
+  group: ams-reconciliation-pr-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -22,8 +20,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'push' && github.ref_name || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -36,19 +32,8 @@ jobs:
       - name: Install pnpm
         run: corepack prepare pnpm@10.28.0 --activate
 
-      - name: Install dependencies and refresh lockfile
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Commit refreshed lockfile
-        if: github.event_name == 'push'
-        run: |
-          if ! git diff --quiet -- pnpm-lock.yaml; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add pnpm-lock.yaml
-            git commit -m "build: refresh pnpm lockfile for entitlements"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
-          fi
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Dependency audit
         run: pnpm audit --audit-level=high
@@ -82,6 +67,7 @@ jobs:
           node -e 'const value=require("/tmp/deployments.json"); if(!Array.isArray(value.deployments)||value.deployments.length!==0) process.exit(1)'
           test "$(curl --silent --output /tmp/relevance.json --write-out '%{http_code}' http://127.0.0.1:3000/api/relevance/agents)" = "401"
           test "$(curl --silent --output /tmp/checkout.json --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/billing/checkout)" = "401"
+          test "$(curl --silent --output /tmp/portal.json --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/billing/portal)" = "401"
           test "$(curl --silent --output /tmp/ai.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"message":"test"}' http://127.0.0.1:3000/api/ai/chat)" = "401"
           test "$(curl --silent --output /tmp/grok.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"agentId":"grok-content","message":"test"}' http://127.0.0.1:3000/api/grok/chat)" = "401"
           test "$(curl --silent --output /tmp/grok-stream.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"agentId":"grok-content","message":"test"}' http://127.0.0.1:3000/api/grok/stream)" = "401"
