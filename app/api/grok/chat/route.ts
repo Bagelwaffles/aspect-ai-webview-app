@@ -1,3 +1,5 @@
+import { xai } from "@ai-sdk/xai"
+import { generateText } from "ai"
 import { NextRequest, NextResponse } from "next/server"
 
 import { grokAgentManager } from "@/lib/grok-agents"
@@ -6,6 +8,8 @@ import { consumeAiRateLimit } from "@/lib/server/rate-limit"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+
+type ConversationEntry = { role: "user" | "assistant"; content: string }
 
 export async function POST(request: NextRequest) {
   const principal = await authorizePaidApiRequest(request)
@@ -20,8 +24,9 @@ export async function POST(request: NextRequest) {
   const agentId = body && typeof body === "object" ? body.agentId : undefined
   const message = body && typeof body === "object" ? body.message : undefined
   const conversationHistory = body && typeof body === "object" ? body.conversationHistory : undefined
+  const agent = typeof agentId === "string" ? grokAgentManager.getAgent(agentId) : undefined
 
-  if (typeof agentId !== "string" || !grokAgentManager.getAgent(agentId)) {
+  if (!agent) {
     return NextResponse.json({ ok: false, error: "Unknown agent" }, { status: 400 })
   }
 
@@ -64,17 +69,36 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  if (!process.env.XAI_API_KEY?.trim() || !process.env.XAI_MODEL?.trim()) {
+  const apiKey = process.env.XAI_API_KEY?.trim()
+  const model = process.env.XAI_MODEL?.trim()
+  if (!apiKey || !model) {
     return NextResponse.json(
       { ok: false, error: "AI provider is not configured", code: "AI_PROVIDER_NOT_CONFIGURED" },
       { status: 503 },
     )
   }
 
+  const history = (Array.isArray(conversationHistory) ? conversationHistory : []) as ConversationEntry[]
+  let prompt = `${agent.systemPrompt}\n\n`
+  if (history.length > 0) {
+    prompt += "Previous conversation:\n"
+    history.slice(-6).forEach((entry) => {
+      prompt += `${entry.role === "user" ? "User" : "Assistant"}: ${entry.content}\n`
+    })
+    prompt += "\n"
+  }
+  prompt += `Current user message: ${message.trim()}\n\nProvide a helpful response. Never invent live metrics, revenue, completed integrations, or customer results.`
+
   try {
-    const response = await grokAgentManager.generateResponse(agentId, message.trim(), conversationHistory)
+    const { text } = await generateText({
+      model: xai(model),
+      prompt,
+      temperature: agent.temperature,
+      maxOutputTokens: agent.maxTokens,
+    })
+
     return NextResponse.json(
-      { ok: true, response },
+      { ok: true, response: text },
       {
         headers: {
           "Cache-Control": "no-store",
