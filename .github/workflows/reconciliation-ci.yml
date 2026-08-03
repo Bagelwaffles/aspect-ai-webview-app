@@ -3,14 +3,13 @@ name: AMS Reconciliation CI
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [feat/ams-controlled-reconciliation]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ams-reconciliation-${{ github.ref }}
+  group: ams-reconciliation-pr-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
