@@ -1,768 +1,238 @@
-"use client"
-
-import type React from "react"
-
-import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
+  ArrowRight,
   BarChart3,
-  Package,
-  Workflow,
-  CreditCard,
-  TrendingUp,
-  ShoppingCart,
-  Settings,
-  Bell,
-  Search,
-  Plus,
-  Activity,
-  DollarSign,
-  Eye,
-  MoreHorizontal,
-  Brain,
   Bot,
+  CheckCircle2,
+  FileText,
+  LockKeyhole,
+  Megaphone,
+  ShieldCheck,
   Sparkles,
-  Globe,
-  Send,
-  MessageSquare,
-  Minimize2,
+  Target,
+  Workflow,
 } from "lucide-react"
 
-interface ChatMessage {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  timestamp: Date
-}
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-type LiveAgent = {
-  id: string
-  name: string
-  status?: string
-  description?: string
-  metrics?: {
-    totalInteractions?: number
-    revenueAttributed?: number
-    userSatisfaction?: number
-  }
-}
+const launchAgents = [
+  {
+    slug: "content",
+    name: "Content Agent",
+    icon: FileText,
+    description: "Creates practical marketing copy, product descriptions, email drafts, and social content.",
+  },
+  {
+    slug: "outreach",
+    name: "Outreach Agent",
+    icon: Target,
+    description: "Builds focused lead qualification, offers, and one-message outreach drafts without spam tactics.",
+  },
+  {
+    slug: "analytics",
+    name: "Analytics Agent",
+    icon: BarChart3,
+    description: "Turns supplied business data into clear findings, priorities, and next-step recommendations.",
+  },
+]
 
-type LiveDeployment = {
-  id: string
-  name: string
-  agentName?: string
-  status?: string
-  analytics?: {
-    totalInteractions?: number
-    uniqueVisitors?: number
-    conversionRate?: number
-  }
-  config?: {
-    position?: string
-    theme?: string
-  }
-}
+const safeguards = [
+  "Customer sign-in before paid AI access",
+  "Signed Stripe webhook fulfillment",
+  "Persistent plan credits and agent access",
+  "Rate limits on paid AI routes",
+  "No fabricated revenue or interaction metrics",
+]
 
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState("overview")
-  const [isChatOpen, setIsChatOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: "1",
-      role: "assistant",
-      content:
-        "Hi! I'm your AI assistant. I can help you with your print-on-demand business, answer questions about orders, products, or workflows. How can I assist you today?",
-      timestamp: new Date(),
-    },
-  ])
-  const [chatInput, setChatInput] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [agents, setAgents] = useState<LiveAgent[]>([])
-  const [deployments, setDeployments] = useState<LiveDeployment[]>([])
-  const [loadingLiveData, setLoadingLiveData] = useState(true)
-
-  useEffect(() => {
-    let mounted = true
-
-    async function loadLiveData() {
-      try {
-        const [agentsResponse, deploymentsResponse] = await Promise.all([
-          fetch("/api/agents", { cache: "no-store" }),
-          fetch("/api/deployments", { cache: "no-store" }),
-        ])
-
-        const agentsData = await agentsResponse.json().catch(() => null)
-        const deploymentsData = await deploymentsResponse.json().catch(() => null)
-
-        if (!mounted) return
-        setAgents(Array.isArray(agentsData?.agents) ? agentsData.agents : [])
-        setDeployments(Array.isArray(deploymentsData?.deployments) ? deploymentsData.deployments : [])
-      } catch (error) {
-        console.error("Failed to load live dashboard data:", error)
-        if (mounted) {
-          setAgents([])
-          setDeployments([])
-        }
-      } finally {
-        if (mounted) {
-          setLoadingLiveData(false)
-        }
-      }
-    }
-
-    void loadLiveData()
-
-    return () => {
-      mounted = false
-    }
-  }, [])
-
-  const totalRevenue = useMemo(
-    () => agents.reduce((sum, agent) => sum + (agent.metrics?.revenueAttributed || 0), 0),
-    [agents],
-  )
-
-  const totalProducts = useMemo(() => {
-    if (deployments.length > 0) return deployments.length
-    return agents.length
-  }, [agents.length, deployments.length])
-
-  const totalOrders = useMemo(
-    () =>
-      deployments.reduce(
-        (sum, deployment) => sum + (deployment.analytics?.totalInteractions || 0),
-        0,
-      ),
-    [deployments],
-  )
-
-  const activeWorkflows = useMemo(
-    () => deployments.filter((deployment) => deployment.status === "active").length,
-    [deployments],
-  )
-
-  const recentCards = useMemo(
-    () =>
-      deployments.slice(0, 5).map((deployment, index) => ({
-        id: deployment.id || String(index),
-        customer: deployment.agentName || deployment.name || "Live deployment",
-        product: `${deployment.config?.position || "unspecified"} • ${deployment.config?.theme || "unspecified"}`,
-        status:
-          deployment.status === "active"
-            ? "Active"
-            : deployment.status === "deploying"
-              ? "Deploying"
-              : deployment.status === "error"
-                ? "Needs attention"
-                : "Inactive",
-        amount: `${deployment.analytics?.conversionRate?.toFixed(1) || "0.0"}% conversion`,
-      })),
-    [deployments],
-  )
-
-  const liveWorkflowCards = useMemo(
-    () =>
-      deployments.slice(0, 6).map((deployment) => ({
-        id: deployment.id,
-        name: deployment.name || "Live deployment",
-        status:
-          deployment.status === "active"
-            ? "Running"
-            : deployment.status === "deploying"
-              ? "Deploying"
-              : deployment.status === "error"
-                ? "Needs attention"
-                : "Paused",
-        lastRun: deployment.analytics?.totalInteractions
-          ? `${deployment.analytics.totalInteractions.toLocaleString()} interactions`
-          : "No recent live interaction data",
-        success:
-          deployment.analytics?.conversionRate !== undefined
-            ? Math.round(deployment.analytics.conversionRate * 100)
-            : 0,
-      })),
-    [deployments],
-  )
-
-  const handleNavigation = (tab: string) => {
-    if (tab === "overview") {
-      window.location.href = "/"
-    } else if (tab === "settings") {
-      window.location.href = "/settings"
-    } else if (tab === "notifications") {
-      window.location.href = "/notifications"
-    } else if (tab === "relevance") {
-      window.location.href = "/relevance-ai"
-    } else if (tab === "products") {
-      window.location.href = "/products"
-    } else if (tab === "analytics") {
-      window.location.href = "/analytics"
-    } else if (tab === "workflows") {
-      window.location.href = "/workflows"
-    } else if (tab === "billing") {
-      window.location.href = "/billing"
-    } else if (tab === "ai-command") {
-      window.location.href = "/ai-command"
-    } else if (tab === "content-agent") {
-      window.location.href = "/content-agent"
-    } else if (tab === "agents") {
-      window.location.href = "/agents"
-    } else if (tab === "grok-chat") {
-      window.location.href = "/grok-chat"
-    } else if (tab === "deployments") {
-      window.location.href = "/deployments"
-    } else if (tab === "pricing") {
-      window.location.href = "/pricing"
-    } else if (tab === "ethical-agent-farm") {
-      window.location.href = "/ethical-agent-farm"
-    } else {
-      setActiveTab(tab)
-    }
-  }
-
-  const sendMessage = async () => {
-    if (!chatInput.trim()) return
-
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: "user",
-      content: chatInput,
-      timestamp: new Date(),
-    }
-
-    setChatMessages((prev) => [...prev, userMessage])
-    setChatInput("")
-    setIsLoading(true)
-
-    try {
-      const response = await fetch("/api/grok/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          agentId: "grok-support",
-          message: chatInput,
-          conversationHistory: chatMessages.slice(-6).map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-          })),
-        }),
-      })
-
-      const data = await response.json()
-
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.response || "I'm here to help! Could you please rephrase your question?",
-        timestamp: new Date(),
-      }
-
-      setChatMessages((prev) => [...prev, assistantMessage])
-    } catch (error) {
-      console.error("Failed to send message:", error)
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment.",
-        timestamp: new Date(),
-      }
-      setChatMessages((prev) => [...prev, errorMessage])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
-  }
-
-  const handleSearchSubmit = (event: React.FormEvent) => {
-    event.preventDefault()
-    const value = searchQuery.trim()
-    window.location.href = value ? `/products?query=${encodeURIComponent(value)}` : "/products"
-  }
-
+export default function HomePage() {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Sidebar */}
-      <div className="fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-sidebar-border">
-        <div className="flex h-full flex-col">
-          {/* Logo */}
-          <div className="flex h-16 items-center border-b border-sidebar-border px-6">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
-                <Package className="h-5 w-5 text-sidebar-primary-foreground" />
-              </div>
-              <span className="text-xl font-bold text-sidebar-foreground font-[family-name:var(--font-work-sans)]">
-                Aspect Marketing Solutions
-              </span>
-            </div>
-          </div>
+    <main className="min-h-screen overflow-hidden bg-background text-foreground">
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.18),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(126,34,206,0.16),transparent_30%),linear-gradient(to_bottom,#050816,#090d1a_50%,#050816)]" />
 
-          {/* Navigation */}
-          <nav className="flex-1 space-y-1 px-3 py-4">
-            {[
-              { id: "overview", label: "Overview", icon: BarChart3 },
-              { id: "ai-command", label: "AI Command", icon: Brain },
-              { id: "content-agent", label: "Content Agent", icon: Sparkles },
-              { id: "agents", label: "Agents", icon: Bot },
-              { id: "relevance", label: "Relevance AI", icon: Brain },
-              { id: "grok-chat", label: "Grok Chat", icon: Sparkles },
-              { id: "deployments", label: "Deployments", icon: Globe },
-              { id: "pricing", label: "Pricing", icon: CreditCard },
-              { id: "ethical-agent-farm", label: "Agent Farm", icon: Bot },
-              { id: "products", label: "Products", icon: Package },
-              { id: "workflows", label: "Workflows", icon: Workflow },
-              { id: "billing", label: "Billing", icon: CreditCard },
-              { id: "analytics", label: "Analytics", icon: TrendingUp },
-              { id: "settings", label: "Settings", icon: Settings },
-            ].map((item) => {
-              const Icon = item.icon
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleNavigation(item.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    activeTab === item.id
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  {item.label}
-                </button>
-              )
-            })}
+      <header className="border-b border-border/70 bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/30 bg-primary/15 text-primary">
+              <Bot className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="font-semibold tracking-tight">Aspect Marketing Solutions</div>
+              <div className="text-xs text-muted-foreground">AI marketing platform</div>
+            </div>
+          </Link>
+
+          <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
+            <Link href="/agents" className="transition hover:text-foreground">Agents</Link>
+            <Link href="/pricing" className="transition hover:text-foreground">Pricing</Link>
+            <Link href="/ethical-agent-farm" className="transition hover:text-foreground">Services</Link>
           </nav>
 
-          {/* User Profile */}
-          <div className="border-t border-sidebar-border p-4">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback>AMS</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">Live workspace</p>
-                <p className="text-xs text-muted-foreground truncate">Connected to production data</p>
-              </div>
-            </div>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/login">Sign in</Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link href="/pricing">Get started</Link>
+            </Button>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-      <div className="pl-64">
-        {/* Top Bar */}
-        <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex h-16 items-center gap-4 px-6">
-            <div className="flex-1">
-              <form onSubmit={handleSearchSubmit} className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search products, orders, workflows..."
-                  className="w-full rounded-lg border border-input bg-input pl-10 pr-4 py-2 text-sm placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-                />
-              </form>
+      <section className="relative">
+        <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+          <div className="space-y-7">
+            <Badge variant="outline" className="border-cyan-400/30 bg-cyan-400/10 text-cyan-200">
+              <Sparkles className="mr-2 h-3.5 w-3.5" />
+              Built for practical marketing execution
+            </Badge>
+
+            <div className="space-y-5">
+              <h1 className="max-w-4xl text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl">
+                Turn marketing work into a repeatable system.
+              </h1>
+              <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
+                AMS combines secure customer accounts, usage-based AI agents, Stripe billing, and focused marketing services in one mobile-first platform.
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/reviewer-access">Reviewer Access</Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/products/new">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Product
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button asChild size="lg">
+                <Link href="/pricing">
+                  View plans
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/notifications" aria-label="Notifications">
-                  <Bell className="h-4 w-4" />
-                </Link>
+              <Button asChild size="lg" variant="outline">
+                <Link href="/ethical-agent-farm">Explore one-time services</Link>
               </Button>
             </div>
-          </div>
-        </header>
 
-        {/* Dashboard Content */}
-        <main className="p-6">
-          <section className="mb-8 overflow-hidden rounded-2xl border border-border bg-card/80 p-6 shadow-lg backdrop-blur-sm lg:p-8">
-            <div className="grid gap-8 lg:grid-cols-[1.4fr_0.9fr] lg:items-center">
-              <div className="space-y-5">
-                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Premium AI marketing SaaS command center
+            <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
+              {safeguards.slice(0, 4).map((item) => (
+                <div key={item} className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                  <span>{item}</span>
                 </div>
-                <div className="space-y-3">
-                  <h1 className="max-w-3xl text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-                    Aspect Marketing Solutions keeps your agents, billing, and workflows in one live command center.
-                  </h1>
-                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                    Monitor live data, manage ethical offers, review billing, and launch compliant marketing systems without fake claims or dead-end tools.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
-                    <Link href="/pricing">View pricing</Link>
-                  </Button>
-                  <Button asChild variant="outline" className="border-border bg-background/50">
-                    <Link href="/ethical-agent-farm">Explore ethical agent farm</Link>
-                  </Button>
-                  <Button asChild variant="ghost">
-                    <Link href="/request-access">Request access</Link>
-                  </Button>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {[
-                    { label: "Live agents", value: loadingLiveData ? "…" : String(agents.length) },
-                    { label: "Live deployments", value: loadingLiveData ? "…" : String(deployments.length) },
-                    { label: "Billing ready", value: "Yes" },
-                  ].map((item) => (
-                    <div key={item.label} className="rounded-xl border border-border bg-background/40 p-4">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.label}</p>
-                      <p className="mt-1 text-2xl font-semibold text-foreground">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-4">
-                <Card className="border-border bg-background/50">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Platform status</CardTitle>
-                    <CardDescription>Live production signals, no fake filler.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm">
-                    <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-                      <span className="text-muted-foreground">Agents</span>
-                      <span className="font-medium text-foreground">{loadingLiveData ? "Loading..." : `${agents.length} connected`}</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-                      <span className="text-muted-foreground">Deployments</span>
-                      <span className="font-medium text-foreground">{loadingLiveData ? "Loading..." : `${deployments.length} live`}</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-                      <span className="text-muted-foreground">Billing</span>
-                      <span className="font-medium text-emerald-400">Ready</span>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="border-border bg-background/50">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Compliance-first funnel</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm text-muted-foreground">
-                    <p>Ethical Agent Farm offers use honest request flows or live checkout where configured.</p>
-                    <p>Protected admin areas stay private.</p>
-                    <p>Reviewer access never exposes real leads.</p>
-                  </CardContent>
-                </Card>
-              </div>
+              ))}
             </div>
-          </section>
-
-          {/* Stats Cards */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">
-                  {loadingLiveData ? "Loading..." : `$${totalRevenue.toLocaleString()}`}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {loadingLiveData ? "Pulling live data from connected APIs" : "Live agent-attributed revenue"}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Products</CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">
-                  {loadingLiveData ? "Loading..." : totalProducts.toLocaleString()}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {loadingLiveData ? "Collecting live counts" : "Live connected products / deployments"}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Orders</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">
-                  {loadingLiveData ? "Loading..." : totalOrders.toLocaleString()}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {loadingLiveData ? "Collecting live interactions" : "Live interaction count across deployments"}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Workflows</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">
-                  {loadingLiveData ? "Loading..." : activeWorkflows.toLocaleString()}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {loadingLiveData ? "Checking live workflow state" : "Active live deployments"}
-                </p>
-              </CardContent>
-            </Card>
           </div>
 
-          {/* Main Dashboard Grid */}
+          <Card className="border-primary/25 bg-card/80 shadow-2xl shadow-primary/10 backdrop-blur-xl">
+            <CardHeader>
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+                <Workflow className="h-6 w-6" />
+              </div>
+              <CardTitle className="text-2xl">Revenue-first launch stack</CardTitle>
+              <CardDescription>
+                The first release is deliberately narrow: three useful agents, honest account state, and verified billing fulfillment.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {launchAgents.map((agent) => {
+                const Icon = agent.icon
+                return (
+                  <div key={agent.slug} className="flex gap-3 rounded-xl border border-border/70 bg-background/50 p-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold">{agent.name}</div>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">{agent.description}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="border-y border-border/70 bg-card/30">
+        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8">
           <div className="grid gap-6 lg:grid-cols-3">
-            {/* Recent Orders */}
-            <Card className="lg:col-span-2">
+            <Card className="bg-background/60">
               <CardHeader>
-                <CardTitle className="font-[family-name:var(--font-work-sans)]">Recent Orders</CardTitle>
+                <LockKeyhole className="mb-3 h-6 w-6 text-primary" />
+                <CardTitle>Account-gated AI</CardTitle>
                 <CardDescription>
-                  {loadingLiveData
-                    ? "Loading live deployment summaries."
-                    : deployments.length > 0
-                      ? `${deployments.length} live deployments connected.`
-                      : "No live deployments are connected yet."}
+                  Paid routes require authenticated customer identity or a protected internal system key.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentCards.length === 0 ? (
-                    <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                      No live deployment summaries are available yet.
-                    </div>
-                  ) : (
-                    recentCards.map((order) => (
-                      <div
-                        key={order.id}
-                        className="flex items-center justify-between p-4 border border-border rounded-lg"
-                      >
-                        <div className="flex items-center gap-4">
-                          <Avatar className="h-9 w-9">
-                            <AvatarFallback>
-                              {order.customer
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                                .slice(0, 2)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-sm font-medium">{order.customer}</p>
-                            <p className="text-sm text-muted-foreground">{order.product}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <Badge variant={order.status === "Active" ? "default" : "outline"}>{order.status}</Badge>
-                          <p className="text-sm font-medium">{order.amount}</p>
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
             </Card>
-
-            {/* Quick Actions */}
-            <Card>
+            <Card className="bg-background/60">
               <CardHeader>
-                <CardTitle className="font-[family-name:var(--font-work-sans)]">Quick Actions</CardTitle>
-                <CardDescription>Manage the live site and connected services efficiently</CardDescription>
+                <ShieldCheck className="mb-3 h-6 w-6 text-primary" />
+                <CardTitle>Verified fulfillment</CardTitle>
+                <CardDescription>
+                  Browser redirects never grant access. Signed Stripe events update plans, credits, and agent entitlements.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <Button asChild className="w-full justify-start bg-transparent" variant="outline">
-                  <Link href="/products/new">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create New Product
-                  </Link>
-                </Button>
-                <Button asChild className="w-full justify-start bg-transparent" variant="outline">
-                  <Link href="/workflows/new">
-                    <Workflow className="h-4 w-4 mr-2" />
-                    Setup Workflow
-                  </Link>
-                </Button>
-                <Button asChild className="w-full justify-start bg-transparent" variant="outline">
-                  <Link href="/analytics">
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    View Analytics
-                  </Link>
-                </Button>
-                <Button asChild className="w-full justify-start bg-transparent" variant="outline">
-                  <Link href="/billing">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Billing Settings
-                  </Link>
-                </Button>
-              </CardContent>
+            </Card>
+            <Card className="bg-background/60">
+              <CardHeader>
+                <Megaphone className="mb-3 h-6 w-6 text-primary" />
+                <CardTitle>Honest marketing</CardTitle>
+                <CardDescription>
+                  AMS does not display invented revenue, fabricated interactions, or fake deployment success.
+                </CardDescription>
+              </CardHeader>
             </Card>
           </div>
+        </div>
+      </section>
 
-          {/* Workflow Status */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="font-[family-name:var(--font-work-sans)]">Active Workflows</CardTitle>
-              <CardDescription>Monitor your automation processes</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {loadingLiveData ? (
-                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground lg:col-span-3">
-                    Loading live workflow summaries...
-                  </div>
-                ) : liveWorkflowCards.length === 0 ? (
-                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground lg:col-span-3">
-                    No live workflow summaries are connected yet.
-                  </div>
-                ) : (
-                  liveWorkflowCards.map((workflow) => (
-                    <div key={workflow.id} className="p-4 border border-border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium">{workflow.name}</h4>
-                        <Badge
-                          variant={
-                            workflow.status === "Running"
-                              ? "default"
-                              : workflow.status === "Deploying"
-                                ? "secondary"
-                                : "outline"
-                          }
-                        >
-                          {workflow.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">Last run: {workflow.lastRun}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Success rate: {workflow.success}%</span>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </main>
-      </div>
-
-      {/* AI Chat Widget */}
-      <div className="fixed bottom-6 right-6 z-50">
-        {!isChatOpen ? (
-          <Button
-            onClick={() => setIsChatOpen(true)}
-            className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-shadow"
-            size="sm"
-          >
-            <MessageSquare className="h-6 w-6" />
-          </Button>
-        ) : (
-          <Card className="w-80 h-96 shadow-2xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-primary-foreground" />
-                </div>
-                <div>
-                  <CardTitle className="text-sm">AI Assistant</CardTitle>
-                  <CardDescription className="text-xs">Always here to help</CardDescription>
-                </div>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setIsChatOpen(false)}>
-                <Minimize2 className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0 flex flex-col h-80">
-              <ScrollArea className="flex-1 p-4">
-                <div className="space-y-4">
-                  {chatMessages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`max-w-[80%] p-2 rounded-lg text-sm ${
-                          message.role === "user"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        <p>{message.content}</p>
-                        <p className="text-xs opacity-70 mt-1">{message.timestamp.toLocaleTimeString()}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {isLoading && (
-                    <div className="flex justify-start">
-                      <div className="bg-muted text-muted-foreground p-2 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <div className="animate-spin h-3 w-3 border-2 border-primary border-t-transparent rounded-full" />
-                          <span className="text-sm">Thinking...</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-              <div className="p-4 border-t border-border">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Ask me anything..."
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    disabled={isLoading}
-                    className="flex-1 text-sm"
-                  />
-                  <Button onClick={sendMessage} disabled={isLoading || !chatInput.trim()} size="sm">
-                    <Send className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-        <footer className="border-t border-border px-6 py-4 text-sm text-muted-foreground">
-          <div className="flex flex-wrap gap-4">
-            <a href="/ethical-agent-farm" className="hover:text-foreground">Agent Farm</a>
-            <a href="/request-access" className="hover:text-foreground">Request Access</a>
-            <a href="/pricing" className="hover:text-foreground">Pricing</a>
-            <a href="/billing" className="hover:text-foreground">Billing</a>
-            <a href="/terms" className="hover:text-foreground">Terms</a>
-            <a href="/privacy" className="hover:text-foreground">Privacy</a>
-            <a href="/refund" className="hover:text-foreground">Refund</a>
+      <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8">
+        <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+          <div className="space-y-4">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Launch scope</p>
+            <h2 className="text-3xl font-bold sm:text-4xl">Finish the core. Then expand.</h2>
+            <p className="leading-7 text-muted-foreground">
+              AMS starts with the functions most likely to save time or produce revenue. Additional agents remain disabled until their integrations and execution paths are real.
+            </p>
           </div>
-        </footer>
-      </div>
-    </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {safeguards.map((item) => (
+              <div key={item} className="flex items-start gap-3 rounded-xl border border-border/70 bg-card/50 p-4">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+                <span className="text-sm leading-6">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-border/70 bg-primary/5">
+        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-5 py-14 sm:px-8 lg:flex-row lg:items-center">
+          <div>
+            <h2 className="text-3xl font-bold">Start with a plan or a one-time project.</h2>
+            <p className="mt-2 max-w-2xl text-muted-foreground">
+              Choose the route that fits the business today. Unconfigured checkout paths fall back safely instead of claiming success.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button asChild size="lg">
+              <Link href="/pricing">Compare pricing</Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href="/login">Customer sign in</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-border/70">
+        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 px-5 py-8 text-sm text-muted-foreground sm:px-8 md:flex-row">
+          <span>© 2026 Aspect Marketing Solutions</span>
+          <div className="flex gap-5">
+            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
+            <Link href="/terms" className="hover:text-foreground">Terms</Link>
+            <Link href="/contact" className="hover:text-foreground">Contact</Link>
+          </div>
+        </div>
+      </footer>
+    </main>
   )
 }
