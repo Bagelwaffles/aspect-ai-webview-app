@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 
+import { isEntitlementStoreConfigured } from "@/lib/server/entitlements"
+
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
@@ -17,7 +19,10 @@ export async function GET() {
       service: "ams-web",
       environment,
       commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? "unknown",
-      database: "not_configured_in_web_shell",
+      persistence: {
+        database: "not_configured_in_web_shell",
+        entitlements: isEntitlementStoreConfigured() ? "configured" : "missing",
+      },
       dependencies: {
         customerAuth: configured(
           "GOOGLE_CLIENT_ID",
@@ -28,7 +33,15 @@ export async function GET() {
           ? "configured"
           : "missing",
         xai: configured("XAI_API_KEY", "XAI_MODEL") ? "configured" : "missing",
-        stripe: configured("STRIPE_SECRET_KEY") ? "configured" : "missing",
+        stripeBilling: configured(
+          "STRIPE_SECRET_KEY",
+          "STRIPE_WEBHOOK_SECRET",
+          "AMS_STRIPE_STARTER_PRICE_ID",
+          "AMS_STRIPE_GROWTH_PRICE_ID",
+          "AMS_STRIPE_PRO_PRICE_ID",
+        )
+          ? "configured"
+          : "missing",
         relevance: configured(
           "RELEVANCE_API_KEY",
           "RELEVANCE_AUTH_TOKEN",
@@ -42,6 +55,7 @@ export async function GET() {
         internalApiAuth: configured("AMS_INTERNAL_API_KEY") ? "configured" : "missing",
       },
       dependencyConnectionsTested: false,
+      productionDependenciesUsed: false,
       timestamp: new Date().toISOString(),
     },
     {
