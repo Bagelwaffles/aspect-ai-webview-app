@@ -19,20 +19,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build source archive
-        run: |
-          tar \
-            --exclude=.git \
-            --exclude=node_modules \
-            --exclude=.next \
-            --exclude=.vercel \
-            --exclude='.env*' \
-            --exclude='!*.example' \
-            -czf ams-source.tar.gz .
+        run: git archive --format=tar.gz --output="$RUNNER_TEMP/ams-source.tar.gz" HEAD
 
       - name: Upload source archive
         uses: actions/upload-artifact@v4
         with:
           name: ams-source-${{ github.sha }}
-          path: ams-source.tar.gz
+          path: ${{ runner.temp }}/ams-source.tar.gz
           if-no-files-found: error
           retention-days: 1
