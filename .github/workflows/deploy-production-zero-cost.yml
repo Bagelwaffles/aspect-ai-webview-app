@@ -1,0 +1,92 @@
+name: Deploy AMS zero-cost production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-production-zero-cost.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ams-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    env:
+      VERCEL_ORG_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
+      VERCEL_PROJECT_ID: prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE: "false"
+    steps:
+      - name: Checkout approved main
+        uses: actions/checkout@v4
+
+      - name: Require deployment credential
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::GitHub secret VERCEL_TOKEN is not configured."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.28.0 --activate
+
+      - name: Pull production configuration
+        run: npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build approved zero-cost release
+        run: npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy approved zero-cost release
+        id: deploy
+        run: |
+          DEPLOYMENT_URL=$(npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          echo "deployment_url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed $DEPLOYMENT_URL"
+
+      - name: Verify production routes
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+        run: |
+          set -euo pipefail
+          for path in / /pricing /content-agent; do
+            code=$(curl -L -sS -o /dev/null -w '%{http_code}' "$DEPLOYMENT_URL$path")
+            echo "$path -> $code"
+            case "$code" in
+              200|301|302|307|308) ;;
+              *) exit 1 ;;
+            esac
+          done
+
+          checkout_code=$(curl -sS -o /tmp/checkout.json -w '%{http_code}' \
+            -X POST -H 'content-type: application/json' \
+            --data '{"plan":"starter"}' \
+            "$DEPLOYMENT_URL/api/billing/checkout")
+          echo "/api/billing/checkout unauthenticated -> $checkout_code"
+          test "$checkout_code" = "401"
+
+      - name: Deployment summary
+        run: |
+          {
+            echo "## AMS zero-cost production deployment"
+            echo ""
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Deployment: ${{ steps.deploy.outputs.deployment_url }}"
+            echo "- Paid AI launch flag: false"
+            echo "- Public route smoke: passed"
+            echo "- Unauthenticated checkout rejection: passed"
+          } >> "$GITHUB_STEP_SUMMARY"
