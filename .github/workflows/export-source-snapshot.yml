@@ -1,0 +1,38 @@
+name: Export AMS source snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/export-source-snapshot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+
+      - name: Build source archive
+        run: |
+          tar \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude=.next \
+            --exclude=.vercel \
+            --exclude='.env*' \
+            --exclude='!*.example' \
+            -czf ams-source.tar.gz .
+
+      - name: Upload source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ams-source-${{ github.sha }}
+          path: ams-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
