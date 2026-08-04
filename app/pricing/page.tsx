@@ -4,6 +4,7 @@ import { Bot, CreditCard, Sparkles } from "lucide-react"
 import { BillingActionButton } from "@/components/billing-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 
 const SAAS_PLANS = [
   {
@@ -11,21 +12,21 @@ const SAAS_PLANS = [
     name: "Starter",
     price: "$29",
     credits: "2,000 credits per month",
-    description: "Account access and a monthly credit allocation for future verified workflows.",
+    description: "Account access and a monthly credit allocation for verified workflows.",
   },
   {
     slug: "growth" as const,
     name: "Growth",
     price: "$79",
     credits: "8,000 credits per month",
-    description: "Additional monthly capacity while the first verified workflow is completed.",
+    description: "Additional monthly capacity for verified workflow usage.",
   },
   {
     slug: "pro" as const,
     name: "Pro",
     price: "$149",
     credits: "20,000 credits per month",
-    description: "Higher monthly capacity for future verified workflow usage.",
+    description: "Higher monthly capacity for verified workflow usage.",
   },
 ]
 
@@ -57,14 +58,16 @@ const ETHICAL_OFFERS = [
 ]
 
 export default function PricingPage() {
+  const contentAgentLive = isContentAgentLaunchEnabled()
+
   return (
     <main className="min-h-screen bg-background px-6 py-10">
       <div className="mx-auto max-w-6xl space-y-12">
         <div className="space-y-4">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-primary">AMS pricing</p>
-          <h1 className="max-w-3xl text-4xl font-bold sm:text-5xl">Clear subscriptions with honest launch status.</h1>
+          <h1 className="max-w-3xl text-4xl font-bold sm:text-5xl">Clear offers with honest launch status.</h1>
           <p className="max-w-2xl text-muted-foreground">
-            Content is the first intended launch agent, but its real execution flow is still in progress. Outreach, Analytics, and every other agent remain unavailable and are not included as working features in these plans.
+            Content Agent is currently in private beta. Paid AI subscriptions remain paused until provider access is funded and the live execution gate is deliberately enabled. No unavailable AI plan can charge a customer.
           </p>
           <div className="flex flex-wrap gap-3">
             <Button asChild variant="outline">
@@ -82,10 +85,26 @@ export default function PricingPage() {
           </div>
         </div>
 
+        {!contentAgentLive ? (
+          <Card className="border-amber-500/40 bg-amber-500/10">
+            <CardHeader>
+              <CardTitle>Paid AI checkout is paused</CardTitle>
+              <CardDescription>
+                AMS is launching the website, accounts, lead capture, and request-based services without charging for unavailable AI execution.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/ethical-agent-farm/request?offer=content-agent-beta">Join the Content Agent beta list</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
         <section className="space-y-5">
           <div>
             <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">SaaS plans</p>
-            <h2 className="text-3xl font-bold">Choose monthly account capacity</h2>
+            <h2 className="text-3xl font-bold">Monthly account capacity</h2>
           </div>
           <div className="grid gap-6 md:grid-cols-3">
             {SAAS_PLANS.map((plan) => (
@@ -104,11 +123,18 @@ export default function PricingPage() {
                   </div>
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     <li>- {plan.credits}</li>
-                    <li>- Content Agent status access; execution is still in progress</li>
-                    <li>- Outreach, Analytics, and other agents are unavailable</li>
-                    <li>- Stripe billing portal</li>
+                    <li>- Content Agent access after the live provider gate is enabled</li>
+                    <li>- Outreach, Analytics, and other agents remain unavailable</li>
+                    <li>- Stripe billing portal for existing subscribers</li>
                   </ul>
-                  <BillingActionButton label={`Choose ${plan.name}`} endpoint="/api/billing/checkout" plan={plan.slug} />
+                  {contentAgentLive ? (
+                    <BillingActionButton label={`Choose ${plan.name}`} endpoint="/api/billing/checkout" plan={plan.slug} />
+                  ) : (
+                    <div className="space-y-2">
+                      <Button type="button" disabled>Private beta — checkout paused</Button>
+                      <p className="text-xs text-muted-foreground">No payment can be started for this plan.</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
