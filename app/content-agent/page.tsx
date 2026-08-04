@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 
 type RunStatus = "queued" | "running" | "succeeded" | "failed" | "refunded" | "reconciliation"
 
@@ -95,6 +96,7 @@ function shouldRetrySameOperation(status: number, code: string | undefined): boo
 }
 
 export default function ContentAgentPage() {
+  const launchEnabled = isContentAgentLaunchEnabled()
   const [brief, setBrief] = useState<ContentRun["input"]>(initialBrief)
   const [runs, setRuns] = useState<ContentRun[]>([])
   const [result, setResult] = useState<ContentRun | null>(null)
@@ -136,6 +138,10 @@ export default function ContentAgentPage() {
 
   async function submitBrief(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!launchEnabled) {
+      setSubmitError("CONTENT_AGENT_TEMPORARILY_UNAVAILABLE: Private beta execution is paused. No credit was reserved or charged.")
+      return
+    }
     if (isSubmitting) return
 
     setIsSubmitting(true)
@@ -177,7 +183,9 @@ export default function ContentAgentPage() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <header className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
-            <Badge variant="secondary" className="w-fit">Subscription workflow</Badge>
+            <Badge variant={launchEnabled ? "secondary" : "outline"} className="w-fit">
+              {launchEnabled ? "Subscription workflow" : "Private beta — execution paused"}
+            </Badge>
             <div>
               <h1 className="text-2xl font-bold sm:text-3xl">Content Agent</h1>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
@@ -195,100 +203,123 @@ export default function ContentAgentPage() {
           </div>
         </header>
 
+        {!launchEnabled ? (
+          <Card className="border-amber-500/40 bg-amber-500/10">
+            <CardHeader>
+              <CardTitle>Content Agent is temporarily unavailable</CardTitle>
+              <CardDescription>
+                AMS is not charging for AI execution while provider access is unfunded. Existing run history remains readable, and the complete protected workflow is preserved for later activation.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-3">
+              <Button asChild>
+                <Link href="/ethical-agent-farm/request?offer=content-agent-beta">Join the beta list</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/pricing">View available request-based services</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
         <section className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
           <Card>
             <CardHeader>
               <CardTitle className="text-xl">Content brief</CardTitle>
               <CardDescription>
-                Requires a signed-in customer, active Content Agent access, available distributed services, and one credit.
+                {launchEnabled
+                  ? "Requires a signed-in customer, active Content Agent access, available distributed services, and one credit."
+                  : "Brief entry is visible for product review, but execution is disabled and no credit can be reserved."}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form className="space-y-5" onSubmit={submitBrief}>
-                <div className="space-y-2">
-                  <Label htmlFor="businessName">Business name</Label>
-                  <Input
-                    id="businessName"
-                    value={brief.businessName}
-                    onChange={(event) => updateBrief({ businessName: event.target.value })}
-                    minLength={2}
-                    maxLength={120}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="audience">Audience</Label>
-                  <Textarea
-                    id="audience"
-                    value={brief.audience}
-                    onChange={(event) => updateBrief({ audience: event.target.value })}
-                    placeholder="Who should this content help or reach?"
-                    minLength={3}
-                    maxLength={500}
-                    required
-                    className="min-h-24"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="goal">Goal</Label>
-                  <Textarea
-                    id="goal"
-                    value={brief.goal}
-                    onChange={(event) => updateBrief({ goal: event.target.value })}
-                    placeholder="What should the draft communicate or encourage?"
-                    minLength={3}
-                    maxLength={500}
-                    required
-                    className="min-h-24"
-                  />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
+                <fieldset disabled={!launchEnabled || isSubmitting} className="space-y-5 disabled:opacity-70">
                   <div className="space-y-2">
-                    <Label htmlFor="channel">Channel</Label>
-                    <select
-                      id="channel"
-                      value={brief.channel}
-                      onChange={(event) => updateBrief({ channel: event.target.value as ContentRun["input"]["channel"] })}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="website">Website</option>
-                      <option value="email">Email</option>
-                      <option value="social">Social post</option>
-                      <option value="blog">Blog</option>
-                      <option value="advertisement">Advertisement</option>
-                    </select>
+                    <Label htmlFor="businessName">Business name</Label>
+                    <Input
+                      id="businessName"
+                      value={brief.businessName}
+                      onChange={(event) => updateBrief({ businessName: event.target.value })}
+                      minLength={2}
+                      maxLength={120}
+                      required
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tone">Tone</Label>
-                    <select
-                      id="tone"
-                      value={brief.tone}
-                      onChange={(event) => updateBrief({ tone: event.target.value as ContentRun["input"]["tone"] })}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="professional">Professional</option>
-                      <option value="friendly">Friendly</option>
-                      <option value="confident">Confident</option>
-                      <option value="educational">Educational</option>
-                      <option value="conversational">Conversational</option>
-                    </select>
-                  </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="offer">Offer (optional)</Label>
-                  <Textarea
-                    id="offer"
-                    value={brief.offer ?? ""}
-                    onChange={(event) => updateBrief({ offer: event.target.value })}
-                    placeholder="Include only an offer that is currently accurate."
-                    maxLength={500}
-                    className="min-h-20"
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="audience">Audience</Label>
+                    <Textarea
+                      id="audience"
+                      value={brief.audience}
+                      onChange={(event) => updateBrief({ audience: event.target.value })}
+                      placeholder="Who should this content help or reach?"
+                      minLength={3}
+                      maxLength={500}
+                      required
+                      className="min-h-24"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="goal">Goal</Label>
+                    <Textarea
+                      id="goal"
+                      value={brief.goal}
+                      onChange={(event) => updateBrief({ goal: event.target.value })}
+                      placeholder="What should the draft communicate or encourage?"
+                      minLength={3}
+                      maxLength={500}
+                      required
+                      className="min-h-24"
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="channel">Channel</Label>
+                      <select
+                        id="channel"
+                        value={brief.channel}
+                        onChange={(event) => updateBrief({ channel: event.target.value as ContentRun["input"]["channel"] })}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="website">Website</option>
+                        <option value="email">Email</option>
+                        <option value="social">Social post</option>
+                        <option value="blog">Blog</option>
+                        <option value="advertisement">Advertisement</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="tone">Tone</Label>
+                      <select
+                        id="tone"
+                        value={brief.tone}
+                        onChange={(event) => updateBrief({ tone: event.target.value as ContentRun["input"]["tone"] })}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="professional">Professional</option>
+                        <option value="friendly">Friendly</option>
+                        <option value="confident">Confident</option>
+                        <option value="educational">Educational</option>
+                        <option value="conversational">Conversational</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="offer">Offer (optional)</Label>
+                    <Textarea
+                      id="offer"
+                      value={brief.offer ?? ""}
+                      onChange={(event) => updateBrief({ offer: event.target.value })}
+                      placeholder="Include only an offer that is currently accurate."
+                      maxLength={500}
+                      className="min-h-20"
+                    />
+                  </div>
+                </fieldset>
 
                 {submitError ? (
                   <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
@@ -296,11 +327,13 @@ export default function ContentAgentPage() {
                   </div>
                 ) : null}
 
-                <Button type="submit" disabled={isSubmitting} className="h-11 w-full sm:w-auto">
+                <Button type="submit" disabled={!launchEnabled || isSubmitting} className="h-11 w-full sm:w-auto">
                   {isSubmitting ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating</>
-                  ) : (
+                  ) : launchEnabled ? (
                     <><Send className="mr-2 h-4 w-4" />Generate draft</>
+                  ) : (
+                    "Execution paused — no charge"
                   )}
                 </Button>
               </form>
@@ -341,7 +374,9 @@ export default function ContentAgentPage() {
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Submit a valid brief to generate a draft. No generated result is shown until the protected workflow succeeds.
+                    {launchEnabled
+                      ? "Submit a valid brief to generate a draft. No generated result is shown until the protected workflow succeeds."
+                      : "New generation is paused. Previously completed runs remain available in account history."}
                   </p>
                 )}
               </CardContent>
