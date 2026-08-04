@@ -2,6 +2,8 @@ import { xai } from "@ai-sdk/xai"
 import { generateText, Output } from "ai"
 import { z } from "zod"
 
+import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
+
 export const CONTENT_AGENT_VERSION = "content-v1" as const
 
 export const contentAgentInputSchema = z
@@ -60,13 +62,15 @@ export function getContentAgentModel(): string | null {
 }
 
 export function isContentAgentProviderConfigured(): boolean {
-  return getContentAgentModel() !== null
+  return isContentAgentLaunchEnabled() && getContentAgentModel() !== null
 }
 
 export async function runContentAgentProvider(input: ContentAgentInput): Promise<ContentAgentOutput> {
   const parsedInput = contentAgentInputSchema.parse(input)
   const model = getContentAgentModel()
-  if (!model) throw new Error("CONTENT_AGENT_PROVIDER_NOT_CONFIGURED")
+  if (!isContentAgentLaunchEnabled() || !model) {
+    throw new Error("CONTENT_AGENT_TEMPORARILY_UNAVAILABLE")
+  }
 
   const result = await generateText({
     model: xai(model),
