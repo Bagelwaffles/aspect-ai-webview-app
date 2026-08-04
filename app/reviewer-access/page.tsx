@@ -6,18 +6,14 @@ import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { safeRelativeCallbackPath } from "@/app/lib/safe-relative-callback"
 
 const REVIEWER_EMAIL = "play-reviewer@aspectmarketingsolutions.app"
 
 export default function ReviewerAccessPage() {
   const searchParams = useSearchParams()
   const nextPath = useMemo(() => {
-    const candidate = searchParams.get("next")?.trim()
-    if (!candidate || !candidate.startsWith("/")) {
-      return "/billing"
-    }
-
-    return candidate
+    return safeRelativeCallbackPath(searchParams.get("next"), "/billing")
   }, [searchParams])
 
   const [email, setEmail] = useState(REVIEWER_EMAIL)

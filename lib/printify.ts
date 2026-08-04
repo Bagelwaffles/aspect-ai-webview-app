@@ -47,14 +47,14 @@ class PrintifyAPI {
     return this.request(`/shops/${shopId}/products/${productId}.json`)
   }
 
-  async createProduct(shopId: number, productData: any) {
+  async createProduct(shopId: number, productData: Record<string, unknown>) {
     return this.request(`/shops/${shopId}/products.json`, {
       method: "POST",
       body: JSON.stringify(productData),
     })
   }
 
-  async updateProduct(shopId: number, productId: string, productData: any) {
+  async updateProduct(shopId: number, productId: string, productData: Record<string, unknown>) {
     return this.request(`/shops/${shopId}/products/${productId}.json`, {
       method: "PUT",
       body: JSON.stringify(productData),
@@ -67,7 +67,7 @@ class PrintifyAPI {
     })
   }
 
-  async publishProduct(shopId: number, productId: string, publishData: any) {
+  async publishProduct(shopId: number, productId: string, publishData: Record<string, unknown>) {
     return this.request(`/shops/${shopId}/products/${productId}/publish.json`, {
       method: "POST",
       body: JSON.stringify(publishData),

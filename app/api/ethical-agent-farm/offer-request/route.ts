@@ -1,138 +1,232 @@
-import { NextRequest, NextResponse } from "next/server";
-import { appendFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isIP } from "node:net"
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 
-const OFFER_SLUGS = new Set([
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
+const OFFER_SLUGS = [
   "quick-marketing-audit",
   "social-content-pack",
   "website-profile-review",
   "business-cleanup-plan",
-  "monthly-marketing-support"
-]);
+  "monthly-marketing-support",
+] as const
 
-const FALLBACK_BACKEND_URL = "https://aspectapi-production.up.railway.app";
-const localLogPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../_reports/ethical-agent-farm-requests.ndjson");
+const REQUEST_TIMEOUT_MS = 8_000
 
-function isText(value: unknown, max = 4000) {
-  return typeof value === "string" && value.trim().length > 0 && value.trim().length <= max;
+const offerRequestSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    email: z.string().trim().max(180).email().transform((value) => value.toLowerCase()),
+    businessName: z.string().trim().min(1).max(140),
+    websiteOrFacebook: z.string().trim().max(240).optional().default(""),
+    selectedOffer: z.enum(OFFER_SLUGS),
+    notesOrGoals: z.string().trim().min(1).max(2_000).optional(),
+    notes: z.string().trim().min(1).max(2_000).optional(),
+    consent: z.literal(true),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (!value.notesOrGoals && !value.notes) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["notesOrGoals"],
+        message: "Notes or goals are required",
+      })
+    }
+  })
+  .transform((value) => ({
+    name: value.name,
+    email: value.email,
+    businessName: value.businessName,
+    websiteOrFacebook: value.websiteOrFacebook || null,
+    selectedOffer: value.selectedOffer,
+    notes: value.notesOrGoals ?? value.notes!,
+    consent: true as const,
+  }))
+
+type OfferRequestDependencies = {
+  env: NodeJS.ProcessEnv
+  fetchImpl: typeof fetch
+  timeoutMs: number
 }
 
-function getBackendUrl() {
-  return (process.env.AMS_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL || FALLBACK_BACKEND_URL).replace(/\/$/, "");
+type OfferRequestTestGlobals = typeof globalThis & {
+  __amsOfferRequestTestDependencies?: Partial<OfferRequestDependencies>
 }
 
-function getFulfillmentSecret() {
-  return process.env.AMS_STRIPE_FULFILLMENT_SECRET?.trim();
+const defaultDependencies: OfferRequestDependencies = {
+  env: process.env,
+  fetchImpl: fetch,
+  timeoutMs: REQUEST_TIMEOUT_MS,
 }
 
-async function forwardRequest(payload: Record<string, unknown>) {
-  const fulfillmentSecret = getFulfillmentSecret();
-  if (!fulfillmentSecret) {
-    if (process.env.NODE_ENV !== "production") {
-      const record = {
-        ...payload,
-        savedAt: new Date().toISOString(),
-        storageMode: "local_log"
-      };
+function testDependencies(): Partial<OfferRequestDependencies> {
+  if (process.env.NODE_ENV === "production") return {}
+  return (globalThis as OfferRequestTestGlobals).__amsOfferRequestTestDependencies ?? {}
+}
 
-      await appendFile(localLogPath, `${JSON.stringify(record)}\n`, "utf8").catch(() => undefined);
+function noStoreJson(body: Record<string, unknown>, status: number) {
+  return NextResponse.json(body, {
+    status,
+    headers: { "Cache-Control": "no-store" },
+  })
+}
 
-      return NextResponse.json({
+function isPrivateOrLoopbackHostname(hostname: string) {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "")
+  const ipVersion = isIP(normalized)
+
+  if (
+    normalized === "localhost" ||
+    normalized.endsWith(".localhost") ||
+    normalized.endsWith(".local") ||
+    normalized.endsWith(".internal") ||
+    (ipVersion === 0 && !normalized.includes("."))
+  ) {
+    return true
+  }
+
+  if (ipVersion === 4) {
+    const [first, second] = normalized.split(".").map(Number)
+    return (
+      first === 0 ||
+      first === 10 ||
+      first === 127 ||
+      (first === 169 && second === 254) ||
+      (first === 172 && second >= 16 && second <= 31) ||
+      (first === 192 && second === 168)
+    )
+  }
+
+  if (ipVersion === 6) {
+    const firstHextet = Number.parseInt(normalized.split(":", 1)[0] || "0", 16)
+    return (
+      normalized === "::" ||
+      normalized === "::1" ||
+      normalized.startsWith("::ffff:") ||
+      (firstHextet & 0xfe00) === 0xfc00 ||
+      (firstHextet & 0xffc0) === 0xfe80
+    )
+  }
+
+  return false
+}
+
+function resolveBackendEndpoint(env: NodeJS.ProcessEnv) {
+  const rawBackendUrl = env.AMS_BACKEND_URL?.trim()
+  const fulfillmentSecret = env.AMS_STRIPE_FULFILLMENT_SECRET?.trim()
+  if (!rawBackendUrl || !fulfillmentSecret) return null
+
+  let backendUrl: URL
+  try {
+    backendUrl = new URL(rawBackendUrl)
+  } catch {
+    return null
+  }
+
+  const production = env.NODE_ENV === "production"
+  if (
+    !["http:", "https:"].includes(backendUrl.protocol) ||
+    backendUrl.username ||
+    backendUrl.password ||
+    backendUrl.search ||
+    backendUrl.hash ||
+    (production && backendUrl.protocol !== "https:") ||
+    (production && isPrivateOrLoopbackHostname(backendUrl.hostname))
+  ) {
+    return null
+  }
+
+  backendUrl.pathname = `${backendUrl.pathname.replace(/\/+$/, "")}/internal/ethical-agent-farm/requests`
+
+  return {
+    endpoint: backendUrl,
+    fulfillmentSecret,
+  }
+}
+
+async function forwardRequest(
+  payload: z.output<typeof offerRequestSchema>,
+  dependencies: OfferRequestDependencies,
+) {
+  const backend = resolveBackendEndpoint(dependencies.env)
+  if (!backend) {
+    return noStoreJson(
+      { ok: false, saved: false, error: "service_request_unavailable" },
+      503,
+    )
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), dependencies.timeoutMs)
+
+  try {
+    const response = await dependencies.fetchImpl(backend.endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-ams-fulfillment-secret": backend.fulfillmentSecret,
+      },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+      signal: controller.signal,
+    })
+
+    await response.body?.cancel().catch(() => undefined)
+
+    if (!response.ok) {
+      return noStoreJson(
+        { ok: false, saved: false, error: "service_request_upstream_failed" },
+        502,
+      )
+    }
+
+    return noStoreJson(
+      {
         ok: true,
         saved: true,
-        emailNotificationStatus: "not_configured",
-        storageMode: "local_log",
-        message: "Request received. We’ll review your business and follow up.",
-        noPaymentCharged: true
-      });
+        message: "Request received. We'll review your business and follow up.",
+        noPaymentCharged: true,
+      },
+      200,
+    )
+  } catch {
+    if (controller.signal.aborted) {
+      return noStoreJson(
+        { ok: false, saved: false, error: "service_request_upstream_timeout" },
+        504,
+      )
     }
 
-    return NextResponse.json(
-      { ok: false, saved: false, error: "lead_capture_not_configured" },
-      { status: 503 }
-    );
+    return noStoreJson(
+      { ok: false, saved: false, error: "service_request_upstream_failed" },
+      502,
+    )
+  } finally {
+    clearTimeout(timeout)
   }
-
-  const response = await fetch(`${getBackendUrl()}/internal/ethical-agent-farm/requests`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-ams-fulfillment-secret": fulfillmentSecret
-    },
-    body: JSON.stringify(payload),
-    cache: "no-store"
-  });
-
-  const text = await response.text();
-  let parsed: unknown = null;
-  if (text) {
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      parsed = { ok: false, error: text };
-    }
-  }
-
-  return NextResponse.json(
-    parsed ?? { ok: false, saved: false, error: "lead_capture_failed" },
-    { status: response.status }
-  );
 }
 
 export async function POST(request: NextRequest) {
+  const dependencies = { ...defaultDependencies, ...testDependencies() }
+
   try {
-    const body = await request.json().catch(() => null);
-    if (!body || typeof body !== "object") {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    const parsed = offerRequestSchema.safeParse(await request.json().catch(() => null))
+    if (!parsed.success) {
+      return noStoreJson(
+        { ok: false, saved: false, error: "invalid_service_request" },
+        400,
+      )
     }
 
-    const name = typeof body.name === "string" ? body.name.trim() : "";
-    const email = typeof body.email === "string" ? body.email.trim() : "";
-    const businessName = typeof body.businessName === "string" ? body.businessName.trim() : "";
-    const websiteOrFacebook = typeof body.websiteOrFacebook === "string" ? body.websiteOrFacebook.trim() : "";
-    const selectedOffer = typeof body.selectedOffer === "string" ? body.selectedOffer.trim() : "";
-    const notesOrGoals = typeof body.notesOrGoals === "string"
-      ? body.notesOrGoals.trim()
-      : typeof body.notes === "string"
-        ? body.notes.trim()
-        : "";
-    const consent = Boolean(body.consent);
-
-    if (!name || !email || !businessName || !selectedOffer || !consent) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
-
-    if (!OFFER_SLUGS.has(selectedOffer)) {
-      return NextResponse.json({ error: "Unknown offer" }, { status: 400 });
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
-    }
-
-    if (!isText(notesOrGoals, 4000)) {
-      return NextResponse.json({ error: "Please include goals or notes" }, { status: 400 });
-    }
-
-    const payload = {
-      name,
-      email,
-      businessName,
-      websiteOrFacebook: websiteOrFacebook || null,
-      selectedOffer,
-      notes: notesOrGoals,
-      consent
-    };
-
-    return forwardRequest(payload);
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Request failed" },
-      { status: 500 }
-    );
+    return await forwardRequest(parsed.data, dependencies)
+  } catch {
+    return noStoreJson(
+      { ok: false, saved: false, error: "service_request_failed" },
+      500,
+    )
   }
 }

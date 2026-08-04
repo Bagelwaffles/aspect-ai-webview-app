@@ -1,29 +1,27 @@
-# Ethical Agent Farm Buy Paths
+# Ethical Agent Farm Launch Paths
 
-## Current State
+## Launch Policy
 
-The ethical agent farm now has two buy path types:
+AMS launches with subscription checkout only. One-time Ethical Agent Farm offers remain request-only until a separate fulfillment design, approved price catalog, and lifecycle tests are complete.
 
-1. Monthly support through live Stripe checkout
-2. One-time offers through configurable Stripe checkout, with request-form fallback when a price ID is not set
+## Subscription Plans
 
-## Monthly Support
+Paths:
 
-Path:
-
-- `/ethical-agent-farm/offers/monthly-marketing-support`
+- `/pricing`
 - `/billing`
-- `/api/billing/checkout`
+- `POST /api/billing/checkout`
 
 Behavior:
 
-- Uses the existing live Stripe subscription checkout flow
-- Keeps the safe org/user billing protections already in place
-- Does not require any Stripe product or price changes
+- Customer authentication is required.
+- The server selects an approved recurring Stripe price for the selected plan.
+- Checkout uses Stripe subscription mode.
+- Access is granted only through signed webhook fulfillment.
 
-## One-Time Offers
+## One-Time Service Requests
 
-Paths:
+Offer pages:
 
 - `/ethical-agent-farm/offers/quick-marketing-audit`
 - `/ethical-agent-farm/offers/social-content-pack`
@@ -32,93 +30,49 @@ Paths:
 
 Behavior:
 
-- Each page explains the offer clearly
-- Each page uses a Stripe checkout button when its price ID is configured
-- Each page falls back to the request form when a price ID is missing
-- No fake revenue claims are shown
+- Public pages link only to the request form.
+- Submitting a request does not create a Stripe session or charge the visitor.
+- Copy states that the offer is request-only at launch.
+- No public `Buy on Stripe` action is shown.
 
-Checkout route:
+The former one-time endpoint is retained as an explicit lockout:
 
 - `POST /api/ethical-agent-farm/checkout`
+- Always returns HTTP `410 Gone`.
+- Returns code `ONE_TIME_CHECKOUT_DISABLED`.
+- Never initializes Stripe or creates a Checkout Session.
 
-Environment variables for live one-time Stripe checkout:
+## Request Form
 
-- `ETHICAL_AGENT_QUICK_MARKETING_AUDIT_PRICE_ID`
-- `ETHICAL_AGENT_SOCIAL_CONTENT_PACK_PRICE_ID`
-- `ETHICAL_AGENT_WEBSITE_PROFILE_REVIEW_PRICE_ID`
-- `ETHICAL_AGENT_BUSINESS_CLEANUP_PLAN_PRICE_ID`
+Path:
 
-If any of those are missing, the page will still work and send the visitor to the compliant request form instead.
+- `/ethical-agent-farm/request`
 
-## Request Form Fields
+Fields:
 
 - name
 - email
 - business name
 - website or Facebook page
 - selected offer
-- notes / goals
+- notes or goals
 - consent checkbox
 
 Consent copy:
 
 > I understand this is an ethical marketing service request and no revenue results are guaranteed.
 
-## API Route
+Requests post to `POST /api/ethical-agent-farm/offer-request`. Accepted requests are stored for protected internal review. The public flow does not expose secrets, grant access, or claim that delivery has started.
 
-Request submissions post to:
+## Future Re-enable Requirements
 
-- `POST /api/ethical-agent-farm/offer-request`
+One-time payments require a separate reviewed change that provides all of the following before public checkout returns:
 
-The route:
+- an approved server-side price-to-fulfillment allowlist
+- authenticated buyer and tenant ownership
+- signed webhook fulfillment for every offer
+- idempotent delivery records
+- failure and refund handling
+- end-to-end tests proving payment cannot succeed without fulfillment
 
-- validates required fields
-- forwards accepted requests to the backend lead-capture store
-- rejects empty or spam-like submissions
-- returns structured JSON
-- does not expose secrets
-- reports whether email notification is configured
-
-## Persistent Storage and Admin Visibility
-
-One-time offer requests are now stored server-side and can be reviewed internally.
-
-- Stored request records use the ethical agent farm request table in the backend database.
-- Internal review is available at `/admin/ethical-agent-farm-requests`.
-- The admin page is gated by the internal admin access flow and is not exposed through reviewer/demo access.
-- Status values supported for follow-up are:
-  - `new`
-  - `reviewed`
-  - `contacted`
-  - `won`
-  - `lost`
-- Email notification remains `not_configured` unless an email provider is explicitly wired later.
-
-## Production Verification
-
-- Public request submissions are saving successfully in production.
-- A production smoke request returned `saved: true` with `emailNotificationStatus: not_configured`.
-- Empty requests return a controlled validation error instead of a server crash.
-- Monthly support checkout continues to return a live Stripe Checkout Session URL.
-- The internal requests page redirects unauthenticated users to `/admin/login` and keeps real lead data behind the internal admin flow.
-
-## Confirmation State
-
-After submission, the user sees:
-
-- Request received
-- We’ll review your business and follow up
-- No payment has been charged yet
-
-## Future Upgrade Path
-
-When dedicated one-time Stripe prices exist, each one-time offer can be mapped to its own checkout session. The code already supports that path now.
-
-Suggested future mapping:
-
-- one offer
-- one Stripe price ID
-- one checkout session
-- one confirmation page
-
-Until then, the request form remains the compliant default fallback.
+Until those conditions are met, the `410` lockout is the intended production behavior.

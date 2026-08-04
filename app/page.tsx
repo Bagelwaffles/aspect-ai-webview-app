@@ -1,768 +1,315 @@
-"use client"
+import styles from "./marketing.module.css"
 
-import type React from "react"
+const agentCards = [
+  {
+    number: "01",
+    status: "Launch focus",
+    title: "Content Agent",
+    copy: "Turn one clear brief into channel-ready marketing content with structured outputs, saved runs, and honest execution status.",
+    accent: "lime",
+  },
+  {
+    number: "02",
+    status: "Queued next",
+    title: "Lead Magnet Agent",
+    copy: "Build a useful offer, positioning angle, and conversion path around a specific audience problem.",
+    accent: "violet",
+  },
+  {
+    number: "03",
+    status: "Queued next",
+    title: "Nurture Agent",
+    copy: "Shape follow-up sequences that keep leads moving without sounding automated or generic.",
+    accent: "orange",
+  },
+]
 
-import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  BarChart3,
-  Package,
-  Workflow,
-  CreditCard,
-  TrendingUp,
-  ShoppingCart,
-  Settings,
-  Bell,
-  Search,
-  Plus,
-  Activity,
-  DollarSign,
-  Eye,
-  MoreHorizontal,
-  Brain,
-  Bot,
-  Sparkles,
-  Globe,
-  Send,
-  MessageSquare,
-  Minimize2,
-} from "lucide-react"
+const principles = [
+  ["One real agent first", "We finish the paid Content Agent flow before expanding the catalog."],
+  ["Proof over theater", "No fake revenue, mock activity, or placeholder success responses."],
+  [
+    "Built to compound",
+    "Every completed agent connects to one customer account, credit system, and saved-run history.",
+  ],
+]
 
-interface ChatMessage {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  timestamp: Date
+const capabilities = [
+  ["01", "Brand strategy", "Positioning, offers, and campaign direction built around a real customer problem."],
+  ["02", "Content systems", "Channel-ready copy, campaigns, and reusable content engines that keep the brand moving."],
+  ["03", "Search + discovery", "SEO planning, market research, and competitive intelligence that uncover demand."],
+  ["04", "Social growth", "Structured publishing workflows for social, video, and community channels."],
+  ["05", "Lead nurture", "Email and follow-up systems designed to turn attention into qualified conversations."],
+  ["06", "Commerce operations", "Shopify-focused product, fulfillment, and customer workflows built for clean handoffs."],
+  ["07", "Performance insight", "Clear reporting that shows what worked, what failed, and what to do next."],
+]
+
+const roadmapGroups = [
+  {
+    label: "Create",
+    agents: ["Content Agent", "SEO Writer", "Email Campaign", "Lead Magnet"],
+  },
+  {
+    label: "Grow",
+    agents: ["Nurture Agent", "Social Publisher", "Affiliate Manager", "Competitive Intel"],
+  },
+  {
+    label: "Publish",
+    agents: ["YouTube Publisher", "Video Editor", "Clip Generator", "Stream Assistant"],
+  },
+  {
+    label: "Operate",
+    agents: ["Shopify Operations", "CRM Follow-up", "Customer Support", "Analytics Agent"],
+  },
+]
+
+function classes(...names: string[]) {
+  return names.map((name) => styles[name]).filter(Boolean).join(" ")
 }
 
-type LiveAgent = {
-  id: string
-  name: string
-  status?: string
-  description?: string
-  metrics?: {
-    totalInteractions?: number
-    revenueAttributed?: number
-    userSatisfaction?: number
-  }
-}
-
-type LiveDeployment = {
-  id: string
-  name: string
-  agentName?: string
-  status?: string
-  analytics?: {
-    totalInteractions?: number
-    uniqueVisitors?: number
-    conversionRate?: number
-  }
-  config?: {
-    position?: string
-    theme?: string
-  }
-}
-
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState("overview")
-  const [isChatOpen, setIsChatOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: "1",
-      role: "assistant",
-      content:
-        "Hi! I'm your AI assistant. I can help you with your print-on-demand business, answer questions about orders, products, or workflows. How can I assist you today?",
-      timestamp: new Date(),
-    },
-  ])
-  const [chatInput, setChatInput] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [agents, setAgents] = useState<LiveAgent[]>([])
-  const [deployments, setDeployments] = useState<LiveDeployment[]>([])
-  const [loadingLiveData, setLoadingLiveData] = useState(true)
-
-  useEffect(() => {
-    let mounted = true
-
-    async function loadLiveData() {
-      try {
-        const [agentsResponse, deploymentsResponse] = await Promise.all([
-          fetch("/api/agents", { cache: "no-store" }),
-          fetch("/api/deployments", { cache: "no-store" }),
-        ])
-
-        const agentsData = await agentsResponse.json().catch(() => null)
-        const deploymentsData = await deploymentsResponse.json().catch(() => null)
-
-        if (!mounted) return
-        setAgents(Array.isArray(agentsData?.agents) ? agentsData.agents : [])
-        setDeployments(Array.isArray(deploymentsData?.deployments) ? deploymentsData.deployments : [])
-      } catch (error) {
-        console.error("Failed to load live dashboard data:", error)
-        if (mounted) {
-          setAgents([])
-          setDeployments([])
-        }
-      } finally {
-        if (mounted) {
-          setLoadingLiveData(false)
-        }
-      }
-    }
-
-    void loadLiveData()
-
-    return () => {
-      mounted = false
-    }
-  }, [])
-
-  const totalRevenue = useMemo(
-    () => agents.reduce((sum, agent) => sum + (agent.metrics?.revenueAttributed || 0), 0),
-    [agents],
-  )
-
-  const totalProducts = useMemo(() => {
-    if (deployments.length > 0) return deployments.length
-    return agents.length
-  }, [agents.length, deployments.length])
-
-  const totalOrders = useMemo(
-    () =>
-      deployments.reduce(
-        (sum, deployment) => sum + (deployment.analytics?.totalInteractions || 0),
-        0,
-      ),
-    [deployments],
-  )
-
-  const activeWorkflows = useMemo(
-    () => deployments.filter((deployment) => deployment.status === "active").length,
-    [deployments],
-  )
-
-  const recentCards = useMemo(
-    () =>
-      deployments.slice(0, 5).map((deployment, index) => ({
-        id: deployment.id || String(index),
-        customer: deployment.agentName || deployment.name || "Live deployment",
-        product: `${deployment.config?.position || "unspecified"} • ${deployment.config?.theme || "unspecified"}`,
-        status:
-          deployment.status === "active"
-            ? "Active"
-            : deployment.status === "deploying"
-              ? "Deploying"
-              : deployment.status === "error"
-                ? "Needs attention"
-                : "Inactive",
-        amount: `${deployment.analytics?.conversionRate?.toFixed(1) || "0.0"}% conversion`,
-      })),
-    [deployments],
-  )
-
-  const liveWorkflowCards = useMemo(
-    () =>
-      deployments.slice(0, 6).map((deployment) => ({
-        id: deployment.id,
-        name: deployment.name || "Live deployment",
-        status:
-          deployment.status === "active"
-            ? "Running"
-            : deployment.status === "deploying"
-              ? "Deploying"
-              : deployment.status === "error"
-                ? "Needs attention"
-                : "Paused",
-        lastRun: deployment.analytics?.totalInteractions
-          ? `${deployment.analytics.totalInteractions.toLocaleString()} interactions`
-          : "No recent live interaction data",
-        success:
-          deployment.analytics?.conversionRate !== undefined
-            ? Math.round(deployment.analytics.conversionRate * 100)
-            : 0,
-      })),
-    [deployments],
-  )
-
-  const handleNavigation = (tab: string) => {
-    if (tab === "overview") {
-      window.location.href = "/"
-    } else if (tab === "settings") {
-      window.location.href = "/settings"
-    } else if (tab === "notifications") {
-      window.location.href = "/notifications"
-    } else if (tab === "relevance") {
-      window.location.href = "/relevance-ai"
-    } else if (tab === "products") {
-      window.location.href = "/products"
-    } else if (tab === "analytics") {
-      window.location.href = "/analytics"
-    } else if (tab === "workflows") {
-      window.location.href = "/workflows"
-    } else if (tab === "billing") {
-      window.location.href = "/billing"
-    } else if (tab === "ai-command") {
-      window.location.href = "/ai-command"
-    } else if (tab === "content-agent") {
-      window.location.href = "/content-agent"
-    } else if (tab === "agents") {
-      window.location.href = "/agents"
-    } else if (tab === "grok-chat") {
-      window.location.href = "/grok-chat"
-    } else if (tab === "deployments") {
-      window.location.href = "/deployments"
-    } else if (tab === "pricing") {
-      window.location.href = "/pricing"
-    } else if (tab === "ethical-agent-farm") {
-      window.location.href = "/ethical-agent-farm"
-    } else {
-      setActiveTab(tab)
-    }
-  }
-
-  const sendMessage = async () => {
-    if (!chatInput.trim()) return
-
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: "user",
-      content: chatInput,
-      timestamp: new Date(),
-    }
-
-    setChatMessages((prev) => [...prev, userMessage])
-    setChatInput("")
-    setIsLoading(true)
-
-    try {
-      const response = await fetch("/api/grok/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          agentId: "grok-support",
-          message: chatInput,
-          conversationHistory: chatMessages.slice(-6).map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-          })),
-        }),
-      })
-
-      const data = await response.json()
-
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.response || "I'm here to help! Could you please rephrase your question?",
-        timestamp: new Date(),
-      }
-
-      setChatMessages((prev) => [...prev, assistantMessage])
-    } catch (error) {
-      console.error("Failed to send message:", error)
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment.",
-        timestamp: new Date(),
-      }
-      setChatMessages((prev) => [...prev, errorMessage])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
-  }
-
-  const handleSearchSubmit = (event: React.FormEvent) => {
-    event.preventDefault()
-    const value = searchQuery.trim()
-    window.location.href = value ? `/products?query=${encodeURIComponent(value)}` : "/products"
-  }
-
+export default function HomePage() {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Sidebar */}
-      <div className="fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-sidebar-border">
-        <div className="flex h-full flex-col">
-          {/* Logo */}
-          <div className="flex h-16 items-center border-b border-sidebar-border px-6">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
-                <Package className="h-5 w-5 text-sidebar-primary-foreground" />
+    <main className={styles.marketingSite}>
+      <div className={classes("ambient", "ambient-one")} aria-hidden="true" />
+      <div className={classes("ambient", "ambient-two")} aria-hidden="true" />
+
+      <header className={styles["site-header"]}>
+        <a className={styles.brand} href="#top" aria-label="Aspect Marketing Solutions home">
+          <span className={styles["brand-mark"]}>A</span>
+          <span className={styles["brand-name"]}>
+            ASPECT<span>/</span>AMS
+          </span>
+        </a>
+
+        <nav className={styles["desktop-nav"]} aria-label="Primary navigation">
+          <a href="#capabilities">Capabilities</a>
+          <a href="#agents">Agents</a>
+          <a href="#method">How it works</a>
+          <a href="#launch">Launch plan</a>
+        </nav>
+
+        <a className={styles["header-cta"]} href="#launch">
+          Enter the system <span aria-hidden="true">↗</span>
+        </a>
+      </header>
+
+      <section className={styles.hero} id="top">
+        <div className={classes("eyebrow", "reveal-one")}>
+          <span className={styles.pulse} />
+          SaaS platform // controlled launch
+        </div>
+
+        <h1 className={styles["reveal-two"]}>
+          Build demand.
+          <br />
+          Automate the work.
+          <br />
+          <span>Own the growth.</span>
+        </h1>
+
+        <div className={classes("hero-bottom", "reveal-three")}>
+          <p>
+            Aspect Marketing Solutions turns focused AI agents into an operating system for
+            small-business growth—content first, then the full revenue machine.
+          </p>
+          <div className={styles["hero-actions"]}>
+            <a className={classes("button", "button-primary")} href="#agents">
+              Explore the agents <span aria-hidden="true">↓</span>
+            </a>
+            <a className={styles["text-link"]} href="#method">
+              See how we build <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </div>
+
+        <div className={styles["hero-stamp"]} aria-hidden="true">
+          <span>AMS</span>
+          <small>EST. 2026</small>
+        </div>
+      </section>
+
+      <section className={styles["signal-bar"]} aria-label="Platform principles">
+        <span>BUILDING REAL EXECUTION</span>
+        <i>✦</i>
+        <span>HONEST METRICS</span>
+        <i>✦</i>
+        <span>TENANT-SAFE</span>
+        <i>✦</i>
+        <span>BUILT TO SELL</span>
+      </section>
+
+      <section className={classes("section", "capabilities-section")} id="capabilities">
+        <div className={styles["capabilities-heading"]}>
+          <p className={styles["section-kicker"]}>What AMS is built to deliver</p>
+          <h2>
+            Strategy outside.
+            <br />
+            Automation inside.
+          </h2>
+          <p>
+            The recovered AMS materials contained a strong service blueprint. We kept the useful
+            business capabilities and rebuilt the presentation around the product we are actually
+            launching.
+          </p>
+        </div>
+
+        <div className={styles["capability-grid"]}>
+          {capabilities.map(([number, title, copy]) => (
+            <article className={styles.capability} key={title}>
+              <span>{number}</span>
+              <h3>{title}</h3>
+              <p>{copy}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className={classes("section", "agents-section")} id="agents">
+        <div className={styles["section-intro"]}>
+          <p className={styles["section-kicker"]}>The first strike team</p>
+          <h2>
+            Agents with a job.
+            <br />
+            Not a gimmick.
+          </h2>
+          <p className={styles["section-copy"]}>
+            We are launching in a deliberate order: one paid workflow that works end to end,
+            followed by the agents that multiply its value.
+          </p>
+        </div>
+
+        <div className={styles["agent-grid"]}>
+          {agentCards.map((agent) => (
+            <article className={classes("agent-card", agent.accent)} key={agent.title}>
+              <div className={styles["card-topline"]}>
+                <span>{agent.number}</span>
+                <span className={styles["status-pill"]}>{agent.status}</span>
               </div>
-              <span className="text-xl font-bold text-sidebar-foreground font-[family-name:var(--font-work-sans)]">
-                Aspect Marketing Solutions
-              </span>
-            </div>
+              <div className={styles["agent-glyph"]} aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
+              <h3>{agent.title}</h3>
+              <p>{agent.copy}</p>
+              <a href="#launch" aria-label={`View the ${agent.title} launch plan`}>
+                View launch plan <span aria-hidden="true">↗</span>
+              </a>
+            </article>
+          ))}
+        </div>
+
+        <div className={styles["roadmap-panel"]}>
+          <div className={styles["roadmap-proof"]}>
+            <p className={styles["section-kicker"]}>Recovered agent inventory</p>
+            <strong>32</strong>
+            <p>
+              Historical agent concepts were audited. They are a backlog—not a claim that 32
+              products are already live.
+            </p>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 space-y-1 px-3 py-4">
-            {[
-              { id: "overview", label: "Overview", icon: BarChart3 },
-              { id: "ai-command", label: "AI Command", icon: Brain },
-              { id: "content-agent", label: "Content Agent", icon: Sparkles },
-              { id: "agents", label: "Agents", icon: Bot },
-              { id: "relevance", label: "Relevance AI", icon: Brain },
-              { id: "grok-chat", label: "Grok Chat", icon: Sparkles },
-              { id: "deployments", label: "Deployments", icon: Globe },
-              { id: "pricing", label: "Pricing", icon: CreditCard },
-              { id: "ethical-agent-farm", label: "Agent Farm", icon: Bot },
-              { id: "products", label: "Products", icon: Package },
-              { id: "workflows", label: "Workflows", icon: Workflow },
-              { id: "billing", label: "Billing", icon: CreditCard },
-              { id: "analytics", label: "Analytics", icon: TrendingUp },
-              { id: "settings", label: "Settings", icon: Settings },
-            ].map((item) => {
-              const Icon = item.icon
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleNavigation(item.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    activeTab === item.id
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  {item.label}
-                </button>
-              )
-            })}
-          </nav>
-
-          {/* User Profile */}
-          <div className="border-t border-sidebar-border p-4">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback>AMS</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">Live workspace</p>
-                <p className="text-xs text-muted-foreground truncate">Connected to production data</p>
+          <div className={styles["roadmap-content"]}>
+            <div className={styles["roadmap-header"]}>
+              <div>
+                <span>Product roadmap</span>
+                <h3>The strongest concepts, organized to ship.</h3>
               </div>
+              <span className={styles["status-pill"]}>Planned // not live</span>
+            </div>
+
+            <div className={styles["roadmap-grid"]}>
+              {roadmapGroups.map((group) => (
+                <article key={group.label}>
+                  <h4>{group.label}</h4>
+                  <ul>
+                    {group.agents.map((agent) => (
+                      <li key={agent}>{agent}</li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Main Content */}
-      <div className="pl-64">
-        {/* Top Bar */}
-        <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex h-16 items-center gap-4 px-6">
-            <div className="flex-1">
-              <form onSubmit={handleSearchSubmit} className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search products, orders, workflows..."
-                  className="w-full rounded-lg border border-input bg-input pl-10 pr-4 py-2 text-sm placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-                />
-              </form>
+      <section className={classes("section", "method-section")} id="method">
+        <div className={styles["method-label"]}>
+          <p className={styles["section-kicker"]}>Our operating rule</p>
+          <span>03 / principles</span>
+        </div>
+        <div className={styles["principle-list"]}>
+          {principles.map(([title, copy], index) => (
+            <article className={styles.principle} key={title}>
+              <span className={styles["principle-number"]}>0{index + 1}</span>
+              <h3>{title}</h3>
+              <p>{copy}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className={classes("section", "launch-section")} id="launch">
+        <div className={styles["launch-copy"]}>
+          <p className={styles["section-kicker"]}>Current mission</p>
+          <h2>
+            From recovered code
+            <br />
+            to paid product.
+          </h2>
+          <p>
+            AMS is being rebuilt in controlled milestones. The public experience grows as
+            authentication, subscriptions, credits, and real agent execution pass verification.
+          </p>
+        </div>
+
+        <ol className={styles["launch-track"]}>
+          <li className={styles.active}>
+            <span>01</span>
+            <div>
+              <strong>Public SaaS foundation</strong>
+              <small>Integrated checkpoint</small>
             </div>
-            <div className="flex items-center gap-2">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/reviewer-access">Reviewer Access</Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/products/new">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Product
-                </Link>
-              </Button>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/notifications" aria-label="Notifications">
-                  <Bell className="h-4 w-4" />
-                </Link>
-              </Button>
+          </li>
+          <li>
+            <span>02</span>
+            <div>
+              <strong>Secure paid Content Agent</strong>
+              <small>Staging verification next</small>
             </div>
-          </div>
-        </header>
-
-        {/* Dashboard Content */}
-        <main className="p-6">
-          <section className="mb-8 overflow-hidden rounded-2xl border border-border bg-card/80 p-6 shadow-lg backdrop-blur-sm lg:p-8">
-            <div className="grid gap-8 lg:grid-cols-[1.4fr_0.9fr] lg:items-center">
-              <div className="space-y-5">
-                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Premium AI marketing SaaS command center
-                </div>
-                <div className="space-y-3">
-                  <h1 className="max-w-3xl text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-                    Aspect Marketing Solutions keeps your agents, billing, and workflows in one live command center.
-                  </h1>
-                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                    Monitor live data, manage ethical offers, review billing, and launch compliant marketing systems without fake claims or dead-end tools.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
-                    <Link href="/pricing">View pricing</Link>
-                  </Button>
-                  <Button asChild variant="outline" className="border-border bg-background/50">
-                    <Link href="/ethical-agent-farm">Explore ethical agent farm</Link>
-                  </Button>
-                  <Button asChild variant="ghost">
-                    <Link href="/request-access">Request access</Link>
-                  </Button>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {[
-                    { label: "Live agents", value: loadingLiveData ? "…" : String(agents.length) },
-                    { label: "Live deployments", value: loadingLiveData ? "…" : String(deployments.length) },
-                    { label: "Billing ready", value: "Yes" },
-                  ].map((item) => (
-                    <div key={item.label} className="rounded-xl border border-border bg-background/40 p-4">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.label}</p>
-                      <p className="mt-1 text-2xl font-semibold text-foreground">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-4">
-                <Card className="border-border bg-background/50">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Platform status</CardTitle>
-                    <CardDescription>Live production signals, no fake filler.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm">
-                    <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-                      <span className="text-muted-foreground">Agents</span>
-                      <span className="font-medium text-foreground">{loadingLiveData ? "Loading..." : `${agents.length} connected`}</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-                      <span className="text-muted-foreground">Deployments</span>
-                      <span className="font-medium text-foreground">{loadingLiveData ? "Loading..." : `${deployments.length} live`}</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-                      <span className="text-muted-foreground">Billing</span>
-                      <span className="font-medium text-emerald-400">Ready</span>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="border-border bg-background/50">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Compliance-first funnel</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm text-muted-foreground">
-                    <p>Ethical Agent Farm offers use honest request flows or live checkout where configured.</p>
-                    <p>Protected admin areas stay private.</p>
-                    <p>Reviewer access never exposes real leads.</p>
-                  </CardContent>
-                </Card>
-              </div>
+          </li>
+          <li>
+            <span>03</span>
+            <div>
+              <strong>Agent expansion + Android</strong>
+              <small>After the core flow passes</small>
             </div>
-          </section>
+          </li>
+        </ol>
+      </section>
 
-          {/* Stats Cards */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">
-                  {loadingLiveData ? "Loading..." : `$${totalRevenue.toLocaleString()}`}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {loadingLiveData ? "Pulling live data from connected APIs" : "Live agent-attributed revenue"}
-                </p>
-              </CardContent>
-            </Card>
+      <section className={styles.closing}>
+        <p>THE SYSTEM IS COMING ONLINE.</p>
+        <h2>
+          Build once.
+          <br />
+          <span>Compound forever.</span>
+        </h2>
+        <a className={classes("button", "button-primary")} href="#top">
+          Back to command <span aria-hidden="true">↑</span>
+        </a>
+      </section>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Products</CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">
-                  {loadingLiveData ? "Loading..." : totalProducts.toLocaleString()}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {loadingLiveData ? "Collecting live counts" : "Live connected products / deployments"}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Orders</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">
-                  {loadingLiveData ? "Loading..." : totalOrders.toLocaleString()}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {loadingLiveData ? "Collecting live interactions" : "Live interaction count across deployments"}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Workflows</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">
-                  {loadingLiveData ? "Loading..." : activeWorkflows.toLocaleString()}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {loadingLiveData ? "Checking live workflow state" : "Active live deployments"}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Main Dashboard Grid */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Recent Orders */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="font-[family-name:var(--font-work-sans)]">Recent Orders</CardTitle>
-                <CardDescription>
-                  {loadingLiveData
-                    ? "Loading live deployment summaries."
-                    : deployments.length > 0
-                      ? `${deployments.length} live deployments connected.`
-                      : "No live deployments are connected yet."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentCards.length === 0 ? (
-                    <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                      No live deployment summaries are available yet.
-                    </div>
-                  ) : (
-                    recentCards.map((order) => (
-                      <div
-                        key={order.id}
-                        className="flex items-center justify-between p-4 border border-border rounded-lg"
-                      >
-                        <div className="flex items-center gap-4">
-                          <Avatar className="h-9 w-9">
-                            <AvatarFallback>
-                              {order.customer
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                                .slice(0, 2)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-sm font-medium">{order.customer}</p>
-                            <p className="text-sm text-muted-foreground">{order.product}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <Badge variant={order.status === "Active" ? "default" : "outline"}>{order.status}</Badge>
-                          <p className="text-sm font-medium">{order.amount}</p>
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-[family-name:var(--font-work-sans)]">Quick Actions</CardTitle>
-                <CardDescription>Manage the live site and connected services efficiently</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button asChild className="w-full justify-start bg-transparent" variant="outline">
-                  <Link href="/products/new">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create New Product
-                  </Link>
-                </Button>
-                <Button asChild className="w-full justify-start bg-transparent" variant="outline">
-                  <Link href="/workflows/new">
-                    <Workflow className="h-4 w-4 mr-2" />
-                    Setup Workflow
-                  </Link>
-                </Button>
-                <Button asChild className="w-full justify-start bg-transparent" variant="outline">
-                  <Link href="/analytics">
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    View Analytics
-                  </Link>
-                </Button>
-                <Button asChild className="w-full justify-start bg-transparent" variant="outline">
-                  <Link href="/billing">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Billing Settings
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Workflow Status */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="font-[family-name:var(--font-work-sans)]">Active Workflows</CardTitle>
-              <CardDescription>Monitor your automation processes</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {loadingLiveData ? (
-                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground lg:col-span-3">
-                    Loading live workflow summaries...
-                  </div>
-                ) : liveWorkflowCards.length === 0 ? (
-                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground lg:col-span-3">
-                    No live workflow summaries are connected yet.
-                  </div>
-                ) : (
-                  liveWorkflowCards.map((workflow) => (
-                    <div key={workflow.id} className="p-4 border border-border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium">{workflow.name}</h4>
-                        <Badge
-                          variant={
-                            workflow.status === "Running"
-                              ? "default"
-                              : workflow.status === "Deploying"
-                                ? "secondary"
-                                : "outline"
-                          }
-                        >
-                          {workflow.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">Last run: {workflow.lastRun}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Success rate: {workflow.success}%</span>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </main>
-      </div>
-
-      {/* AI Chat Widget */}
-      <div className="fixed bottom-6 right-6 z-50">
-        {!isChatOpen ? (
-          <Button
-            onClick={() => setIsChatOpen(true)}
-            className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-shadow"
-            size="sm"
-          >
-            <MessageSquare className="h-6 w-6" />
-          </Button>
-        ) : (
-          <Card className="w-80 h-96 shadow-2xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-primary-foreground" />
-                </div>
-                <div>
-                  <CardTitle className="text-sm">AI Assistant</CardTitle>
-                  <CardDescription className="text-xs">Always here to help</CardDescription>
-                </div>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setIsChatOpen(false)}>
-                <Minimize2 className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0 flex flex-col h-80">
-              <ScrollArea className="flex-1 p-4">
-                <div className="space-y-4">
-                  {chatMessages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`max-w-[80%] p-2 rounded-lg text-sm ${
-                          message.role === "user"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        <p>{message.content}</p>
-                        <p className="text-xs opacity-70 mt-1">{message.timestamp.toLocaleTimeString()}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {isLoading && (
-                    <div className="flex justify-start">
-                      <div className="bg-muted text-muted-foreground p-2 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <div className="animate-spin h-3 w-3 border-2 border-primary border-t-transparent rounded-full" />
-                          <span className="text-sm">Thinking...</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-              <div className="p-4 border-t border-border">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Ask me anything..."
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    disabled={isLoading}
-                    className="flex-1 text-sm"
-                  />
-                  <Button onClick={sendMessage} disabled={isLoading || !chatInput.trim()} size="sm">
-                    <Send className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-        <footer className="border-t border-border px-6 py-4 text-sm text-muted-foreground">
-          <div className="flex flex-wrap gap-4">
-            <a href="/ethical-agent-farm" className="hover:text-foreground">Agent Farm</a>
-            <a href="/request-access" className="hover:text-foreground">Request Access</a>
-            <a href="/pricing" className="hover:text-foreground">Pricing</a>
-            <a href="/billing" className="hover:text-foreground">Billing</a>
-            <a href="/terms" className="hover:text-foreground">Terms</a>
-            <a href="/privacy" className="hover:text-foreground">Privacy</a>
-            <a href="/refund" className="hover:text-foreground">Refund</a>
-          </div>
-        </footer>
-      </div>
-    </div>
+      <footer className={styles.footer}>
+        <a className={styles.brand} href="#top" aria-label="Aspect Marketing Solutions home">
+          <span className={styles["brand-mark"]}>A</span>
+          <span className={styles["brand-name"]}>
+            ASPECT<span>/</span>AMS
+          </span>
+        </a>
+        <p>Aspect Marketing Solutions © 2026</p>
+        <p>Kentucky built. Global ambition.</p>
+      </footer>
+    </main>
   )
 }

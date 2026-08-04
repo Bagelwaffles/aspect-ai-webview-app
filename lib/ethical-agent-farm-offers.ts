@@ -14,7 +14,7 @@ export const ETHICAL_AGENT_FARM_OFFERS: EthicalOfferPage[] = [
   {
     slug: "quick-marketing-audit",
     name: "Quick Marketing Audit",
-    price: "$49",
+    price: "Quote after review",
     whoItIsFor: "Small businesses that need a fast outside view of their current marketing.",
     buyerGets: ["5 visible problems", "5 practical fixes", "sample headline", "sample offer", "sample post"],
     deliveryExpectation: "Review within 1-2 business days after request approval.",
@@ -25,7 +25,7 @@ export const ETHICAL_AGENT_FARM_OFFERS: EthicalOfferPage[] = [
   {
     slug: "social-content-pack",
     name: "Social Content Pack",
-    price: "$99",
+    price: "Quote after review",
     whoItIsFor: "Businesses that need a small set of usable posts and hooks.",
     buyerGets: ["10 post ideas", "5 ready-to-use posts", "CTA set", "light brand angle"],
     deliveryExpectation: "Draft set delivered after review and intake completion.",
@@ -36,7 +36,7 @@ export const ETHICAL_AGENT_FARM_OFFERS: EthicalOfferPage[] = [
   {
     slug: "website-profile-review",
     name: "Website / Google Profile Review",
-    price: "$199",
+    price: "Quote after review",
     whoItIsFor: "Businesses that need stronger conversion, clarity, and local trust signals.",
     buyerGets: ["site critique", "Google profile notes", "conversion fixes", "priority checklist"],
     deliveryExpectation: "Review delivered after intake and source review.",
@@ -47,7 +47,7 @@ export const ETHICAL_AGENT_FARM_OFFERS: EthicalOfferPage[] = [
   {
     slug: "business-cleanup-plan",
     name: "Business Cleanup Plan",
-    price: "$297",
+    price: "Quote after review",
     whoItIsFor: "Owners who need sharper positioning and a cleaner funnel.",
     buyerGets: ["offer cleanup", "homepage fixes", "content priorities", "next 7-day plan"],
     deliveryExpectation: "Plan drafted after request review and business context intake.",
@@ -58,12 +58,12 @@ export const ETHICAL_AGENT_FARM_OFFERS: EthicalOfferPage[] = [
   {
     slug: "monthly-marketing-support",
     name: "Monthly Marketing Support",
-    price: "$497/month",
+    price: "See subscription plans",
     whoItIsFor: "Teams that want ongoing audits, content support, and light execution help.",
     buyerGets: ["monthly audit", "content support", "offer tuning", "analytics review"],
-    deliveryExpectation: "Subscription checkout starts immediately through Stripe.",
-    ethicalNote: "Uses the live checkout path and existing billing protections.",
-    ctaLabel: "Start checkout",
+    deliveryExpectation: "Choose only from the verified recurring plans shown on the pricing page.",
+    ethicalNote: "No subscription starts until an authenticated customer chooses a verified recurring plan.",
+    ctaLabel: "View subscription plans",
     requestPath: "/billing",
   },
 ]

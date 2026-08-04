@@ -1,0 +1,165 @@
+name: AMS Reconciliation CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ams-reconciliation-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      redis:
+        image: redis:7.4.10-alpine3.21
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+      redis-rest:
+        image: hiett/serverless-redis-http:0.0.10
+        env:
+          SRH_MODE: env
+          SRH_TOKEN: ci-only-redis-rest-token
+          SRH_CONNECTION_STRING: redis://redis:6379
+          SRH_MAX_CONNECTIONS: 10
+        ports:
+          - 8079:80
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate isolated staging topology
+        run: |
+          cp .env.staging.example .env.staging
+          docker compose --env-file .env.staging -f docker-compose.staging.yml config --format json > /tmp/ams-compose.json
+          node -e '
+            const config = require("/tmp/ams-compose.json");
+            const names = Object.keys(config.services).sort();
+            if (JSON.stringify(names) !== JSON.stringify(["redis", "redis-rest", "web"])) process.exit(1);
+            if (config.services.redis.ports || config.services["redis-rest"].ports) process.exit(1);
+            if (!config.services.redis.volumes?.length) process.exit(1);
+            if (!config.services.web.ports?.every((port) => port.host_ip === "127.0.0.1")) process.exit(1);
+            if (Object.values(config.services).some((service) => service.image?.endsWith(":latest"))) process.exit(1);
+          '
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install pnpm
+        run: corepack prepare pnpm@10.28.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Dependency audit
+        run: pnpm audit --audit-level=high
+
+      - name: TypeScript check
+        run: pnpm exec tsc --noEmit
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Application tests
+        run: pnpm test
+
+      - name: Production build
+        run: pnpm run build
+
+      - name: Staging container runtime smoke tests
+        run: |
+          cp .env.staging.example .env.staging
+          docker compose --env-file .env.staging -f docker-compose.staging.yml up --build -d
+
+          cleanup() {
+            docker compose --env-file .env.staging -f docker-compose.staging.yml logs --no-color || true
+            docker compose --env-file .env.staging -f docker-compose.staging.yml down || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /tmp/compose-health.json; then
+              break
+            fi
+            sleep 2
+          done
+
+          node -e 'const value=require("/tmp/compose-health.json"); if(value.ok!==true||value.persistence?.redis?.status!=="ready") process.exit(1)'
+
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T redis redis-cli SET ams:ci:persistence-check verified
+          docker compose --env-file .env.staging -f docker-compose.staging.yml restart redis
+          for attempt in $(seq 1 60); do
+            if docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T redis redis-cli PING | grep -q PONG; then
+              break
+            fi
+            sleep 1
+          done
+          test "$(docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T redis redis-cli GET ams:ci:persistence-check)" = "verified"
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T redis redis-cli DEL ams:ci:persistence-check
+
+          docker compose --env-file .env.staging -f docker-compose.staging.yml stop redis
+          test "$(curl --silent --output /tmp/compose-health-down.json --write-out '%{http_code}' http://127.0.0.1:3000/api/health)" = "503"
+          node -e 'const value=require("/tmp/compose-health-down.json"); if(value.ok!==false||value.persistence?.redis?.status==="ready") process.exit(1)'
+
+          docker compose --env-file .env.staging -f docker-compose.staging.yml start redis
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /tmp/compose-health-restored.json; then
+              break
+            fi
+            sleep 2
+          done
+          node -e 'const value=require("/tmp/compose-health-restored.json"); if(value.ok!==true||value.persistence?.redis?.status!=="ready") process.exit(1)'
+
+      - name: Runtime security smoke tests
+        env:
+          NEXTAUTH_SECRET: ci-only-placeholder-secret-not-for-production
+          NEXTAUTH_URL: http://127.0.0.1:3000
+          UPSTASH_REDIS_REST_URL: http://127.0.0.1:8079
+          UPSTASH_REDIS_REST_TOKEN: ci-only-redis-rest-token
+        run: |
+          pnpm start > /tmp/ams-next.log 2>&1 &
+          APP_PID=$!
+          trap 'kill "$APP_PID" 2>/dev/null || true; cat /tmp/ams-next.log' EXIT
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /tmp/health.json; then
+              break
+            fi
+            sleep 1
+          done
+
+          node -e 'const value=require("/tmp/health.json"); if(value.ok!==true||value.status!=="ready"||value.persistence?.redis?.status!=="ready") process.exit(1)'
+          curl --fail --silent http://127.0.0.1:3000/api/agents > /tmp/agents.json
+          node -e 'const value=require("/tmp/agents.json"); if(!Array.isArray(value.agents)||value.agents.length!==0) process.exit(1)'
+          curl --fail --silent http://127.0.0.1:3000/api/deployments > /tmp/deployments.json
+          node -e 'const value=require("/tmp/deployments.json"); if(!Array.isArray(value.deployments)||value.deployments.length!==0) process.exit(1)'
+          test "$(curl --silent --output /tmp/relevance.json --write-out '%{http_code}' http://127.0.0.1:3000/api/relevance/agents)" = "401"
+          test "$(curl --silent --output /tmp/checkout.json --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/billing/checkout)" = "401"
+          test "$(curl --silent --output /tmp/portal.json --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/billing/portal)" = "401"
+          test "$(curl --silent --output /tmp/ai.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"message":"test"}' http://127.0.0.1:3000/api/ai/chat)" = "401"
+          test "$(curl --silent --output /tmp/grok.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"agentId":"grok-content","message":"test"}' http://127.0.0.1:3000/api/grok/chat)" = "401"
+          test "$(curl --silent --output /tmp/grok-stream.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"agentId":"grok-content","message":"test"}' http://127.0.0.1:3000/api/grok/stream)" = "401"
+          test "$(curl --silent --output /tmp/grok-agents.json --write-out '%{http_code}' http://127.0.0.1:3000/api/grok/agents)" = "401"
+          test "$(curl --silent --output /tmp/entitlements.json --write-out '%{http_code}' http://127.0.0.1:3000/api/account/entitlements)" = "401"
+          test "$(curl --silent --output /tmp/content-agent-list.json --write-out '%{http_code}' http://127.0.0.1:3000/api/content-agent/runs)" = "401"
+          test "$(curl --silent --output /tmp/content-agent-run.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"businessName":"CI Test","audience":"CI audience","goal":"CI test goal","channel":"social","tone":"professional"}' http://127.0.0.1:3000/api/content-agent/runs)" = "401"
+          test "$(curl --silent --output /tmp/agent-deploy.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{}' http://127.0.0.1:3000/api/agents/deploy)" = "401"
+          test "$(curl --silent --output /tmp/relevance-run.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{}' http://127.0.0.1:3000/api/relevance/agents/ci-agent/run)" = "401"
+          test "$(curl --silent --output /tmp/one-time-checkout.json --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/ethical-agent-farm/checkout)" = "410"
+          node -e 'const value=require("/tmp/one-time-checkout.json"); if(value.code!=="ONE_TIME_CHECKOUT_DISABLED") process.exit(1)'
+          test "$(curl --silent --output /tmp/session.json --write-out '%{http_code}' http://127.0.0.1:3000/api/auth/session)" = "200"

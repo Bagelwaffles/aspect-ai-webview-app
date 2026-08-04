@@ -1,15 +1,27 @@
-import { relevanceClient } from "@/lib/relevance"
 import type { NextRequest } from "next/server"
 
-export const runtime = "nodejs"
+import {
+  isInternalApiAuthorized,
+  unauthorizedInternalApiResponse,
+} from "@/lib/server/internal-api-auth"
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const { input } = await req.json()
-    const result = await relevanceClient.runAgent(params.id, input)
-    return Response.json({ result })
-  } catch (error) {
-    console.error("Failed to run Relevance agent:", error)
-    return Response.json({ error: "Failed to run agent" }, { status: 500 })
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
+export async function POST(request: NextRequest) {
+  if (!isInternalApiAuthorized(request)) {
+    return unauthorizedInternalApiResponse()
   }
+
+  return Response.json(
+    {
+      ok: false,
+      error: "Relevance agent execution is unavailable during launch staging",
+      code: "NOT_IMPLEMENTED",
+    },
+    {
+      status: 501,
+      headers: { "Cache-Control": "no-store" },
+    },
+  )
 }

@@ -4,7 +4,7 @@ export interface Agent {
   type: "chat" | "workflow" | "analytics" | "customer-service" | "sales"
   status: "active" | "inactive" | "training" | "error"
   description: string
-  capabilities: string[]
+  capabilities: readonly string[]
   model: "grok" | "relevance" | "custom"
   config: AgentConfig
   metrics: AgentMetrics
@@ -25,7 +25,7 @@ export interface AgentConfig {
 export interface AgentTrigger {
   type: "keyword" | "intent" | "schedule" | "webhook" | "user-action"
   value: string
-  conditions?: Record<string, any>
+  conditions?: Record<string, unknown>
 }
 
 export interface AgentMetrics {

@@ -1,0 +1,12 @@
+.git
+.github
+.next
+.vercel
+node_modules
+coverage
+*.log
+.env*
+!.env.staging.example
+upload
+ams_sources
+source_inspection

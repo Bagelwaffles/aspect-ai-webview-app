@@ -26,7 +26,7 @@ interface RelevanceWorkflowStep {
   id: string
   type: "llm" | "api" | "condition" | "transform"
   name: string
-  config: Record<string, any>
+  config: Record<string, unknown>
 }
 
 class RelevanceClient {
@@ -44,7 +44,7 @@ class RelevanceClient {
     this.baseUrl = process.env.RELEVANCE_AGENT_API_URL!
   }
 
-  private async makeRequest(endpoint: string, options: RequestInit = {}) {
+  private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
 
     const response = await fetch(url, {
@@ -63,12 +63,12 @@ class RelevanceClient {
       throw new Error(`Relevance API error: ${response.status} ${response.statusText}`)
     }
 
-    return response.json()
+    return response.json() as Promise<T>
   }
 
   async getAgents(): Promise<RelevanceAgent[]> {
     try {
-      const data = await this.makeRequest("/agents")
+      const data = await this.makeRequest<{ agents?: RelevanceAgent[] }>("/agents")
       return data.agents || []
     } catch (error) {
       console.error("Failed to fetch Relevance agents:", error)
@@ -78,7 +78,7 @@ class RelevanceClient {
 
   async createAgent(agentData: Partial<RelevanceAgent>): Promise<RelevanceAgent> {
     try {
-      const data = await this.makeRequest("/agents", {
+      const data = await this.makeRequest<{ agent: RelevanceAgent }>("/agents", {
         method: "POST",
         body: JSON.stringify(agentData),
       })
@@ -89,9 +89,9 @@ class RelevanceClient {
     }
   }
 
-  async runAgent(agentId: string, input: Record<string, any>): Promise<any> {
+  async runAgent<T = unknown>(agentId: string, input: Record<string, unknown>): Promise<T> {
     try {
-      const data = await this.makeRequest(`/agents/${agentId}/run`, {
+      const data = await this.makeRequest<{ result: T }>(`/agents/${agentId}/run`, {
         method: "POST",
         body: JSON.stringify({ input }),
       })
@@ -104,7 +104,7 @@ class RelevanceClient {
 
   async getWorkflows(): Promise<RelevanceWorkflow[]> {
     try {
-      const data = await this.makeRequest("/workflows")
+      const data = await this.makeRequest<{ workflows?: RelevanceWorkflow[] }>("/workflows")
       return data.workflows || []
     } catch (error) {
       console.error("Failed to fetch Relevance workflows:", error)
@@ -114,7 +114,7 @@ class RelevanceClient {
 
   async createWorkflow(workflowData: Partial<RelevanceWorkflow>): Promise<RelevanceWorkflow> {
     try {
-      const data = await this.makeRequest("/workflows", {
+      const data = await this.makeRequest<{ workflow: RelevanceWorkflow }>("/workflows", {
         method: "POST",
         body: JSON.stringify(workflowData),
       })
@@ -125,9 +125,12 @@ class RelevanceClient {
     }
   }
 
-  async triggerWorkflow(workflowId: string, payload: Record<string, any>): Promise<any> {
+  async triggerWorkflow<T = unknown>(
+    workflowId: string,
+    payload: Record<string, unknown>,
+  ): Promise<T> {
     try {
-      const data = await this.makeRequest(`/workflows/${workflowId}/trigger`, {
+      const data = await this.makeRequest<{ result: T }>(`/workflows/${workflowId}/trigger`, {
         method: "POST",
         body: JSON.stringify(payload),
       })

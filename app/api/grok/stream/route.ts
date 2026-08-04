@@ -1,21 +1,49 @@
-import { grokAgentManager } from "@/lib/grok-agents"
-import type { NextRequest } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+
+import { authorizePaidApiRequest } from "@/lib/server/customer-api-auth"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
-export async function POST(req: NextRequest) {
-  try {
-    const { agentId, message, conversationHistory } = await req.json()
+type GrokStreamDependencies = {
+  authorize: typeof authorizePaidApiRequest
+}
 
-    if (!agentId || !message) {
-      return new Response("Agent ID and message are required", { status: 400 })
+type GrokStreamTestGlobals = typeof globalThis & {
+  __amsGrokStreamTestDependencies?: Partial<GrokStreamDependencies>
+}
+
+function testDependencies(): Partial<GrokStreamDependencies> {
+  if (process.env.NODE_ENV === "production") return {}
+  return (globalThis as GrokStreamTestGlobals).__amsGrokStreamTestDependencies ?? {}
+}
+
+function createGrokStreamHandler(overrides: Partial<GrokStreamDependencies> = {}) {
+  const dependencies: GrokStreamDependencies = {
+    authorize: authorizePaidApiRequest,
+    ...overrides,
+  }
+
+  return async function POST(request: NextRequest) {
+    const principal = await dependencies.authorize(request)
+    if (!principal || principal.kind !== "customer") {
+      return NextResponse.json(
+        { ok: false, error: "A customer session is required", code: "CUSTOMER_SESSION_REQUIRED" },
+        { status: 401, headers: { "Cache-Control": "no-store" } },
+      )
     }
 
-    const result = await grokAgentManager.streamResponse(agentId, message, conversationHistory)
-
-    return result.toTextStreamResponse()
-  } catch (error) {
-    console.error("Grok stream error:", error)
-    return new Response("Failed to generate response", { status: 500 })
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Streaming is disabled until credit commit and refund semantics are proven",
+        code: "STREAMING_NOT_IMPLEMENTED",
+      },
+      { status: 501, headers: { "Cache-Control": "no-store" } },
+    )
   }
+}
+
+export async function POST(request: NextRequest) {
+  return createGrokStreamHandler(testDependencies())(request)
 }

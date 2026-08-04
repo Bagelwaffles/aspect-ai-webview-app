@@ -1,28 +1,55 @@
-import { generateText } from "ai"
-import { xai } from "@ai-sdk/xai"
+import { NextRequest, NextResponse } from "next/server"
+
+import { authorizePaidApiRequest } from "@/lib/server/customer-api-auth"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
-export async function POST(req: Request) {
-  try {
-    const { message } = await req.json()
+type AiChatDependencies = {
+  authorize: typeof authorizePaidApiRequest
+}
 
-    const { text } = await generateText({
-      model: xai("grok-beta"),
-      prompt: `You are an AI assistant for a print-on-demand business automation platform. The user has access to:
-      - Printify integration for product creation
-      - n8n workflows for automation
-      - Stripe for billing
-      - Real-time analytics and market data
-      
-      User message: ${message}
-      
-      Provide helpful, actionable insights about their print-on-demand business. Be concise but informative. Focus on automation opportunities, market trends, and business optimization.`,
-    })
+const defaultDependencies: AiChatDependencies = {
+  authorize: authorizePaidApiRequest,
+}
 
-    return Response.json({ response: text })
-  } catch (error) {
-    console.error("AI Chat Error:", error)
-    return Response.json({ error: "Failed to generate AI response" }, { status: 500 })
+type AiChatTestGlobals = typeof globalThis & {
+  __amsAiChatTestDependencies?: Partial<AiChatDependencies>
+}
+
+function testDependencies(): Partial<AiChatDependencies> {
+  if (process.env.NODE_ENV === "production") return {}
+  return (globalThis as AiChatTestGlobals).__amsAiChatTestDependencies ?? {}
+}
+
+function noStoreJson(body: Record<string, unknown>, status: number) {
+  return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } })
+}
+
+function createAiChatHandler(overrides: Partial<AiChatDependencies> = {}) {
+  const dependencies = { ...defaultDependencies, ...overrides }
+
+  return async function POST(request: NextRequest) {
+    const principal = await dependencies.authorize(request)
+    if (!principal || principal.kind !== "customer") {
+      return noStoreJson(
+        { ok: false, error: "A customer session is required", code: "CUSTOMER_SESSION_REQUIRED" },
+        401,
+      )
+    }
+
+    return noStoreJson(
+      {
+        ok: false,
+        error: "Legacy AI chat is disabled for launch. Use the saved Content Agent route.",
+        code: "LEGACY_AI_ROUTE_DISABLED",
+        next: "/content-agent",
+      },
+      410,
+    )
   }
+}
+
+export async function POST(request: NextRequest) {
+  return createAiChatHandler(testDependencies())(request)
 }

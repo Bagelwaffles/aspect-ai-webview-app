@@ -1,44 +1,55 @@
+import { getServerSession } from "next-auth"
 import Link from "next/link"
+import { redirect } from "next/navigation"
+
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { getBillingSnapshot } from "@/lib/billing"
+import { authOptions, isCustomerAuthConfigured, isStableCustomerSubject } from "@/lib/auth"
+import { getEntitlementSnapshot } from "@/lib/server/entitlements"
 
 export const dynamic = "force-dynamic"
 
 function statusTone(status?: string | null) {
   if (status === "active" || status === "trialing") return "default"
-  if (status === "locked" || status === "past_due" || status === "canceled") return "destructive"
+  if (status === "past_due" || status === "canceled") return "destructive"
   return "secondary"
 }
 
-export default async function BillingSuccessPage({
-  searchParams
-}: {
-  searchParams?: { session_id?: string }
-}) {
-  const snapshot = await getBillingSnapshot()
-  const org = snapshot.organization
-  const status = org?.subscriptionStatus ?? "locked"
-  const params = searchParams ?? {}
+type PageProps = {
+  searchParams?: Promise<{ session_id?: string }>
+}
+
+export default async function BillingSuccessPage({ searchParams }: PageProps) {
+  if (!isCustomerAuthConfigured()) redirect("/login?next=/billing/success")
+
+  const session = await getServerSession(authOptions).catch(() => null)
+  const subject = session?.user?.customerSubject
+  if (!isStableCustomerSubject(subject)) redirect("/login?next=/billing/success")
+
+  const snapshot = await getEntitlementSnapshot(subject).catch(() => null)
+  const billingEmail = snapshot?.billingEmail ?? session?.user?.email?.trim().toLowerCase()
+  const status = snapshot?.subscriptionStatus ?? "unverified"
+  const params = (await searchParams) ?? {}
+  const accessEnabled = status === "active" || status === "trialing"
 
   return (
     <main className="min-h-screen bg-background px-6 py-10">
       <div className="mx-auto max-w-4xl space-y-6">
         <div>
           <Badge variant={statusTone(status)} className="capitalize">
-            Checkout complete
+            Checkout returned
           </Badge>
-          <h1 className="mt-3 text-3xl font-bold">Billing success</h1>
+          <h1 className="mt-3 text-3xl font-bold">Billing confirmation</h1>
           <p className="text-muted-foreground">
-            The checkout return route is live and now resolves to a real billing state view.
+            Stripe returned to AMS. Access appears only after the signed webhook updates this account’s entitlement record.
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Safe org status</CardTitle>
-            <CardDescription>{org?.organizationSlug ?? "ams-stripe-test-org"}</CardDescription>
+            <CardTitle>Verified account state</CardTitle>
+            <CardDescription>{billingEmail ?? "Authenticated customer"}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="rounded-lg border p-4">
@@ -47,32 +58,42 @@ export default async function BillingSuccessPage({
             </div>
             <div className="rounded-lg border p-4">
               <div className="text-sm text-muted-foreground">Access</div>
-              <div className="text-xl font-semibold">{org?.accessEnabled ? "Enabled" : "Locked"}</div>
+              <div className="text-xl font-semibold">{accessEnabled ? "Enabled" : "Pending verification"}</div>
             </div>
             <div className="rounded-lg border p-4">
-              <div className="text-sm text-muted-foreground">Current period end</div>
-              <div className="text-xl font-semibold">{org?.currentPeriodEnd ?? "Unavailable"}</div>
+              <div className="text-sm text-muted-foreground">Plan</div>
+              <div className="text-xl font-semibold capitalize">{snapshot?.plan ?? "Unverified"}</div>
             </div>
             <div className="rounded-lg border p-4">
-              <div className="text-sm text-muted-foreground">Stripe session</div>
-              <div className="text-xl font-semibold">{params.session_id ?? "No session id in return URL"}</div>
+              <div className="text-sm text-muted-foreground">Credits</div>
+              <div className="text-xl font-semibold">{snapshot?.totalCredits.toLocaleString() ?? "0"}</div>
+            </div>
+            <div className="rounded-lg border p-4 md:col-span-2">
+              <div className="text-sm text-muted-foreground">Stripe session reference</div>
+              <div className="break-all text-sm font-semibold">{params.session_id ?? "Not provided"}</div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Next step</CardTitle>
-            <CardDescription>
-              Return to the dashboard now that the checkout return route is working.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link href="/">Back to dashboard</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        {!accessEnabled && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Fulfillment pending</CardTitle>
+              <CardDescription>
+                No access has been granted from the browser redirect alone. Refresh billing after Stripe webhook processing completes.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+
+        <div className="flex gap-3">
+          <Button asChild>
+            <Link href="/billing">Refresh billing</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/grok-chat">Open agents</Link>
+          </Button>
+        </div>
       </div>
     </main>
   )

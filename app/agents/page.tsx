@@ -1,435 +1,172 @@
-"use client"
+import Link from "next/link"
+import { Bot, FileText, LockKeyhole, Sparkles } from "lucide-react"
 
-import { useState, useEffect } from "react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Bot, Plus, Settings, TrendingUp, MessageSquare, Globe, Play, Pause, DollarSign } from "lucide-react"
-import { type Agent, AGENT_TEMPLATES } from "@/lib/agents"
+
+const intendedLaunchAgent = {
+  name: "Content Agent",
+  status: "In progress",
+  description: "The first intended AMS launch agent. Its real persisted execution flow is not implemented yet.",
+  plannedCapabilities: ["Marketing copy", "Product descriptions", "Email drafts", "Social content"],
+}
+
+const unavailableAgents = [
+  {
+    name: "Outreach Agent",
+    detail: "Lead qualification, offer positioning, and outreach drafting remain unavailable.",
+  },
+  {
+    name: "Analytics Agent",
+    detail: "Data analysis, reporting, and recommendation workflows remain unavailable.",
+  },
+  {
+    name: "Sales Agent",
+    detail: "Sales qualification and recommendation workflows remain unavailable.",
+  },
+  {
+    name: "Customer Support Agent",
+    detail: "Customer support execution and integrations remain unavailable.",
+  },
+  {
+    name: "Technical Support Agent",
+    detail: "Technical support execution and integrations remain unavailable.",
+  },
+]
+
+const deferredAgents = [
+  "Automation Builder",
+  "SEO Agent",
+  "Shopify Agent",
+  "Video Agent",
+  "Affiliate Agent",
+  "Research Agent",
+  "Notifier Agent",
+  "Android Build Agent",
+]
 
 export default function AgentsPage() {
-  const [agents, setAgents] = useState<Agent[]>([])
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [selectedTemplate, setSelectedTemplate] = useState<keyof typeof AGENT_TEMPLATES>("customer-service")
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    fetchAgents()
-  }, [])
-
-  const fetchAgents = async () => {
-    try {
-      const response = await fetch("/api/agents")
-      const data = await response.json()
-      setAgents(data.agents || [])
-    } catch (error) {
-      console.error("Failed to fetch agents:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const createAgent = async (agentData: Partial<Agent>) => {
-    try {
-      const response = await fetch("/api/agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(agentData),
-      })
-
-      if (response.ok) {
-        fetchAgents()
-        setIsCreateDialogOpen(false)
-      }
-    } catch (error) {
-      console.error("Failed to create agent:", error)
-    }
-  }
-
-  const toggleAgentStatus = async (agentId: string, currentStatus: string) => {
-    const newStatus = currentStatus === "active" ? "inactive" : "active"
-
-    try {
-      await fetch(`/api/agents/${agentId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      })
-
-      fetchAgents()
-    } catch (error) {
-      console.error("Failed to update agent status:", error)
-    }
-  }
-
-  const deployAgent = async (agentId: string) => {
-    try {
-      const response = await fetch("/api/agents/deploy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          agentId,
-          deploymentConfig: {
-            position: "bottom-right",
-            theme: "light",
-            autoOpen: false,
-          },
-        }),
-      })
-
-      const data = await response.json()
-      console.log("Agent deployed:", data.deployment)
-    } catch (error) {
-      console.error("Failed to deploy agent:", error)
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-500"
-      case "inactive":
-        return "bg-gray-500"
-      case "training":
-        return "bg-yellow-500"
-      case "error":
-        return "bg-red-500"
-      default:
-        return "bg-gray-500"
-    }
-  }
-
-  const totalInteractions = agents.reduce((sum, agent) => sum + (agent.metrics?.totalInteractions || 0), 0)
-  const totalRevenue = agents.reduce((sum, agent) => sum + (agent.metrics?.revenueAttributed || 0), 0)
-  const averageSatisfaction =
-    agents.length > 0
-      ? agents.reduce((sum, agent) => sum + (agent.metrics?.userSatisfaction || 0), 0) / agents.length
-      : 0
-
-  const templateCards = Object.entries(AGENT_TEMPLATES).map(([key, template]) => ({
-    key,
-    name: template.name,
-    description: template.description,
-    capabilities: template.capabilities,
-    type: key,
-  }))
-
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm">
-        <div className="flex h-16 items-center justify-between px-6">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-                <Bot className="h-6 w-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold font-serif">Agent Management</h1>
-                <p className="text-sm text-muted-foreground">Deploy and manage AI agents</p>
-              </div>
+    <main className="min-h-screen bg-background px-5 py-10 sm:px-8">
+      <div className="mx-auto max-w-6xl space-y-10">
+        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
+          <div className="space-y-4">
+            <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+              <Sparkles className="mr-2 h-3.5 w-3.5" />
+              AMS agent roadmap
+            </Badge>
+            <div>
+              <h1 className="text-4xl font-black tracking-tight sm:text-5xl">One intended launch agent. Still in progress.</h1>
+              <p className="mt-3 max-w-3xl leading-7 text-muted-foreground">
+                Content is the first intended AMS launch agent, but it is not complete or available for customer execution. Outreach, Analytics, Sales, Support, Technical, and the rest of the roadmap remain unavailable.
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Create Agent
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Create New Agent</DialogTitle>
-                  <DialogDescription>Choose a template and configure your AI agent</DialogDescription>
-                </DialogHeader>
-                <Tabs defaultValue="template" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="template">Choose Template</TabsTrigger>
-                    <TabsTrigger value="custom">Custom Configuration</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="template" className="space-y-4">
-                    <div className="grid gap-4">
-                      {Object.entries(AGENT_TEMPLATES).map(([key, template]) => (
-                        <Card
-                          key={key}
-                          className={`cursor-pointer transition-colors ${
-                            selectedTemplate === key ? "border-primary" : "hover:border-primary/50"
-                          }`}
-                          onClick={() => setSelectedTemplate(key as keyof typeof AGENT_TEMPLATES)}
-                        >
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-base">{template.name}</CardTitle>
-                            <CardDescription>{template.description}</CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="flex flex-wrap gap-1">
-                              {template.capabilities.map((capability) => (
-                                <Badge key={capability} variant="secondary" className="text-xs">
-                                  {capability}
-                                </Badge>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                    <Button
-                      onClick={() =>
-                        createAgent({
-                          ...AGENT_TEMPLATES[selectedTemplate],
-                          type: selectedTemplate as any,
-                          model: "grok",
-                          config: {
-                            systemPrompt: AGENT_TEMPLATES[selectedTemplate].systemPrompt,
-                            temperature: 0.7,
-                            maxTokens: 500,
-                            responseFormat: "text",
-                            integrations: [],
-                            triggers: [],
-                            personality: AGENT_TEMPLATES[selectedTemplate].personality,
-                          },
-                        })
-                      }
-                      className="w-full"
-                    >
-                      Create Agent from Template
-                    </Button>
-                  </TabsContent>
-                  <TabsContent value="custom" className="space-y-4">
-                    <div className="grid gap-4">
-                      <div>
-                        <Label htmlFor="name">Agent Name</Label>
-                        <Input id="name" placeholder="Enter agent name" />
-                      </div>
-                      <div>
-                        <Label htmlFor="description">Description</Label>
-                        <Textarea id="description" placeholder="Describe what this agent does" />
-                      </div>
-                      <div>
-                        <Label htmlFor="type">Agent Type</Label>
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select agent type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="chat">Chat Assistant</SelectItem>
-                            <SelectItem value="workflow">Workflow Automation</SelectItem>
-                            <SelectItem value="analytics">Analytics Agent</SelectItem>
-                            <SelectItem value="customer-service">Customer Service</SelectItem>
-                            <SelectItem value="sales">Sales Assistant</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <Button className="w-full">Create Custom Agent</Button>
-                  </TabsContent>
-                </Tabs>
-              </DialogContent>
-            </Dialog>
-            <Button variant="outline" onClick={() => (window.location.href = "/")}>
-              Dashboard
+          <div className="flex flex-wrap gap-3">
+            <Button asChild>
+              <Link href="/content-agent">View Content status</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/pricing">View plans</Link>
             </Button>
           </div>
         </div>
-      </header>
 
-      <div className="p-6">
-        {/* Overview Stats */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Agents</CardTitle>
-              <Bot className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">
-                {agents.filter((a) => a.status === "active").length}
+        <section className="grid gap-6 lg:grid-cols-[1.1fr_1.9fr]">
+          <Card className="border-primary/20 bg-card/80 shadow-lg">
+            <CardHeader>
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                  <FileText className="h-6 w-6" />
+                </div>
+                <Badge variant="secondary">{intendedLaunchAgent.status}</Badge>
               </div>
-              <p className="text-xs text-muted-foreground">{agents.length} total agents</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Interactions</CardTitle>
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-xl">{intendedLaunchAgent.name}</CardTitle>
+              <CardDescription className="leading-6">{intendedLaunchAgent.description}</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">{totalInteractions.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Across all agents</p>
+            <CardContent className="space-y-5">
+              <div>
+                <p className="mb-2 text-sm font-medium">Planned capabilities</p>
+                <div className="flex flex-wrap gap-2">
+                  {intendedLaunchAgent.plannedCapabilities.map((capability) => (
+                    <Badge key={capability} variant="outline" className="text-xs">
+                      {capability}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              <Button asChild className="w-full">
+                <Link href="/content-agent">View implementation status</Link>
+              </Button>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Revenue Generated</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">${totalRevenue.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">From agent interactions</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Satisfaction Score</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">{averageSatisfaction.toFixed(1)}/5.0</div>
-              <p className="text-xs text-muted-foreground">Average user rating</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Agents Grid */}
-        <div className="mb-10">
           <Card>
             <CardHeader>
-              <CardTitle>Available Agent Templates</CardTitle>
-              <CardDescription>
-                These are the real agent roles the platform can launch. If no active records exist yet, this is the honest catalog instead of a fake list.
-              </CardDescription>
+              <CardTitle>Unavailable agents</CardTitle>
+              <CardDescription>These roles are not active, executable, or included as working subscription features.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {templateCards.map((template) => (
-                  <div key={template.key} className="rounded-lg border p-4">
-                    <div className="mb-3 flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="font-medium">{template.name}</h3>
-                        <p className="text-sm text-muted-foreground">{template.description}</p>
-                      </div>
-                      <Badge variant="secondary">{template.type}</Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {template.capabilities.map((capability) => (
-                        <Badge key={capability} variant="outline" className="text-xs">
-                          {capability}
-                        </Badge>
-                      ))}
-                    </div>
+            <CardContent className="grid gap-3 sm:grid-cols-2">
+              {unavailableAgents.map((agent) => (
+                <div key={agent.name} className="rounded-lg border border-border/70 bg-muted/20 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium">{agent.name}</span>
+                    <Badge variant="outline">Unavailable</Badge>
                   </div>
-                ))}
-              </div>
+                  <p className="mt-2 text-sm text-muted-foreground">{agent.detail}</p>
+                </div>
+              ))}
             </CardContent>
           </Card>
-        </div>
+        </section>
 
-        <div className="mb-4 flex items-center justify-between">
+        <Card className="border-emerald-500/20 bg-emerald-500/5">
+          <CardHeader>
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+                <LockKeyhole className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle>Availability boundary</CardTitle>
+                <CardDescription className="mt-1 leading-6">
+                  A page, catalog entry, subscription, or provider configuration does not make an agent available. AMS will mark an agent ready only after its authenticated execution, credit handling, persistence, failure paths, and customer experience are verified.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+
+        <section className="space-y-5">
           <div>
-            <h2 className="text-xl font-semibold">Live Agent Records</h2>
-            <p className="text-sm text-muted-foreground">
-              These are the active records fetched from production data. If there are none yet, we show that plainly.
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Deferred catalog</p>
+            <h2 className="mt-2 text-3xl font-bold">Unavailable until verified</h2>
+            <p className="mt-2 max-w-3xl text-muted-foreground">
+              These roles remain disabled until their integrations and persistent execution paths are verified. They are not counted as working agents today.
             </p>
           </div>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {agents.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground md:col-span-2 lg:col-span-3">
-              No live agents are connected yet. The template catalog above shows what can be launched.
-            </div>
-          ) : (
-            agents.map((agent) => (
-              <Card key={agent.id} className="relative">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Bot className="h-5 w-5 text-primary" />
-                      </div>
-                      <div
-                        className={`absolute -bottom-1 -right-1 h-3 w-3 rounded-full ${getStatusColor(agent.status)}`}
-                      />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base">{agent.name}</CardTitle>
-                      <CardDescription className="text-sm">{agent.description}</CardDescription>
-                    </div>
-                  </div>
-                  <Badge variant={agent.status === "active" ? "default" : "secondary"}>{agent.status}</Badge>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {deferredAgents.map((name) => (
+              <div key={name} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/40 p-4">
+                <Bot className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <div className="font-medium">{name}</div>
+                  <div className="text-xs text-muted-foreground">In progress - not available</div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex flex-wrap gap-1">
-                    {agent.capabilities?.map((capability) => (
-                      <Badge key={capability} variant="outline" className="text-xs">
-                        {capability}
-                      </Badge>
-                    ))}
-                  </div>
+              </div>
+            ))}
+          </div>
+        </section>
 
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Interactions</p>
-                      <p className="font-medium">{agent.metrics?.totalInteractions?.toLocaleString() || 0}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Success Rate</p>
-                      <p className="font-medium">{agent.metrics?.successRate?.toFixed(1) || 0}%</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Avg Response</p>
-                      <p className="font-medium">{agent.metrics?.averageResponseTime?.toFixed(1) || 0}s</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Revenue</p>
-                      <p className="font-medium">${agent.metrics?.revenueAttributed?.toLocaleString() || 0}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant={agent.status === "active" ? "outline" : "default"}
-                      onClick={() => toggleAgentStatus(agent.id, agent.status)}
-                      className="flex-1"
-                    >
-                      {agent.status === "active" ? (
-                        <>
-                          <Pause className="h-3 w-3 mr-1" />
-                          Pause
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-3 w-3 mr-1" />
-                          Activate
-                        </>
-                      )}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => deployAgent(agent.id)}>
-                      <Globe className="h-3 w-3 mr-1" />
-                      Deploy
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      <Settings className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            ))
-          )}
+        <div className="flex flex-wrap gap-3 border-t border-border/70 pt-8">
+          <Button asChild variant="outline">
+            <Link href="/">Back home</Link>
+          </Button>
+          <Button asChild variant="ghost">
+            <Link href="/billing">Account billing</Link>
+          </Button>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

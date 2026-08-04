@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "incremental": false
+  },
+  "include": [
+    "../next-env.d.ts",
+    "../types/next-auth.d.ts",
+    "../lib/auth.ts",
+    "../lib/server/internal-api-auth.ts",
+    "../lib/server/customer-api-auth.ts",
+    "../lib/server/rate-limit.ts",
+    "./customer-identity.test.ts",
+    "./rate-limit.test.ts"
+  ],
+  "exclude": ["../node_modules", "../.next"]
+}

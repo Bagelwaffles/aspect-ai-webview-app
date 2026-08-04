@@ -1,12 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  output: "standalone",
   async rewrites() {
     return [
       {
@@ -16,11 +11,11 @@ const nextConfig = {
     ]
   },
   images: {
-    domains: [
-      "images.printify.com",
-      "cdn.printify.com",
-      "aspectmarketingsolutions.app",
-      "vo.aspectmarketingsolutions.app",
+    remotePatterns: [
+      { protocol: "https", hostname: "images.printify.com" },
+      { protocol: "https", hostname: "cdn.printify.com" },
+      { protocol: "https", hostname: "aspectmarketingsolutions.app" },
+      { protocol: "https", hostname: "vo.aspectmarketingsolutions.app" },
     ],
     unoptimized: true,
   },
