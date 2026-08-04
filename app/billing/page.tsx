@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { authOptions, isCustomerAuthConfigured } from "@/lib/auth"
+import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 import { getEntitlementSnapshot } from "@/lib/server/entitlements"
 
 export const dynamic = "force-dynamic"
@@ -34,6 +35,7 @@ export default async function BillingPage() {
   const snapshot = await getEntitlementSnapshot(subject).catch(() => null)
   const configured = Boolean(snapshot?.configured)
   const status = snapshot?.subscriptionStatus ?? "inactive"
+  const contentAgentLive = isContentAgentLaunchEnabled()
 
   return (
     <main className="min-h-screen bg-background px-6 py-10">
@@ -47,6 +49,22 @@ export default async function BillingPage() {
             <Link href="/">Back to dashboard</Link>
           </Button>
         </div>
+
+        {!contentAgentLive ? (
+          <Card className="border-amber-500/40 bg-amber-500/10">
+            <CardHeader>
+              <CardTitle>New paid AI subscriptions are paused</CardTitle>
+              <CardDescription>
+                Content Agent is in private beta. Existing subscribers can still manage their subscription, but AMS will not open a new paid checkout for unavailable AI execution.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/ethical-agent-farm/request?offer=content-agent-beta">Join the beta list</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card>
           <CardHeader>
@@ -101,10 +119,16 @@ export default async function BillingPage() {
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">{plan.credits} per billing cycle.</p>
                 <p className="text-sm text-muted-foreground">
-                  Content Agent is the first planned launch capability. It becomes usable only after its authenticated
-                  route and entitlement gate are enabled for this account. Outreach and Analytics are not available.
+                  Content Agent access becomes available only after the live provider gate is explicitly enabled. Outreach and Analytics are not available.
                 </p>
-                <BillingActionButton label={`Choose ${plan.name}`} endpoint="/api/billing/checkout" plan={plan.slug} />
+                {contentAgentLive ? (
+                  <BillingActionButton label={`Choose ${plan.name}`} endpoint="/api/billing/checkout" plan={plan.slug} />
+                ) : (
+                  <div className="space-y-2">
+                    <Button type="button" disabled>Checkout paused</Button>
+                    <p className="text-xs text-muted-foreground">No payment can be started for this plan.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -113,7 +137,7 @@ export default async function BillingPage() {
         <div className="flex flex-wrap gap-3">
           <BillingActionButton label="Manage subscription" endpoint="/api/billing/portal" variant="outline" />
           <Button asChild variant="ghost">
-            <Link href="/grok-chat">Open agent workspace</Link>
+            <Link href="/content-agent">View Content Agent status</Link>
           </Button>
         </div>
       </div>
