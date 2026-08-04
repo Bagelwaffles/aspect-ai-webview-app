@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 
+import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 import { authorizePaidApiRequest } from "@/lib/server/customer-api-auth"
 import { getEntitlementSnapshot, type PlanSlug } from "@/lib/server/entitlements"
 import {
@@ -28,6 +29,7 @@ type CheckoutDependencies = {
   claimIntent: typeof claimStripeCheckoutIntent
   completeIntent: typeof completeStripeCheckoutIntent
   releaseIntent: typeof releaseStripeCheckoutIntent
+  launchEnabled: typeof isContentAgentLaunchEnabled
   env: NodeJS.ProcessEnv
   now: () => number
   createSession: (
@@ -43,6 +45,7 @@ const defaultDependencies: CheckoutDependencies = {
   claimIntent: claimStripeCheckoutIntent,
   completeIntent: completeStripeCheckoutIntent,
   releaseIntent: releaseStripeCheckoutIntent,
+  launchEnabled: isContentAgentLaunchEnabled,
   env: process.env,
   now: Date.now,
   createSession: async (secretKey, params, options) => {
@@ -57,7 +60,13 @@ type CheckoutTestGlobals = typeof globalThis & {
 
 function testDependencies(): Partial<CheckoutDependencies> {
   if (process.env.NODE_ENV === "production") return {}
-  return (globalThis as CheckoutTestGlobals).__amsCheckoutTestDependencies ?? {}
+  const overrides =
+    (globalThis as CheckoutTestGlobals).__amsCheckoutTestDependencies ?? {}
+  if (Object.keys(overrides).length === 0) return overrides
+
+  // Existing deterministic checkout tests exercise the enabled path. Individual
+  // tests can explicitly override launchEnabled to prove the paused path.
+  return { launchEnabled: () => true, ...overrides }
 }
 
 function isPlanSlug(value: unknown): value is PlanSlug {
@@ -92,6 +101,17 @@ function createCheckoutHandler(overrides: Partial<CheckoutDependencies> = {}) {
       return noStoreJson(
         { ok: false, error: "Unknown or unsupported billing request", code: "INVALID_CHECKOUT_REQUEST" },
         400,
+      )
+    }
+
+    if (!dependencies.launchEnabled()) {
+      return noStoreJson(
+        {
+          ok: false,
+          error: "Paid AI subscriptions are paused while Content Agent remains in private beta. No charge was created.",
+          code: "SUBSCRIPTION_CHECKOUT_PAUSED",
+        },
+        503,
       )
     }
 
