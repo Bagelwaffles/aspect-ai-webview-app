@@ -59,7 +59,15 @@ export async function GET() {
         )
           ? "configured"
           : "missing",
-        n8n: configured("N8N_WEBHOOK_SECRET") ? "configured" : "missing",
+        n8n: configured(
+          "AMS_N8N_URL",
+          "AMS_N8N_ORCHESTRATOR_WEBHOOK_URL",
+          "AMS_N8N_WEBHOOK_SECRET",
+          "AMS_APP_URL",
+        )
+          ? "configured"
+          : "missing",
+        n8nApiKey: "not_required",
         internalApiAuth: configured("AMS_INTERNAL_API_KEY") ? "configured" : "missing",
       },
       dependencyConnectionsTested: {
