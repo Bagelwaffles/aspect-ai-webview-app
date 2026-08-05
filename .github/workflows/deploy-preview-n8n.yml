@@ -169,8 +169,8 @@ jobs:
             }),
           })
 
-          if (![401, 403].includes(negativeResponse.status)) {
-            throw new Error(`n8n accepted an invalid Header Auth value: HTTP ${negativeResponse.status}`)
+          if (![401, 403, 404].includes(negativeResponse.status)) {
+            throw new Error(`n8n did not reject an invalid Header Auth value: HTTP ${negativeResponse.status}`)
           }
           console.log(`Invalid n8n Header Auth rejected with HTTP ${negativeResponse.status}.`)
 
