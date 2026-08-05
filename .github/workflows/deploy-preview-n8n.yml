@@ -124,7 +124,17 @@ jobs:
           node --import tsx --input-type=module <<'NODE'
           import { readFileSync } from "node:fs"
           import { randomUUID } from "node:crypto"
-          import { sendAmsN8nWebhook } from "./lib/server/ams-n8n-webhook-client.ts"
+
+          const webhookModule = await import("./lib/server/ams-n8n-webhook-client.ts")
+          const sendAmsN8nWebhook =
+            typeof webhookModule.sendAmsN8nWebhook === "function"
+              ? webhookModule.sendAmsN8nWebhook
+              : typeof webhookModule.default?.sendAmsN8nWebhook === "function"
+                ? webhookModule.default.sendAmsN8nWebhook
+                : null
+          if (!sendAmsN8nWebhook) {
+            throw new Error("sendAmsN8nWebhook export is unavailable")
+          }
 
           const envFile = readFileSync(".vercel/.env.preview.local", "utf8")
           for (const rawLine of envFile.split(/\r?\n/u)) {
