@@ -6,7 +6,7 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 function isAuthorized(request: NextRequest): boolean {
-  const expected = process.env.N8N_WEBHOOK_SECRET?.trim()
+  const expected = process.env.AMS_N8N_WEBHOOK_SECRET?.trim()
   const supplied = request.headers.get("x-vo-secret")?.trim()
   return Boolean(expected && supplied && constantTimeStringEqual(supplied, expected))
 }
@@ -33,9 +33,9 @@ function sanitizeBaseUrl(raw?: string) {
 }
 
 async function checkN8nHealth() {
-  const baseUrl = process.env.N8N_BASE_URL?.trim()
+  const baseUrl = process.env.AMS_N8N_URL?.trim()
   if (!baseUrl) {
-    return { online: false, latencyMs: 0, error: "N8N_BASE_URL not configured" }
+    return { online: false, latencyMs: 0, error: "AMS_N8N_URL not configured" }
   }
 
   const controller = new AbortController()
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const baseUrl = process.env.N8N_BASE_URL?.trim()
+  const baseUrl = process.env.AMS_N8N_URL?.trim()
   const health = await checkN8nHealth()
   const sanitizedUrl = sanitizeBaseUrl(baseUrl)
 
@@ -86,10 +86,12 @@ export async function GET(request: NextRequest) {
         endpoint: sanitizedUrl,
       },
       webhook: {
-        configured: Boolean(process.env.N8N_WEBHOOK_SECRET?.trim()),
-        path: "/api/webhooks/n8n",
+        configured: Boolean(process.env.AMS_N8N_WEBHOOK_SECRET?.trim()),
+        urlConfigured: Boolean(process.env.AMS_N8N_ORCHESTRATOR_WEBHOOK_URL?.trim()),
+        apiKeyRequired: false,
+        path: process.env.AMS_N8N_ORCHESTRATOR_WEBHOOK_URL ? "configured" : "missing",
       },
-      warnings: sanitizedUrl?.localOnly ? ["N8N_BASE_URL is local-only and unavailable from Vercel."] : [],
+      warnings: sanitizedUrl?.localOnly ? ["AMS_N8N_URL is local-only and unavailable from Vercel."] : [],
       timestamp: new Date().toISOString(),
     },
     { headers: { "Cache-Control": "no-store" } },
