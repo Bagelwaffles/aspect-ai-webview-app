@@ -1,3 +1,4 @@
+# Triggered after repository-scoped AMS_N8N_INTERNAL_KEY was configured.
 name: Deploy restored AMS n8n preview
 
 on:
