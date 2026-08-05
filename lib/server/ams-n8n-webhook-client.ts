@@ -100,10 +100,11 @@ function normalizeSecret(value: string) {
 function isUnsafeSecret(value: string) {
   const normalized = normalizeSecret(value)
   return (
-    normalized.length < 32 ||
+    normalized.length < 1 ||
     /^replace[-_ ]?me$/iu.test(normalized) ||
     /^changeme$/iu.test(normalized) ||
     /^placeholder$/iu.test(normalized) ||
+    /^your[-_ ].*here$/iu.test(normalized) ||
     normalized.includes("<") ||
     normalized.includes(">")
   )

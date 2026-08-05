@@ -147,6 +147,33 @@ test("n8n webhook client rejects missing or unsafe internal key before network w
   assert.equal(called, false)
 })
 
+test("n8n webhook client accepts non-empty configured Header Auth values without logging them", async () => {
+  const calls: RequestInit[] = []
+  const response = await sendAmsN8nWebhook(
+    {
+      action: "status.ping",
+      requestId: "req-short-key",
+      idempotencyKey: "idem-short-key",
+    },
+    {
+      webhookUrl,
+      internalKey: "configured-key",
+      fetchImpl: (async (_url, init) => {
+        calls.push(init ?? {})
+        return Response.json({
+          ok: true,
+          request_id: "req-short-key",
+          action: "status.ping",
+          result: { accepted: true },
+        })
+      }) as typeof fetch,
+    },
+  )
+
+  assert.equal(response.ok, true)
+  assert.equal(new Headers(calls[0].headers).get("x-ams-internal-key"), "configured-key")
+})
+
 test("wrong n8n Header Auth value returns sanitized rejection", async () => {
   const response = await sendAmsN8nWebhook(
     {
