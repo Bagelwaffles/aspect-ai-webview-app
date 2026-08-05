@@ -116,6 +116,73 @@ jobs:
           echo "/api/internal/n8n/orchestrator unauthenticated -> $gateway_code"
           test "$gateway_code" = "401"
 
+      - name: Verify n8n Header Auth and response contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          node --import tsx --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs"
+          import { randomUUID } from "node:crypto"
+          import { sendAmsN8nWebhook } from "./lib/server/ams-n8n-webhook-client.ts"
+
+          const envFile = readFileSync(".vercel/.env.preview.local", "utf8")
+          for (const rawLine of envFile.split(/\r?\n/u)) {
+            const line = rawLine.trim()
+            if (!line || line.startsWith("#")) continue
+            const separator = line.indexOf("=")
+            if (separator < 1) continue
+            const name = line.slice(0, separator)
+            let value = line.slice(separator + 1)
+            if (value.startsWith('"') && value.endsWith('"')) {
+              value = JSON.parse(value)
+            }
+            process.env[name] = value
+          }
+
+          const webhookUrl = process.env.AMS_N8N_ORCHESTRATOR_WEBHOOK_URL?.trim()
+          if (!webhookUrl) throw new Error("N8N preview webhook URL is missing")
+
+          const negativeResponse = await fetch(webhookUrl, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "x-ams-internal-key": `invalid-preview-key-${randomUUID()}`,
+              "x-request-id": randomUUID(),
+              "idempotency-key": randomUUID(),
+            },
+            body: JSON.stringify({
+              request_id: randomUUID(),
+              action: "status.ping",
+              payload: {},
+              meta: { source: "ams-preview-negative-auth-check" },
+            }),
+          })
+
+          if (![401, 403].includes(negativeResponse.status)) {
+            throw new Error(`n8n accepted an invalid Header Auth value: HTTP ${negativeResponse.status}`)
+          }
+          console.log(`Invalid n8n Header Auth rejected with HTTP ${negativeResponse.status}.`)
+
+          const requestId = randomUUID()
+          const result = await sendAmsN8nWebhook({
+            action: "status.ping",
+            payload: { probe: "vercel-preview" },
+            meta: { test_mode: true },
+            requestId,
+            idempotencyKey: `preview-${requestId}`,
+          })
+
+          if (!result.ok || result.status !== "accepted") {
+            const code = result.error?.code ?? "N8N_RESPONSE_REJECTED"
+            throw new Error(`Authenticated n8n preview check failed: ${code}`)
+          }
+          if (result.action !== "status.ping") {
+            throw new Error("n8n response action did not match status.ping")
+          }
+          console.log("Valid n8n Header Auth request accepted with a structured JSON response.")
+          NODE
+
       - name: Preview summary
         shell: bash
         env:
@@ -129,6 +196,8 @@ jobs:
             echo "- Required preview variable names: present"
             echo "- Public smoke tests: passed"
             echo "- Unauthenticated gateway rejection: passed"
+            echo "- Invalid n8n Header Auth rejection: passed"
+            echo "- Valid n8n Header Auth response contract: passed"
             echo "- Paid AI launch flag: false"
             echo "- Production deployment: not performed"
           } >> "$GITHUB_STEP_SUMMARY"
