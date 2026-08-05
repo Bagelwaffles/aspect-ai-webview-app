@@ -1,44 +1,76 @@
 # Credential Exposure Audit and Rotation Checklist
 
-## Scope and method
+## Current repository state
 
-- Worktree: `C:\AMS_Vault\_reconciliation_pr14`
-- Branch: `feat/ams-controlled-reconciliation`
-- Current-tree scope: all tracked files plus the intended untracked files in this reconciliation worktree.
-- Historical scope: metadata-only classification of credential assignments in the branch `HEAD` version of `README.md`.
-- Local `.env` files were not read. Ignore rules were verified for `.env`, `.env.local`, `.env.production`, and `.env.development.local`.
-- Checks emitted credential type and file path only. No credential value was printed.
+- Security branch: `security/api-key-cleanup-20260805`
+- Base commit: `36d7ca8cf69773da3f045aa5e43895aa6431b2cd`
+- Real environment files and private-key formats are ignored by Git and Docker.
+- `.env.example` and `.env.staging.example` contain placeholders only.
+- A value-blind tracked-file scanner runs in `.github/workflows/secret-scan.yml`.
+- The scanner reports only file path, line number, and detector type; it never prints a suspected value.
 
-## Result
+## Known historical exposure
 
-The current working tree is clean under the value-blind credential scan. References in `.env.example`, tests, CI, and documentation are placeholders, fixtures, environment-variable names, or secret-store references.
-
-The branch history is not clean. The previous `README.md` revision contains both of these credential types:
+Repository history previously contained credentials assigned to:
 
 - `RELEVANCE_API_KEY`
 - `RELEVANCE_AUTH_TOKEN`
 
-The working copy of `README.md` is redacted, but redaction does not revoke a credential or remove it from Git history. Provider-side rotation is required before merge.
+The current tree is redacted, but deleting a value from the current tree does not revoke it or remove it from Git history. Provider-side revocation remains mandatory.
 
-## Required before merge
+## Required provider-side rotations
 
-- [ ] Revoke and replace `RELEVANCE_API_KEY` in the provider account and each authorized runtime secret store.
-- [ ] Revoke and replace `RELEVANCE_AUTH_TOKEN` in the provider account and each authorized runtime secret store.
-- [ ] Confirm whether the duplicated opaque token was also used for OpenAI. If so, revoke and replace the applicable `OPENAI_API_KEY` or `API_KEY_OPENAI` credential.
-- [x] Replace the two credential values in the current `README.md` with non-secret setup instructions.
-- [ ] Verify provider-side revocation without printing or copying the old value.
-- [ ] Decide whether repository-history rewriting is required. Do not rewrite shared history without repository-owner approval and a coordinated force-push plan.
+These operations cannot be proven by a source-code change. Complete them in the provider dashboards without pasting values into GitHub, chat, tickets, logs, or screenshots.
 
-## Storage checks
+- [ ] Revoke and replace the historical `RELEVANCE_API_KEY`.
+- [ ] Revoke and replace the historical `RELEVANCE_AUTH_TOKEN`.
+- [ ] Confirm whether any historically duplicated opaque token was also used as `OPENAI_API_KEY` or `API_KEY_OPENAI`; revoke it if applicable.
+- [ ] Rotate any Stripe secret or webhook secret ever pasted outside an approved secret store.
+- [ ] Rotate any Vercel access token ever pasted into source, chat, or logs.
+- [ ] Rotate any Upstash/Vercel KV token ever pasted outside Vercel or the provider dashboard.
 
-Verify these names in authorized secret stores only. Their absence from Git does not prove that deployment configuration exists.
+## n8n and Vercel cleanup
 
-- Stripe: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
-- Google/NextAuth: `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`
-- AI: `XAI_API_KEY`, `OPENAI_API_KEY`, `API_KEY_OPENAI`
-- Upstash/KV: `UPSTASH_REDIS_REST_TOKEN`, `KV_REST_API_TOKEN`
-- Internal API: `AMS_INTERNAL_API_KEY`, `AMS_STRIPE_FULFILLMENT_SECRET`
-- n8n: `N8N_WEBHOOK_SECRET`, `N8N_API_KEY`, `N8N_ENCRYPTION_KEY`
-- Deployment: `VERCEL_TOKEN`, `VERCEL_ACCESS_TOKEN`, `RAILWAY_TOKEN`, `RAILWAY_API_TOKEN`
+Use only the current server-side names:
 
-Do not copy values into source, reports, tickets, chat, or command output.
+- `AMS_N8N_URL`
+- `AMS_N8N_ORCHESTRATOR_WEBHOOK_URL`
+- `AMS_N8N_INTERNAL_KEY`
+- `AMS_APP_URL`
+
+Delete obsolete or duplicate runtime entries unless another audited component still requires them:
+
+- `N8N_BASE_URL`
+- `N8N_WEBHOOK_SECRET`
+- `N8N_API_KEY`
+
+For `AMS_N8N_INTERNAL_KEY`:
+
+1. Generate one new high-entropy secret outside chat.
+2. Save it in the n8n Header Auth credential used by `AMS Orchestrator - v1`.
+3. Header name must be `x-ams-internal-key`.
+4. Save the exact same value in Vercel Preview and Production.
+5. Remove branch-specific or duplicate Vercel entries that override the intended value.
+6. Create a new Preview build and require the authenticated `status.ping` test to pass before merge or production promotion.
+
+## Authorized secret stores
+
+Store runtime values only in the relevant provider secret store:
+
+- Vercel: application, Stripe, OAuth, Redis, internal API, AI, and n8n runtime secrets.
+- GitHub Actions: deployment automation token only when a workflow requires it.
+- n8n Credentials: n8n Header Auth value and provider credentials used inside workflows.
+- Provider dashboards: the authoritative source for generating, revoking, and rotating credentials.
+
+## Repository-history decision
+
+- [ ] Decide whether history rewriting is required for the historical Relevance credentials.
+- [ ] Do not rewrite shared history without repository-owner approval, coordinated force-push instructions, and immediate revocation of the exposed credentials.
+
+## Verification gates
+
+- [ ] `Secret scan` GitHub Action passes.
+- [ ] No real `.env`, private key, credential JSON, or service-account file is tracked.
+- [ ] Vercel Preview and Production contain one intentional entry per required secret.
+- [ ] The n8n valid Header Auth probe succeeds; an invalid value remains rejected.
+- [ ] No secret value appears in build output, runtime logs, PR comments, or browser bundles.
