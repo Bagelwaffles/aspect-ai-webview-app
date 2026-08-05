@@ -6,7 +6,16 @@ node_modules
 coverage
 *.log
 .env*
+!.env.example
 !.env.staging.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+credentials*.json
+service-account*.json
+*.secrets.*
 upload
 ams_sources
 source_inspection
