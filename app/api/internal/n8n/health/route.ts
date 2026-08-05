@@ -6,7 +6,7 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 function isAuthorized(request: NextRequest): boolean {
-  const expected = process.env.AMS_N8N_WEBHOOK_SECRET?.trim()
+  const expected = process.env.AMS_INTERNAL_API_KEY?.trim()
   const supplied = request.headers.get("x-vo-secret")?.trim()
   return Boolean(expected && supplied && constantTimeStringEqual(supplied, expected))
 }
@@ -86,7 +86,9 @@ export async function GET(request: NextRequest) {
         endpoint: sanitizedUrl,
       },
       webhook: {
-        configured: Boolean(process.env.AMS_N8N_WEBHOOK_SECRET?.trim()),
+        authMethod: "n8n_header_auth",
+        requiredHeader: "x-ams-internal-key",
+        internalKeyConfigured: Boolean(process.env.AMS_N8N_INTERNAL_KEY?.trim()),
         urlConfigured: Boolean(process.env.AMS_N8N_ORCHESTRATOR_WEBHOOK_URL?.trim()),
         apiKeyRequired: false,
         path: process.env.AMS_N8N_ORCHESTRATOR_WEBHOOK_URL ? "configured" : "missing",

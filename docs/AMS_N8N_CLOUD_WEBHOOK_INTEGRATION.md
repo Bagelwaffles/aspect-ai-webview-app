@@ -1,15 +1,30 @@
-# AMS n8n Cloud webhook integration
+# AMS n8n Cloud gateway integration
 
 ## Phase
 
-AMS n8n Cloud integration without `N8N_API_KEY`.
+AMS n8n Cloud activation without `N8N_API_KEY`, n8n upgrade, External Secrets, or Project Variables.
+
+## Architecture
+
+```text
+Browser/user
+  -> authenticated AMS Vercel API route
+  -> strict payload validation
+  -> distributed rate limit
+  -> idempotency reservation in existing Redis
+  -> n8n production webhook using Header Auth credential
+  -> structured n8n response
+  -> safe customer response
+```
+
+The n8n webhook is never called from browser JavaScript. The only approved caller is the server-side AMS Vercel route.
 
 ## Required environment
 
 ```env
 AMS_N8N_URL=https://aspectmarketingsolutions.app.n8n.cloud
 AMS_N8N_ORCHESTRATOR_WEBHOOK_URL=https://aspectmarketingsolutions.app.n8n.cloud/webhook/ams-orchestrator
-AMS_N8N_WEBHOOK_SECRET=<rotated secret stored securely>
+AMS_N8N_INTERNAL_KEY=<same newly rotated value stored in the n8n Header Auth credential>
 AMS_APP_URL=https://aspectmarketingsolutions.app
 ```
 
@@ -17,51 +32,66 @@ AMS_APP_URL=https://aspectmarketingsolutions.app
 
 ## Security note
 
-The previous webhook secret was exposed in chat and is treated as compromised. Do not use, store, log, or commit that value. Generate a new high-entropy secret and store it only in Vercel and n8n before activating workflows.
+The previously exposed webhook secret is compromised. Do not use, store, log, or commit that value.
 
-## Request signing
+Use a new high-entropy secret only in:
 
-The AMS server-only webhook client signs each outbound request with HMAC-SHA256.
+1. Vercel environment variable `AMS_N8N_INTERNAL_KEY`
+2. n8n Header Auth credential for `AMS Orchestrator - v1`
 
-Headers:
+Do not store the secret in source code, workflow JSON, n8n Project Variables, logs, or browser JavaScript.
 
-- `x-ams-timestamp`
-- `x-ams-signature`
-- `x-request-id`
-- `idempotency-key`
+## n8n workflow configuration
 
-Signature payload:
+Workflow:
 
 ```text
-timestamp + "." + exact raw JSON request body
+AMS Orchestrator - v1
 ```
 
-Signature header format:
+Production webhook:
 
 ```text
-sha256=<hex digest>
+https://aspectmarketingsolutions.app.n8n.cloud/webhook/ams-orchestrator
 ```
 
-## n8n workflow guard requirements
+Authentication:
 
-Before publishing `AMS Orchestrator - v1`, the workflow must validate:
+```text
+Header Auth
+```
 
-- missing signatures are rejected
-- invalid signatures are rejected with constant-time comparison
-- timestamps older than 5 minutes are rejected
-- request schema is validated before action routing
-- duplicate idempotency keys do not cause duplicate execution
-- errors are structured JSON only
-- logs redact authorization data, signatures, secrets, and private payload fields
+Header name:
 
-Keep all workflows inactive until the rotated secret is present in both Vercel and n8n.
+```text
+x-ams-internal-key
+```
+
+The owner must manually create the Header Auth credential in n8n and store the newly rotated secret there. This avoids External Secrets and Project Variables on the trial account.
+
+## Gateway guard requirements
+
+The AMS Vercel gateway must:
+
+- reject unauthenticated website requests before calling n8n
+- validate action and payload with a strict schema
+- generate `x-request-id` and `idempotency-key` server-side
+- reserve the idempotency key in Redis before calling n8n
+- avoid duplicate downstream execution
+- apply distributed rate limiting before n8n
+- enforce payload-size and request-timeout limits
+- fail closed when `AMS_N8N_INTERNAL_KEY` is missing or unsafe
+- redact headers, secrets, tokens, keys, authorization data, and private fields from logs
+- return structured JSON only
 
 ## Activation order
+
+After the owner creates the n8n Header Auth credential, stores the same rotated value in Vercel, and controlled tests pass:
 
 1. `AMS Orchestrator - v1`
 2. `AMS Content Engine - Launch v1`
 
-All other workflows remain inactive.
+All other 14 workflows remain inactive.
 
 ## Paid services
 

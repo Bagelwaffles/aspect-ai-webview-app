@@ -62,7 +62,7 @@ export async function GET() {
         n8n: configured(
           "AMS_N8N_URL",
           "AMS_N8N_ORCHESTRATOR_WEBHOOK_URL",
-          "AMS_N8N_WEBHOOK_SECRET",
+          "AMS_N8N_INTERNAL_KEY",
           "AMS_APP_URL",
         )
           ? "configured"
