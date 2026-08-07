@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import test from "node:test"
 
 import {
@@ -42,4 +43,26 @@ test("rejects a thumbnail outside the source allowlist", () => {
       }),
     (error) => error instanceof YouTubePublisherError && error.code === "YOUTUBE_THUMBNAIL_SOURCE_FORBIDDEN",
   )
+})
+
+test("n8n workflow avoids unsupported URL global and disables upload retries", () => {
+  const workflow = JSON.parse(
+    readFileSync("automation/n8n/AMS_YouTube_Uploader_v2.json", "utf8"),
+  ) as {
+    nodes: Array<{
+      name: string
+      retryOnFail?: boolean
+      maxTries?: number
+      parameters?: { jsCode?: string }
+    }>
+  }
+
+  const normalizeNode = workflow.nodes.find((node) => node.name === "Normalize + Validate")
+  assert.ok(normalizeNode)
+  assert.equal(normalizeNode.parameters?.jsCode?.includes("new URL("), false)
+
+  const uploadNode = workflow.nodes.find((node) => node.name === "Upload Video to YouTube")
+  assert.ok(uploadNode)
+  assert.equal(uploadNode.retryOnFail, false)
+  assert.equal(uploadNode.maxTries, undefined)
 })
