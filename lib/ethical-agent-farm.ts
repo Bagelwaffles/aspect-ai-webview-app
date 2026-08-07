@@ -88,12 +88,13 @@ export const ETHICAL_OFFERS: EthicalOffer[] = [
   {
     id: "quick-marketing-audit",
     name: "Quick Marketing Audit",
-    price: "Quote after review",
-    billingLabel: "Request only",
+    price: "$49",
+    billingLabel: "One-time purchase",
     summary: "A fast, practical audit with the top issues and the first fixes that matter.",
-    deliverables: ["5 problems", "5 fixes", "sample headline", "sample offer", "sample post"],
-    cta: "Request audit",
-    ctaHref: "/ethical-agent-farm/request?offer=quick-marketing-audit",
+    deliverables: ["5 problems", "5 fixes", "improved headline", "improved offer", "one promotional post", "7-day action plan"],
+    cta: "Get my audit — $49",
+    ctaHref: "/quick-marketing-audit",
+    featured: true,
   },
   {
     id: "social-content-pack",
@@ -134,7 +135,6 @@ export const ETHICAL_OFFERS: EthicalOffer[] = [
     deliverables: ["monthly audit", "content support", "offer tuning", "analytics review"],
     cta: "View subscription plans",
     ctaHref: "/pricing",
-    featured: true,
   },
 ]
 

@@ -12,23 +12,23 @@ export default function EthicalAgentFarmPage() {
         <section className="grid gap-6 lg:grid-cols-[1.4fr_0.9fr]">
           <div className="space-y-4">
             <Badge variant="outline" className="w-fit">
-              Service workflow roadmap
+              Service workflow launch
             </Badge>
             <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
-              Planned service workflows with human review.
+              One live offer. The rest stay behind the launch gate.
             </h1>
             <p className="max-w-2xl text-lg text-muted-foreground">
-              These service concepts are request-only at launch. Submitting a request does not collect payment, start work, or indicate that an automated agent is available.
+              The AMS Quick Marketing Audit is now available as a $49 one-time service with Stripe-hosted checkout. Other service concepts remain request-only until their payment and fulfillment paths are verified.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button asChild>
-                <Link href="/pricing">View subscription plans</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/billing">
-                  View billing state
+                <Link href="/quick-marketing-audit">
+                  Get the $49 audit
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/pricing">View subscription plans</Link>
               </Button>
               <Button asChild variant="ghost">
                 <Link href="/agents">Inspect agents</Link>
@@ -43,7 +43,7 @@ export default function EthicalAgentFarmPage() {
                 Launch guardrails
               </CardTitle>
               <CardDescription>
-                Any future workflow must satisfy these rules before AMS makes it available.
+                Every AMS offer must satisfy these rules before customers can buy it.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
@@ -59,51 +59,58 @@ export default function EthicalAgentFarmPage() {
 
         <section className="space-y-4">
           <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Request-only services</p>
-            <h2 className="text-2xl font-bold">Service briefs for human review</h2>
+            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Service offers</p>
+            <h2 className="text-2xl font-bold">Buy the verified offer. Request the rest.</h2>
             <p className="mt-2 max-w-3xl text-muted-foreground">
-              No payment is accepted for these services in the app. Scope, price, availability, and delivery must be confirmed separately before any work begins.
+              Quick Marketing Audit checkout is live through Stripe. The other offers still require human review before scope, price, or delivery is confirmed.
             </p>
           </div>
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {ETHICAL_OFFERS.map((offer) => (
-              <Card key={offer.id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <CardTitle>{offer.name}</CardTitle>
-                      <CardDescription>Requested scope is reviewed by a human before availability or delivery is confirmed.</CardDescription>
+            {ETHICAL_OFFERS.map((offer) => {
+              const isLiveAudit = offer.id === "quick-marketing-audit"
+              return (
+                <Card key={offer.id} className={isLiveAudit ? "border-primary/30" : undefined}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <CardTitle>{offer.name}</CardTitle>
+                        <CardDescription>{offer.summary}</CardDescription>
+                      </div>
+                      <Badge variant={isLiveAudit ? "default" : "secondary"}>
+                        {isLiveAudit ? "Live" : offer.billingLabel}
+                      </Badge>
                     </div>
-                    <Badge variant="secondary">Request only</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-lg font-semibold">No payment accepted</div>
-                  <ul className="space-y-2 text-sm text-muted-foreground">
-                    {offer.deliverables.map((item) => (
-                      <li key={item}>- {item}</li>
-                    ))}
-                  </ul>
-                  <div className="flex flex-wrap gap-3">
-                    <Button asChild>
-                      <Link href={`/ethical-agent-farm/request?offer=${offer.id}`}>Request review</Link>
-                    </Button>
-                    <Button asChild variant="outline">
-                      <Link href="/pricing">View subscriptions</Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-lg font-semibold">{offer.price}</div>
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                      {offer.deliverables.map((item) => (
+                        <li key={item}>- {item}</li>
+                      ))}
+                    </ul>
+                    <div className="flex flex-wrap gap-3">
+                      <Button asChild>
+                        <Link href={offer.ctaHref}>{offer.cta}</Link>
+                      </Button>
+                      {!isLiveAudit ? (
+                        <Button asChild variant="outline">
+                          <Link href="/pricing">View subscriptions</Link>
+                        </Button>
+                      ) : null}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </section>
 
         <section className="space-y-4">
           <div>
             <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Planned roles</p>
-            <h2 className="text-2xl font-bold">Roadmap concepts, not active agents</h2>
+            <h2 className="text-2xl font-bold">Roadmap concepts, not active autonomous agents</h2>
             <p className="mt-2 max-w-3xl text-muted-foreground">
-              Content is the first intended launch agent and remains in progress. Every role below is unavailable for customer execution.
+              The paid audit is a service with human review and AI assistance. Every role below remains unavailable for autonomous customer execution until it passes production verification.
             </p>
           </div>
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -144,32 +151,32 @@ export default function EthicalAgentFarmPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
-                How a service request is handled
+                How the live audit is handled
               </CardTitle>
               <CardDescription>
-                This is a human review path, not an automated sale or fulfillment claim.
+                A real paid service now, with automation increasing only after proof.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>1. A customer submits a request without payment.</p>
-              <p>2. A human reviews scope, availability, and delivery expectations.</p>
-              <p>3. AMS provides next steps only after that review.</p>
-              <p>4. No automated outreach, purchase, or fulfillment is implied.</p>
+              <p>1. The customer purchases the $49 audit through Stripe-hosted checkout.</p>
+              <p>2. Checkout collects the business URL, target customer, and biggest marketing challenge.</p>
+              <p>3. AMS reviews the business and prepares the promised deliverables with human oversight.</p>
+              <p>4. The completed audit is targeted for delivery within 48 hours.</p>
             </CardContent>
           </Card>
 
           <Card className="bg-muted/30">
             <CardHeader>
               <CardTitle>Launch boundary</CardTitle>
-              <CardDescription>What this page does and does not offer.</CardDescription>
+              <CardDescription>What is live and what is not.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                This page accepts service requests only. It does not accept payment, promise revenue, start automated work, or represent unfinished agents as active.
+                Only the Quick Marketing Audit is positioned here as a live one-time paid service. No unfinished agent is represented as autonomous or production-ready.
               </p>
               <Button asChild className="w-full">
-                <Link href="/ethical-agent-farm/request">
-                  Submit a request
+                <Link href="/quick-marketing-audit">
+                  Get the Quick Marketing Audit
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
