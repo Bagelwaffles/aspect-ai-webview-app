@@ -1,0 +1,203 @@
+{
+  "name": "AMS YouTube Uploader v2",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ams-youtube-publish-v2",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "50ef6cf4-7889-4a54-b15f-d923d07018ab",
+      "name": "AMS YouTube Publish Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-960, 0],
+      "webhookId": "ams-youtube-publish-v2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json.body ?? $json;\nconst allowedHosts = new Set(['files2.heygen.ai', 'resource2.heygen.ai', 'dynamic.heygen.ai']);\n\nfunction requireString(value, name, max) {\n  if (typeof value !== 'string' || !value.trim()) throw new Error(`${name} is required`);\n  const cleaned = value.trim();\n  if (cleaned.length > max) throw new Error(`${name} exceeds ${max} characters`);\n  return cleaned;\n}\n\nfunction sourceUrl(value, name, required = true) {\n  if ((value === null || value === undefined || value === '') && !required) return null;\n  const raw = requireString(value, name, 4096);\n  const match = raw.match(/^https:\\/\\/([^\\/?#]+)([\\/?#].*)?$/i);\n  if (!match) throw new Error(`${name} must use HTTPS`);\n\n  const authority = match[1];\n  if (authority.includes('@')) throw new Error(`${name} must not contain credentials`);\n  if (authority.startsWith('[')) throw new Error(`${name} host is not allowlisted`);\n\n  const parts = authority.split(':');\n  if (parts.length > 2) throw new Error(`${name} host is not allowlisted`);\n  const hostname = parts[0].toLowerCase();\n  if (!allowedHosts.has(hostname)) throw new Error(`${name} host is not allowlisted`);\n\n  if (parts.length === 2) {\n    if (!/^\\d{1,5}$/.test(parts[1])) throw new Error(`${name} has an invalid port`);\n    const port = Number(parts[1]);\n    if (port < 1 || port > 65535) throw new Error(`${name} has an invalid port`);\n  }\n\n  return raw;\n}\n\nconst privacy = ['private', 'unlisted', 'public'].includes(input.privacy_status) ? input.privacy_status : 'private';\nconst tags = Array.isArray(input.tags) ? input.tags.filter(v => typeof v === 'string' && v.trim()).slice(0, 30).map(v => v.trim().slice(0,100)) : [];\nconst category = typeof input.category_id === 'string' && /^\\d+$/.test(input.category_id) ? input.category_id : '28';\n\nreturn [{\n  json: {\n    request_id: typeof input.request_id === 'string' && input.request_id.trim() ? input.request_id.trim() : crypto.randomUUID(),\n    video_url: sourceUrl(input.video_url, 'video_url'),\n    thumbnail_url: sourceUrl(input.thumbnail_url, 'thumbnail_url', false),\n    title: requireString(input.title, 'title', 100),\n    description: typeof input.description === 'string' ? input.description.slice(0, 5000) : '',\n    tags,\n    tags_csv: tags.join(','),\n    privacy_status: privacy,\n    category_id: category,\n    made_for_kids: input.made_for_kids === true,\n    notify_subscribers: input.notify_subscribers === true\n  }\n}];"
+      },
+      "id": "0e0732ed-6cc1-429c-881a-cd5b87614cfb",
+      "name": "Normalize + Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-720, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Normalize + Validate').item.json.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "5141e6b7-e24f-4fc3-930f-20305a5d340a",
+      "name": "Download Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-480, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "upload",
+        "title": "={{ $('Normalize + Validate').item.json.title }}",
+        "regionCode": "US",
+        "categoryId": "={{ $('Normalize + Validate').item.json.category_id }}",
+        "binaryPropertyName": "data",
+        "options": {
+          "description": "={{ $('Normalize + Validate').item.json.description }}",
+          "tags": "={{ $('Normalize + Validate').item.json.tags_csv }}",
+          "privacyStatus": "={{ $('Normalize + Validate').item.json.privacy_status }}",
+          "selfDeclaredMadeForKids": "={{ $('Normalize + Validate').item.json.made_for_kids }}",
+          "notifySubscribers": "={{ $('Normalize + Validate').item.json.notify_subscribers }}"
+        }
+      },
+      "id": "bdba863d-6400-4f31-9b5c-94567487b90a",
+      "name": "Upload Video to YouTube",
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [-224, 0],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-thumbnail",
+              "leftValue": "={{ Boolean($('Normalize + Validate').item.json.thumbnail_url) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "82b40b1c-8e5c-4c44-9fca-2236026cb0f5",
+      "name": "Has Custom Thumbnail?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [16, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Normalize + Validate').item.json.thumbnail_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "aa66ef00-7aae-4c41-b142-a20ae4b1af37",
+      "name": "Download Thumbnail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [256, -112],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId={{ $('Upload Video to YouTube').item.json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "75bab0d4-c022-43ec-9644-4c6662c15f18",
+      "name": "Set YouTube Thumbnail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [496, -112],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const upload = $('Upload Video to YouTube').first().json;\nconst normalized = $('Normalize + Validate').first().json;\nconst videoId = upload.id ?? upload.videoId ?? upload.video_id;\nif (!videoId) throw new Error('YouTube upload completed without a video ID');\nreturn [{ json: { ok: true, status: 'published', request_id: normalized.request_id, video_id: videoId, youtube_url: `https://youtu.be/${videoId}`, privacy_status: normalized.privacy_status, thumbnail_set: true } }];"
+      },
+      "id": "9354ef77-4e37-48a0-bb9f-6970922edb0d",
+      "name": "Build Success With Thumbnail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [736, -112]
+    },
+    {
+      "parameters": {
+        "jsCode": "const upload = $('Upload Video to YouTube').first().json;\nconst normalized = $('Normalize + Validate').first().json;\nconst videoId = upload.id ?? upload.videoId ?? upload.video_id;\nif (!videoId) throw new Error('YouTube upload completed without a video ID');\nreturn [{ json: { ok: true, status: 'published', request_id: normalized.request_id, video_id: videoId, youtube_url: `https://youtu.be/${videoId}`, privacy_status: normalized.privacy_status, thumbnail_set: false } }];"
+      },
+      "id": "777446dc-44f4-48be-a2a3-f8bf4713cb93",
+      "name": "Build Success Without Thumbnail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [496, 112]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "51329f74-098a-4c61-9148-bb6e6c19ef76",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [976, 0]
+    }
+  ],
+  "connections": {
+    "AMS YouTube Publish Webhook": {"main": [[{"node":"Normalize + Validate","type":"main","index":0}]]},
+    "Normalize + Validate": {"main": [[{"node":"Download Video","type":"main","index":0}]]},
+    "Download Video": {"main": [[{"node":"Upload Video to YouTube","type":"main","index":0}]]},
+    "Upload Video to YouTube": {"main": [[{"node":"Has Custom Thumbnail?","type":"main","index":0}]]},
+    "Has Custom Thumbnail?": {"main": [[{"node":"Download Thumbnail","type":"main","index":0}],[{"node":"Build Success Without Thumbnail","type":"main","index":0}]]},
+    "Download Thumbnail": {"main": [[{"node":"Set YouTube Thumbnail","type":"main","index":0}]]},
+    "Set YouTube Thumbnail": {"main": [[{"node":"Build Success With Thumbnail","type":"main","index":0}]]},
+    "Build Success With Thumbnail": {"main": [[{"node":"Respond to Webhook","type":"main","index":0}]]},
+    "Build Success Without Thumbnail": {"main": [[{"node":"Respond to Webhook","type":"main","index":0}]]}
+  },
+  "pinData": {},
+  "settings": {"executionOrder":"v1","saveManualExecutions":true,"callerPolicy":"workflowsFromSameOwner"},
+  "active": false,
+  "versionId": "2f9f3d46-a731-4a98-9959-abe593688826",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "amsNotes": "After import, assign Header Auth credential 'AMS Internal Gateway' to the Webhook and YouTube OAuth credential 'AMS YouTube OAuth' to both YouTube-authenticated nodes. Validate in private mode before activating. YouTube upload retries are intentionally disabled to prevent duplicate videos on ambiguous failures."
+  }
+}

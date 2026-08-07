@@ -1,0 +1,61 @@
+{
+  "name": "AMS YouTube Uploader v2",
+  "id": "youtube.uploader.v2",
+  "version": "2.0.0",
+  "description": "Operator-only cloud publisher for uploading verified AMS video assets to YouTube through n8n Cloud and a stored YouTube OAuth credential.",
+  "security": {
+    "audience": "operator-only",
+    "public_customer_action": false,
+    "ams_api_auth": "Authorization: Bearer ${AMS_INTERNAL_API_KEY}",
+    "n8n_auth": "x-ams-internal-key: ${AMS_N8N_INTERNAL_KEY}",
+    "youtube_auth": "n8n credential: AMS YouTube OAuth (youTubeOAuth2Api)",
+    "secrets_in_manifest": false,
+    "source_allowlist_env": "AMS_YOUTUBE_SOURCE_HOSTS"
+  },
+  "endpoint": {
+    "method": "POST",
+    "path": "/api/internal/youtube/publish"
+  },
+  "workflow": {
+    "webhook_env": "AMS_N8N_YOUTUBE_PUBLISH_WEBHOOK_URL",
+    "default_webhook_path": "ams-youtube-publish-v2",
+    "stages": [
+      "validate operator request",
+      "validate allowlisted HTTPS asset URLs",
+      "download source video",
+      "upload video with YouTube OAuth",
+      "optionally download and set custom thumbnail",
+      "return video_id and youtube_url"
+    ]
+  },
+  "inputs": {
+    "videoUrl": "HTTPS URL on an approved source host",
+    "thumbnailUrl": "optional HTTPS URL on an approved source host",
+    "title": "1-100 characters",
+    "description": "0-5000 characters",
+    "tags": "0-30 tags",
+    "privacyStatus": ["private", "unlisted", "public"],
+    "categoryId": "YouTube category ID; defaults to 28",
+    "madeForKids": "boolean; defaults false",
+    "notifySubscribers": "boolean; defaults false"
+  },
+  "outputs": {
+    "ok": "boolean",
+    "request_id": "string",
+    "video_id": "string",
+    "youtube_url": "string",
+    "privacy_status": "string",
+    "thumbnail_set": "boolean"
+  },
+  "safe_defaults": {
+    "privacyStatus": "private",
+    "categoryId": "28",
+    "madeForKids": false,
+    "notifySubscribers": false
+  },
+  "legacy_replaces": {
+    "legacy_name": "YouTube Uploader",
+    "legacy_credentials_file": "C:/Program Files/Aspect Marketing Solutions/youtube_credentials.json",
+    "removed_reason": "Cloud deployments cannot depend on a local Windows credentials file, and credentials must not live in source code or manifests."
+  }
+}
