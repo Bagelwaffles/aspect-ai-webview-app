@@ -17,6 +17,7 @@ export default async function OfferPage({ params }: PageProps) {
   if (!offer) notFound()
 
   const isSubscriptionOffer = offer.slug === "monthly-marketing-support"
+  const isPaidQuickAudit = offer.slug === "quick-marketing-audit"
 
   return (
     <main className="min-h-screen bg-background px-6 py-10">
@@ -28,7 +29,9 @@ export default async function OfferPage({ params }: PageProps) {
             {offer.ethicalNote}{" "}
             {isSubscriptionOffer
               ? "Choose an AMS subscription plan through the verified recurring checkout flow."
-              : "This scoped service is request-only at launch. Submitting the intake form does not charge you."}
+              : isPaidQuickAudit
+                ? "This is a live one-time service offer. Secure payment is handled on Stripe Checkout before AMS begins the audit."
+                : "This scoped service is request-only at launch. Submitting the intake form does not charge you."}
           </p>
         </div>
 
@@ -80,7 +83,10 @@ export default async function OfferPage({ params }: PageProps) {
                 </Button>
               ) : (
                 <Button asChild>
-                  <Link href={offer.requestPath}>{offer.ctaLabel}</Link>
+                  <Link href={offer.requestPath}>
+                    {offer.ctaLabel}
+                    {isPaidQuickAudit ? <ArrowRight className="ml-2 h-4 w-4" /> : null}
+                  </Link>
                 </Button>
               )}
               <Button asChild variant="outline">
