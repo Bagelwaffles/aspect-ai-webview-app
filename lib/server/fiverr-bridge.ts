@@ -220,10 +220,10 @@ function extractOrderReference(context: string): string | null {
   const fromUrl = context.match(/fiverr\.com\/orders?\/([A-Za-z0-9_-]{6,80})/i)?.[1]
   if (fromUrl) return fromUrl
 
-  const fromLabel = context.match(
-    /\border\s*(?:number|no\.?|id|#)?\s*[:#-]?\s*([A-Z0-9][A-Z0-9_-]{5,79})\b/i,
+  const fromExplicitMarker = context.match(
+    /\border[ \t]*(?:(?:number|no\.?|id)[ \t]*[:#-]?[ \t]*|#[ \t]*)([A-Z0-9][A-Z0-9_-]{5,79})\b/i,
   )?.[1]
-  return fromLabel ?? null
+  return fromExplicitMarker ?? null
 }
 
 function extractBuyerUsername(context: string): string | null {
