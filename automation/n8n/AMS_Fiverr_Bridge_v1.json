@@ -1,0 +1,147 @@
+{
+  "name": "AMS Fiverr Bridge v1",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "from:fiverr.com -in:spam -in:trash"
+        },
+        "options": {}
+      },
+      "id": "665df404-6e82-4ceb-a033-ef839b48367d",
+      "name": "Fiverr Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [-960, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $json;\n\nfunction header(name) {\n  const direct = source[name] ?? source[name.toLowerCase()] ?? source[name.toUpperCase()];\n  if (typeof direct === 'string') return direct;\n  const headers = source.headers ?? source.payload?.headers ?? [];\n  if (Array.isArray(headers)) {\n    const found = headers.find(h => String(h?.name ?? '').toLowerCase() === name.toLowerCase());\n    if (found && typeof found.value === 'string') return found.value;\n  }\n  return '';\n}\n\nfunction mailbox(value) {\n  const angle = String(value ?? '').match(/<\\s*([^<>\\s]+@[^<>\\s]+)\\s*>/);\n  const raw = angle?.[1] ?? String(value ?? '').match(/\\b([^\\s<>]+@[^\\s<>]+)\\b/)?.[1] ?? '';\n  return raw.trim().toLowerCase();\n}\n\nconst from = header('From');\nconst sender = mailbox(from);\nconst domain = sender.includes('@') ? sender.split('@').pop() : '';\nconst validSender = domain === 'fiverr.com' || domain.endsWith('.fiverr.com');\nconst subject = header('Subject');\nconst text = [source.text, source.textPlain, source.snippet, source.body, source.payload?.body?.data]\n  .filter(v => typeof v === 'string' && v.trim())\n  .join('\\n')\n  .slice(0, 50000);\nconst receivedRaw = source.internalDate ?? source.date ?? source.Date ?? null;\nlet receivedAt = null;\nif (receivedRaw) {\n  const numeric = Number(receivedRaw);\n  const parsed = Number.isFinite(numeric) && numeric > 100000000000 ? new Date(numeric) : new Date(receivedRaw);\n  if (!Number.isNaN(parsed.getTime())) receivedAt = parsed.toISOString();\n}\n\nreturn [{\n  json: {\n    valid_sender: validSender,\n    sender_domain: domain,\n    payload: {\n      message_id: String(source.id ?? source.messageId ?? source.message_id ?? ''),\n      thread_id: source.threadId ?? source.thread_id ?? null,\n      from,\n      subject: String(subject ?? '').slice(0, 500),\n      snippet: String(source.snippet ?? '').slice(0, 5000),\n      text,\n      received_at: receivedAt,\n      labels: Array.isArray(source.labelIds) ? source.labelIds.map(String).slice(0,100) : []\n    }\n  }\n}];"
+      },
+      "id": "85526108-cc37-4338-8404-b6bb7bab3b74",
+      "name": "Normalize + Verify Fiverr Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-704, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid-fiverr-sender",
+              "leftValue": "={{ $json.valid_sender }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "260dc1fd-13a0-4f53-8294-9d1510f86f2d",
+      "name": "Genuine Fiverr Sender?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-448, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.aspectmarketingsolutions.app/api/internal/fiverr/intake",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "9c8cc52e-fd8e-4123-82fc-d4a5fc4e9b64",
+      "name": "Send to AMS Fiverr Intake",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-192, -96],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json;\nif (!response?.ok || !response?.event) throw new Error('AMS Fiverr intake rejected the notification');\nconst event = response.event;\nconst brief = response.operator_brief ?? {};\nconst order = event.order_reference ?? 'not detected';\nconst buyer = event.buyer_username ?? 'not detected';\nconst deadline = event.deadline_at ?? event.deadline_hint ?? 'not detected';\nconst service = event.service_slug ?? 'manual review';\nconst deliverables = Array.isArray(brief.fulfillment?.deliverables) ? brief.fulfillment.deliverables.map(v => `- ${v}`).join('\\n') : '- No automated deliverable package selected';\nconst prohibited = Array.isArray(brief.prohibited_actions) ? brief.prohibited_actions.map(v => `- ${v}`).join('\\n') : '';\n\nconst approvalMessage = [\n  'AMS FIVERR BRIDGE — HUMAN REVIEW REQUIRED',\n  '',\n  `Event: ${event.event_type}`,\n  `Priority: ${event.priority}`,\n  `Order: ${order}`,\n  `Buyer: ${buyer}`,\n  `Deadline: ${deadline}`,\n  `Service: ${service}`,\n  `Recommended internal action: ${event.recommended_action}`,\n  '',\n  'Planned deliverables:',\n  deliverables,\n  '',\n  'Safety boundary:',\n  prohibited,\n  '',\n  'Open Fiverr manually to take any buyer-facing action. Nothing in this workflow can send, accept, cancel, revise, or deliver on Fiverr.',\n  '',\n  'Sanitized Fiverr context:',\n  String(event.safe_context ?? '').slice(0, 5000)\n].join('\\n');\n\nreturn [{ json: {\n  event_id: event.event_id,\n  event_type: event.event_type,\n  order_reference: event.order_reference,\n  buyer_username: event.buyer_username,\n  deadline_at: event.deadline_at,\n  service_slug: event.service_slug,\n  subject: `AMS Fiverr review | ${event.event_type} | ${order}`,\n  approval_message: approvalMessage\n} }];"
+      },
+      "id": "82ed3e31-5923-4677-a986-685b3cb5753c",
+      "name": "Build Human Approval Packet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [64, -96]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "owner@example.invalid",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.approval_message }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "837033f7-c67a-42cd-9101-3d07aeb10f55",
+      "name": "Email Owner Approval Packet",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [320, -96]
+    }
+  ],
+  "connections": {
+    "Fiverr Gmail Trigger": {
+      "main": [[{"node":"Normalize + Verify Fiverr Email","type":"main","index":0}]]
+    },
+    "Normalize + Verify Fiverr Email": {
+      "main": [[{"node":"Genuine Fiverr Sender?","type":"main","index":0}]]
+    },
+    "Genuine Fiverr Sender?": {
+      "main": [[{"node":"Send to AMS Fiverr Intake","type":"main","index":0}],[]]
+    },
+    "Send to AMS Fiverr Intake": {
+      "main": [[{"node":"Build Human Approval Packet","type":"main","index":0}]]
+    },
+    "Build Human Approval Packet": {
+      "main": [[{"node":"Email Owner Approval Packet","type":"main","index":0}]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "versionId": "c74998cc-1fe7-47b9-af54-887532712f39",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "amsNotes": "After import: connect the Gmail account that receives Fiverr notifications to the Gmail Trigger and Email Owner Approval Packet nodes; replace owner@example.invalid with the operator email; assign existing Header Auth credential AMS Internal Gateway to Send to AMS Fiverr Intake. Keep inactive until a test Fiverr notification is validated. This workflow intentionally contains no Fiverr browser automation, no Fiverr API calls, no buyer auto-messaging, no auto-delivery, and no off-platform payment routing."
+  }
+}
