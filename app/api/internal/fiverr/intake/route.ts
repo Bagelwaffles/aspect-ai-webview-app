@@ -24,10 +24,10 @@ function configuredKey() {
 }
 
 function safeEqual(left: string, right: string) {
-  const leftBuffer = Buffer.from(left, "utf8")
-  const rightBuffer = Buffer.from(right, "utf8")
-  if (leftBuffer.length !== rightBuffer.length) return false
-  return timingSafeEqual(leftBuffer, rightBuffer)
+  const leftBytes = Uint8Array.from(Buffer.from(left, "utf8"))
+  const rightBytes = Uint8Array.from(Buffer.from(right, "utf8"))
+  if (leftBytes.length !== rightBytes.length) return false
+  return timingSafeEqual(leftBytes, rightBytes)
 }
 
 function authorize(request: NextRequest) {
