@@ -102,17 +102,6 @@ const EVENT_RULES: Array<{
     ],
   },
   {
-    type: "deadline_warning",
-    action: "alert_deadline",
-    priority: "urgent",
-    patterns: [
-      /delivery\s+(?:is\s+)?due/i,
-      /due\s+in\s+\d+\s*(?:hours?|days?)/i,
-      /deadline/i,
-      /late\s+delivery/i,
-    ],
-  },
-  {
     type: "cancellation",
     action: "record_cancellation",
     priority: "high",
@@ -163,6 +152,17 @@ const EVENT_RULES: Array<{
       /sent\s+you\s+(?:a\s+)?message/i,
       /new\s+message/i,
       /replied\s+to\s+you/i,
+    ],
+  },
+  {
+    type: "deadline_warning",
+    action: "alert_deadline",
+    priority: "urgent",
+    patterns: [
+      /delivery\s+(?:is\s+)?due/i,
+      /due\s+in\s+\d+\s*(?:hours?|days?)/i,
+      /deadline/i,
+      /late\s+delivery/i,
     ],
   },
 ]
