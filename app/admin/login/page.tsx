@@ -19,7 +19,7 @@ export default function AdminLoginPage() {
     )
   }, [searchParams])
 
-  const ownerLoginHref = `/login?next=${encodeURIComponent(nextPath)}`
+  const ownerLoginHref = `/api/operator/session?next=${encodeURIComponent(nextPath)}`
 
   const [email, setEmail] = useState(ADMIN_EMAIL)
   const [password, setPassword] = useState("")
@@ -78,7 +78,7 @@ export default function AdminLoginPage() {
               <Link href={ownerLoginHref}>Continue with Google owner login</Link>
             </Button>
             <p className="text-xs text-muted-foreground">
-              After Google verifies the allow-listed owner account, AMS creates the signed internal operator session and returns you to the requested dashboard page.
+              AMS now completes owner elevation through a server-side session bridge, then returns you to the requested dashboard page.
             </p>
           </CardContent>
         </Card>
