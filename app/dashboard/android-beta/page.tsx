@@ -49,7 +49,7 @@ export default async function AndroidBetaDashboardPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">AMS Command Center / Android</p>
             <h1 className="mt-2 text-4xl font-black tracking-tight">Google Play tester operations</h1>
             <p className="mt-3 max-w-3xl leading-7 text-muted-foreground">
-              This is the AMS recruitment roster, not Google Play's authoritative eligibility count. Google Play Console remains the source of truth for who actually opted in and how many continuous test days qualify.
+              This is the AMS recruitment roster, not Google Play&apos;s authoritative eligibility count. Google Play Console remains the source of truth for who actually opted in and how many continuous test days qualify.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
