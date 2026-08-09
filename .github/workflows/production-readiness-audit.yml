@@ -1,0 +1,167 @@
+name: Audit AMS production readiness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-readiness-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ams-production-readiness-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      VERCEL_ORG_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
+      VERCEL_PROJECT_ID: prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Require deployment credential
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::VERCEL_TOKEN is not configured for the production environment."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Pull production environment without printing values
+        run: npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Audit production configuration and dependency reachability
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          set -a
+          source .vercel/.env.production.local
+          set +a
+
+          summary="$GITHUB_STEP_SUMMARY"
+          {
+            echo "## AMS production readiness audit"
+            echo
+            echo "This audit reports only presence, validity class, sanitized hosts, and HTTP reachability. Secret values are never printed."
+            echo
+            echo "| Check | Result |"
+            echo "|---|---|"
+          } >> "$summary"
+
+          report() {
+            local name="$1"
+            local result="$2"
+            echo "$name -> $result"
+            printf '| %s | %s |\n' "$name" "$result" >> "$summary"
+          }
+
+          all_present() {
+            local var
+            for var in "$@"; do
+              if [ -z "${!var:-}" ]; then
+                return 1
+              fi
+            done
+            return 0
+          }
+
+          safe_host() {
+            node -e 'try { console.log(new URL(process.argv[1]).hostname) } catch { console.log("invalid-url") }' "$1"
+          }
+
+          if all_present GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET NEXTAUTH_SECRET NEXTAUTH_URL; then
+            report "Customer authentication" "configured"
+          else
+            report "Customer authentication" "missing variable(s)"
+          fi
+
+          redis_url="${UPSTASH_REDIS_REST_URL:-${KV_REST_API_URL:-}}"
+          redis_token="${UPSTASH_REDIS_REST_TOKEN:-${KV_REST_API_TOKEN:-}}"
+          if [ -z "$redis_url" ] || [ -z "$redis_token" ]; then
+            report "Redis persistence" "missing URL/token pair"
+          else
+            redis_host=$(safe_host "$redis_url")
+            redis_code=$(curl --max-time 8 --silent --show-error --output /tmp/redis-probe.json --write-out '%{http_code}' \
+              -H "Authorization: Bearer $redis_token" "${redis_url%/}/ping" || true)
+            if [ "$redis_code" = "200" ] && grep -qi 'PONG' /tmp/redis-probe.json 2>/dev/null; then
+              report "Redis persistence" "reachable ($redis_host, HTTP 200/PONG)"
+            else
+              report "Redis persistence" "UNHEALTHY ($redis_host, HTTP ${redis_code:-transport-error})"
+            fi
+          fi
+
+          if all_present AMS_N8N_URL AMS_N8N_ORCHESTRATOR_WEBHOOK_URL AMS_N8N_INTERNAL_KEY AMS_APP_URL; then
+            n8n_host=$(safe_host "$AMS_N8N_URL")
+            n8n_code=$(curl --max-time 8 --silent --show-error --output /tmp/n8n-health.txt --write-out '%{http_code}' \
+              "${AMS_N8N_URL%/}/healthz" || true)
+            if [ "$n8n_code" = "200" ]; then
+              report "n8n" "configured and reachable ($n8n_host, HTTP 200)"
+            else
+              report "n8n" "configured but UNHEALTHY ($n8n_host, HTTP ${n8n_code:-transport-error})"
+            fi
+          else
+            report "n8n" "missing variable(s)"
+          fi
+
+          if [ -n "${STRIPE_SECRET_KEY:-}" ]; then
+            stripe_code=$(curl --max-time 8 --silent --show-error --output /tmp/stripe-probe.json --write-out '%{http_code}' \
+              -u "${STRIPE_SECRET_KEY}:" "https://api.stripe.com/v1/charges?limit=1" || true)
+            if [ "$stripe_code" = "200" ]; then
+              report "Stripe API" "secret configured and API reachable"
+            else
+              report "Stripe API" "secret configured but API probe failed (HTTP ${stripe_code:-transport-error})"
+            fi
+          else
+            report "Stripe API" "STRIPE_SECRET_KEY missing"
+          fi
+
+          if all_present STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET AMS_STRIPE_STARTER_PRICE_ID AMS_STRIPE_GROWTH_PRICE_ID AMS_STRIPE_PRO_PRICE_ID; then
+            report "Stripe subscription billing bundle" "configured"
+          else
+            report "Stripe subscription billing bundle" "missing variable(s)"
+          fi
+
+          admin_ok=false
+          if all_present INTERNAL_ADMIN_EMAIL INTERNAL_ADMIN_PASSWORD_HASH INTERNAL_ADMIN_SECRET; then
+            if [[ "$INTERNAL_ADMIN_PASSWORD_HASH" == scrypt-v1\$* ]] && [ "$(printf '%s' "$INTERNAL_ADMIN_SECRET" | wc -c)" -ge 32 ]; then
+              admin_ok=true
+            fi
+          fi
+          if [ "$admin_ok" = true ]; then
+            report "Internal admin access" "configured with supported hash/session secret"
+          else
+            report "Internal admin access" "missing or invalid configuration"
+          fi
+
+          if [ -n "${AMS_INTERNAL_API_KEY:-}" ]; then
+            report "Internal API auth" "configured"
+          else
+            report "Internal API auth" "missing"
+          fi
+
+          if all_present XAI_API_KEY XAI_MODEL; then
+            report "xAI provider" "configured (not invoked)"
+          else
+            report "xAI provider" "missing variable(s)"
+          fi
+
+          if all_present RELEVANCE_API_KEY RELEVANCE_AUTH_TOKEN RELEVANCE_REGION RELEVANCE_PROJECT_ID RELEVANCE_AGENT_API_URL; then
+            report "Relevance AI" "configured (not invoked)"
+          else
+            report "Relevance AI" "missing variable(s)"
+          fi
+
+          report "Audit mode" "read-only; no environment values changed"
