@@ -2,22 +2,8 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import {
-  ArrowRight,
-  Bot,
-  CheckCircle2,
-  Clock3,
-  FlaskConical,
-  LockKeyhole,
-  Rocket,
-  ShieldCheck,
-  Sparkles,
-  Wrench,
-} from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import styles from "./agents.module.css"
 
 type AgentStatus = "live" | "beta" | "in-development" | "coming-soon"
 type AgentCategory =
@@ -274,37 +260,26 @@ const agents: Agent[] = [
   },
 ]
 
-const statusMeta: Record<
-  AgentStatus,
-  { label: string; description: string; icon: typeof Bot; badgeClass: string; dotClass: string }
-> = {
+const statusMeta: Record<AgentStatus, { label: string; description: string; visual: string }> = {
   live: {
     label: "Live",
-    description: "Verified and generally available.",
-    icon: CheckCircle2,
-    badgeClass: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-    dotClass: "bg-emerald-400",
+    description: "Verified end to end and generally available to the intended customer group.",
+    visual: "live",
   },
   beta: {
     label: "Beta",
-    description: "Working in controlled testing; not generally available.",
-    icon: FlaskConical,
-    badgeClass: "border-sky-500/30 bg-sky-500/10 text-sky-300",
-    dotClass: "bg-sky-400",
+    description: "Working in controlled testing with restricted availability and active monitoring.",
+    visual: "beta",
   },
   "in-development": {
     label: "In Development",
-    description: "Actively being built or hardened.",
-    icon: Wrench,
-    badgeClass: "border-violet-500/30 bg-violet-500/10 text-violet-300",
-    dotClass: "bg-violet-400",
+    description: "Actively being built, integrated, tested, or hardened before customer availability.",
+    visual: "development",
   },
   "coming-soon": {
     label: "Coming Soon",
-    description: "Approved roadmap capability; not currently available.",
-    icon: Clock3,
-    badgeClass: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-    dotClass: "bg-amber-400",
+    description: "Approved roadmap capability. It is visible for planning and demand signals, not sold as working functionality.",
+    visual: "soon",
   },
 }
 
@@ -325,6 +300,13 @@ const statusOptions = ["All", "live", "beta", "in-development", "coming-soon"] a
 
 type CategoryFilter = (typeof categoryOptions)[number]
 type StatusFilter = (typeof statusOptions)[number]
+
+const operatingSteps = [
+  ["01", "Start with the business outcome", "AMS begins with the result that matters: more qualified demand, less repetitive work, faster publishing, cleaner follow-up, or better operational visibility."],
+  ["02", "Route work to a specialist", "The network model keeps agents scoped. A content task should not pretend to be billing, support, research, and orchestration at the same time."],
+  ["03", "Keep controls around execution", "Sensitive actions, publishing, credentials, payments, and privileged system changes stay behind explicit authorization and verification boundaries."],
+  ["04", "Record what actually happened", "The future Command Center is designed around real runs, real status, failure visibility, usage, and traceable handoffs instead of decorative activity."],
+]
 
 export default function AgentsPage() {
   const [category, setCategory] = useState<CategoryFilter>("All")
@@ -351,219 +333,197 @@ export default function AgentsPage() {
   )
 
   return (
-    <main className="min-h-screen bg-background">
-      <section className="relative overflow-hidden border-b border-border/70 px-5 py-16 sm:px-8 lg:py-24">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(124,58,237,0.18),transparent_34%),radial-gradient(circle_at_85%_18%,rgba(59,130,246,0.10),transparent_30%)]" />
-        <div className="relative mx-auto max-w-7xl">
-          <div className="grid gap-10 lg:grid-cols-[1.35fr_0.65fr] lg:items-end">
-            <div>
-              <Badge variant="outline" className="mb-5 border-primary/30 bg-primary/10 text-primary">
-                <Sparkles className="mr-2 h-3.5 w-3.5" />
-                Aspect Agent Network
-              </Badge>
-              <h1 className="max-w-4xl text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl">
-                Specialized AI systems for the work businesses actually need done.
-              </h1>
-              <p className="mt-6 max-w-3xl text-base leading-7 text-muted-foreground sm:text-lg">
-                Explore the AMS agent roadmap across marketing, automation, sales, content, commerce, research, creator tools, and platform operations. Every agent is labeled by its real lifecycle state so planned capability is never presented as verified production functionality.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Button asChild size="lg">
-                  <Link href="/contact">
-                    Request early access <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button asChild size="lg" variant="outline">
-                  <Link href="/pricing">View AMS plans</Link>
-                </Button>
-              </div>
-            </div>
+    <main className={styles.network}>
+      <header className={styles.header}>
+        <Link className={styles.brand} href="/" aria-label="Aspect Marketing Solutions home">
+          <span className={styles.brandMark}>A</span>
+          <span className={styles.brandText}>ASPECT<span>/</span>AMS</span>
+        </Link>
+        <nav className={styles.nav} aria-label="Agent Network navigation">
+          <Link href="/">Home</Link>
+          <a href="#lifecycle">Lifecycle</a>
+          <a href="#catalog">Catalog</a>
+          <Link href="/pricing">Pricing</Link>
+        </nav>
+        <Link className={styles.enter} href="/request-access">Enter the system ↗</Link>
+      </header>
 
-            <Card className="border-primary/20 bg-card/80 shadow-2xl shadow-primary/5 backdrop-blur">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-primary" />
-                  Availability standard
-                </CardTitle>
-                <CardDescription className="leading-6">
-                  AMS only marks an agent Live after its execution path, authentication, persistence, failure handling, and customer experience are verified.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {(Object.keys(statusMeta) as AgentStatus[]).map((key) => {
-                  const meta = statusMeta[key]
-                  return (
-                    <div key={key} className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-background/40 px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <span className={`h-2.5 w-2.5 rounded-full ${meta.dotClass}`} />
-                        <span className="text-sm font-medium">{meta.label}</span>
-                      </div>
-                      <span className="text-xl font-black tabular-nums">{counts[key]}</span>
-                    </div>
-                  )
-                })}
-              </CardContent>
-            </Card>
+      <section className={styles.hero}>
+        <p className={styles.kicker}><span className={styles.kickerDot} />Aspect Agent Network // transparent roadmap</p>
+        <div className={styles.heroGrid}>
+          <h1>The agent network.<span>Built to do the work.</span></h1>
+          <div className={styles.heroCopy}>
+            <p>
+              AMS is organizing specialized AI and automation systems around real business jobs: create demand, qualify leads,
+              publish content, connect workflows, support customers, research markets, operate commerce, and coordinate the platform behind it all.
+              Every capability below carries an explicit lifecycle state so the roadmap is ambitious without pretending unfinished work is already a product.
+            </p>
+            <div className={styles.heroActions}>
+              <a className={styles.primary} href="#catalog">Explore 32 agents <span>↓</span></a>
+              <Link className={styles.secondary} href="/contact">Request early access <span>↗</span></Link>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="px-5 py-10 sm:px-8">
-        <div className="mx-auto max-w-7xl space-y-8">
-          <div className="rounded-2xl border border-border/70 bg-card/50 p-5 shadow-sm">
-            <div className="space-y-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Filter by category</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {categoryOptions.map((option) => (
-                    <Button
-                      key={option}
-                      type="button"
-                      size="sm"
-                      variant={category === option ? "default" : "outline"}
-                      onClick={() => setCategory(option)}
-                      className="rounded-full"
-                    >
-                      {option}
-                    </Button>
-                  ))}
-                </div>
-              </div>
+      <section className={styles.signal} aria-label="Current lifecycle counts">
+        <div className={styles.signalItem} data-status="live"><span className={styles.signalLabel}>Live // verified</span><strong className={styles.signalValue}>{counts.live}</strong></div>
+        <div className={styles.signalItem} data-status="beta"><span className={styles.signalLabel}>Beta // controlled</span><strong className={styles.signalValue}>{counts.beta}</strong></div>
+        <div className={styles.signalItem} data-status="development"><span className={styles.signalLabel}>In development</span><strong className={styles.signalValue}>{counts["in-development"]}</strong></div>
+        <div className={styles.signalItem} data-status="soon"><span className={styles.signalLabel}>Coming soon</span><strong className={styles.signalValue}>{counts["coming-soon"]}</strong></div>
+      </section>
 
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Filter by lifecycle</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {statusOptions.map((option) => {
-                    const label = option === "All" ? "All statuses" : statusMeta[option].label
-                    return (
-                      <Button
-                        key={option}
-                        type="button"
-                        size="sm"
-                        variant={status === option ? "secondary" : "ghost"}
-                        onClick={() => setStatus(option)}
-                        className="rounded-full"
-                      >
-                        {label}
-                      </Button>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
+      <section className={styles.section} id="lifecycle">
+        <div className={styles.sectionHead}>
+          <div>
+            <p className={styles.kicker}>Availability means something here</p>
+            <h2>Roadmap labels with teeth.</h2>
           </div>
+          <p>
+            The agent count is an inventory of product concepts and active builds—not a claim that 32 autonomous products are running in production.
+            AMS only moves a capability toward Live as the real execution path, authentication, persistence, failure handling, operator controls,
+            and customer experience are verified. That distinction protects trust and gives customers a useful view of what exists, what is being hardened,
+            and what they can influence next.
+          </p>
+        </div>
 
-          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Agent catalog</p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">{filteredAgents.length} agents in view</h2>
-            </div>
-            <p className="max-w-xl text-sm leading-6 text-muted-foreground">
-              Internal infrastructure agents are shown at a high level only. Operational details, credentials, security controls, and privileged implementation data remain private.
-            </p>
-          </div>
+        <div className={styles.lifecycle}>
+          {(Object.keys(statusMeta) as AgentStatus[]).map((key, index) => {
+            const meta = statusMeta[key]
+            return (
+              <article className={styles.lifeCard} data-status={meta.visual} key={key}>
+                <div className={styles.lifeTop}>
+                  <span className={styles.lifeIndex}>0{index + 1}</span>
+                  <span className={styles.lifePill}>{meta.label}</span>
+                </div>
+                <h3>{meta.label}</h3>
+                <p>{meta.description}</p>
+              </article>
+            )
+          })}
+        </div>
+      </section>
 
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {filteredAgents.map((agent) => {
-              const meta = statusMeta[agent.status]
-              const StatusIcon = meta.icon
-
-              return (
-                <Card
-                  key={agent.name}
-                  className="group flex h-full flex-col overflow-hidden border-border/70 bg-card/70 transition-all duration-200 hover:-translate-y-1 hover:border-primary/35 hover:shadow-2xl hover:shadow-primary/5"
+      <section className={`${styles.section} ${styles.catalogSection}`} id="catalog">
+        <div className={styles.filters}>
+          <div className={styles.filterGroup}>
+            <p>Filter by business function</p>
+            <div className={styles.filterRow}>
+              {categoryOptions.map((option) => (
+                <button
+                  className={`${styles.filter} ${category === option ? styles.filterActive : ""}`}
+                  key={option}
+                  type="button"
+                  onClick={() => setCategory(option)}
                 >
-                  <CardHeader className="space-y-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-primary/15 bg-primary/10 text-primary shadow-inner">
-                        <Bot className="h-6 w-6" />
-                      </div>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {agent.internal ? (
-                          <Badge variant="outline" className="border-border/80 bg-muted/30 text-muted-foreground">
-                            <LockKeyhole className="mr-1 h-3 w-3" /> Internal
-                          </Badge>
-                        ) : null}
-                        <Badge variant="outline" className={meta.badgeClass}>
-                          <StatusIcon className="mr-1 h-3 w-3" />
-                          {meta.label}
-                        </Badge>
-                      </div>
-                    </div>
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={styles.filterGroup}>
+            <p>Filter by lifecycle</p>
+            <div className={styles.filterRow}>
+              {statusOptions.map((option) => (
+                <button
+                  className={`${styles.filter} ${status === option ? styles.filterActive : ""}`}
+                  key={option}
+                  type="button"
+                  onClick={() => setStatus(option)}
+                >
+                  {option === "All" ? "All statuses" : statusMeta[option].label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
 
-                    <div>
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{agent.category}</div>
-                      <CardTitle className="text-xl">{agent.name}</CardTitle>
-                      <CardDescription className="mt-2 min-h-16 leading-6">{agent.description}</CardDescription>
-                    </div>
-                  </CardHeader>
+        <div className={styles.catalogHeading}>
+          <div>
+            <p className={styles.kicker}>Agent catalog</p>
+            <h2>{filteredAgents.length} agents in view.</h2>
+          </div>
+          <p>
+            Public cards explain the job, capability surface, and lifecycle. Internal agents stay intentionally high level; privileged architecture,
+            credentials, security rules, and operator-only implementation details are not exposed here.
+          </p>
+        </div>
 
-                  <CardContent className="flex flex-1 flex-col justify-between gap-6">
-                    <div className="flex flex-wrap gap-2">
-                      {agent.capabilities.map((capability) => (
-                        <Badge key={capability} variant="secondary" className="font-normal">
-                          {capability}
-                        </Badge>
-                      ))}
+        {filteredAgents.length ? (
+          <div className={styles.catalog}>
+            {filteredAgents.map((agent, index) => {
+              const meta = statusMeta[agent.status]
+              return (
+                <article className={styles.card} data-status={meta.visual} key={agent.name}>
+                  <div className={styles.cardTop}>
+                    <span className={styles.cardIndex}>{String(index + 1).padStart(2, "0")}</span>
+                    <div className={styles.badges}>
+                      {agent.internal ? <span className={styles.internal}>Internal surface</span> : null}
+                      <span className={styles.badge} data-status={meta.visual}>{meta.label}</span>
                     </div>
+                  </div>
 
-                    <div className="border-t border-border/60 pt-4">
-                      <div className="mb-4 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
-                        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${meta.dotClass}`} />
-                        <span>{meta.description}</span>
-                      </div>
-                      <Button asChild variant={agent.href ? "default" : "outline"} className="w-full">
-                        <Link href={agent.href ?? "/contact"}>
-                          {agent.href ? "View agent status" : agent.status === "coming-soon" ? "Request early access" : "Ask about this agent"}
-                          <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  <div className={styles.glyph} aria-hidden="true"><i /><i /><i /></div>
+                  <p className={styles.category}>{agent.category}</p>
+                  <h3>{agent.name}</h3>
+                  <p className={styles.description}>{agent.description}</p>
+
+                  <div className={styles.capabilities} aria-label={`${agent.name} capabilities`}>
+                    {agent.capabilities.map((capability) => <span className={styles.capability} key={capability}>{capability}</span>)}
+                  </div>
+
+                  <div className={styles.cardFooter}>
+                    <div className={styles.statusNote}><span className={styles.statusDot} /><span>{meta.description}</span></div>
+                    <Link className={styles.cardLink} href={agent.href ?? "/contact"}>
+                      <span>{agent.href ? "View agent status" : agent.status === "coming-soon" ? "Request early access" : "Ask about this agent"}</span>
+                      <span>↗</span>
+                    </Link>
+                  </div>
+                </article>
               )
             })}
           </div>
+        ) : (
+          <div className={styles.empty}>No agents match those filters yet. Change the category or lifecycle to reopen the catalog.</div>
+        )}
+      </section>
 
-          {filteredAgents.length === 0 ? (
-            <Card className="border-dashed py-12 text-center">
-              <CardContent>
-                <Rocket className="mx-auto h-8 w-8 text-muted-foreground" />
-                <h3 className="mt-4 text-xl font-bold">No agents match these filters yet.</h3>
-                <p className="mt-2 text-sm text-muted-foreground">Try another lifecycle or category to explore the broader roadmap.</p>
-              </CardContent>
-            </Card>
-          ) : null}
-
-          <Card className="overflow-hidden border-primary/20 bg-primary/5">
-            <CardContent className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div>
-                <Badge variant="outline" className="border-primary/30 bg-background/30 text-primary">
-                  Early access
-                </Badge>
-                <h2 className="mt-4 text-2xl font-black sm:text-3xl">See an agent your business needs?</h2>
-                <p className="mt-3 max-w-3xl leading-7 text-muted-foreground">
-                  Tell AMS which capability matters to you. Early-access demand helps determine which agents move through development and verification first.
-                </p>
-              </div>
-              <Button asChild size="lg">
-                <Link href="/contact">
-                  Request an agent <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <div className="flex flex-wrap gap-3 border-t border-border/70 pt-8">
-            <Button asChild variant="outline">
-              <Link href="/">Back home</Link>
-            </Button>
-            <Button asChild variant="ghost">
-              <Link href="/billing">Account billing</Link>
-            </Button>
-          </div>
+      <section className={`${styles.section} ${styles.explain}`}>
+        <div className={styles.explainLeft}>
+          <p className={styles.kicker}>How the network is meant to work</p>
+          <h2>Specialists outside. Orchestration underneath.</h2>
+          <p>
+            The goal is not to build one giant chatbot with a hundred vague promises. AMS is being structured as a network of scoped systems with clear jobs,
+            shared controls, and deliberate handoffs. Customers should be able to understand what was requested, what system handled it, whether execution succeeded,
+            and where human approval was required.
+          </p>
+        </div>
+        <div className={styles.steps}>
+          {operatingSteps.map(([number, title, copy]) => (
+            <article className={styles.step} key={number}>
+              <span>{number}</span><h3>{title}</h3><p>{copy}</p>
+            </article>
+          ))}
         </div>
       </section>
+
+      <section className={styles.cta}>
+        <div className={styles.ctaInner}>
+          <div>
+            <h2>See the job you need automated?</h2>
+            <p>
+              Tell AMS which capability matters to your business. Demand does not magically make an unfinished agent Live, but it does give the roadmap a real commercial signal about what should be prioritized, tested, and productized next.
+            </p>
+          </div>
+          <Link className={styles.ctaButton} href="/contact">Request an agent <span>↗</span></Link>
+        </div>
+      </section>
+
+      <footer className={styles.footer}>
+        <Link className={styles.brand} href="/"><span className={styles.brandMark}>A</span><span className={styles.brandText}>ASPECT<span>/</span>AMS</span></Link>
+        <span>Agent Network // controlled launch</span>
+        <div className={styles.footerLinks}><Link href="/pricing">Pricing</Link><Link href="/contact">Contact</Link><Link href="/">Home</Link></div>
+      </footer>
     </main>
   )
 }
