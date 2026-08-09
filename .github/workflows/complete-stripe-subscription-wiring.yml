@@ -1,10 +1,6 @@
 name: Complete AMS Stripe subscription wiring
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/complete-stripe-subscription-wiring.yml"
   workflow_dispatch:
 
 permissions:
