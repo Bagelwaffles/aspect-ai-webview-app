@@ -1,8 +1,13 @@
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 
-import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie";
+import {
+  createInternalAdminCookie,
+  verifyInternalAdminCookie,
+} from "@/app/lib/internal-admin-cookie";
 import { configuredOperatorOwnerEmail, isOperatorOwnerEmail } from "@/lib/operator-owner";
+
+const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 
 export async function middleware(request: NextRequest) {
   const requiresInternalAdmin =
@@ -25,7 +30,31 @@ export async function middleware(request: NextRequest) {
   if (ownerEmail && nextAuthSecret) {
     const token = await getToken({ req: request, secret: nextAuthSecret }).catch(() => null);
     if (isOperatorOwnerEmail(token?.email)) {
-      return NextResponse.next();
+      if (!expectedSecret) {
+        const configurationUrl = new URL("/admin/login", request.url);
+        configurationUrl.searchParams.set("next", request.nextUrl.pathname);
+        configurationUrl.searchParams.set("error", "owner_session_not_configured");
+        return NextResponse.redirect(configurationUrl);
+      }
+
+      const adminToken = await createInternalAdminCookie(ownerEmail, expectedSecret);
+      const retryUrl = new URL(request.nextUrl.pathname + request.nextUrl.search, request.url);
+      const response = NextResponse.redirect(retryUrl);
+      response.cookies.set("ams_internal_admin_access", adminToken, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: true,
+        path: "/",
+        maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
+      });
+      response.cookies.set("ams_internal_admin_email", ownerEmail, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: true,
+        path: "/",
+        maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
+      });
+      return response;
     }
 
     if (token?.email) {
