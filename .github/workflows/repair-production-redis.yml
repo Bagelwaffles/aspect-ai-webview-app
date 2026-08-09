@@ -117,29 +117,9 @@ jobs:
             process.exit(1)
           }
 
-          console.log('Canonical Redis variables upserted for production.')
+          console.log('Canonical Redis variables upserted for production as sensitive values.')
+          console.log('Vercel intentionally masks sensitive values in env pull; runtime health is the verification source.')
           NODE
-
-      - name: Verify canonical Redis readiness after cutover
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN" >/dev/null
-          set +x
-          set -a
-          source .vercel/.env.production.local
-          set +a
-          : "${UPSTASH_REDIS_REST_URL:?canonical Redis URL missing}"
-          : "${UPSTASH_REDIS_REST_TOKEN:?canonical Redis token missing}"
-          host=$(node -e 'console.log(new URL(process.argv[1]).hostname)' "$UPSTASH_REDIS_REST_URL")
-          code=$(curl --max-time 8 --silent --show-error --output /tmp/redis-canonical.json --write-out '%{http_code}' \
-            -H "Authorization: Bearer $UPSTASH_REDIS_REST_TOKEN" \
-            "${UPSTASH_REDIS_REST_URL%/}/ping" || true)
-          if [ "$code" != "200" ] || ! grep -qi 'PONG' /tmp/redis-canonical.json 2>/dev/null; then
-            echo "::error::Canonical Redis is not ready after cutover ($host, HTTP ${code:-transport-error})."
-            exit 1
-          fi
-          echo "Canonical Redis verified ($host, HTTP 200/PONG)."
 
       - name: Deploy repaired production configuration
         run: npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
@@ -148,7 +128,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in 1 2 3 4 5 6; do
+          for attempt in 1 2 3 4 5 6 7 8; do
             code=$(curl --max-time 12 --silent --show-error --output /tmp/health.json --write-out '%{http_code}' \
               https://www.aspectmarketingsolutions.app/api/health || true)
             if [ "$code" = "200" ]; then
@@ -157,8 +137,11 @@ jobs:
               const health = JSON.parse(fs.readFileSync('/tmp/health.json', 'utf8'))
               console.log(`Production health: ${health.status}`)
               console.log(`Redis: ${health.persistence?.redis?.status}`)
+              console.log(`Redis configured: ${health.persistence?.redis?.configured}`)
+              console.log(`Redis checked: ${health.persistence?.redis?.checked}`)
               console.log(`Environment: ${health.environment}`)
               console.log(`Commit: ${health.commit}`)
+              if (health.persistence?.redis?.status !== 'ready') process.exit(2)
               NODE
               exit 0
             fi
