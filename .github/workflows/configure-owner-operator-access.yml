@@ -37,8 +37,8 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          node - <<'NODE'
-          const { randomBytes } = require('node:crypto')
+          node --input-type=module - <<'NODE'
+          import { randomBytes } from 'node:crypto'
 
           const required = ['VERCEL_TOKEN', 'VERCEL_PROJECT_ID', 'VERCEL_ORG_ID', 'AMS_OWNER_EMAIL_VALUE']
           for (const name of required) {
