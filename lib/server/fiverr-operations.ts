@@ -35,7 +35,10 @@ function createClient(): Redis | null {
   return configuration ? new Redis(configuration) : null
 }
 
-function toRecord(event: NormalizedFiverrEvent): FiverrOperationRecord {
+export function fiverrOperationRecordFromEvent(
+  event: NormalizedFiverrEvent,
+  recordedAt = new Date().toISOString(),
+): FiverrOperationRecord {
   return {
     event_id: event.event_id,
     event_type: event.event_type,
@@ -43,7 +46,7 @@ function toRecord(event: NormalizedFiverrEvent): FiverrOperationRecord {
     recommended_action: event.recommended_action,
     subject: event.subject.slice(0, 500),
     received_at: event.received_at,
-    recorded_at: new Date().toISOString(),
+    recorded_at: recordedAt,
     order_reference: event.order_reference,
     buyer_username: event.buyer_username,
     deadline_at: event.deadline_at,
@@ -60,11 +63,11 @@ export async function recordFiverrOperation(
   const redis = createClient()
   if (!redis) return "unavailable"
 
-  const record = toRecord(event)
+  const record = fiverrOperationRecordFromEvent(event)
   const recordKey = `${RECORD_PREFIX}${record.event_id}`
 
   try {
-    const result = await redis.set(recordKey, JSON.stringify(record), {
+    const result = await redis.set(recordKey, record, {
       nx: true,
       ex: RECORD_TTL_SECONDS,
     })
@@ -81,32 +84,38 @@ export async function recordFiverrOperation(
 }
 
 function parseRecord(value: unknown): FiverrOperationRecord | null {
-  if (typeof value !== "string") return null
+  let parsed: unknown = value
 
-  try {
-    const parsed = JSON.parse(value) as Partial<FiverrOperationRecord>
-    if (!parsed.event_id || !parsed.event_type || !parsed.priority || !parsed.recommended_action) {
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed)
+    } catch {
       return null
     }
+  }
 
-    return {
-      event_id: parsed.event_id,
-      event_type: parsed.event_type,
-      priority: parsed.priority,
-      recommended_action: parsed.recommended_action,
-      subject: typeof parsed.subject === "string" ? parsed.subject : "",
-      received_at: typeof parsed.received_at === "string" ? parsed.received_at : null,
-      recorded_at: typeof parsed.recorded_at === "string" ? parsed.recorded_at : "",
-      order_reference: typeof parsed.order_reference === "string" ? parsed.order_reference : null,
-      buyer_username: typeof parsed.buyer_username === "string" ? parsed.buyer_username : null,
-      deadline_at: typeof parsed.deadline_at === "string" ? parsed.deadline_at : null,
-      deadline_hint: typeof parsed.deadline_hint === "string" ? parsed.deadline_hint : null,
-      service_slug: parsed.service_slug === "quick-marketing-audit" ? parsed.service_slug : null,
-      quick_audit_match: parsed.quick_audit_match === true,
-      human_approval_required: true,
-    }
-  } catch {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null
+  const record = parsed as Partial<FiverrOperationRecord>
+
+  if (!record.event_id || !record.event_type || !record.priority || !record.recommended_action) {
     return null
+  }
+
+  return {
+    event_id: record.event_id,
+    event_type: record.event_type,
+    priority: record.priority,
+    recommended_action: record.recommended_action,
+    subject: typeof record.subject === "string" ? record.subject : "",
+    received_at: typeof record.received_at === "string" ? record.received_at : null,
+    recorded_at: typeof record.recorded_at === "string" ? record.recorded_at : "",
+    order_reference: typeof record.order_reference === "string" ? record.order_reference : null,
+    buyer_username: typeof record.buyer_username === "string" ? record.buyer_username : null,
+    deadline_at: typeof record.deadline_at === "string" ? record.deadline_at : null,
+    deadline_hint: typeof record.deadline_hint === "string" ? record.deadline_hint : null,
+    service_slug: record.service_slug === "quick-marketing-audit" ? record.service_slug : null,
+    quick_audit_match: record.quick_audit_match === true,
+    human_approval_required: true,
   }
 }
 
@@ -117,10 +126,13 @@ export async function listRecentFiverrOperations(limit = 8): Promise<FiverrOpera
   const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 25)
 
   try {
-    const ids = await redis.lrange<string[]>(INDEX_KEY, 0, safeLimit - 1)
+    const ids = await redis.lrange<string>(INDEX_KEY, 0, safeLimit - 1)
     if (!ids.length) return []
 
-    const values = await Promise.all(ids.map((eventId) => redis.get<string>(`${RECORD_PREFIX}${eventId}`)))
+    const values = await Promise.all(
+      ids.map((eventId) => redis.get<FiverrOperationRecord>(`${RECORD_PREFIX}${eventId}`)),
+    )
+
     return values.map(parseRecord).filter((record): record is FiverrOperationRecord => Boolean(record))
   } catch {
     return []
