@@ -66,15 +66,15 @@ jobs:
               echo "::error::Approved recurring price lookup failed with HTTP $code."
               exit 1
             fi
-            PRICE_ID="$price_id" node --input-type=module - <<'NODE'
-            import fs from 'node:fs'
-            const price = JSON.parse(fs.readFileSync('/tmp/price.json', 'utf8'))
-            if (price.id !== process.env.PRICE_ID || price.active !== true || price.livemode !== true || price.type !== 'recurring' || price.recurring?.interval !== 'month' || price.recurring?.interval_count !== 1) {
-              console.error('Approved price failed the live monthly recurring safety check.')
-              process.exit(1)
-            }
-            console.log(`Verified live monthly recurring price ${price.id} at $${(price.unit_amount / 100).toFixed(2)}/month.`)
-            NODE
+            PRICE_ID="$price_id" node --input-type=module -e '
+              import fs from "node:fs";
+              const price = JSON.parse(fs.readFileSync("/tmp/price.json", "utf8"));
+              if (price.id !== process.env.PRICE_ID || price.active !== true || price.livemode !== true || price.type !== "recurring" || price.recurring?.interval !== "month" || price.recurring?.interval_count !== 1) {
+                console.error("Approved price failed the live monthly recurring safety check.");
+                process.exit(1);
+              }
+              console.log(`Verified live monthly recurring price ${price.id} at $${(price.unit_amount / 100).toFixed(2)}/month.`);
+            '
           done
 
       - name: Create replacement Stripe webhook endpoint without exposing its secret
@@ -86,40 +86,28 @@ jobs:
           set -a
           source .vercel/.env.production.local
           set +a
-          STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" node --input-type=module - <<'NODE'
-          import fs from 'node:fs'
-
-          const body = new URLSearchParams()
-          body.set('url', 'https://www.aspectmarketingsolutions.app/api/webhooks/stripe')
-          body.set('description', 'AMS production subscription webhook - rotated 2026-08-09')
-          const events = [
-            'checkout.session.completed',
-            'customer.subscription.created',
-            'customer.subscription.updated',
-            'customer.subscription.deleted',
-            'invoice.payment_succeeded',
-            'invoice.payment_failed',
-          ]
-          events.forEach((event, index) => body.set(`enabled_events[${index}]`, event))
-
-          const response = await fetch('https://api.stripe.com/v1/webhook_endpoints', {
-            method: 'POST',
-            headers: {
-              authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
-              'content-type': 'application/x-www-form-urlencoded',
-            },
-            body,
-          })
-          const payload = await response.json()
-          if (!response.ok || !payload.id || !payload.secret) {
-            console.error(`Stripe webhook creation failed with HTTP ${response.status}.`)
-            process.exit(1)
-          }
-          fs.writeFileSync('/tmp/ams-stripe-webhook-id', payload.id, { mode: 0o600 })
-          fs.writeFileSync('/tmp/ams-stripe-webhook-secret', payload.secret, { mode: 0o600 })
-          fs.appendFileSync(process.env.GITHUB_ENV, `AMS_NEW_WEBHOOK_ENDPOINT_ID=${payload.id}\n`)
-          console.log(`Created replacement Stripe webhook endpoint ${payload.id}; signing secret retained only in the runner.`)
-          NODE
+          STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" node --input-type=module -e '
+            import fs from "node:fs";
+            const body = new URLSearchParams();
+            body.set("url", "https://www.aspectmarketingsolutions.app/api/webhooks/stripe");
+            body.set("description", "AMS production subscription webhook - rotated 2026-08-09");
+            const events = ["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted", "invoice.payment_succeeded", "invoice.payment_failed"];
+            events.forEach((event, index) => body.set(`enabled_events[${index}]`, event));
+            const response = await fetch("https://api.stripe.com/v1/webhook_endpoints", {
+              method: "POST",
+              headers: { authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`, "content-type": "application/x-www-form-urlencoded" },
+              body,
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload.id || !payload.secret) {
+              console.error(`Stripe webhook creation failed with HTTP ${response.status}.`);
+              process.exit(1);
+            }
+            fs.writeFileSync("/tmp/ams-stripe-webhook-id", payload.id, { mode: 0o600 });
+            fs.writeFileSync("/tmp/ams-stripe-webhook-secret", payload.secret, { mode: 0o600 });
+            fs.appendFileSync(process.env.GITHUB_ENV, `AMS_NEW_WEBHOOK_ENDPOINT_ID=${payload.id}\n`);
+            console.log(`Created replacement Stripe webhook endpoint ${payload.id}; signing secret retained only in the runner.`);
+          '
 
       - name: Upsert production Stripe billing variables in Vercel
         shell: bash
@@ -127,40 +115,29 @@ jobs:
           set -euo pipefail
           set +x
           webhook_secret=$(cat /tmp/ams-stripe-webhook-secret)
-          STRIPE_WEBHOOK_SECRET_VALUE="$webhook_secret" node --input-type=module - <<'NODE'
-          const endpoint = new URL(`https://api.vercel.com/v10/projects/${process.env.VERCEL_PROJECT_ID}/env`)
-          endpoint.searchParams.set('teamId', process.env.VERCEL_ORG_ID)
-          endpoint.searchParams.set('upsert', 'true')
-
-          const variables = [
-            ['STRIPE_WEBHOOK_SECRET', process.env.STRIPE_WEBHOOK_SECRET_VALUE, 'sensitive'],
-            ['AMS_STRIPE_WEBHOOK_MODE', 'live', 'plain'],
-            ['AMS_STRIPE_STARTER_PRICE_ID', process.env.AMS_STARTER_PRICE_ID, 'plain'],
-            ['AMS_STRIPE_GROWTH_PRICE_ID', process.env.AMS_GROWTH_PRICE_ID, 'plain'],
-            ['AMS_STRIPE_PRO_PRICE_ID', process.env.AMS_PRO_PRICE_ID, 'plain'],
-          ]
-          const body = variables.map(([key, value, type]) => ({
-            key,
-            value,
-            type,
-            target: ['production'],
-            comment: 'AMS verified live Stripe subscription wiring',
-          }))
-
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              authorization: `Bearer ${process.env.VERCEL_TOKEN}`,
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify(body),
-          })
-          if (!response.ok) {
-            console.error(`Vercel Stripe environment upsert failed with HTTP ${response.status}.`)
-            process.exit(1)
-          }
-          console.log('Production Stripe webhook mode and Starter/Growth/Pro price mappings were configured without exposing secret values.')
-          NODE
+          STRIPE_WEBHOOK_SECRET_VALUE="$webhook_secret" node --input-type=module -e '
+            const endpoint = new URL(`https://api.vercel.com/v10/projects/${process.env.VERCEL_PROJECT_ID}/env`);
+            endpoint.searchParams.set("teamId", process.env.VERCEL_ORG_ID);
+            endpoint.searchParams.set("upsert", "true");
+            const variables = [
+              ["STRIPE_WEBHOOK_SECRET", process.env.STRIPE_WEBHOOK_SECRET_VALUE, "sensitive"],
+              ["AMS_STRIPE_WEBHOOK_MODE", "live", "plain"],
+              ["AMS_STRIPE_STARTER_PRICE_ID", process.env.AMS_STARTER_PRICE_ID, "plain"],
+              ["AMS_STRIPE_GROWTH_PRICE_ID", process.env.AMS_GROWTH_PRICE_ID, "plain"],
+              ["AMS_STRIPE_PRO_PRICE_ID", process.env.AMS_PRO_PRICE_ID, "plain"],
+            ];
+            const body = variables.map(([key, value, type]) => ({ key, value, type, target: ["production"], comment: "AMS verified live Stripe subscription wiring" }));
+            const response = await fetch(endpoint, {
+              method: "POST",
+              headers: { authorization: `Bearer ${process.env.VERCEL_TOKEN}`, "content-type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            if (!response.ok) {
+              console.error(`Vercel Stripe environment upsert failed with HTTP ${response.status}.`);
+              process.exit(1);
+            }
+            console.log("Production Stripe webhook mode and Starter/Growth/Pro price mappings were configured without exposing secret values.");
+          '
 
       - name: Deploy production with completed Stripe wiring
         run: npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
@@ -176,19 +153,18 @@ jobs:
             health_code=$(curl --max-time 12 --silent --show-error --output /tmp/app-health.json --write-out '%{http_code}' \
               https://www.aspectmarketingsolutions.app/api/health || true)
             if [ "$webhook_code" = "200" ] && [ "$health_code" = "200" ]; then
-              if node --input-type=module - <<'NODE'
-              import fs from 'node:fs'
-              const webhook = JSON.parse(fs.readFileSync('/tmp/webhook-health.json', 'utf8'))
-              const health = JSON.parse(fs.readFileSync('/tmp/app-health.json', 'utf8'))
-              if (webhook.configured !== true) process.exit(1)
-              if (health.persistence?.redis?.status !== 'ready') process.exit(1)
-              if (health.dependencies?.stripeBilling !== 'configured') process.exit(1)
-              console.log('Stripe webhook: configured')
-              console.log('Stripe billing bundle: configured')
-              console.log(`Redis: ${health.persistence.redis.status}`)
-              console.log(`Production commit: ${health.commit}`)
-              NODE
-              then
+              if node --input-type=module -e '
+                import fs from "node:fs";
+                const webhook = JSON.parse(fs.readFileSync("/tmp/webhook-health.json", "utf8"));
+                const health = JSON.parse(fs.readFileSync("/tmp/app-health.json", "utf8"));
+                if (webhook.configured !== true) process.exit(1);
+                if (health.persistence?.redis?.status !== "ready") process.exit(1);
+                if (health.dependencies?.stripeBilling !== "configured") process.exit(1);
+                console.log("Stripe webhook: configured");
+                console.log("Stripe billing bundle: configured");
+                console.log(`Redis: ${health.persistence.redis.status}`);
+                console.log(`Production commit: ${health.commit}`);
+              '; then
                 ready=true
                 break
               fi
