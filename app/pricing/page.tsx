@@ -1,10 +1,11 @@
 import Link from "next/link"
-import { Bot, CreditCard, Sparkles } from "lucide-react"
+import { ArrowRight, Bot, CreditCard, Sparkles } from "lucide-react"
 
 import { BillingActionButton } from "@/components/billing-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
+import { QUICK_MARKETING_AUDIT } from "@/lib/quick-marketing-audit"
 
 const SAAS_PLANS = [
   {
@@ -30,13 +31,7 @@ const SAAS_PLANS = [
   },
 ]
 
-const ETHICAL_OFFERS = [
-  {
-    id: "quick-marketing-audit",
-    name: "Quick Marketing Audit",
-    summary: "A proposed audit scope for human review before any work begins.",
-    deliverables: ["5 problems", "5 fixes", "sample headline", "sample offer", "sample post"],
-  },
+const REQUEST_OFFERS = [
   {
     id: "social-content-pack",
     name: "Social Content Pack",
@@ -67,9 +62,15 @@ export default function PricingPage() {
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-primary">AMS pricing</p>
           <h1 className="max-w-3xl text-4xl font-bold sm:text-5xl">Clear offers with honest launch status.</h1>
           <p className="max-w-2xl text-muted-foreground">
-            Content Agent is currently in private beta. Paid AI subscriptions remain paused until provider access is funded and the live execution gate is deliberately enabled. No unavailable AI plan can charge a customer.
+            The $49 Quick Marketing Audit is live now. Content Agent remains in private beta, so paid AI subscriptions stay paused until provider access is funded and the live execution gate is deliberately enabled.
           </p>
           <div className="flex flex-wrap gap-3">
+            <Button asChild>
+              <Link href="/quick-marketing-audit">
+                Get the $49 audit
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
             <Button asChild variant="outline">
               <Link href="/agents">
                 <Bot className="mr-2 h-4 w-4" />
@@ -90,7 +91,7 @@ export default function PricingPage() {
             <CardHeader>
               <CardTitle>Paid AI checkout is paused</CardTitle>
               <CardDescription>
-                AMS is launching the website, accounts, lead capture, and request-based services without charging for unavailable AI execution.
+                SaaS subscriptions cannot charge while the AI execution gate is disabled. This does not affect the live one-time Quick Marketing Audit.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -100,6 +101,38 @@ export default function PricingPage() {
             </CardContent>
           </Card>
         ) : null}
+
+        <section className="space-y-5">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Live service</p>
+            <h2 className="text-3xl font-bold">Start with a focused marketing win</h2>
+            <p className="max-w-2xl text-muted-foreground">
+              Buy the Quick Marketing Audit now through secure Stripe Checkout. This is a one-time service, not an AI subscription.
+            </p>
+          </div>
+          <Card className="border-primary/40 bg-primary/5">
+            <CardHeader>
+              <CardDescription>Available now · delivered {QUICK_MARKETING_AUDIT.deliveryWindow}</CardDescription>
+              <CardTitle className="flex flex-wrap items-end gap-3 text-2xl">
+                {QUICK_MARKETING_AUDIT.name}
+                <span className="text-4xl">{QUICK_MARKETING_AUDIT.priceLabel}</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
+              <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                {QUICK_MARKETING_AUDIT.deliverables.map((item) => (
+                  <li key={item}>- {item}</li>
+                ))}
+              </ul>
+              <Button asChild size="lg">
+                <a href={QUICK_MARKETING_AUDIT.checkoutUrl} rel="noreferrer">
+                  Buy the audit — $49
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+        </section>
 
         <section className="space-y-5">
           <div>
@@ -143,18 +176,18 @@ export default function PricingPage() {
 
         <section className="space-y-5">
           <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Done-for-you services</p>
-            <h2 className="text-3xl font-bold">Scoped marketing requests</h2>
+            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Request-based services</p>
+            <h2 className="text-3xl font-bold">Need a different scope?</h2>
             <p className="max-w-2xl text-muted-foreground">
-              One-time checkout is disabled for launch. Submit a request for review; the form does not charge you or claim that work has started.
+              These services remain request-only. Submitting a request does not charge you, start work, or guarantee availability.
             </p>
           </div>
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            {ETHICAL_OFFERS.map((offer) => (
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {REQUEST_OFFERS.map((offer) => (
               <Card key={offer.id}>
                 <CardHeader>
                   <CardTitle>{offer.name}</CardTitle>
-                  <CardDescription>Request-only at launch</CardDescription>
+                  <CardDescription>Request-only</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="text-lg font-semibold">No payment accepted</div>
