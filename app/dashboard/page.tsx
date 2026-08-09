@@ -20,6 +20,7 @@ import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie"
 import { getCommandCenterTelemetry } from "@/lib/server/command-center-telemetry"
 
 import styles from "./dashboard.module.css"
+import opsStyles from "./dashboard-operations.module.css"
 
 export const dynamic = "force-dynamic"
 
@@ -340,23 +341,23 @@ export default async function DashboardPage() {
               </div>
 
               {telemetry.fiverr.recentOperations.length ? (
-                <div className={styles.operationsList}>
+                <div className={opsStyles.operationsList}>
                   {telemetry.fiverr.recentOperations.map((operation) => (
-                    <article className={styles.operation} key={operation.event_id}>
-                      <div className={styles.operationTopline}>
-                        <span className={styles[`priority_${operation.priority}`]}>{operation.priority.toUpperCase()}</span>
+                    <article className={opsStyles.operation} key={operation.event_id}>
+                      <div className={opsStyles.operationTopline}>
+                        <span className={opsStyles[`priority_${operation.priority}`]}>{operation.priority.toUpperCase()}</span>
                         <small>{formatTimestamp(operation.received_at ?? operation.recorded_at)}</small>
                       </div>
                       <h3>{titleCase(operation.event_type)}</h3>
                       <p>{operation.subject || "Fiverr notification"}</p>
-                      <div className={styles.operationMeta}>
+                      <div className={opsStyles.operationMeta}>
                         {operation.buyer_username ? <span>Buyer: {operation.buyer_username}</span> : null}
                         {operation.order_reference ? <span>Order: {operation.order_reference}</span> : null}
                         <span>Next: {titleCase(operation.recommended_action)}</span>
                         {operation.deadline_at ? <span>Deadline: {formatTimestamp(operation.deadline_at)}</span> : null}
                         {operation.quick_audit_match ? <span>Quick Audit match</span> : null}
                       </div>
-                      <small className={styles.approvalNote}>Human approval required · no automatic Fiverr actions</small>
+                      <small className={opsStyles.approvalNote}>Human approval required · no automatic Fiverr actions</small>
                     </article>
                   ))}
                 </div>
@@ -383,7 +384,7 @@ export default async function DashboardPage() {
                 </div>
                 <Activity size={22} />
               </div>
-              <div className={styles.telemetrySummary}>
+              <div className={opsStyles.telemetrySummary}>
                 <span>Checked {formatTimestamp(telemetry.checkedAt)}</span>
                 <span>Redis: {telemetry.redis.state}</span>
                 <span>n8n: {telemetry.n8n.online ? "online" : "offline"}</span>
