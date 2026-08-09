@@ -42,6 +42,9 @@ jobs:
       - name: Pull production environment without printing values
         run: npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
 
+      - name: Inspect Upstash Redis provisioning options
+        run: npx --yes vercel@latest integration add upstash/upstash-kv --help --token="$VERCEL_TOKEN"
+
       - name: Audit production configuration and dependency reachability
         shell: bash
         run: |
