@@ -1,172 +1,529 @@
+"use client"
+
 import Link from "next/link"
-import { Bot, FileText, LockKeyhole, Sparkles } from "lucide-react"
+import { useMemo, useState } from "react"
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import styles from "./agents.module.css"
 
-const intendedLaunchAgent = {
-  name: "Content Agent",
-  status: "In progress",
-  description: "The first intended AMS launch agent. Its real persisted execution flow is not implemented yet.",
-  plannedCapabilities: ["Marketing copy", "Product descriptions", "Email drafts", "Social content"],
+type AgentStatus = "live" | "beta" | "in-development" | "coming-soon"
+type AgentCategory =
+  | "Marketing"
+  | "Sales"
+  | "Automation"
+  | "Content"
+  | "Commerce"
+  | "Operations"
+  | "Research"
+  | "Creator"
+  | "Platform"
+
+type Agent = {
+  name: string
+  category: AgentCategory
+  status: AgentStatus
+  description: string
+  capabilities: string[]
+  href?: string
+  internal?: boolean
 }
 
-const unavailableAgents = [
+const agents: Agent[] = [
   {
-    name: "Outreach Agent",
-    detail: "Lead qualification, offer positioning, and outreach drafting remain unavailable.",
+    name: "Content Agent",
+    category: "Content",
+    status: "in-development",
+    description: "The first intended customer-facing AMS agent, focused on practical marketing and business content generation.",
+    capabilities: ["Marketing copy", "Product descriptions", "Email drafts", "Social content"],
+    href: "/content-agent",
   },
   {
-    name: "Analytics Agent",
-    detail: "Data analysis, reporting, and recommendation workflows remain unavailable.",
+    name: "AMS Fiverr Bridge",
+    category: "Sales",
+    status: "beta",
+    description: "A controlled automation layer for classifying Fiverr activity and routing approved events into AMS workflows.",
+    capabilities: ["Lead classification", "Order-event handling", "Safety gates", "Workflow routing"],
+    internal: true,
+  },
+  {
+    name: "Aspect Overmind",
+    category: "Platform",
+    status: "in-development",
+    description: "The orchestration layer intended to coordinate specialized AMS agents, tools, and operator-approved actions.",
+    capabilities: ["Agent routing", "Task coordination", "Tool orchestration", "Operator controls"],
+    internal: true,
+  },
+  {
+    name: "YouTube Uploader Agent",
+    category: "Creator",
+    status: "in-development",
+    description: "A controlled publishing workflow for preparing and uploading video assets through owner-authorized channels.",
+    capabilities: ["Video upload", "Metadata", "Thumbnail workflow", "Publishing controls"],
+    internal: true,
+  },
+  {
+    name: "Social Publisher Agent",
+    category: "Marketing",
+    status: "in-development",
+    description: "Approval-first social publishing infrastructure designed for controlled multi-platform distribution.",
+    capabilities: ["Post validation", "Approval gates", "Platform routing", "Publishing status"],
+    internal: true,
+  },
+  {
+    name: "Android Build Agent",
+    category: "Platform",
+    status: "in-development",
+    description: "Build automation for Android application packaging and future Google Play release workflows.",
+    capabilities: ["APK builds", "AAB builds", "Release assets", "Build automation"],
+  },
+  {
+    name: "Lead Magnet Agent",
+    category: "Marketing",
+    status: "coming-soon",
+    description: "Planned lead-generation assistant for creating useful conversion assets around a business offer.",
+    capabilities: ["Lead magnets", "Offer alignment", "Conversion assets", "Campaign support"],
+  },
+  {
+    name: "Nurture Agent",
+    category: "Marketing",
+    status: "coming-soon",
+    description: "Planned follow-up assistant for building structured prospect and customer nurture sequences.",
+    capabilities: ["Follow-up sequences", "Lifecycle messaging", "Lead nurture", "Retention support"],
+  },
+  {
+    name: "Outreach Agent",
+    category: "Sales",
+    status: "coming-soon",
+    description: "Planned outreach assistant for qualification, positioning, and human-reviewed prospect communication.",
+    capabilities: ["Lead qualification", "Offer positioning", "Outreach drafts", "Follow-up support"],
   },
   {
     name: "Sales Agent",
-    detail: "Sales qualification and recommendation workflows remain unavailable.",
+    category: "Sales",
+    status: "coming-soon",
+    description: "Planned sales assistant for discovery, qualification, recommendation, and next-step routing.",
+    capabilities: ["Discovery", "Qualification", "Recommendations", "Handoff routing"],
+  },
+  {
+    name: "Marketing Audit Agent",
+    category: "Marketing",
+    status: "coming-soon",
+    description: "Planned diagnostic agent for turning business inputs into a structured marketing assessment and action plan.",
+    capabilities: ["Marketing review", "Gap analysis", "Priority actions", "Growth planning"],
+  },
+  {
+    name: "Analytics Agent",
+    category: "Operations",
+    status: "coming-soon",
+    description: "Planned analytics assistant for interpreting authorized business data and surfacing actionable insights.",
+    capabilities: ["Data analysis", "Reporting", "Trend detection", "Recommendations"],
+  },
+  {
+    name: "Automation Builder",
+    category: "Automation",
+    status: "coming-soon",
+    description: "Planned workflow-building assistant for mapping repetitive processes into controlled automations.",
+    capabilities: ["Process mapping", "Workflow design", "Trigger planning", "Integration logic"],
+  },
+  {
+    name: "n8n Automation Agent",
+    category: "Automation",
+    status: "coming-soon",
+    description: "Planned customer-facing assistant for designing, reviewing, and improving n8n-based business workflows.",
+    capabilities: ["n8n workflows", "Webhook design", "Integration planning", "Failure-path review"],
+  },
+  {
+    name: "SEO Agent",
+    category: "Marketing",
+    status: "coming-soon",
+    description: "Planned SEO assistant for structured optimization recommendations and content planning.",
+    capabilities: ["SEO review", "Keyword planning", "Content briefs", "Optimization guidance"],
+  },
+  {
+    name: "Affiliate Marketing Agent",
+    category: "Marketing",
+    status: "coming-soon",
+    description: "Planned affiliate-growth assistant for campaign structure, offer positioning, and promotional workflows.",
+    capabilities: ["Affiliate campaigns", "Offer positioning", "Content support", "Tracking plans"],
+  },
+  {
+    name: "Shopify Agent",
+    category: "Commerce",
+    status: "coming-soon",
+    description: "Planned commerce assistant for Shopify catalog, merchandising, and store workflow support.",
+    capabilities: ["Catalog support", "Store workflows", "Merchandising", "Automation planning"],
+  },
+  {
+    name: "Product Creator Agent",
+    category: "Commerce",
+    status: "coming-soon",
+    description: "Planned product-development assistant for turning concepts into structured digital or commerce-ready offers.",
+    capabilities: ["Product concepts", "Offer packaging", "Listing support", "Launch assets"],
+  },
+  {
+    name: "Video Agent",
+    category: "Creator",
+    status: "coming-soon",
+    description: "Planned video workflow assistant for scripting, metadata, production handoff, and publishing preparation.",
+    capabilities: ["Scripts", "Metadata", "Production handoff", "Publishing prep"],
+  },
+  {
+    name: "Twitch Watcher Agent",
+    category: "Creator",
+    status: "coming-soon",
+    description: "Planned creator assistant for stream monitoring, summaries, clip opportunities, and publishing handoffs.",
+    capabilities: ["Stream monitoring", "Summaries", "Clip discovery", "Creator alerts"],
   },
   {
     name: "Customer Support Agent",
-    detail: "Customer support execution and integrations remain unavailable.",
+    category: "Operations",
+    status: "coming-soon",
+    description: "Planned support assistant for triage, knowledge-guided responses, and escalation to a human operator.",
+    capabilities: ["Triage", "Response drafting", "Knowledge lookup", "Escalation"],
   },
   {
     name: "Technical Support Agent",
-    detail: "Technical support execution and integrations remain unavailable.",
+    category: "Operations",
+    status: "coming-soon",
+    description: "Planned technical support assistant for structured troubleshooting and operator-approved remediation guidance.",
+    capabilities: ["Issue triage", "Troubleshooting", "Diagnostics", "Escalation"],
+  },
+  {
+    name: "Notifier Agent",
+    category: "Operations",
+    status: "coming-soon",
+    description: "Planned notification assistant for routing important business events to the right channel and operator.",
+    capabilities: ["Event alerts", "Routing rules", "Escalations", "Delivery status"],
+  },
+  {
+    name: "Slack Agent",
+    category: "Operations",
+    status: "coming-soon",
+    description: "Planned workspace assistant for summaries, alerts, structured commands, and approved operational actions.",
+    capabilities: ["Slack summaries", "Alerts", "Commands", "Operational handoffs"],
+  },
+  {
+    name: "Telegram Agent",
+    category: "Operations",
+    status: "coming-soon",
+    description: "Planned messaging assistant for Telegram-triggered workflows, notifications, and controlled commands.",
+    capabilities: ["Telegram triggers", "Notifications", "Workflow handoff", "Command routing"],
+  },
+  {
+    name: "Web Scraper Agent",
+    category: "Research",
+    status: "coming-soon",
+    description: "Planned research assistant for collecting permitted public web information into structured business inputs.",
+    capabilities: ["Public web research", "Extraction", "Normalization", "Research handoff"],
+  },
+  {
+    name: "Research Agent",
+    category: "Research",
+    status: "coming-soon",
+    description: "Planned general research assistant for evidence gathering, comparison, synthesis, and source-aware briefs.",
+    capabilities: ["Research", "Comparison", "Synthesis", "Source briefs"],
+  },
+  {
+    name: "Reverse-Engineering Intelligence Agent",
+    category: "Research",
+    status: "coming-soon",
+    description: "Planned product-intelligence assistant for monitoring public releases, changelogs, and implementation patterns.",
+    capabilities: ["Release monitoring", "Changelog review", "Pattern analysis", "Improvement briefs"],
+  },
+  {
+    name: "AGI Research Bot",
+    category: "Research",
+    status: "coming-soon",
+    description: "Planned research-oriented agent for tracking AI developments and organizing findings for AMS operators.",
+    capabilities: ["AI research", "Trend monitoring", "Briefing", "Knowledge organization"],
+  },
+  {
+    name: "Console Builder",
+    category: "Platform",
+    status: "coming-soon",
+    description: "Planned platform assistant for generating controlled internal dashboards and business interfaces.",
+    capabilities: ["Dashboard planning", "UI scaffolding", "Operator tools", "System views"],
+  },
+  {
+    name: "Meme-to-Agent",
+    category: "Platform",
+    status: "coming-soon",
+    description: "Experimental concept for turning structured creative prompts into safe, scoped agent prototypes.",
+    capabilities: ["Concept intake", "Agent scoping", "Prototype planning", "Safety boundaries"],
+  },
+  {
+    name: "Agent Battle Arena",
+    category: "Platform",
+    status: "coming-soon",
+    description: "Experimental evaluation concept for comparing agent outputs against defined quality and task criteria.",
+    capabilities: ["Agent comparison", "Quality scoring", "Evaluation runs", "Benchmark views"],
+    internal: true,
   },
 ]
 
-const deferredAgents = [
-  "Automation Builder",
-  "SEO Agent",
-  "Shopify Agent",
-  "Video Agent",
-  "Affiliate Agent",
-  "Research Agent",
-  "Notifier Agent",
-  "Android Build Agent",
+const statusMeta: Record<AgentStatus, { label: string; description: string; visual: string }> = {
+  live: {
+    label: "Live",
+    description: "Verified end to end and generally available to the intended customer group.",
+    visual: "live",
+  },
+  beta: {
+    label: "Beta",
+    description: "Working in controlled testing with restricted availability and active monitoring.",
+    visual: "beta",
+  },
+  "in-development": {
+    label: "In Development",
+    description: "Actively being built, integrated, tested, or hardened before customer availability.",
+    visual: "development",
+  },
+  "coming-soon": {
+    label: "Coming Soon",
+    description: "Approved roadmap capability. It is visible for planning and demand signals, not sold as working functionality.",
+    visual: "soon",
+  },
+}
+
+const categoryOptions = [
+  "All",
+  "Marketing",
+  "Sales",
+  "Automation",
+  "Content",
+  "Commerce",
+  "Operations",
+  "Research",
+  "Creator",
+  "Platform",
+] as const
+
+const statusOptions = ["All", "live", "beta", "in-development", "coming-soon"] as const
+
+type CategoryFilter = (typeof categoryOptions)[number]
+type StatusFilter = (typeof statusOptions)[number]
+
+const operatingSteps = [
+  ["01", "Start with the business outcome", "AMS begins with the result that matters: more qualified demand, less repetitive work, faster publishing, cleaner follow-up, or better operational visibility."],
+  ["02", "Route work to a specialist", "The network model keeps agents scoped. A content task should not pretend to be billing, support, research, and orchestration at the same time."],
+  ["03", "Keep controls around execution", "Sensitive actions, publishing, credentials, payments, and privileged system changes stay behind explicit authorization and verification boundaries."],
+  ["04", "Record what actually happened", "The future Command Center is designed around real runs, real status, failure visibility, usage, and traceable handoffs instead of decorative activity."],
 ]
 
 export default function AgentsPage() {
+  const [category, setCategory] = useState<CategoryFilter>("All")
+  const [status, setStatus] = useState<StatusFilter>("All")
+
+  const filteredAgents = useMemo(
+    () =>
+      agents.filter((agent) => {
+        const categoryMatch = category === "All" || agent.category === category
+        const statusMatch = status === "All" || agent.status === status
+        return categoryMatch && statusMatch
+      }),
+    [category, status],
+  )
+
+  const counts = useMemo(
+    () => ({
+      live: agents.filter((agent) => agent.status === "live").length,
+      beta: agents.filter((agent) => agent.status === "beta").length,
+      "in-development": agents.filter((agent) => agent.status === "in-development").length,
+      "coming-soon": agents.filter((agent) => agent.status === "coming-soon").length,
+    }),
+    [],
+  )
+
   return (
-    <main className="min-h-screen bg-background px-5 py-10 sm:px-8">
-      <div className="mx-auto max-w-6xl space-y-10">
-        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-          <div className="space-y-4">
-            <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-              <Sparkles className="mr-2 h-3.5 w-3.5" />
-              AMS agent roadmap
-            </Badge>
-            <div>
-              <h1 className="text-4xl font-black tracking-tight sm:text-5xl">One intended launch agent. Still in progress.</h1>
-              <p className="mt-3 max-w-3xl leading-7 text-muted-foreground">
-                Content is the first intended AMS launch agent, but it is not complete or available for customer execution. Outreach, Analytics, Sales, Support, Technical, and the rest of the roadmap remain unavailable.
-              </p>
+    <main className={styles.network}>
+      <header className={styles.header}>
+        <Link className={styles.brand} href="/" aria-label="Aspect Marketing Solutions home">
+          <span className={styles.brandMark}>A</span>
+          <span className={styles.brandText}>ASPECT<span>/</span>AMS</span>
+        </Link>
+        <nav className={styles.nav} aria-label="Agent Network navigation">
+          <Link href="/">Home</Link>
+          <a href="#lifecycle">Lifecycle</a>
+          <a href="#catalog">Catalog</a>
+          <Link href="/pricing">Pricing</Link>
+        </nav>
+        <Link className={styles.enter} href="/request-access">Enter the system ↗</Link>
+      </header>
+
+      <section className={styles.hero}>
+        <p className={styles.kicker}><span className={styles.kickerDot} />Aspect Agent Network // transparent roadmap</p>
+        <div className={styles.heroGrid}>
+          <h1>The agent network.<span>Built to do the work.</span></h1>
+          <div className={styles.heroCopy}>
+            <p>
+              AMS is organizing specialized AI and automation systems around real business jobs: create demand, qualify leads,
+              publish content, connect workflows, support customers, research markets, operate commerce, and coordinate the platform behind it all.
+              Every capability below carries an explicit lifecycle state so the roadmap is ambitious without pretending unfinished work is already a product.
+            </p>
+            <div className={styles.heroActions}>
+              <a className={styles.primary} href="#catalog">Explore 32 agents <span>↓</span></a>
+              <Link className={styles.secondary} href="/contact">Request early access <span>↗</span></Link>
             </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild>
-              <Link href="/content-agent">View Content status</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/pricing">View plans</Link>
-            </Button>
+        </div>
+      </section>
+
+      <section className={styles.signal} aria-label="Current lifecycle counts">
+        <div className={styles.signalItem} data-status="live"><span className={styles.signalLabel}>Live // verified</span><strong className={styles.signalValue}>{counts.live}</strong></div>
+        <div className={styles.signalItem} data-status="beta"><span className={styles.signalLabel}>Beta // controlled</span><strong className={styles.signalValue}>{counts.beta}</strong></div>
+        <div className={styles.signalItem} data-status="development"><span className={styles.signalLabel}>In development</span><strong className={styles.signalValue}>{counts["in-development"]}</strong></div>
+        <div className={styles.signalItem} data-status="soon"><span className={styles.signalLabel}>Coming soon</span><strong className={styles.signalValue}>{counts["coming-soon"]}</strong></div>
+      </section>
+
+      <section className={styles.section} id="lifecycle">
+        <div className={styles.sectionHead}>
+          <div>
+            <p className={styles.kicker}>Availability means something here</p>
+            <h2>Roadmap labels with teeth.</h2>
+          </div>
+          <p>
+            The agent count is an inventory of product concepts and active builds—not a claim that 32 autonomous products are running in production.
+            AMS only moves a capability toward Live as the real execution path, authentication, persistence, failure handling, operator controls,
+            and customer experience are verified. That distinction protects trust and gives customers a useful view of what exists, what is being hardened,
+            and what they can influence next.
+          </p>
+        </div>
+
+        <div className={styles.lifecycle}>
+          {(Object.keys(statusMeta) as AgentStatus[]).map((key, index) => {
+            const meta = statusMeta[key]
+            return (
+              <article className={styles.lifeCard} data-status={meta.visual} key={key}>
+                <div className={styles.lifeTop}>
+                  <span className={styles.lifeIndex}>0{index + 1}</span>
+                  <span className={styles.lifePill}>{meta.label}</span>
+                </div>
+                <h3>{meta.label}</h3>
+                <p>{meta.description}</p>
+              </article>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className={`${styles.section} ${styles.catalogSection}`} id="catalog">
+        <div className={styles.filters}>
+          <div className={styles.filterGroup}>
+            <p>Filter by business function</p>
+            <div className={styles.filterRow}>
+              {categoryOptions.map((option) => (
+                <button
+                  className={`${styles.filter} ${category === option ? styles.filterActive : ""}`}
+                  key={option}
+                  type="button"
+                  onClick={() => setCategory(option)}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={styles.filterGroup}>
+            <p>Filter by lifecycle</p>
+            <div className={styles.filterRow}>
+              {statusOptions.map((option) => (
+                <button
+                  className={`${styles.filter} ${status === option ? styles.filterActive : ""}`}
+                  key={option}
+                  type="button"
+                  onClick={() => setStatus(option)}
+                >
+                  {option === "All" ? "All statuses" : statusMeta[option].label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        <section className="grid gap-6 lg:grid-cols-[1.1fr_1.9fr]">
-          <Card className="border-primary/20 bg-card/80 shadow-lg">
-            <CardHeader>
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/15 text-primary">
-                  <FileText className="h-6 w-6" />
-                </div>
-                <Badge variant="secondary">{intendedLaunchAgent.status}</Badge>
-              </div>
-              <CardTitle className="text-xl">{intendedLaunchAgent.name}</CardTitle>
-              <CardDescription className="leading-6">{intendedLaunchAgent.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div>
-                <p className="mb-2 text-sm font-medium">Planned capabilities</p>
-                <div className="flex flex-wrap gap-2">
-                  {intendedLaunchAgent.plannedCapabilities.map((capability) => (
-                    <Badge key={capability} variant="outline" className="text-xs">
-                      {capability}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <Button asChild className="w-full">
-                <Link href="/content-agent">View implementation status</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Unavailable agents</CardTitle>
-              <CardDescription>These roles are not active, executable, or included as working subscription features.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3 sm:grid-cols-2">
-              {unavailableAgents.map((agent) => (
-                <div key={agent.name} className="rounded-lg border border-border/70 bg-muted/20 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium">{agent.name}</span>
-                    <Badge variant="outline">Unavailable</Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">{agent.detail}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </section>
-
-        <Card className="border-emerald-500/20 bg-emerald-500/5">
-          <CardHeader>
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
-                <LockKeyhole className="h-5 w-5" />
-              </div>
-              <div>
-                <CardTitle>Availability boundary</CardTitle>
-                <CardDescription className="mt-1 leading-6">
-                  A page, catalog entry, subscription, or provider configuration does not make an agent available. AMS will mark an agent ready only after its authenticated execution, credit handling, persistence, failure paths, and customer experience are verified.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-
-        <section className="space-y-5">
+        <div className={styles.catalogHeading}>
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Deferred catalog</p>
-            <h2 className="mt-2 text-3xl font-bold">Unavailable until verified</h2>
-            <p className="mt-2 max-w-3xl text-muted-foreground">
-              These roles remain disabled until their integrations and persistent execution paths are verified. They are not counted as working agents today.
+            <p className={styles.kicker}>Agent catalog</p>
+            <h2>{filteredAgents.length} agents in view.</h2>
+          </div>
+          <p>
+            Public cards explain the job, capability surface, and lifecycle. Internal agents stay intentionally high level; privileged architecture,
+            credentials, security rules, and operator-only implementation details are not exposed here.
+          </p>
+        </div>
+
+        {filteredAgents.length ? (
+          <div className={styles.catalog}>
+            {filteredAgents.map((agent, index) => {
+              const meta = statusMeta[agent.status]
+              return (
+                <article className={styles.card} data-status={meta.visual} key={agent.name}>
+                  <div className={styles.cardTop}>
+                    <span className={styles.cardIndex}>{String(index + 1).padStart(2, "0")}</span>
+                    <div className={styles.badges}>
+                      {agent.internal ? <span className={styles.internal}>Internal surface</span> : null}
+                      <span className={styles.badge} data-status={meta.visual}>{meta.label}</span>
+                    </div>
+                  </div>
+
+                  <div className={styles.glyph} aria-hidden="true"><i /><i /><i /></div>
+                  <p className={styles.category}>{agent.category}</p>
+                  <h3>{agent.name}</h3>
+                  <p className={styles.description}>{agent.description}</p>
+
+                  <div className={styles.capabilities} aria-label={`${agent.name} capabilities`}>
+                    {agent.capabilities.map((capability) => <span className={styles.capability} key={capability}>{capability}</span>)}
+                  </div>
+
+                  <div className={styles.cardFooter}>
+                    <div className={styles.statusNote}><span className={styles.statusDot} /><span>{meta.description}</span></div>
+                    <Link className={styles.cardLink} href={agent.href ?? "/contact"}>
+                      <span>{agent.href ? "View agent status" : agent.status === "coming-soon" ? "Request early access" : "Ask about this agent"}</span>
+                      <span>↗</span>
+                    </Link>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        ) : (
+          <div className={styles.empty}>No agents match those filters yet. Change the category or lifecycle to reopen the catalog.</div>
+        )}
+      </section>
+
+      <section className={`${styles.section} ${styles.explain}`}>
+        <div className={styles.explainLeft}>
+          <p className={styles.kicker}>How the network is meant to work</p>
+          <h2>Specialists outside. Orchestration underneath.</h2>
+          <p>
+            The goal is not to build one giant chatbot with a hundred vague promises. AMS is being structured as a network of scoped systems with clear jobs,
+            shared controls, and deliberate handoffs. Customers should be able to understand what was requested, what system handled it, whether execution succeeded,
+            and where human approval was required.
+          </p>
+        </div>
+        <div className={styles.steps}>
+          {operatingSteps.map(([number, title, copy]) => (
+            <article className={styles.step} key={number}>
+              <span>{number}</span><h3>{title}</h3><p>{copy}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className={styles.cta}>
+        <div className={styles.ctaInner}>
+          <div>
+            <h2>See the job you need automated?</h2>
+            <p>
+              Tell AMS which capability matters to your business. Demand does not magically make an unfinished agent Live, but it does give the roadmap a real commercial signal about what should be prioritized, tested, and productized next.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {deferredAgents.map((name) => (
-              <div key={name} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/40 p-4">
-                <Bot className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <div className="font-medium">{name}</div>
-                  <div className="text-xs text-muted-foreground">In progress - not available</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <div className="flex flex-wrap gap-3 border-t border-border/70 pt-8">
-          <Button asChild variant="outline">
-            <Link href="/">Back home</Link>
-          </Button>
-          <Button asChild variant="ghost">
-            <Link href="/billing">Account billing</Link>
-          </Button>
+          <Link className={styles.ctaButton} href="/contact">Request an agent <span>↗</span></Link>
         </div>
-      </div>
+      </section>
+
+      <footer className={styles.footer}>
+        <Link className={styles.brand} href="/"><span className={styles.brandMark}>A</span><span className={styles.brandText}>ASPECT<span>/</span>AMS</span></Link>
+        <span>Agent Network // controlled launch</span>
+        <div className={styles.footerLinks}><Link href="/pricing">Pricing</Link><Link href="/contact">Contact</Link><Link href="/">Home</Link></div>
+      </footer>
     </main>
   )
 }
