@@ -12,8 +12,6 @@ android {
         targetSdk 36
         versionCode 2026080901
         versionName '2.0.0'
-
-        resValue 'string', 'app_version_label', '2.0.0'
     }
 
     buildTypes {
