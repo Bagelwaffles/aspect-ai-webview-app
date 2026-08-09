@@ -1,0 +1,89 @@
+name: Configure AMS owner operator access
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ams-owner-operator-access
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: production
+    env:
+      VERCEL_ORG_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
+      VERCEL_PROJECT_ID: prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      AMS_OWNER_EMAIL_VALUE: kimberleyaversbiz@gmail.com
+    steps:
+      - name: Require Vercel credential
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::VERCEL_TOKEN is not configured."
+            exit 1
+          fi
+
+      - name: Configure owner email and rotate session signing secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          node --input-type=module - <<'NODE'
+          import { randomBytes } from 'node:crypto'
+
+          const required = ['VERCEL_TOKEN', 'VERCEL_PROJECT_ID', 'VERCEL_ORG_ID', 'AMS_OWNER_EMAIL_VALUE']
+          for (const name of required) {
+            if (!process.env[name]) throw new Error(`Missing ${name}`)
+          }
+
+          const endpoint = new URL(`https://api.vercel.com/v10/projects/${process.env.VERCEL_PROJECT_ID}/env`)
+          endpoint.searchParams.set('teamId', process.env.VERCEL_ORG_ID)
+          endpoint.searchParams.set('upsert', 'true')
+
+          const sessionSecret = randomBytes(48).toString('base64url')
+          const body = [
+            {
+              key: 'AMS_OWNER_EMAIL',
+              value: process.env.AMS_OWNER_EMAIL_VALUE.trim().toLowerCase(),
+              type: 'plain',
+              target: ['production', 'preview'],
+              comment: 'Exact Google account allowed to bootstrap the AMS internal operator session',
+            },
+            {
+              key: 'INTERNAL_ADMIN_SECRET',
+              value: sessionSecret,
+              type: 'sensitive',
+              target: ['production', 'preview'],
+              comment: 'Independent signing secret for AMS internal operator session cookies',
+            },
+          ]
+
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${process.env.VERCEL_TOKEN}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify(body),
+          })
+
+          if (!response.ok) {
+            console.error(`Vercel owner access configuration failed with HTTP ${response.status}`)
+            process.exit(1)
+          }
+
+          console.log('AMS owner operator access variables configured for Preview and Production.')
+          console.log('No password was created; owner elevation requires the exact configured Google account.')
+          console.log('The generated internal session-signing secret was not printed.')
+          NODE
+
+      - name: Safety assertion
+        run: |
+          echo "Operator elevation is email-allowlisted and still depends on a valid signed Google NextAuth session."
+          echo "No customer account is granted operator access by this workflow."
+          echo "This workflow is manual-only because each run deliberately rotates the operator session secret."
