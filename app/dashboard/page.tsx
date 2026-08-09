@@ -43,6 +43,12 @@ function stateClass(state: boolean | string) {
   return styles.warn
 }
 
+function priorityClass(priority: "normal" | "high" | "urgent") {
+  if (priority === "urgent") return opsStyles.priority_urgent
+  if (priority === "high") return opsStyles.priority_high
+  return opsStyles.priority_normal
+}
+
 function formatMoney(cents: number | null, currency: string | null) {
   if (cents === null || !currency || currency === "mixed") return "—"
 
@@ -81,8 +87,9 @@ export default async function DashboardPage() {
   const adminSession = expectedSecret
     ? await verifyInternalAdminCookie(adminAccess, expectedSecret)
     : null
+  const adminEmail = adminSession?.email
 
-  if (!adminSession) {
+  if (!adminEmail) {
     redirect("/admin/login?next=/dashboard")
   }
 
@@ -123,7 +130,7 @@ export default async function DashboardPage() {
   const coreConnectedCount = coreOperational.filter(Boolean).length
   const environment = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown"
   const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ?? "unknown"
-  const displayName = adminSession.email.split("@")[0]
+  const displayName = adminEmail.split("@")[0]
 
   const systemRows = [
     ["Web application", "ready"],
@@ -189,7 +196,7 @@ export default async function DashboardPage() {
             <span className={styles.avatar}>{displayName.slice(0, 1).toUpperCase()}</span>
             <div>
               <strong>{displayName}</strong>
-              <small>{adminSession.email}</small>
+              <small>{adminEmail}</small>
             </div>
           </div>
         </header>
@@ -345,7 +352,7 @@ export default async function DashboardPage() {
                   {telemetry.fiverr.recentOperations.map((operation) => (
                     <article className={opsStyles.operation} key={operation.event_id}>
                       <div className={opsStyles.operationTopline}>
-                        <span className={opsStyles[`priority_${operation.priority}`]}>{operation.priority.toUpperCase()}</span>
+                        <span className={priorityClass(operation.priority)}>{operation.priority.toUpperCase()}</span>
                         <small>{formatTimestamp(operation.received_at ?? operation.recorded_at)}</small>
                       </div>
                       <h3>{titleCase(operation.event_type)}</h3>
