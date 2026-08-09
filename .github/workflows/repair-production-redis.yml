@@ -117,10 +117,10 @@ jobs:
             process.exit(1)
           }
 
-          console.log('Canonical Redis variables upserted for production: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN')
+          console.log('Canonical Redis variables upserted for production.')
           NODE
 
-      - name: Confirm canonical Redis values resolve to replacement
+      - name: Verify canonical Redis readiness after cutover
         shell: bash
         run: |
           set -euo pipefail
@@ -129,15 +129,17 @@ jobs:
           set -a
           source .vercel/.env.production.local
           set +a
-          if [ "$UPSTASH_REDIS_REST_URL" != "$AMS_REDIS_KV_REST_API_URL" ]; then
-            echo "::error::Canonical Redis URL does not match replacement URL."
+          : "${UPSTASH_REDIS_REST_URL:?canonical Redis URL missing}"
+          : "${UPSTASH_REDIS_REST_TOKEN:?canonical Redis token missing}"
+          host=$(node -e 'console.log(new URL(process.argv[1]).hostname)' "$UPSTASH_REDIS_REST_URL")
+          code=$(curl --max-time 8 --silent --show-error --output /tmp/redis-canonical.json --write-out '%{http_code}' \
+            -H "Authorization: Bearer $UPSTASH_REDIS_REST_TOKEN" \
+            "${UPSTASH_REDIS_REST_URL%/}/ping" || true)
+          if [ "$code" != "200" ] || ! grep -qi 'PONG' /tmp/redis-canonical.json 2>/dev/null; then
+            echo "::error::Canonical Redis is not ready after cutover ($host, HTTP ${code:-transport-error})."
             exit 1
           fi
-          if [ "$UPSTASH_REDIS_REST_TOKEN" != "$AMS_REDIS_KV_REST_API_TOKEN" ]; then
-            echo "::error::Canonical Redis token does not match replacement token."
-            exit 1
-          fi
-          echo "Canonical Redis variables now point to the verified replacement."
+          echo "Canonical Redis verified ($host, HTTP 200/PONG)."
 
       - name: Deploy repaired production configuration
         run: npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
