@@ -6,6 +6,7 @@ import {
   buildFiverrOperatorBrief,
   normalizeFiverrNotification,
 } from "@/lib/server/fiverr-bridge"
+import { recordFiverrOperation } from "@/lib/server/fiverr-operations"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -65,6 +66,7 @@ export async function GET() {
       source: "fiverr_email",
       human_approval_required: true,
       auto_delivery_enabled: false,
+      operations_persistence: "enabled_when_redis_available",
     },
     200,
   )
@@ -89,6 +91,7 @@ export async function POST(request: NextRequest) {
   try {
     const event = normalizeFiverrNotification(body.value)
     const operatorBrief = buildFiverrOperatorBrief(event)
+    const persistence = await recordFiverrOperation(event)
 
     return noStoreJson(
       {
@@ -96,6 +99,7 @@ export async function POST(request: NextRequest) {
         status: "accepted",
         event,
         operator_brief: operatorBrief,
+        operations_persistence: persistence,
       },
       200,
     )
