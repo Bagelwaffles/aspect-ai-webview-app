@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.aspectai.webview'
+    namespace 'com.aspectmarketingsolutions.app'
     compileSdk 36
 
     defaultConfig {
-        applicationId 'com.aspectai.webview'
+        applicationId 'com.aspectmarketingsolutions.app'
         minSdk 24
         targetSdk 36
         versionCode 20000
