@@ -190,11 +190,11 @@ export default function HomePage() {
             verified.
           </p>
           <div className={styles["hero-actions"]}>
-            <a className={classes("button", "button-primary")} href="/agents">
-              Explore the Agent Network <span aria-hidden="true">↗</span>
+            <a className={classes("button", "button-primary")} href="/quick-marketing-audit">
+              Get the $49 Marketing Audit <span aria-hidden="true">↗</span>
             </a>
-            <a className={styles["text-link"]} href="#experience">
-              See how AMS works <span aria-hidden="true">→</span>
+            <a className={styles["text-link"]} href="/agents">
+              Explore the Agent Network <span aria-hidden="true">→</span>
             </a>
           </div>
         </div>
@@ -449,8 +449,8 @@ export default function HomePage() {
           <br />
           <span>Compound forever.</span>
         </h2>
-        <a className={classes("button", "button-primary")} href="/agents">
-          Enter the Agent Network <span aria-hidden="true">↗</span>
+        <a className={classes("button", "button-primary")} href="/quick-marketing-audit">
+          Start with the $49 Audit <span aria-hidden="true">↗</span>
         </a>
       </section>
 
