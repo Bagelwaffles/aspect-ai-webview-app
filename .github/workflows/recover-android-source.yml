@@ -1,0 +1,144 @@
+name: Recover AMS Android source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/recover-android-source.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ams-android-source-recovery
+  cancel-in-progress: true
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download recovered Aspect AI Android archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          file_id='15DcX74KwDdK0fafGEc_LwQ71umZQRk5n'
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "https://drive.usercontent.google.com/download?id=${file_id}&export=download&confirm=t" \
+            --output /tmp/aspect-ai-source.zip
+          if ! unzip -tq /tmp/aspect-ai-source.zip >/dev/null; then
+            echo "::error::Recovered Drive file is not a valid ZIP archive."
+            exit 1
+          fi
+          echo "Recovered ZIP validated."
+
+      - name: Extract and inventory Android source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/aspect-android
+          mkdir -p /tmp/aspect-android
+          unzip -q /tmp/aspect-ai-source.zip -d /tmp/aspect-android
+
+          echo "## Recovered Android source inventory" >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          find /tmp/aspect-android -type f \
+            | sed 's#^/tmp/aspect-android/##' \
+            | sort \
+            | head -200 \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          file_count=$(find /tmp/aspect-android -type f | wc -l | tr -d ' ')
+          echo "Recovered file count: ${file_count}"
+          echo "AndroidManifest files: $(find /tmp/aspect-android -name AndroidManifest.xml | wc -l | tr -d ' ')"
+          echo "Gradle build files: $(find /tmp/aspect-android \( -name build.gradle -o -name build.gradle.kts \) | wc -l | tr -d ' ')"
+          echo "Gradle wrapper present: $(find /tmp/aspect-android -name gradlew | wc -l | tr -d ' ')"
+
+      - name: Extract safe Android identity and build metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=/tmp/aspect-android
+          summary="$GITHUB_STEP_SUMMARY"
+          echo >> "$summary"
+          echo "## Android identity metadata" >> "$summary"
+          echo >> "$summary"
+
+          manifests=$(find "$root" -name AndroidManifest.xml -type f | sort)
+          if [ -z "$manifests" ]; then
+            echo "No AndroidManifest.xml found." | tee -a "$summary"
+          else
+            while IFS= read -r manifest; do
+              rel=${manifest#${root}/}
+              package=$(grep -oE 'package="[A-Za-z0-9_.]+"' "$manifest" | head -1 | cut -d'"' -f2 || true)
+              echo "Manifest: $rel" | tee -a "$summary"
+              echo "Manifest package: ${package:-not declared}" | tee -a "$summary"
+            done <<< "$manifests"
+          fi
+
+          while IFS= read -r gradle; do
+            rel=${gradle#${root}/}
+            echo "Gradle file: $rel" | tee -a "$summary"
+            grep -E '^[[:space:]]*(namespace|applicationId|versionCode|versionName|minSdk|targetSdk|compileSdk)[[:space:]=]' "$gradle" \
+              | sed -E 's/[[:space:]]+/ /g; s/^[[:space:]]+//' \
+              | head -40 \
+              | tee -a "$summary" || true
+          done < <(find "$root" \( -name build.gradle -o -name build.gradle.kts \) -type f | sort)
+
+          while IFS= read -r props; do
+            rel=${props#${root}/}
+            echo "Properties file: $rel" | tee -a "$summary"
+            grep -E '^(VERSION_|version|applicationId|namespace|android.useAndroidX|org.gradle.jvmargs)' "$props" \
+              | sed -E 's/(password|secret|token|key)[^=]*=.*/\1=[REDACTED]/Ig' \
+              | head -30 \
+              | tee -a "$summary" || true
+          done < <(find "$root" -name gradle.properties -type f | sort)
+
+      - name: Inspect WebView and endpoint behavior safely
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=/tmp/aspect-android
+          summary="$GITHUB_STEP_SUMMARY"
+          echo >> "$summary"
+          echo "## WebView / endpoint indicators" >> "$summary"
+          echo >> "$summary"
+
+          grep -RInE --include='*.kt' --include='*.java' --include='*.xml' --include='*.gradle' --include='*.kts' \
+            '(WebView|loadUrl\(|setJavaScriptEnabled|javaScriptEnabled|setAllowFileAccess|allowFileAccess|setMixedContentMode|MIXED_CONTENT|aspectmarketingsolutions|aspect-ai|http://|https://)' \
+            "$root" 2>/dev/null \
+            | sed "s#${root}/##" \
+            | sed -E 's#(https?://)[^/@:]+:[^/@]+@#\1[REDACTED]@#g' \
+            | grep -viE '(password|api[_ -]?key|bearer |token=|secret=)' \
+            | head -120 \
+            | tee -a "$summary" || true
+
+      - name: Scan for signing material without exposing it
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=/tmp/aspect-android
+          summary="$GITHUB_STEP_SUMMARY"
+          echo >> "$summary"
+          echo "## Signing-material inventory" >> "$summary"
+          echo >> "$summary"
+          count=$(find "$root" -type f \( -iname '*.jks' -o -iname '*.keystore' -o -iname '*.p12' -o -iname '*.pem' -o -iname '*.key' \) | wc -l | tr -d ' ')
+          echo "Signing/key-like files present: $count" | tee -a "$summary"
+          if [ "$count" -gt 0 ]; then
+            find "$root" -type f \( -iname '*.jks' -o -iname '*.keystore' -o -iname '*.p12' -o -iname '*.pem' -o -iname '*.key' \) \
+              | sed "s#${root}/##" \
+              | sort \
+              | sed 's/^/- /' \
+              | tee -a "$summary"
+          fi
+          echo "No key contents or passwords are printed by this workflow."
+
+      - name: Source-age warning
+        run: |
+          echo "Recovered source is from July 2025 and must be modernized before any 2026 Play submission."
