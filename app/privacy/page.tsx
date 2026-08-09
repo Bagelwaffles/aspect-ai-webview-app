@@ -14,7 +14,7 @@ export default function PrivacyPolicyPage() {
           <h1 className="text-4xl font-black tracking-tight sm:text-5xl">Privacy Policy</h1>
           <p className="text-sm text-muted-foreground">Last updated: {updated}</p>
           <p className="max-w-3xl leading-7 text-muted-foreground">
-            This policy explains how Aspect Marketing Solutions ("AMS", "we", "us", or "our") handles information in connection with our website, services, and the Aspect Marketing Solutions Android companion app.
+            This policy explains how Aspect Marketing Solutions (&quot;AMS&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) handles information in connection with our website, services, and the Aspect Marketing Solutions Android companion app.
           </p>
         </header>
 
