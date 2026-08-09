@@ -1,10 +1,6 @@
 name: Repair AMS production Redis
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/repair-production-redis.yml"
   workflow_dispatch:
 
 permissions:
@@ -42,7 +38,7 @@ jobs:
       - name: Pull production environment
         run: npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
 
-      - name: Verify replacement Redis before cutover
+      - name: Verify replacement Redis
         shell: bash
         run: |
           set -euo pipefail
@@ -62,7 +58,7 @@ jobs:
           fi
           echo "Replacement Redis verified ($host, HTTP 200/PONG)."
 
-      - name: Upsert canonical Redis variables through Vercel API
+      - name: Restore canonical Redis variables through Vercel API
         shell: bash
         run: |
           set -euo pipefail
@@ -92,14 +88,14 @@ jobs:
               value: process.env.AMS_REDIS_KV_REST_API_URL,
               type: 'sensitive',
               target: ['production'],
-              comment: 'AMS production Redis replacement managed via Vercel Upstash integration',
+              comment: 'AMS production Redis recovery mapping',
             },
             {
               key: 'UPSTASH_REDIS_REST_TOKEN',
               value: process.env.AMS_REDIS_KV_REST_API_TOKEN,
               type: 'sensitive',
               target: ['production'],
-              comment: 'AMS production Redis replacement managed via Vercel Upstash integration',
+              comment: 'AMS production Redis recovery mapping',
             },
           ]
 
@@ -116,43 +112,10 @@ jobs:
             console.error(`Vercel environment upsert failed with HTTP ${response.status}`)
             process.exit(1)
           }
-
-          console.log('Canonical Redis variables upserted for production as sensitive values.')
-          console.log('Vercel intentionally masks sensitive values in env pull; runtime health is the verification source.')
+          console.log('Canonical production Redis variables restored as sensitive values.')
           NODE
 
-      - name: Deploy repaired production configuration
-        run: npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
-
-      - name: Verify production health
-        shell: bash
+      - name: Recovery guidance
         run: |
-          set -euo pipefail
-          for attempt in 1 2 3 4 5 6 7 8; do
-            code=$(curl --max-time 12 --silent --show-error --output /tmp/health.json --write-out '%{http_code}' \
-              https://www.aspectmarketingsolutions.app/api/health || true)
-            if [ "$code" = "200" ]; then
-              node - <<'NODE'
-              const fs = require('fs')
-              const health = JSON.parse(fs.readFileSync('/tmp/health.json', 'utf8'))
-              console.log(`Production health: ${health.status}`)
-              console.log(`Redis: ${health.persistence?.redis?.status}`)
-              console.log(`Redis configured: ${health.persistence?.redis?.configured}`)
-              console.log(`Redis checked: ${health.persistence?.redis?.checked}`)
-              console.log(`Environment: ${health.environment}`)
-              console.log(`Commit: ${health.commit}`)
-              if (health.persistence?.redis?.status !== 'ready') process.exit(2)
-              NODE
-              exit 0
-            fi
-            echo "Health attempt $attempt returned HTTP ${code:-transport-error}; waiting for deployment propagation."
-            sleep 10
-          done
-          echo "::error::Production health did not reach HTTP 200 after Redis cutover."
-          cat /tmp/health.json 2>/dev/null || true
-          exit 1
-
-      - name: Zero-cost safety assertion
-        run: |
-          echo "Redis remains on the explicitly selected free plan."
-          echo "The replacement resource was provisioned with prodPack=false and autoUpgrade=false."
+          echo "Environment values have been restored. Redeploy production from the verified main branch, then confirm /api/health reports Redis ready."
+          echo "The Redis resource is the explicitly provisioned free plan with autoUpgrade=false."
