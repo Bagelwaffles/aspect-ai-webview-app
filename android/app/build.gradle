@@ -10,7 +10,7 @@ android {
         applicationId 'com.aspectai.webview'
         minSdk 24
         targetSdk 36
-        versionCode 2026080901
+        versionCode 20000
         versionName '2.0.0'
     }
 
