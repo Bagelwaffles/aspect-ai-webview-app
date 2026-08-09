@@ -1,17 +1,10 @@
+import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 
 import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie";
+import { configuredOperatorOwnerEmail, isOperatorOwnerEmail } from "@/lib/operator-owner";
 
 export async function middleware(request: NextRequest) {
-  if (
-    request.nextUrl.pathname === "/login" &&
-    request.nextUrl.searchParams.get("next") === "/dashboard"
-  ) {
-    const adminLoginUrl = new URL("/admin/login", request.url);
-    adminLoginUrl.searchParams.set("next", "/dashboard");
-    return NextResponse.redirect(adminLoginUrl);
-  }
-
   const requiresInternalAdmin =
     request.nextUrl.pathname === "/dashboard" ||
     request.nextUrl.pathname.startsWith("/dashboard/") ||
@@ -27,11 +20,26 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const loginUrl = new URL("/admin/login", request.url);
+  const ownerEmail = configuredOperatorOwnerEmail();
+  const nextAuthSecret = process.env.NEXTAUTH_SECRET?.trim();
+  if (ownerEmail && nextAuthSecret) {
+    const token = await getToken({ req: request, secret: nextAuthSecret }).catch(() => null);
+    if (isOperatorOwnerEmail(token?.email)) {
+      return NextResponse.next();
+    }
+
+    if (token?.email) {
+      const deniedUrl = new URL("/", request.url);
+      deniedUrl.searchParams.set("operatorAccess", "denied");
+      return NextResponse.redirect(deniedUrl);
+    }
+  }
+
+  const loginUrl = new URL("/login", request.url);
   loginUrl.searchParams.set("next", request.nextUrl.pathname);
   return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
-  matcher: ["/login", "/dashboard/:path*", "/admin/ethical-agent-farm-requests"]
+  matcher: ["/dashboard/:path*", "/admin/ethical-agent-farm-requests"]
 };
