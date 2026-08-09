@@ -62,7 +62,7 @@ jobs:
           fi
           echo "Replacement Redis verified ($host, HTTP 200/PONG)."
 
-      - name: Update canonical Redis environment variables
+      - name: Upsert canonical Redis variables through Vercel API
         shell: bash
         run: |
           set -euo pipefail
@@ -70,11 +70,74 @@ jobs:
           set -a
           source .vercel/.env.production.local
           set +a
-          printf '%s' "$AMS_REDIS_KV_REST_API_URL" | \
-            npx --yes vercel@latest env update UPSTASH_REDIS_REST_URL production --yes --token="$VERCEL_TOKEN" >/tmp/update-url.log 2>&1
-          printf '%s' "$AMS_REDIS_KV_REST_API_TOKEN" | \
-            npx --yes vercel@latest env update UPSTASH_REDIS_REST_TOKEN production --yes --sensitive --token="$VERCEL_TOKEN" >/tmp/update-token.log 2>&1
-          echo "Canonical production Redis URL/token updated without printing values."
+          node - <<'NODE'
+          const required = [
+            'VERCEL_TOKEN',
+            'VERCEL_PROJECT_ID',
+            'VERCEL_ORG_ID',
+            'AMS_REDIS_KV_REST_API_URL',
+            'AMS_REDIS_KV_REST_API_TOKEN',
+          ]
+          for (const name of required) {
+            if (!process.env[name]) throw new Error(`Missing ${name}`)
+          }
+
+          const endpoint = new URL(`https://api.vercel.com/v10/projects/${process.env.VERCEL_PROJECT_ID}/env`)
+          endpoint.searchParams.set('teamId', process.env.VERCEL_ORG_ID)
+          endpoint.searchParams.set('upsert', 'true')
+
+          const body = [
+            {
+              key: 'UPSTASH_REDIS_REST_URL',
+              value: process.env.AMS_REDIS_KV_REST_API_URL,
+              type: 'sensitive',
+              target: ['production'],
+              comment: 'AMS production Redis replacement managed via Vercel Upstash integration',
+            },
+            {
+              key: 'UPSTASH_REDIS_REST_TOKEN',
+              value: process.env.AMS_REDIS_KV_REST_API_TOKEN,
+              type: 'sensitive',
+              target: ['production'],
+              comment: 'AMS production Redis replacement managed via Vercel Upstash integration',
+            },
+          ]
+
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${process.env.VERCEL_TOKEN}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify(body),
+          })
+
+          if (!response.ok) {
+            console.error(`Vercel environment upsert failed with HTTP ${response.status}`)
+            process.exit(1)
+          }
+
+          console.log('Canonical Redis variables upserted for production: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN')
+          NODE
+
+      - name: Confirm canonical Redis values resolve to replacement
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN" >/dev/null
+          set +x
+          set -a
+          source .vercel/.env.production.local
+          set +a
+          if [ "$UPSTASH_REDIS_REST_URL" != "$AMS_REDIS_KV_REST_API_URL" ]; then
+            echo "::error::Canonical Redis URL does not match replacement URL."
+            exit 1
+          fi
+          if [ "$UPSTASH_REDIS_REST_TOKEN" != "$AMS_REDIS_KV_REST_API_TOKEN" ]; then
+            echo "::error::Canonical Redis token does not match replacement token."
+            exit 1
+          fi
+          echo "Canonical Redis variables now point to the verified replacement."
 
       - name: Deploy repaired production configuration
         run: npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
