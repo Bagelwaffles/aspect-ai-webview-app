@@ -1,10 +1,6 @@
 name: Configure AMS owner operator access
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/configure-owner-operator-access.yml"
   workflow_dispatch:
 
 permissions:
@@ -32,7 +28,7 @@ jobs:
             exit 1
           fi
 
-      - name: Configure owner email and session signing secret
+      - name: Configure owner email and rotate session signing secret
         shell: bash
         run: |
           set -euo pipefail
@@ -90,3 +86,4 @@ jobs:
         run: |
           echo "Operator elevation is email-allowlisted and still depends on a valid signed Google NextAuth session."
           echo "No customer account is granted operator access by this workflow."
+          echo "This workflow is manual-only because each run deliberately rotates the operator session secret."
