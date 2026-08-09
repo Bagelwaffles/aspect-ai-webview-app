@@ -19,6 +19,8 @@ export default function AdminLoginPage() {
     )
   }, [searchParams])
 
+  const ownerLoginHref = `/login?next=${encodeURIComponent(nextPath)}`
+
   const [email, setEmail] = useState(ADMIN_EMAIL)
   const [password, setPassword] = useState("")
   const [busy, setBusy] = useState(false)
@@ -56,7 +58,7 @@ export default function AdminLoginPage() {
           <div className="space-y-1">
             <h1 className="text-2xl font-bold leading-tight sm:text-3xl">Admin Access</h1>
             <p className="max-w-prose text-sm text-muted-foreground sm:text-base">
-              Protected internal access for lead review and operational tools. Reviewer/demo access does not open this area.
+              Protected internal access for AMS owner operations. The owner account signs in through Google; the password form below is a separate legacy fallback.
             </p>
           </div>
           <Button asChild variant="outline" className="w-full shrink-0 sm:w-auto">
@@ -64,11 +66,28 @@ export default function AdminLoginPage() {
           </Button>
         </div>
 
+        <Card className="border-primary/40 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-xl sm:text-2xl">AMS owner login</CardTitle>
+            <CardDescription className="text-sm sm:text-base">
+              Use the Google account configured as the AMS owner. No internal-admin password is required for the owner login path.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button asChild className="w-full sm:w-auto">
+              <Link href={ownerLoginHref}>Continue with Google owner login</Link>
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              After Google verifies the allow-listed owner account, AMS creates the signed internal operator session and returns you to the requested dashboard page.
+            </p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl sm:text-2xl">Open internal admin tools</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl">Legacy internal admin login</CardTitle>
             <CardDescription className="text-sm sm:text-base">
-              Enter the internal admin email and password configured for this environment.
+              Use this only if a separate internal-admin email and password hash have been deliberately configured for the environment.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -101,15 +120,24 @@ export default function AdminLoginPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <Button onClick={submit} disabled={busy || !password} className="w-full sm:w-auto">
-                {busy ? "Opening..." : "Enter admin access"}
+              <Button onClick={submit} disabled={busy || !password} className="w-full sm:w-auto" variant="outline">
+                {busy ? "Opening..." : "Enter legacy admin access"}
               </Button>
               <Button asChild variant="ghost" className="w-full sm:w-auto">
                 <Link href="/reviewer-access">Reviewer access</Link>
               </Button>
             </div>
 
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {error ? (
+              <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                <p className="text-sm text-destructive">{error}</p>
+                {error === "internal_admin_access_not_configured" ? (
+                  <p className="text-xs text-muted-foreground">
+                    The legacy password login is not configured. Use the Google owner login above instead.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>
