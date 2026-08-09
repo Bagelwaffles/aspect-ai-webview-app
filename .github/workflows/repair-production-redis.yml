@@ -1,0 +1,96 @@
+name: Repair AMS production Redis
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/repair-production-redis.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ams-production-redis-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: production
+    env:
+      VERCEL_ORG_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
+      VERCEL_PROJECT_ID: prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Require deployment credential
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::VERCEL_TOKEN is not configured."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Pull project configuration
+        run: npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Provision free Redis replacement
+        run: |
+          set -euo pipefail
+          npx --yes vercel@latest integration add upstash/upstash-kv \
+            --name ams-production-redis \
+            --plan free \
+            --metadata primaryRegion=iad1 \
+            --metadata prodPack=false \
+            --metadata autoUpgrade=false \
+            --environment production \
+            --prefix AMS_REDIS_ \
+            --no-claim \
+            --non-interactive \
+            --json \
+            --token="$VERCEL_TOKEN" > /tmp/upstash-result.json
+          node - <<'NODE'
+          const fs = require('fs')
+          const value = JSON.parse(fs.readFileSync('/tmp/upstash-result.json', 'utf8'))
+          const safe = {
+            created: Boolean(value),
+            name: value?.name ?? value?.resource?.name ?? 'ams-production-redis',
+            product: value?.productSlug ?? value?.resource?.productSlug ?? 'upstash-kv',
+          }
+          console.log(JSON.stringify(safe))
+          NODE
+
+      - name: Pull refreshed production environment
+        run: npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Report injected variable names only
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          node - <<'NODE'
+          const fs = require('fs')
+          const text = fs.readFileSync('.vercel/.env.production.local', 'utf8')
+          const names = text
+            .split(/\r?\n/)
+            .map((line) => line.match(/^([A-Za-z_][A-Za-z0-9_]*)=/)?.[1])
+            .filter(Boolean)
+            .filter((name) => name.startsWith('AMS_REDIS_'))
+            .sort()
+          console.log('Injected Redis variables:')
+          for (const name of names) console.log(`- ${name}`)
+          if (!names.length) process.exit(2)
+          NODE
+
+      - name: Safety assertion
+        run: |
+          echo "Redis resource requested with plan=free, prodPack=false, autoUpgrade=false."
+          echo "No paid Redis plan was authorized or selected."
