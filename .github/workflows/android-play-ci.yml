@@ -1,9 +1,15 @@
 name: AMS Android Play CI
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "android/**"
+      - ".github/workflows/android-play-ci.yml"
   push:
     branches:
-      - android/play-v1
+      - main
     paths:
       - "android/**"
       - ".github/workflows/android-play-ci.yml"
@@ -13,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ams-android-play-v1
+  group: ams-android-play-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
