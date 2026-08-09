@@ -3,7 +3,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie";
 
 export async function middleware(request: NextRequest) {
-  if (request.nextUrl.pathname !== "/admin/ethical-agent-farm-requests") {
+  if (
+    request.nextUrl.pathname === "/login" &&
+    request.nextUrl.searchParams.get("next") === "/dashboard"
+  ) {
+    const adminLoginUrl = new URL("/admin/login", request.url);
+    adminLoginUrl.searchParams.set("next", "/dashboard");
+    return NextResponse.redirect(adminLoginUrl);
+  }
+
+  const requiresInternalAdmin =
+    request.nextUrl.pathname === "/dashboard" ||
+    request.nextUrl.pathname.startsWith("/dashboard/") ||
+    request.nextUrl.pathname === "/admin/ethical-agent-farm-requests";
+
+  if (!requiresInternalAdmin) {
     return NextResponse.next();
   }
 
@@ -14,10 +28,10 @@ export async function middleware(request: NextRequest) {
   }
 
   const loginUrl = new URL("/admin/login", request.url);
-  loginUrl.searchParams.set("next", "/admin/ethical-agent-farm-requests");
+  loginUrl.searchParams.set("next", request.nextUrl.pathname);
   return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
-  matcher: ["/admin/ethical-agent-farm-requests"]
+  matcher: ["/login", "/dashboard/:path*", "/admin/ethical-agent-farm-requests"]
 };
