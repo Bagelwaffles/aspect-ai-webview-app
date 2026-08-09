@@ -163,8 +163,8 @@ export default function HomePage() {
           <a href="/pricing">Pricing</a>
         </nav>
 
-        <a className={styles["header-cta"]} href="/agents">
-          Explore the network <span aria-hidden="true">↗</span>
+        <a className={styles["header-cta"]} href="/login?next=/dashboard">
+          Enter the system <span aria-hidden="true">↗</span>
         </a>
       </header>
 
