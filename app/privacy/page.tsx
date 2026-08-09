@@ -14,7 +14,7 @@ export default function PrivacyPolicyPage() {
           <h1 className="text-4xl font-black tracking-tight sm:text-5xl">Privacy Policy</h1>
           <p className="text-sm text-muted-foreground">Last updated: {updated}</p>
           <p className="max-w-3xl leading-7 text-muted-foreground">
-            This policy explains how Aspect Marketing Solutions (&quot;AMS&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) handles information in connection with our website, services, and the Aspect Marketing Solutions Android companion app.
+            This policy explains how Aspect Marketing Solutions (&quot;AMS&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) handles information in connection with our website, services, Android beta testing program, and the Aspect Marketing Solutions Android companion app.
           </p>
         </header>
 
@@ -34,6 +34,7 @@ export default function PrivacyPolicyPage() {
           <ul className="list-disc space-y-2 pl-6 leading-7 text-muted-foreground">
             <li>Account information such as your name, email address, and authentication identifiers when you sign in.</li>
             <li>Business and service information you submit, such as your company name, website or social profile, target customer, marketing challenge, requests, and other details needed to provide a requested service.</li>
+            <li>Android beta tester information such as first name, Google account email used for Play testing, Android device description, referral source, optional notes, 14-day testing commitment, and private beta feedback you submit.</li>
             <li>Transaction and subscription metadata such as product, price, payment status, customer identifier, and receipt information. Payment card details are entered into and processed by Stripe; AMS does not need to store full card numbers.</li>
             <li>Operational and security information such as request logs, timestamps, service status, fraud/abuse signals, and technical diagnostics.</li>
             <li>Content you intentionally submit to an AMS workflow or agent when that capability is available.</li>
@@ -45,9 +46,10 @@ export default function PrivacyPolicyPage() {
           <ul className="list-disc space-y-2 pl-6 leading-7 text-muted-foreground">
             <li>Provide, secure, troubleshoot, and improve AMS services.</li>
             <li>Authenticate users and protect restricted areas.</li>
+            <li>Coordinate the Android closed beta, maintain the private tester roster, review tester feedback, and document legitimate testing outcomes for Google Play production-readiness review.</li>
             <li>Fulfill service requests and maintain service history.</li>
             <li>Process payments, subscriptions, refunds, and entitlement records when a web purchase is made.</li>
-            <li>Communicate about requested services, account activity, support, and important operational notices.</li>
+            <li>Communicate about requested services, account activity, support, testing invitations, and important operational notices.</li>
             <li>Prevent fraud, abuse, unauthorized access, and other security incidents.</li>
             <li>Meet legal, tax, accounting, and regulatory obligations that apply to AMS.</li>
           </ul>
@@ -56,7 +58,7 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-3">
           <h2 className="text-2xl font-bold">4. Service providers and sharing</h2>
           <p className="leading-7 text-muted-foreground">
-            AMS uses service providers to operate the platform. Depending on the feature, these may include Google for authentication, Stripe for payments, Vercel for web hosting and application delivery, Upstash for Redis-based persistence, and n8n for approved automation workflows. These providers process information for the services they provide to AMS and are subject to their own contractual and privacy obligations.
+            AMS uses service providers to operate the platform. Depending on the feature, these may include Google for authentication and Google Play testing/distribution, Stripe for payments, Vercel for web hosting and application delivery, Upstash for Redis-based persistence, and n8n for approved automation workflows. These providers process information for the services they provide to AMS and are subject to their own contractual and privacy obligations.
           </p>
           <p className="leading-7 text-muted-foreground">
             AMS does not sell personal or sensitive user data. We may disclose information when required by law, to protect users or AMS from fraud or security threats, or as part of a legitimate business transfer subject to applicable law.
@@ -66,14 +68,14 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-3">
           <h2 className="text-2xl font-bold">5. Security</h2>
           <p className="leading-7 text-muted-foreground">
-            We use HTTPS in transit, server-side secret storage, authenticated access controls, and operational safeguards designed to limit unauthorized access. No internet service can guarantee absolute security, so AMS also uses monitoring, rate limits, and incident-response practices where appropriate.
+            We use HTTPS in transit, server-side secret storage, authenticated access controls, and operational safeguards designed to limit unauthorized access. The Android tester roster is available only on an internal operator surface. No internet service can guarantee absolute security, so AMS also uses monitoring, rate limits, and incident-response practices where appropriate.
           </p>
         </section>
 
         <section className="space-y-3">
           <h2 className="text-2xl font-bold">6. Retention and deletion</h2>
           <p className="leading-7 text-muted-foreground">
-            AMS keeps information only as long as reasonably needed for the purpose it was collected, to operate and secure the service, and to meet legal, tax, accounting, dispute, or fraud-prevention requirements. Retention periods can differ by data type and service.
+            AMS keeps information only as long as reasonably needed for the purpose it was collected, to operate and secure the service, and to meet legal, tax, accounting, dispute, or fraud-prevention requirements. The current Android beta roster and private feedback records are configured with a maximum 120-day application retention window unless a shorter deletion request or longer lawful retention requirement applies.
           </p>
           <p className="leading-7 text-muted-foreground">
             You may request access, correction, or deletion of personal information by contacting AMS at the email below. We will verify the request as appropriate and delete or de-identify eligible data, except information we must retain for lawful reasons. The current Android companion does not create a separate Android account.
@@ -83,7 +85,7 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-3">
           <h2 className="text-2xl font-bold">7. Children</h2>
           <p className="leading-7 text-muted-foreground">
-            AMS business software and services are not directed to children under 13. We do not knowingly design the Android companion to collect personal information from children.
+            AMS business software and services are not directed to children under 13. We do not knowingly design the Android companion or beta recruitment program to collect personal information from children.
           </p>
         </section>
 
