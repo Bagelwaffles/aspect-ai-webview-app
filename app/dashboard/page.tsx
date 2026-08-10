@@ -19,7 +19,9 @@ import {
 import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie"
 import { getCommandCenterTelemetry } from "@/lib/server/command-center-telemetry"
 
-import { agentStatusCounts, agents } from "@/app/agents/agentCatalog"\n\nimport styles from "./dashboard.module.css"
+import { agentStatusCounts, agents } from "@/app/agents/agentCatalog"
+
+import styles from "./dashboard.module.css"
 import opsStyles from "./dashboard-operations.module.css"
 
 export const dynamic = "force-dynamic"
