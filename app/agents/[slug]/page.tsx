@@ -24,7 +24,7 @@ export default async function AgentStatusPage({ params }: { params: Promise<{ sl
       </header>
 
       <section className={styles.hero}>
-        <p className={styles.kicker}><span className={styles.kickerDot} />{agent.category} // current status</p>
+        <p className={styles.kicker}><span className={styles.kickerDot} />{agent.category} {"//"} current status</p>
         <div className={styles.heroGrid}>
           <h1>{agent.name}<span>{meta.label}</span></h1>
           <div className={styles.heroCopy}>
