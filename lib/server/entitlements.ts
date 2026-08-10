@@ -207,6 +207,47 @@ export async function grantTopupCredits(subject: string, units: number) {
   await redis.incrby(keys(owner).topupCredits, amount)
 }
 
+export type OwnerTestEntitlementResult = {
+  state: "granted" | "already-granted"
+  credits: number
+}
+
+export async function grantOwnerContentTestEntitlement(
+  subject: string,
+  units = 3,
+): Promise<OwnerTestEntitlementResult> {
+  const redis = getRedis()
+  const owner = requireStableSubject(subject)
+  const amount = Math.max(1, Math.min(3, Math.floor(units)))
+  if (!redis) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
+
+  const key = keys(owner)
+  const claimKey = `ams:owner-test-entitlement:content:${owner}`
+  const script = `
+    if redis.call('EXISTS', KEYS[1]) == 1 then
+      return {'already-granted', redis.call('GET', KEYS[3]) or '0'}
+    end
+
+    redis.call('SADD', KEYS[2], 'content')
+    local credits = redis.call('INCRBY', KEYS[3], ARGV[2])
+    redis.call('SET', KEYS[1], ARGV[1])
+    return {'granted', tostring(credits)}
+  `
+  const raw = await redis.eval(script, [claimKey, key.agents, key.topupCredits], [
+    new Date().toISOString(),
+    String(amount),
+  ])
+
+  if (!Array.isArray(raw) || (raw[0] !== "granted" && raw[0] !== "already-granted")) {
+    throw new Error("OWNER_TEST_ENTITLEMENT_INVALID_RESPONSE")
+  }
+
+  return {
+    state: raw[0] === "granted" ? "granted" : "already-granted",
+    credits: parseNonNegativeInt(raw[1]),
+  }
+}
+
 export function agentSlugForRuntimeAgent(agentId: string): string | null {
   const mapping: Record<string, string> = {
     "grok-content": "content",
