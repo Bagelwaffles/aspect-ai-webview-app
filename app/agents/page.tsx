@@ -190,7 +190,7 @@ export default function AgentsPage() {
                   </div>
 
                   <div className={styles.cardFooter}>
-                    <div className={styles.statusNote}><span className={styles.statusDot} /><span>{meta.description}</span></div>
+                    <div className={styles.statusNote}><span className={styles.statusDot} /><span>{agent.statusReason}</span></div>
                     <Link className={styles.cardLink} href={`/agents/${agent.slug}`}>
                       <span>View agent status</span>
                       <span>↗</span>
