@@ -83,6 +83,13 @@ const agents: Agent[] = [
     capabilities: ["Lead magnets", "Offer alignment", "Conversion assets", "Campaign support"],
   },
   {
+    name: "Email Campaign Agent",
+    category: "Marketing",
+    status: "coming-soon",
+    description: "Planned email marketing assistant for campaign structure, audience-aware messaging, and human-reviewed delivery workflows.",
+    capabilities: ["Campaign planning", "Email sequences", "Audience messaging", "Delivery handoff"],
+  },
+  {
     name: "Nurture Agent",
     category: "Marketing",
     status: "coming-soon",
@@ -359,7 +366,7 @@ export default function AgentsPage() {
               Every capability below carries an explicit lifecycle state so the roadmap is ambitious without pretending unfinished work is already a product.
             </p>
             <div className={styles.heroActions}>
-              <a className={styles.primary} href="#catalog">Explore 32 agents <span>↓</span></a>
+              <a className={styles.primary} href="#catalog">Explore 33 agents <span>↓</span></a>
               <Link className={styles.secondary} href="/contact">Request early access <span>↗</span></Link>
             </div>
           </div>
@@ -380,7 +387,7 @@ export default function AgentsPage() {
             <h2>Roadmap labels with teeth.</h2>
           </div>
           <p>
-            The agent count is an inventory of product concepts and active builds—not a claim that 32 autonomous products are running in production.
+            The agent count is an inventory of product concepts and active builds—not a claim that 33 autonomous products are running in production.
             AMS only moves a capability toward Live as the real execution path, authentication, persistence, failure handling, operator controls,
             and customer experience are verified. That distinction protects trust and gives customers a useful view of what exists, what is being hardened,
             and what they can influence next.
