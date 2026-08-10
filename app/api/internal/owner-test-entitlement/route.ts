@@ -60,8 +60,11 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const body = await request.json().catch(() => null)
-  if (!body || body.confirmation !== CONFIRMATION) {
+  const contentType = request.headers.get("content-type") ?? ""
+  const confirmation = contentType.includes("application/json")
+    ? (await request.json().catch(() => null))?.confirmation
+    : (await request.formData().catch(() => null))?.get("confirmation")
+  if (confirmation !== CONFIRMATION) {
     return noStore(
       { ok: false, code: "CONFIRMATION_REQUIRED", error: "Exact owner confirmation required" },
       400,
