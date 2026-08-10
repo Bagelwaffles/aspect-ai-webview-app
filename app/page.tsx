@@ -280,7 +280,7 @@ export default function HomePage() {
         <div className={styles["roadmap-panel"]}>
           <div className={styles["roadmap-proof"]}>
             <p className={styles["section-kicker"]}>Agent network inventory</p>
-            <strong>32</strong>
+            <strong>33</strong>
             <p>
               The network includes customer-facing, creator, commerce, research, automation, and
               internal platform concepts. Inventory is not the same thing as availability: every
