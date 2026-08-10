@@ -73,7 +73,7 @@ export async function runContentAgentProvider(input: ContentAgentInput): Promise
   }
 
   const result = await generateText({
-    model: xai(model),
+    model: xai.responses(model),
     output: Output.object({ schema: contentAgentOutputSchema }),
     system: CONTENT_AGENT_SYSTEM_PROMPT,
     prompt: buildContentAgentPrompt(parsedInput),
