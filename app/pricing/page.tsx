@@ -62,7 +62,7 @@ export default function PricingPage() {
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-primary">AMS pricing</p>
           <h1 className="max-w-3xl text-4xl font-bold sm:text-5xl">Clear offers with honest launch status.</h1>
           <p className="max-w-2xl text-muted-foreground">
-            The $49 Quick Marketing Audit is live now. Content Agent remains in private beta, so paid AI subscriptions stay paused until provider access is funded and the live execution gate is deliberately enabled.
+            The $49 Quick Marketing Audit is live now. Content Agent provider execution and credit deduction have passed controlled testing; paid AI subscriptions remain paused until the production provider configuration and live execution gate are deliberately enabled.
           </p>
           <div className="flex flex-wrap gap-3">
             <Button asChild>
@@ -156,7 +156,7 @@ export default function PricingPage() {
                   </div>
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     <li>- {plan.credits}</li>
-                    <li>- Content Agent access after the live provider gate is enabled</li>
+                    <li>- Content Agent access after the production provider gate is enabled</li>
                     <li>- Outreach, Analytics, and other agents remain unavailable</li>
                     <li>- Stripe billing portal for existing subscribers</li>
                   </ul>

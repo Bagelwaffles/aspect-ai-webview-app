@@ -49,6 +49,6 @@ The webview-native staging topology contains exactly:
 
 No datastore port is published to the host. The web port binds to loopback only. See [docs/AMS_WEBVIEW_STAGING_RUNBOOK.md](docs/AMS_WEBVIEW_STAGING_RUNBOOK.md).
 
-## Production hold
+## Production status
 
-Draft PR #14 must remain unmerged until the isolated test-mode staging sequence is executed and evidenced. Do not modify production, DNS, live Stripe, Vercel production configuration, Supabase production, `main`, or Google Play production from this branch.
+PR #14 has been merged after the approved controlled reconciliation sequence. The public Next.js site and Redis readiness path are deployed. Provider-backed Content Agent execution and credit deduction have passed controlled testing, while public SaaS checkout remains gated until the production provider configuration is present and deliberately enabled. Google Play release work remains a separate blocked track.
