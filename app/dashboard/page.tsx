@@ -19,7 +19,7 @@ import {
 import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie"
 import { getCommandCenterTelemetry } from "@/lib/server/command-center-telemetry"
 
-import styles from "./dashboard.module.css"
+import { agentStatusCounts, agents } from "@/app/agents/agentCatalog"\n\nimport styles from "./dashboard.module.css"
 import opsStyles from "./dashboard-operations.module.css"
 
 export const dynamic = "force-dynamic"
@@ -312,12 +312,9 @@ export default async function DashboardPage() {
                 <Bot size={22} />
               </div>
               <div className={styles.lifecycle}>
-                <div><strong>0</strong><span>Live</span></div>
-                <div><strong>1</strong><span>Beta</span></div>
-                <div><strong>5</strong><span>In development</span></div>
-                <div><strong>26</strong><span>Coming soon</span></div>
+                <div><strong>{agentStatusCounts.live}</strong><span>Live</span></div>\n                <div><strong>{agentStatusCounts.beta}</strong><span>Beta</span></div>\n                <div><strong>{agentStatusCounts["setup-required"]}</strong><span>Setup required</span></div>\n                <div><strong>{agentStatusCounts.planned}</strong><span>Planned</span></div>\n                <div><strong>{agentStatusCounts.blocked}</strong><span>Blocked</span></div>
               </div>
-              <Link className={styles.panelLink} href="/agents">Review all 32 agents →</Link>
+              <Link className={styles.panelLink} href="/agents">Review all {agents.length} agents →</Link>
             </article>
 
             <article className={styles.panel}>
