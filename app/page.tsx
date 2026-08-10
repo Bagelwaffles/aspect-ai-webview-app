@@ -158,7 +158,7 @@ export default function HomePage() {
 
         <nav className={styles["desktop-nav"]} aria-label="Primary navigation">
           <a href="#capabilities">Capabilities</a>
-          <a href="/agents">Agent Network</a>
+          <Link href="/agents">Agent Network</Link>
           <a href="#experience">How it works</a>
           <a href="/pricing">Pricing</a>
         </nav>
@@ -193,9 +193,9 @@ export default function HomePage() {
             <a className={classes("button", "button-primary")} href="/quick-marketing-audit">
               Get the $49 Marketing Audit <span aria-hidden="true">↗</span>
             </a>
-            <a className={styles["text-link"]} href="/agents">
+            <Link className={styles["text-link"]} href="/agents">
               Explore the Agent Network <span aria-hidden="true">→</span>
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -270,9 +270,9 @@ export default function HomePage() {
               </div>
               <h3>{agent.title}</h3>
               <p>{agent.copy}</p>
-              <a href="/agents" aria-label={`View ${agent.title} in the AMS Agent Network`}>
+              <Link href="/agents" aria-label={`View ${agent.title} in the AMS Agent Network`}>
                 View Agent Network <span aria-hidden="true">↗</span>
-              </a>
+              </Link>
             </article>
           ))}
         </div>
