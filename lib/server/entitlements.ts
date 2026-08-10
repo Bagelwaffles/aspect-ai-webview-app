@@ -228,9 +228,9 @@ export async function grantOwnerContentTestEntitlement(
       return {'already-granted', redis.call('GET', KEYS[3]) or '0'}
     end
 
-    redis.call('SET', KEYS[1], ARGV[1])
     redis.call('SADD', KEYS[2], 'content')
     local credits = redis.call('INCRBY', KEYS[3], ARGV[2])
+    redis.call('SET', KEYS[1], ARGV[1])
     return {'granted', tostring(credits)}
   `
   const raw = await redis.eval(script, [claimKey, key.agents, key.topupCredits], [
