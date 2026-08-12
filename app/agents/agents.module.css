@@ -67,7 +67,7 @@
 .secondary { border: 1px solid var(--line); color: var(--paper); }
 .secondary:hover { border-color: var(--lime); color: var(--lime); }
 
-.signal { display: grid; grid-template-columns: repeat(4,1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: rgba(17,19,21,.76); }
+.signal { display: grid; grid-template-columns: repeat(5,1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: rgba(17,19,21,.76); }
 .signalItem { min-height: 132px; padding: 26px 4.5vw; border-right: 1px solid var(--line); }
 .signalItem:last-child { border-right: 0; }
 .signalLabel { display: block; color: var(--muted); font: 700 9px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing: .16em; text-transform: uppercase; }
@@ -75,7 +75,7 @@
 .signalItem[data-status="live"] .signalValue { color: #9bf8ba; }
 .signalItem[data-status="beta"] .signalValue { color: var(--blue); }
 .signalItem[data-status="development"] .signalValue { color: #b19aff; }
-.signalItem[data-status="soon"] .signalValue { color: #ffb66b; }
+.signalItem[data-status="soon"] .signalValue { color: #ffb66b; }\n.signalItem[data-status="blocked"] .signalValue { color: #ff6b6b; }
 
 .section { max-width: 1440px; margin: 0 auto; padding: 104px 4.5vw; }
 .sectionHead { display: grid; grid-template-columns: .85fr 1.15fr; gap: 7vw; align-items: end; margin-bottom: 50px; }
@@ -91,7 +91,7 @@
 .lifeCard[data-status="live"] .lifePill { color: #9bf8ba; }
 .lifeCard[data-status="beta"] .lifePill { color: var(--blue); }
 .lifeCard[data-status="development"] .lifePill { color: #b19aff; }
-.lifeCard[data-status="soon"] .lifePill { color: #ffb66b; }
+.lifeCard[data-status="soon"] .lifePill { color: #ffb66b; }\n.lifeCard[data-status="blocked"] .lifePill { color: #ff6b6b; }
 .lifeCard h3 { margin: 42px 0 12px; font-size: 23px; letter-spacing: -.035em; }
 .lifeCard p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.68; }
 
@@ -117,7 +117,7 @@
 .badge[data-status="live"] { color: #9bf8ba; }
 .badge[data-status="beta"] { color: var(--blue); }
 .badge[data-status="development"] { color: #b19aff; }
-.badge[data-status="soon"] { color: #ffb66b; }
+.badge[data-status="soon"] { color: #ffb66b; }\n.badge[data-status="blocked"] { color: #ff6b6b; }
 .internal { color: #9ca0a5; }
 .glyph { position: relative; display: grid; width: 82px; height: 82px; margin: 48px auto 42px; place-items: center; transform: rotate(45deg); color: var(--lime); }
 .glyph i { position: absolute; border: 1px solid currentColor; }
@@ -126,7 +126,7 @@
 .glyph i:nth-child(3) { inset: 31px; background: currentColor; }
 .card[data-status="beta"] .glyph { color: var(--blue); }
 .card[data-status="development"] .glyph { color: var(--violet); }
-.card[data-status="soon"] .glyph { color: var(--orange); }
+.card[data-status="soon"] .glyph { color: var(--orange); }\n.card[data-status="blocked"] .glyph { color: #ff6b6b; }
 .card h3 { margin: 0; font-size: 24px; line-height: 1.08; letter-spacing: -.04em; }
 .category { margin: 10px 0 13px; color: var(--lime); font: 800 9px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing: .14em; text-transform: uppercase; }
 .description { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
@@ -137,7 +137,7 @@
 .statusDot { width: 7px; height: 7px; margin-top: 4px; flex: 0 0 auto; border-radius: 50%; background: var(--lime); }
 .card[data-status="beta"] .statusDot { background: var(--blue); }
 .card[data-status="development"] .statusDot { background: var(--violet); }
-.card[data-status="soon"] .statusDot { background: var(--orange); }
+.card[data-status="soon"] .statusDot { background: var(--orange); }\n.card[data-status="blocked"] .statusDot { background: #ff6b6b; }
 .cardLink { display: flex; align-items: center; justify-content: space-between; margin-top: 13px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,.08); font: 800 9px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing: .09em; text-transform: uppercase; }
 .cardLink:hover { color: var(--lime); }
 .empty { padding: 65px 24px; border: 1px dashed var(--line); color: var(--muted); text-align: center; }
