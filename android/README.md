@@ -2,14 +2,16 @@
 
 This directory is the modern Android replacement for the July 2025 `Aspect AI-source.zip` project recovered from the AMS Google Drive archive.
 
-## Preserved identity
+## Authoritative Play identity
 
-- Application ID / package: `com.aspectai.webview`
+- Google Play application ID / package: `com.aspectmarketingsolutions.app`
 - App name: `Aspect Marketing Solutions`
-- Version code: `2026080901`
+- Version code: `20000`
 - Version name: `2.0.0`
 
-The recovered project also used `com.aspectai.webview`, but targeted API 34 and loaded `https://aspect-ai.web.app` in an embedded WebView with file access and mixed-content compatibility enabled. Those legacy behaviors are intentionally not carried forward.
+The recovered July 2025 source used the obsolete package `com.aspectai.webview`, but the existing Google Play Console app record for Aspect Marketing Solutions is registered as `com.aspectmarketingsolutions.app`. The Play Console record is authoritative for this release, so the modern Android project now uses that exact package identity.
+
+The recovered project also targeted API 34 and loaded `https://aspect-ai.web.app` in an embedded WebView with file access and mixed-content compatibility enabled. Those legacy behaviors are intentionally not carried forward.
 
 ## Play v1 product boundary
 
@@ -36,4 +38,4 @@ The app provides native platform-health reporting, a truthful launch-agent statu
 
 ## Signing
 
-The recovered 2025 archive contained no `.jks`, `.keystore`, `.p12`, `.pem`, or `.key` signing material. Release signing must therefore be resolved against the existing Play Console app record before production upload. Do not invent or replace a signing key until Play App Signing / upload-key status is confirmed.
+Google Play Console confirms Play App Signing is enabled for `com.aspectmarketingsolutions.app` and shows an existing upload-key certificate. The recovered source, Gmail, and Drive search did not recover the corresponding private upload keystore. The safe release path is therefore to generate a new upload key, request an upload-key reset in Play Console, keep the new private keystore secure, and use only its public certificate for the reset request.

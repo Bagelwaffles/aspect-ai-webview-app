@@ -58,7 +58,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(grep -c "applicationId 'com.aspectai.webview'" android/app/build.gradle)" -eq 1
+          test "$(grep -c "applicationId 'com.aspectmarketingsolutions.app'" android/app/build.gradle)" -eq 1
+          test "$(grep -c "namespace 'com.aspectmarketingsolutions.app'" android/app/build.gradle)" -eq 1
           test "$(grep -c 'targetSdk 36' android/app/build.gradle)" -eq 1
           test "$(grep -c 'compileSdk 36' android/app/build.gradle)" -eq 1
           test "$(grep -c 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml)" -eq 1
@@ -91,7 +92,7 @@ jobs:
           fi
           AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
           BADGING=$($AAPT dump badging "$APK")
-          echo "$BADGING" | grep -F "package: name='com.aspectai.webview'"
+          echo "$BADGING" | grep -F "package: name='com.aspectmarketingsolutions.app'"
           echo "$BADGING" | grep -F "targetSdkVersion:'36'"
           echo "$BADGING" | grep -F "application-label:'Aspect Marketing Solutions'"
           echo "Release package identity and target SDK verified."
@@ -117,4 +118,4 @@ jobs:
 
       - name: Release status
         run: |
-          echo "Build passed. Artifacts are intentionally unsigned until the existing Play Console signing/upload-key state is confirmed."
+          echo "Build passed. Artifacts are intentionally unsigned until the Play upload-key reset/identity is completed."

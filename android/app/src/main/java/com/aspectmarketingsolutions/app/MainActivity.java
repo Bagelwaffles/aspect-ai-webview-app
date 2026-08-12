@@ -1,4 +1,4 @@
-package com.aspectai.webview;
+package com.aspectmarketingsolutions.app;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -142,7 +142,7 @@ public final class MainActivity extends Activity {
         root.addView(supportButton, buttonParams());
 
         TextView footer = text(
-                "Version " + getString(R.string.app_version_label) + " · Package com.aspectai.webview",
+                "Version " + getString(R.string.app_version_label) + " · Package com.aspectmarketingsolutions.app",
                 12,
                 COLOR_MUTED,
                 false
