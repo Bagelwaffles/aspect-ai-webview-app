@@ -9,6 +9,7 @@ import {
   releaseStripeEvent,
   revokeStripeSubscriptionEntitlement,
 } from "@/lib/server/entitlements"
+import { fulfillQuickAuditCheckout } from "@/lib/server/quick-audit-fulfillment"
 import {
   assertStripeSecretKeyMatchesMode,
   createStripeReadGateway,
@@ -27,8 +28,24 @@ export const POST = createStripeWebhookPostHandler({
   claimEvent: claimStripeEvent,
   completeEvent: completeStripeEvent,
   releaseEvent: releaseStripeEvent,
-  processEvent: (stripe, event, config) =>
-    processStripeLifecycleEvent({
+  processEvent: async (stripe, event, config) => {
+    if (event.type === "checkout.session.completed") {
+      const quickAudit = await fulfillQuickAuditCheckout({ stripe, event })
+      if (quickAudit.matched) {
+        console.info(`[Stripe] Quick Audit fulfillment ${quickAudit.status}`)
+        return {
+          processed: true,
+          applied: quickAudit.status === "ai_draft_ready",
+          creditsReset: false,
+          reason:
+            quickAudit.status === "ai_draft_ready"
+              ? "QUICK_AUDIT_AI_DRAFT_READY"
+              : "QUICK_AUDIT_MANUAL_REVIEW_REQUIRED",
+        }
+      }
+    }
+
+    return processStripeLifecycleEvent({
       event,
       gateway: createStripeReadGateway(stripe),
       writer: {
@@ -36,7 +53,8 @@ export const POST = createStripeWebhookPostHandler({
         revoke: revokeStripeSubscriptionEntitlement,
       },
       config,
-    }),
+    })
+  },
 })
 
 export async function GET() {
