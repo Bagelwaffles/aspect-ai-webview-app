@@ -345,6 +345,7 @@ test("Quick Audit checkout refuses to fall back to the general Stripe secret", a
 
   const handler = createQuickAuditCheckoutHandler({
     env: {
+      NODE_ENV: "test",
       AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED: "true",
       STRIPE_SECRET_KEY: liveSecretKey,
       AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: priceId,
@@ -396,6 +397,7 @@ test("Quick Audit webhook refuses to fall back to general Stripe webhook credent
 
   const handler = createQuickAuditWebhookHandler({
     env: {
+      NODE_ENV: "test",
       STRIPE_SECRET_KEY: liveSecretKey,
       STRIPE_WEBHOOK_SECRET: webhookSecret,
       AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: priceId,
