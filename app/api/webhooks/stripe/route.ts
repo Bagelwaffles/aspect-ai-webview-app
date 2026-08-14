@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 
 import {
@@ -9,7 +9,6 @@ import {
   releaseStripeEvent,
   revokeStripeSubscriptionEntitlement,
 } from "@/lib/server/entitlements"
-import { fulfillQuickAuditCheckout } from "@/lib/server/quick-audit-fulfillment"
 import {
   assertStripeSecretKeyMatchesMode,
   createStripeReadGateway,
@@ -17,35 +16,23 @@ import {
   processStripeLifecycleEvent,
   stripeEntitlementConfigFromEnv,
 } from "@/lib/server/stripe-entitlements"
+import {
+  createQuickAuditWebhookHandler,
+  defaultQuickAuditWebhookDependencies,
+} from "@/lib/server/quick-audit-webhook"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-export const POST = createStripeWebhookPostHandler({
+const subscriptionPost = createStripeWebhookPostHandler({
   env: process.env,
   isStoreConfigured: isEntitlementStoreConfigured,
   createStripe: (secretKey) => new Stripe(secretKey),
   claimEvent: claimStripeEvent,
   completeEvent: completeStripeEvent,
   releaseEvent: releaseStripeEvent,
-  processEvent: async (stripe, event, config) => {
-    if (event.type === "checkout.session.completed") {
-      const quickAudit = await fulfillQuickAuditCheckout({ stripe, event })
-      if (quickAudit.matched) {
-        console.info(`[Stripe] Quick Audit fulfillment ${quickAudit.status}`)
-        return {
-          processed: true,
-          applied: quickAudit.status === "ai_draft_ready",
-          creditsReset: false,
-          reason:
-            quickAudit.status === "ai_draft_ready"
-              ? "QUICK_AUDIT_AI_DRAFT_READY"
-              : "QUICK_AUDIT_MANUAL_REVIEW_REQUIRED",
-        }
-      }
-    }
-
-    return processStripeLifecycleEvent({
+  processEvent: (stripe, event, config) =>
+    processStripeLifecycleEvent({
       event,
       gateway: createStripeReadGateway(stripe),
       writer: {
@@ -53,9 +40,23 @@ export const POST = createStripeWebhookPostHandler({
         revoke: revokeStripeSubscriptionEntitlement,
       },
       config,
-    })
-  },
+    }),
 })
+
+const quickAuditPost = createQuickAuditWebhookHandler(defaultQuickAuditWebhookDependencies({
+  env: process.env,
+  claimEvent: claimStripeEvent,
+  completeEvent: completeStripeEvent,
+  releaseEvent: releaseStripeEvent,
+}))
+
+export async function POST(request: NextRequest) {
+  const rawBody = await request.text()
+  const init = { method: "POST", headers: request.headers, body: rawBody }
+  const quickAuditResponse = await quickAuditPost(new NextRequest(request.url, init))
+  if (quickAuditResponse) return quickAuditResponse
+  return subscriptionPost(new NextRequest(request.url, init))
+}
 
 export async function GET() {
   let priceConfigurationValid = false

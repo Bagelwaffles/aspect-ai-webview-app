@@ -3,6 +3,7 @@ import { ArrowRight, CheckCircle2, Clock3, ShieldCheck, Sparkles } from "lucide-
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { QuickAuditCheckoutForm } from "@/components/quick-audit-checkout-form"
 import { QUICK_MARKETING_AUDIT } from "@/lib/quick-marketing-audit"
 
 export const metadata = {
@@ -39,7 +40,7 @@ export default function QuickMarketingAuditPage() {
 
             <div className="flex flex-wrap items-center gap-3">
               <Button asChild size="lg">
-                <a href={QUICK_MARKETING_AUDIT.checkoutUrl} rel="noreferrer">
+                <a href="#quick-audit-checkout">
                   Get my audit — $49
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </a>
@@ -79,12 +80,7 @@ export default function QuickMarketingAuditPage() {
                 </ul>
               </div>
 
-              <Button asChild className="w-full" size="lg">
-                <a href={QUICK_MARKETING_AUDIT.checkoutUrl} rel="noreferrer">
-                  Start the audit
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </a>
-              </Button>
+              <QuickAuditCheckoutForm />
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Secure checkout is handled by Stripe. At checkout we collect the business details needed to begin the review. AMS does not promise specific revenue or ranking outcomes.
               </p>
