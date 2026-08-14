@@ -29,16 +29,24 @@ export function createQuickAuditWebhookHandler(dependencies: Dependencies) {
     const signature = request.headers.get("stripe-signature")
     if (!signature) return null
     const rawBody = await request.text()
+    const sharedWebhookSecret = dependencies.env.STRIPE_WEBHOOK_SECRET?.trim()
+    const sharedWebhookMode = (dependencies.env.AMS_STRIPE_WEBHOOK_MODE ?? "test").trim().toLowerCase()
     const configurations = [
       {
         secretKey: dependencies.env.AMS_STRIPE_QUICK_AUDIT_SECRET_KEY?.trim(),
-        webhookSecret: dependencies.env.AMS_STRIPE_QUICK_AUDIT_WEBHOOK_SECRET?.trim(),
+        webhookSecret: (
+          dependencies.env.AMS_STRIPE_QUICK_AUDIT_WEBHOOK_SECRET ??
+          (sharedWebhookMode === "test" ? sharedWebhookSecret : undefined)
+        )?.trim(),
         priceId: dependencies.env.AMS_STRIPE_QUICK_AUDIT_PRICE_ID?.trim(),
         livemode: false,
       },
       {
         secretKey: dependencies.env.AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY?.trim(),
-        webhookSecret: dependencies.env.AMS_STRIPE_QUICK_AUDIT_LIVE_WEBHOOK_SECRET?.trim(),
+        webhookSecret: (
+          dependencies.env.AMS_STRIPE_QUICK_AUDIT_LIVE_WEBHOOK_SECRET ??
+          (sharedWebhookMode === "live" ? sharedWebhookSecret : undefined)
+        )?.trim(),
         priceId: dependencies.env.AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID?.trim(),
         livemode: true,
       },
@@ -64,6 +72,7 @@ export function createQuickAuditWebhookHandler(dependencies: Dependencies) {
     }
     const session = event.data.object as Stripe.Checkout.Session
     if (session.mode !== "payment") return null
+    if (session.metadata?.ams_offer !== "quick-marketing-audit") return null
 
     let claim: StripeEventClaim
     try { claim = await dependencies.claimEvent(event.id) } catch {
