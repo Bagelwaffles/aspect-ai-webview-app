@@ -1,0 +1,17 @@
+{
+  "name": "ams-browser-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pair": "tsx src/index.ts pair",
+    "start": "tsx src/index.ts run"
+  },
+  "dependencies": {
+    "playwright-core": "^1.55.0"
+  },
+  "devDependencies": {
+    "tsx": "4.20.6",
+    "typescript": "5.9.3"
+  }
+}
