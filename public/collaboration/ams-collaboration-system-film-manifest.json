@@ -1,0 +1,93 @@
+{
+  "title": "AMS Collaboration System \u2014 Build Together. Prove It. Scale It.",
+  "voice": "en-US-JennyNeural",
+  "voice_rate": "+6%",
+  "resolution": "1280x720",
+  "fps": 30,
+  "duration_seconds": 108.801,
+  "sha256": "7ec51992e9a1945a9daae2896682e7e80e8a2f0a60ae2009fe2f6f47cf87dd0f",
+  "timing_method": "per-scene neural narration duration + 0.10 second transition tolerance; no cumulative fixed hold",
+  "scenes": [
+    {
+      "title": "THE HOOK",
+      "headline": "WHAT IF YOUR EXPERTISE\nCOULD PLUG INTO THE SYSTEM?",
+      "voiceover": "What if your expertise could plug into an AI-powered business operating system built to turn ideas into measurable action?",
+      "kind": "hook",
+      "start": 0.0,
+      "duration": 6.892,
+      "end": 6.892
+    },
+    {
+      "title": "WHAT AMS IS",
+      "headline": "COORDINATED AI + AUTOMATION",
+      "voiceover": "Aspect Marketing Solutions is building a coordinated AI operating layer for business growth\u2014connecting specialized agents, automation, content, sales support, research, commerce, and operator controls inside one system.",
+      "kind": "categories",
+      "start": 6.892,
+      "duration": 13.9,
+      "end": 20.792
+    },
+    {
+      "title": "33 SPECIALIZED ROLES",
+      "headline": "POWER = COORDINATION",
+      "voiceover": "The catalog defines thirty-three specialized roles. But the power is not the number. It is the coordination. Every capability is labeled honestly, because AMS is built around proof, not theater.",
+      "kind": "agents",
+      "start": 20.792,
+      "duration": 13.852,
+      "end": 34.644
+    },
+    {
+      "title": "THE REAL SYSTEM BEHIND IT",
+      "headline": "REAL BUSINESS INFRASTRUCTURE",
+      "voiceover": "Behind the interface are real business foundations: a Next.js platform on Vercel, Stripe payment and entitlement flows, n8n orchestration, persistent state and failure controls, protected routes, and a separate Android release track.",
+      "kind": "architecture",
+      "start": 34.644,
+      "duration": 14.98,
+      "end": 49.624
+    },
+    {
+      "title": "WHAT A COLLABORATOR BRINGS",
+      "headline": "BRING THE ADVANTAGE\nAMS SHOULD NOT PRETEND TO OWN",
+      "voiceover": "A collaborator brings the part AMS should not pretend to own: deep niche expertise, an audience, a proven service, technology, distribution, creative skill, or a real customer problem.",
+      "kind": "incoming",
+      "start": 49.624,
+      "duration": 12.028,
+      "end": 61.652
+    },
+    {
+      "title": "WHAT AMS BRINGS",
+      "headline": "AMS BRINGS THE SYSTEM LAYER",
+      "voiceover": "AMS brings the system layer\u2014structured audits, content workflows, automation architecture, agent-oriented infrastructure, controlled integrations, and a pilot-first way to turn expertise into something repeatable.",
+      "kind": "system",
+      "start": 61.652,
+      "duration": 13.084,
+      "end": 74.736
+    },
+    {
+      "title": "PILOT BEFORE SCALE",
+      "headline": "DEFINE  \u2192  OWN  \u2192  PILOT  \u2192  REVIEW",
+      "voiceover": "We do not start with giant partnerships. We define one measurable outcome, assign ownership, run a small reversible pilot, and review the evidence before scaling.",
+      "kind": "pilot",
+      "start": 74.736,
+      "duration": 10.252,
+      "end": 84.988
+    },
+    {
+      "title": "CONTROL + TRUST",
+      "headline": "HUMAN APPROVAL\nWHERE RISK MATTERS",
+      "voiceover": "Public actions, payments, account changes, and sensitive operations stay human-approved where risk matters. No shared passwords. No fake availability. No roadmap promises dressed up as production.",
+      "kind": "trust",
+      "start": 84.988,
+      "duration": 14.332,
+      "end": 99.32
+    },
+    {
+      "title": "THE INVITATION",
+      "headline": "FIND THE OVERLAP.\nTEST SOMETHING REAL.",
+      "voiceover": "If you see an overlap between what you do and what AMS is building, explore the Collaboration Hub, complete the AI-ready brief, and let us test something real.",
+      "kind": "cta",
+      "start": 99.32,
+      "duration": 9.412,
+      "end": 108.732
+    }
+  ]
+}
