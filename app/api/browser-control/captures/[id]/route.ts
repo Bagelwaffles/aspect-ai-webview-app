@@ -14,7 +14,7 @@ export async function GET(
   const capture = await getBrowserCapture(id)
   if (!capture) return new Response("Not found", { status: 404 })
 
-  return new Response(capture, {
+  return new Response(new Uint8Array(capture), {
     headers: {
       "Content-Type": "image/png",
       "Cache-Control": "private, no-store",
