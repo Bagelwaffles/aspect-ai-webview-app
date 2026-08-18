@@ -1,12 +1,6 @@
 name: Build AMS Collaboration Film
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/build-ams-collaboration-film.yml'
-      - 'scripts/build_ams_collaboration_film.py'
   workflow_dispatch:
 
 permissions:
