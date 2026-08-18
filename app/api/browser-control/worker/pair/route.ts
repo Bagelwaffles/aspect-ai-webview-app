@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { pairBrowserWorker } from "@/lib/server/browser-control"
+import { pairBrowserWorkerCompat } from "@/lib/server/browser-control-pairing-compat"
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null)
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const paired = await pairBrowserWorker({
+    const paired = await pairBrowserWorkerCompat({
       code: body.code,
       name: typeof body.name === "string" ? body.name : undefined,
       version: typeof body.version === "string" ? body.version : undefined,
