@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto"
+import { createHash, randomBytes, randomUUID } from "node:crypto"
 
 import { Redis } from "@upstash/redis"
 import type { NextRequest } from "next/server"
@@ -105,8 +105,8 @@ function captureKey(jobId: string) {
   return `${PREFIX}:capture:${jobId}`
 }
 
-function sha256(value: string | Buffer) {
-  return createHash("sha256").update(value).digest("hex")
+function sha256(value: string) {
+  return createHash("sha256").update(value, "utf8").digest("hex")
 }
 
 function normalizePairingCode(value: string) {
@@ -114,9 +114,12 @@ function normalizePairingCode(value: string) {
 }
 
 function safeEqual(left: string, right: string) {
-  const leftBuffer = Buffer.from(left)
-  const rightBuffer = Buffer.from(right)
-  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer)
+  if (left.length !== right.length) return false
+  let mismatch = 0
+  for (let index = 0; index < left.length; index += 1) {
+    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index)
+  }
+  return mismatch === 0
 }
 
 async function putJob(redis: Redis, job: BrowserJob) {
@@ -337,11 +340,14 @@ export async function completeBrowserJob(
   return updated
 }
 
-export async function getBrowserCapture(jobId: string): Promise<Buffer | null> {
+export async function getBrowserCapture(jobId: string): Promise<Uint8Array<ArrayBuffer> | null> {
   const redis = getRedis()
   const base64 = await redis.get<string>(captureKey(jobId))
   if (!base64) return null
-  return Buffer.from(base64, "base64")
+  const decoded = Buffer.from(base64, "base64")
+  const copy = new Uint8Array(decoded.length)
+  copy.set(decoded)
+  return copy
 }
 
 export async function setBrowserKillSwitch(disabled: boolean): Promise<void> {
