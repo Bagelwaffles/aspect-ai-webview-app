@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { agents, agentStatusCounts, statusMeta, type AgentCategory } from "../agents/agentCatalog"
 import CollaborationBriefBuilder from "./CollaborationBriefBuilder"
+import CollaborationFilm from "./CollaborationFilm"
 import styles from "./collaborate.module.css"
 
 export const metadata: Metadata = {
@@ -196,6 +197,8 @@ export default function CollaboratePage() {
           </dl>
         </aside>
       </section>
+
+      <CollaborationFilm />
 
       <section className={styles.signalBar} aria-label="AMS collaboration principles">
         <span>NO FAKE AVAILABILITY</span><i>✦</i><span>OWNER-AUTHORIZED ACCESS</span><i>✦</i>
