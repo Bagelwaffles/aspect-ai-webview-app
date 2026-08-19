@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
@@ -19,5 +20,17 @@ export default async function BrowserControlPage() {
     redirect("/admin/login?next=/dashboard/browser-control")
   }
 
-  return <BrowserControlClient />
+  return (
+    <>
+      <div className="fixed bottom-4 right-4 z-50">
+        <Link
+          href="/dashboard/browser-control/fiverr"
+          className="inline-flex rounded-full border border-emerald-400/30 bg-slate-950/95 px-4 py-2 text-xs font-black uppercase tracking-wider text-emerald-200 shadow-xl shadow-black/40"
+        >
+          Fiverr Phase 1 →
+        </Link>
+      </div>
+      <BrowserControlClient />
+    </>
+  )
 }
