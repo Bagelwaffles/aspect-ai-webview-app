@@ -99,6 +99,7 @@ async function launchContext(): Promise<BrowserContext> {
       return await chromium.launchPersistentContext(profilePath, {
         channel,
         headless: false,
+        chromiumSandbox: true,
         viewport: { width: 1440, height: 900 },
         acceptDownloads: false,
       })
@@ -107,7 +108,7 @@ async function launchContext(): Promise<BrowserContext> {
     }
   }
 
-  throw new Error(`Could not launch Microsoft Edge or Chrome. ${lastError instanceof Error ? lastError.message : "Browser unavailable"}`)
+  throw new Error(`Could not launch Microsoft Edge or Chrome with Chromium sandboxing enabled. ${lastError instanceof Error ? lastError.message : "Browser unavailable"}`)
 }
 
 async function pageFor(context: BrowserContext): Promise<Page> {
