@@ -20,6 +20,8 @@ const RISK_BY_ACTION: Record<BrowserAction, BrowserRisk> = {
   submit: "red",
 }
 
+// Phase-1 perimeter: keep browser control intentionally narrow.
+// Add business sites one at a time only after a dedicated onboarding/proof pass.
 export const DEFAULT_BROWSER_ALLOWED_HOSTS = [
   "aspectmarketingsolutions.app",
   "www.aspectmarketingsolutions.app",
@@ -27,17 +29,6 @@ export const DEFAULT_BROWSER_ALLOWED_HOSTS = [
   "www.github.com",
   "fiverr.com",
   "www.fiverr.com",
-  "facebook.com",
-  "www.facebook.com",
-  "business.facebook.com",
-  "linkedin.com",
-  "www.linkedin.com",
-  "dashboard.stripe.com",
-  "stripe.com",
-  "aspectmarketingsolutions.app.n8n.cloud",
-  "youtube.com",
-  "www.youtube.com",
-  "studio.youtube.com",
 ] as const
 
 export function riskForBrowserAction(action: BrowserAction): BrowserRisk {
