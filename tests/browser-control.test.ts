@@ -16,9 +16,12 @@ test("browser control classifies read-only and write actions by risk", () => {
   assert.equal(riskForBrowserAction("submit"), "red")
 })
 
-test("browser control only accepts exact allowlisted HTTPS hosts", () => {
+test("browser control only accepts exact phase-1 allowlisted HTTPS hosts", () => {
   assert.equal(isAllowedBrowserUrl("https://www.aspectmarketingsolutions.app/collaborate"), true)
   assert.equal(isAllowedBrowserUrl("https://github.com/Bagelwaffles"), true)
+  assert.equal(isAllowedBrowserUrl("https://www.fiverr.com/"), true)
+  assert.equal(isAllowedBrowserUrl("https://dashboard.stripe.com/"), false)
+  assert.equal(isAllowedBrowserUrl("https://www.linkedin.com/"), false)
   assert.equal(isAllowedBrowserUrl("https://evil.example/"), false)
   assert.equal(isAllowedBrowserUrl("https://github.com.evil.example/"), false)
   assert.equal(isAllowedBrowserUrl("https://user:pass@github.com/"), false)
