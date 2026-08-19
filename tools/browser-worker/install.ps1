@@ -46,14 +46,18 @@ if (Test-Path $CredentialFile) {
 
 $StartScript = Join-Path $WorkerRoot "start.ps1"
 $TaskCommand = "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$StartScript`""
-Write-Host "Creating startup task '$TaskName'..." -ForegroundColor Cyan
-& schtasks.exe /Create /TN $TaskName /SC ONLOGON /TR $TaskCommand /F | Out-Null
+Write-Host "Creating limited-privilege startup task '$TaskName'..." -ForegroundColor Cyan
+& schtasks.exe /Create /TN $TaskName /SC ONLOGON /TR $TaskCommand /RL LIMITED /IT /F | Out-Null
 if ($LASTEXITCODE -ne 0) {
-  Write-Warning "Could not create the startup task. You can still run start.ps1 manually."
+  throw "Could not create the limited-privilege startup task. The browser worker was not started."
 }
 
-Write-Host "Starting AMS Browser Worker now..." -ForegroundColor Cyan
-Start-Process powershell.exe -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $StartScript)
+Write-Host "Starting AMS Browser Worker through the limited-privilege task..." -ForegroundColor Cyan
+& schtasks.exe /Run /TN $TaskName | Out-Null
+if ($LASTEXITCODE -ne 0) {
+  throw "Could not start the AMS Browser Worker task."
+}
 
 Write-Host "Installed. Return to /dashboard/browser-control and wait for the worker status to turn ONLINE." -ForegroundColor Green
-Write-Host "The worker uses a separate Edge/Chrome profile under $DataRoot. Log into approved sites in that profile only when needed." -ForegroundColor Yellow
+Write-Host "The worker uses Chromium sandboxing and a separate Edge/Chrome profile under $DataRoot." -ForegroundColor Yellow
+Write-Host "Log into approved sites in that profile only when needed. Do not run start.ps1 from an elevated Administrator shell." -ForegroundColor Yellow
