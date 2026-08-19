@@ -7,7 +7,7 @@ import readline from "node:readline/promises"
 
 import { chromium, type BrowserContext, type Page } from "playwright-core"
 
-const VERSION = "1.0.0"
+const VERSION = "1.0.1"
 const appRoot = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "AMS", "BrowserWorker")
 const credentialsPath = path.join(appRoot, "credentials.json")
 const profilePath = path.join(appRoot, "EdgeProfile")
@@ -24,6 +24,11 @@ interface BrowserJob {
   url: string
   selector?: string
   value?: string
+}
+
+interface BrowserSession {
+  context: BrowserContext
+  page: Page
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -115,6 +120,37 @@ async function pageFor(context: BrowserContext): Promise<Page> {
   return context.pages()[0] || await context.newPage()
 }
 
+async function newSession(): Promise<BrowserSession> {
+  const context = await launchContext()
+  const page = await pageFor(context)
+  return { context, page }
+}
+
+function sessionIsUsable(session: BrowserSession | null) {
+  if (!session || session.page.isClosed()) return false
+  try {
+    return session.context.pages().includes(session.page)
+  } catch {
+    return false
+  }
+}
+
+async function ensureSession(session: BrowserSession | null): Promise<BrowserSession> {
+  if (sessionIsUsable(session)) return session as BrowserSession
+  if (session) await session.context.close().catch(() => undefined)
+  console.warn("AMS browser session was closed. Relaunching the dedicated profile.")
+  return newSession()
+}
+
+function isReadOnlyAction(action: BrowserJob["action"]) {
+  return action === "open" || action === "inspect" || action === "screenshot"
+}
+
+function isClosedBrowserError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  return /target page, context or browser has been closed|browser has been closed|page has been closed/i.test(message)
+}
+
 async function navigate(page: Page, url: string) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 })
   await page.waitForTimeout(500)
@@ -161,8 +197,7 @@ async function execute(page: Page, job: BrowserJob) {
 
 async function run() {
   const creds = await credentials()
-  const context = await launchContext()
-  const page = await pageFor(context)
+  let session: BrowserSession | null = await newSession()
   let currentJobId: string | null = null
   let lastHeartbeat = 0
 
@@ -170,7 +205,7 @@ async function run() {
   console.log(`Dedicated profile: ${profilePath}`)
 
   process.on("SIGINT", async () => {
-    await context.close().catch(() => undefined)
+    if (session) await session.context.close().catch(() => undefined)
     process.exit(0)
   })
 
@@ -209,7 +244,18 @@ async function run() {
       console.log(`[${job.id}] ${job.action} ${job.url}`)
       const started = Date.now()
       try {
-        const result = await execute(page, job)
+        session = await ensureSession(session)
+        let result
+        try {
+          result = await execute(session.page, job)
+        } catch (error) {
+          if (!isReadOnlyAction(job.action) || !isClosedBrowserError(error)) throw error
+          console.warn(`[${job.id}] Browser closed during read-only job. Relaunching and retrying once.`)
+          await session.context.close().catch(() => undefined)
+          session = await newSession()
+          result = await execute(session.page, job)
+        }
+
         await jsonRequest(`${creds.baseUrl}/api/browser-control/worker/result`, {
           method: "POST",
           headers: workerHeaders(creds),
@@ -218,10 +264,15 @@ async function run() {
         console.log(`[${job.id}] PASS · ${result.title}`)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
+        const finalUrl = session && !session.page.isClosed() ? session.page.url() : undefined
+        if (isClosedBrowserError(error)) {
+          if (session) await session.context.close().catch(() => undefined)
+          session = null
+        }
         await jsonRequest(`${creds.baseUrl}/api/browser-control/worker/result`, {
           method: "POST",
           headers: workerHeaders(creds),
-          body: JSON.stringify({ jobId: job.id, ok: false, error: message, durationMs: Date.now() - started, finalUrl: page.url() }),
+          body: JSON.stringify({ jobId: job.id, ok: false, error: message, durationMs: Date.now() - started, finalUrl }),
         }).catch(() => undefined)
         console.error(`[${job.id}] FAIL · ${message}`)
       } finally {
