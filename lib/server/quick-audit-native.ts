@@ -77,7 +77,7 @@ function isNativeQuickAuditResult(value: unknown): value is NativeQuickAuditResu
 
 function decodeResult(raw: unknown): NativeQuickAuditResult | null {
   if (raw === null || raw === undefined) return null
-  let value = raw
+  let value: unknown = raw
   if (typeof raw === "string") {
     try {
       value = JSON.parse(raw) as unknown
