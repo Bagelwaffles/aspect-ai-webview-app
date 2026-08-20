@@ -29,6 +29,19 @@ function validSessionId(value: string | null) {
   return Boolean(value && value.length <= 255 && /^cs_(?:live|test)_[A-Za-z0-9]+$/.test(value))
 }
 
+function configurationForSession(env: NodeJS.ProcessEnv, sessionId: string) {
+  const live = sessionId.startsWith("cs_live_")
+  const secretKey = (live
+    ? env.AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY
+    : env.AMS_STRIPE_QUICK_AUDIT_SECRET_KEY)?.trim()
+  const priceId = (live
+    ? env.AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID
+    : env.AMS_STRIPE_QUICK_AUDIT_PRICE_ID)?.trim()
+  const expectedPrefix = live ? /^(sk|rk)_live_/ : /^(sk|rk)_test_/
+  if (!secretKey || !expectedPrefix.test(secretKey) || !priceId?.startsWith("price_")) return null
+  return { secretKey, priceId, livemode: live }
+}
+
 export function createQuickAuditResultHandler(overrides: Partial<Dependencies> = {}) {
   const dependencies = { ...defaults, ...overrides }
 
@@ -41,9 +54,8 @@ export function createQuickAuditResultHandler(overrides: Partial<Dependencies> =
       )
     }
 
-    const secretKey = dependencies.env.AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY?.trim()
-    const priceId = dependencies.env.AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID?.trim()
-    if (!secretKey || !/^(sk|rk)_live_/.test(secretKey) || !priceId?.startsWith("price_")) {
+    const config = configurationForSession(dependencies.env, sessionId!)
+    if (!config) {
       return noStoreJson(
         { ok: false, error: "Quick Audit result access is unavailable", code: "QUICK_AUDIT_RESULT_UNCONFIGURED" },
         503,
@@ -51,10 +63,10 @@ export function createQuickAuditResultHandler(overrides: Partial<Dependencies> =
     }
 
     try {
-      const stripe = dependencies.createStripe(secretKey)
+      const stripe = dependencies.createStripe(config.secretKey)
       const session = await stripe.checkout.sessions.retrieve(sessionId!)
       if (
-        !session.livemode ||
+        session.livemode !== config.livemode ||
         session.mode !== "payment" ||
         session.status !== "complete" ||
         session.payment_status !== "paid" ||
@@ -67,7 +79,7 @@ export function createQuickAuditResultHandler(overrides: Partial<Dependencies> =
       }
 
       const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 10 })
-      const matching = lineItems.data.filter((item) => item.price?.id === priceId && item.quantity === 1)
+      const matching = lineItems.data.filter((item) => item.price?.id === config.priceId && item.quantity === 1)
       if (matching.length !== 1 || lineItems.data.length !== 1) {
         return noStoreJson(
           { ok: false, error: "Quick Audit purchase was not verified", code: "QUICK_AUDIT_PRICE_NOT_VERIFIED" },
