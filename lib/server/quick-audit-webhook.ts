@@ -3,7 +3,6 @@ import Stripe from "stripe"
 
 import type { StripeEventClaim } from "./entitlements"
 import {
-  createQuickAuditAuditGateway,
   processQuickAuditCheckout,
   QuickAuditFulfillmentError,
   RedisQuickAuditStore,
@@ -12,6 +11,7 @@ import {
   type QuickAuditStore,
   type QuickAuditStripeGateway,
 } from "./quick-audit-fulfillment"
+import { createNativeQuickAuditAuditGateway } from "./quick-audit-native"
 
 type Dependencies = {
   env: NodeJS.ProcessEnv
@@ -113,6 +113,6 @@ export function defaultQuickAuditWebhookDependencies(input: {
     ...input,
     createStripe: (key) => new Stripe(key),
     store: new RedisQuickAuditStore(),
-    auditGateway: createQuickAuditAuditGateway(),
+    auditGateway: createNativeQuickAuditAuditGateway(),
   }
 }
