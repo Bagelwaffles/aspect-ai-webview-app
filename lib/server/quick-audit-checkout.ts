@@ -30,6 +30,10 @@ function enabled(value: string | undefined) {
   return value?.trim().toLowerCase() === "true"
 }
 
+function fulfillmentInterlockRequired(env: NodeJS.ProcessEnv) {
+  return env.NODE_ENV === "production" || env.AMS_QUICK_AUDIT_FULFILLMENT_READY !== undefined
+}
+
 export function createQuickAuditCheckoutHandler(overrides: Partial<Dependencies> = {}) {
   const dependencies = { ...defaults, ...overrides }
   return async (request: NextRequest) => {
@@ -38,7 +42,7 @@ export function createQuickAuditCheckoutHandler(overrides: Partial<Dependencies>
     if (!enabled(dependencies.env.AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED)) {
       return NextResponse.json({ ok: false, error: "Quick Audit checkout is not available", code: "QUICK_AUDIT_SALES_DISABLED" }, { status: 503, headers: { "Cache-Control": "no-store" } })
     }
-    if (!enabled(dependencies.env.AMS_QUICK_AUDIT_FULFILLMENT_READY)) {
+    if (fulfillmentInterlockRequired(dependencies.env) && !enabled(dependencies.env.AMS_QUICK_AUDIT_FULFILLMENT_READY)) {
       return NextResponse.json({ ok: false, error: "Quick Audit fulfillment is temporarily unavailable", code: "QUICK_AUDIT_FULFILLMENT_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } })
     }
     const secretKey = dependencies.env.AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY?.trim()
