@@ -8,8 +8,11 @@ function enabled(value: string | undefined) {
 }
 
 export async function GET() {
-  const liveSecretKeyConfigured = /^(sk|rk)_live_/.test(
+  const quickAuditLiveSecretConfigured = /^(sk|rk)_live_/.test(
     process.env.AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY?.trim() ?? "",
+  )
+  const sharedStripeLiveSecretConfigured = /^(sk|rk)_live_/.test(
+    process.env.STRIPE_SECRET_KEY?.trim() ?? "",
   )
   const livePriceConfigured = (
     process.env.AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID?.trim() ?? ""
@@ -26,9 +29,11 @@ export async function GET() {
   )
   const salesEnabled = enabled(process.env.AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED)
   const fulfillmentReady = enabled(process.env.AMS_QUICK_AUDIT_FULFILLMENT_READY)
+  const sharedWebhookModeLive = process.env.AMS_STRIPE_WEBHOOK_MODE?.trim().toLowerCase() === "live"
 
+  const liveSecretAvailable = quickAuditLiveSecretConfigured || sharedStripeLiveSecretConfigured
   const infrastructureReady =
-    liveSecretKeyConfigured &&
+    liveSecretAvailable &&
     livePriceConfigured &&
     liveWebhookConfigured &&
     redisConfigured
@@ -37,10 +42,12 @@ export async function GET() {
     {
       ok: true,
       checks: {
-        liveSecretKeyConfigured,
+        quickAuditLiveSecretConfigured,
+        sharedStripeLiveSecretConfigured,
         livePriceConfigured,
         liveWebhookConfigured,
         redisConfigured,
+        sharedWebhookModeLive,
         salesEnabled,
         fulfillmentReady,
       },
