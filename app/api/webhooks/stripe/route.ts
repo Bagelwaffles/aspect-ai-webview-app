@@ -20,9 +20,12 @@ import {
   createQuickAuditWebhookHandler,
   defaultQuickAuditWebhookDependencies,
 } from "@/lib/server/quick-audit-webhook"
+import { normalizeQuickAuditLiveStripeSecret } from "@/lib/server/quick-audit-runtime"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+
+normalizeQuickAuditLiveStripeSecret()
 
 const subscriptionPost = createStripeWebhookPostHandler({
   env: process.env,
