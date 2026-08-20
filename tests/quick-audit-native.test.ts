@@ -115,6 +115,7 @@ test("paid live Quick Audit session can retrieve only its durable native result"
   await store.save(result)
   const handler = createQuickAuditResultHandler({
     env: {
+      NODE_ENV: "test",
       AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: "rk_live_fixture",
       AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: "price_native",
     },
@@ -144,6 +145,7 @@ test("unpaid, wrong-price, and unrelated sessions never receive a Quick Audit re
   ]) {
     const handler = createQuickAuditResultHandler({
       env: {
+        NODE_ENV: "test",
         AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: "rk_live_fixture",
         AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: "price_native",
       },
@@ -159,6 +161,7 @@ test("verified paid order returns processing without inventing a result", async 
   const store = new MemoryResultStore()
   const handler = createQuickAuditResultHandler({
     env: {
+      NODE_ENV: "test",
       AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: "rk_live_fixture",
       AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: "price_native",
     },
