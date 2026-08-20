@@ -7,14 +7,43 @@ type RedisLike = {
   set(key: string, value: string): Promise<unknown>
 }
 
-function redisClient(env: NodeJS.ProcessEnv = process.env): RedisLike | null {
-  const url = (env.UPSTASH_REDIS_REST_URL ?? env.KV_REST_API_URL)?.trim()
-  const token = (env.UPSTASH_REDIS_REST_TOKEN ?? env.KV_REST_API_TOKEN)?.trim()
-  return url && token ? new Redis({ url, token }) : null
+type RuntimeOptions = {
+  redis?: RedisLike | null
 }
 
-function enabled(value: string | undefined) {
-  return value?.trim().toLowerCase() === "true"
+type RedisConfig = {
+  url: string
+  token: string
+}
+
+function trimmed(value: string | undefined) {
+  const result = value?.trim()
+  return result || null
+}
+
+export function resolveQuickAuditRedisConfig(env: NodeJS.ProcessEnv = process.env): RedisConfig | null {
+  const upstashUrl = trimmed(env.UPSTASH_REDIS_REST_URL)
+  const upstashToken = trimmed(env.UPSTASH_REDIS_REST_TOKEN)
+  if (upstashUrl && upstashToken) return { url: upstashUrl, token: upstashToken }
+
+  const kvUrl = trimmed(env.KV_REST_API_URL)
+  const kvToken = trimmed(env.KV_REST_API_TOKEN)
+  if (kvUrl && kvToken) return { url: kvUrl, token: kvToken }
+
+  return null
+}
+
+function redisClient(env: NodeJS.ProcessEnv = process.env): RedisLike | null {
+  const config = resolveQuickAuditRedisConfig(env)
+  return config ? new Redis(config) : null
+}
+
+function runtimeRedis(env: NodeJS.ProcessEnv, options: RuntimeOptions) {
+  return Object.prototype.hasOwnProperty.call(options, "redis") ? options.redis ?? null : redisClient(env)
+}
+
+function launchValueEnabled(value: unknown) {
+  return value === true || value === "true" || value === "enabled" || value === 1 || value === "1"
 }
 
 export function normalizeQuickAuditLiveStripeSecret(env: NodeJS.ProcessEnv = process.env) {
@@ -40,50 +69,47 @@ export function quickAuditInfrastructureReady(env: NodeJS.ProcessEnv = process.e
     env.AMS_STRIPE_WEBHOOK_MODE?.trim().toLowerCase() === "live" &&
     (env.STRIPE_WEBHOOK_SECRET?.trim().startsWith("whsec_") ?? false)
   )
-  const redisReady = Boolean(
-    (env.UPSTASH_REDIS_REST_URL?.trim() || env.KV_REST_API_URL?.trim()) &&
-    (env.UPSTASH_REDIS_REST_TOKEN?.trim() || env.KV_REST_API_TOKEN?.trim()),
-  )
+  const redisReady = resolveQuickAuditRedisConfig(env) !== null
 
   return liveSecretReady && livePriceReady && liveWebhookReady && redisReady
 }
 
-export async function isQuickAuditRuntimeLaunchEnabled(env: NodeJS.ProcessEnv = process.env) {
+export async function isQuickAuditRuntimeLaunchEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+  options: RuntimeOptions = {},
+) {
   if (!quickAuditInfrastructureReady(env)) return false
 
-  if (
-    enabled(env.AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED) &&
-    enabled(env.AMS_QUICK_AUDIT_FULFILLMENT_READY)
-  ) {
-    return true
-  }
-
-  const redis = redisClient(env)
+  const redis = runtimeRedis(env, options)
   if (!redis) return false
 
   const value = await redis.get<unknown>(QUICK_AUDIT_LAUNCH_KEY).catch(() => null)
-  return value === true || value === "true" || value === "enabled" || value === 1 || value === "1"
+  return launchValueEnabled(value)
 }
 
-export async function ensureQuickAuditRuntimeLaunchState(env: NodeJS.ProcessEnv = process.env) {
+export async function ensureQuickAuditRuntimeLaunchState(
+  env: NodeJS.ProcessEnv = process.env,
+  options: RuntimeOptions = {},
+) {
   normalizeQuickAuditLiveStripeSecret(env)
-  const launchEnabled = await isQuickAuditRuntimeLaunchEnabled(env)
-  if (launchEnabled) {
-    env.AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED = "true"
-    env.AMS_QUICK_AUDIT_FULFILLMENT_READY = "true"
-  }
+  const launchEnabled = await isQuickAuditRuntimeLaunchEnabled(env, options)
+
+  env.AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED = launchEnabled ? "true" : "false"
+  env.AMS_QUICK_AUDIT_FULFILLMENT_READY = launchEnabled ? "true" : "false"
+
   return launchEnabled
 }
 
 export async function setQuickAuditRuntimeLaunchEnabled(
   launchEnabled: boolean,
   env: NodeJS.ProcessEnv = process.env,
+  options: RuntimeOptions = {},
 ) {
   if (launchEnabled && !quickAuditInfrastructureReady(env)) {
     throw new Error("QUICK_AUDIT_INFRASTRUCTURE_NOT_READY")
   }
 
-  const redis = redisClient(env)
+  const redis = runtimeRedis(env, options)
   if (!redis) throw new Error("QUICK_AUDIT_LAUNCH_STORE_UNAVAILABLE")
 
   await redis.set(QUICK_AUDIT_LAUNCH_KEY, launchEnabled ? "enabled" : "disabled")
