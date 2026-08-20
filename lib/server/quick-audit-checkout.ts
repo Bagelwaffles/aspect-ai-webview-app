@@ -26,13 +26,24 @@ const defaults: Dependencies = {
   createSession: async (secretKey, params, options) => new Stripe(secretKey).checkout.sessions.create(params, options),
 }
 
+function enabled(value: string | undefined) {
+  return value?.trim().toLowerCase() === "true"
+}
+
+function fulfillmentInterlockRequired(env: NodeJS.ProcessEnv) {
+  return env.NODE_ENV === "production" || env.AMS_QUICK_AUDIT_FULFILLMENT_READY !== undefined
+}
+
 export function createQuickAuditCheckoutHandler(overrides: Partial<Dependencies> = {}) {
   const dependencies = { ...defaults, ...overrides }
   return async (request: NextRequest) => {
     const parsed = schema.safeParse(await request.json().catch(() => null))
     if (!parsed.success) return NextResponse.json({ ok: false, error: "Invalid Quick Audit request", code: "QUICK_AUDIT_REQUEST_INVALID" }, { status: 400, headers: { "Cache-Control": "no-store" } })
-    if (dependencies.env.AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED?.trim().toLowerCase() !== "true") {
+    if (!enabled(dependencies.env.AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED)) {
       return NextResponse.json({ ok: false, error: "Quick Audit checkout is not available", code: "QUICK_AUDIT_SALES_DISABLED" }, { status: 503, headers: { "Cache-Control": "no-store" } })
+    }
+    if (fulfillmentInterlockRequired(dependencies.env) && !enabled(dependencies.env.AMS_QUICK_AUDIT_FULFILLMENT_READY)) {
+      return NextResponse.json({ ok: false, error: "Quick Audit fulfillment is temporarily unavailable", code: "QUICK_AUDIT_FULFILLMENT_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } })
     }
     const secretKey = dependencies.env.AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY?.trim()
     const priceId = dependencies.env.AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID?.trim()

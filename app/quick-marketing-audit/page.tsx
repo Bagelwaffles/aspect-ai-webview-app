@@ -18,9 +18,14 @@ const idealFor = [
   "Small teams that need practical next actions instead of another generic report",
 ]
 
+function enabled(value: string | undefined) {
+  return value?.trim().toLowerCase() === "true"
+}
+
 export default function QuickMarketingAuditPage() {
-  const customCheckoutEnabled =
-    process.env.AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED?.trim().toLowerCase() === "true"
+  const salesEnabled = enabled(process.env.AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED)
+  const fulfillmentReady = enabled(process.env.AMS_QUICK_AUDIT_FULFILLMENT_READY)
+  const checkoutReady = salesEnabled && fulfillmentReady
 
   return (
     <main className="min-h-screen bg-background px-4 py-10 sm:px-6 lg:py-16">
@@ -42,15 +47,18 @@ export default function QuickMarketingAuditPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <Button asChild size="lg">
-                <a
-                  href={customCheckoutEnabled ? "#quick-audit-checkout" : QUICK_MARKETING_AUDIT.checkoutUrl}
-                  rel={customCheckoutEnabled ? undefined : "noreferrer"}
-                >
-                  Get my audit — $49
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </a>
-              </Button>
+              {checkoutReady ? (
+                <Button asChild size="lg">
+                  <a href="#quick-audit-checkout">
+                    Get my audit — $49
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </a>
+                </Button>
+              ) : (
+                <Button asChild size="lg" variant="secondary">
+                  <a href="#quick-audit-status">Checkout temporarily paused</a>
+                </Button>
+              )}
               <Button asChild size="lg" variant="outline">
                 <Link href="/">Back to AMS</Link>
               </Button>
@@ -68,7 +76,7 @@ export default function QuickMarketingAuditPage() {
             </div>
           </div>
 
-          <Card className="border-primary/30">
+          <Card className="border-primary/30" id="quick-audit-status">
             <CardHeader>
               <CardDescription>Launch price</CardDescription>
               <CardTitle className="text-4xl">{QUICK_MARKETING_AUDIT.priceLabel}</CardTitle>
@@ -86,15 +94,17 @@ export default function QuickMarketingAuditPage() {
                 </ul>
               </div>
 
-              {customCheckoutEnabled ? (
-                <QuickAuditCheckoutForm />
+              {checkoutReady ? (
+                <div id="quick-audit-checkout">
+                  <QuickAuditCheckoutForm />
+                </div>
               ) : (
-                <Button asChild className="w-full" size="lg">
-                  <a href={QUICK_MARKETING_AUDIT.checkoutUrl} rel="noreferrer">
-                    Start the audit
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </a>
-                </Button>
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                  <p className="font-medium">Checkout is temporarily paused.</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    AMS is upgrading the fulfillment path for this offer. We are not accepting payment until the delivery system is verified again.
+                  </p>
+                </div>
               )}
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Secure checkout is handled by Stripe. At checkout we collect the business details needed to begin the review. AMS does not promise specific revenue or ranking outcomes.
