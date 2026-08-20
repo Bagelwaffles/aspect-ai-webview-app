@@ -1,19 +1,22 @@
+import { Suspense } from "react"
 import Link from "next/link"
-import { CheckCircle2, Clock3, Mail } from "lucide-react"
+import { CheckCircle2, Clock3, ShieldCheck } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { QUICK_MARKETING_AUDIT } from "@/lib/quick-marketing-audit"
 
+import { QuickAuditResultClient } from "./QuickAuditResultClient"
+
 export const metadata = {
   title: "Payment received | AMS Quick Marketing Audit",
-  description: "Next steps after purchasing the AMS Quick Marketing Audit.",
+  description: "Verified result delivery after purchasing the AMS Quick Marketing Audit.",
 }
 
 export default function QuickMarketingAuditThanksPage() {
   return (
     <main className="min-h-screen bg-background px-4 py-12 sm:px-6">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-4xl space-y-8">
         <Card className="border-primary/30">
           <CardHeader className="space-y-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -22,7 +25,7 @@ export default function QuickMarketingAuditThanksPage() {
             <div>
               <CardTitle className="text-3xl">Your AMS audit order is in.</CardTitle>
               <CardDescription className="mt-2 text-base">
-                Stripe has completed the checkout flow. AMS will use the business information entered at checkout to begin the review.
+                AMS verifies the Stripe payment before showing any customer audit result. The result below is tied to this checkout session and is never created by this page itself.
               </CardDescription>
             </div>
           </CardHeader>
@@ -31,18 +34,22 @@ export default function QuickMarketingAuditThanksPage() {
               <div className="rounded-lg border p-4">
                 <Clock3 className="mb-3 h-5 w-5 text-primary" />
                 <p className="font-medium">Delivery target</p>
-                <p className="mt-1 text-sm text-muted-foreground">Your completed audit is targeted for delivery {QUICK_MARKETING_AUDIT.deliveryWindow}.</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  The native AMS path is designed to make the result available here after fulfillment completes. The published service target remains {QUICK_MARKETING_AUDIT.deliveryWindow}.
+                </p>
               </div>
               <div className="rounded-lg border p-4">
-                <Mail className="mb-3 h-5 w-5 text-primary" />
-                <p className="font-medium">Watch your checkout email</p>
-                <p className="mt-1 text-sm text-muted-foreground">Use the same email address you entered in Stripe for any follow-up about the order.</p>
+                <ShieldCheck className="mb-3 h-5 w-5 text-primary" />
+                <p className="font-medium">No second charge</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Refreshing or checking this page reads the existing paid order. It does not create another Stripe Checkout Session or another payment.
+                </p>
               </div>
             </div>
 
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground">
-              If AMS needs anything else before completing the audit, we will contact you using the email from checkout. Keep your website or social page accessible so we can review the current marketing accurately.
-            </div>
+            <Suspense fallback={<div className="rounded-lg border p-4 text-sm text-muted-foreground">Loading verified audit status…</div>}>
+              <QuickAuditResultClient />
+            </Suspense>
 
             <div className="flex flex-wrap gap-3">
               <Button asChild>
