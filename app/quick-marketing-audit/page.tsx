@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { QuickAuditCheckoutForm } from "@/components/quick-audit-checkout-form"
 import { QUICK_MARKETING_AUDIT } from "@/lib/quick-marketing-audit"
+import { isQuickAuditRuntimeLaunchEnabled } from "@/lib/server/quick-audit-runtime"
+
+export const dynamic = "force-dynamic"
 
 export const metadata = {
   title: "AMS Quick Marketing Audit | Aspect Marketing Solutions",
@@ -18,14 +21,8 @@ const idealFor = [
   "Small teams that need practical next actions instead of another generic report",
 ]
 
-function enabled(value: string | undefined) {
-  return value?.trim().toLowerCase() === "true"
-}
-
-export default function QuickMarketingAuditPage() {
-  const salesEnabled = enabled(process.env.AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED)
-  const fulfillmentReady = enabled(process.env.AMS_QUICK_AUDIT_FULFILLMENT_READY)
-  const checkoutReady = salesEnabled && fulfillmentReady
+export default async function QuickMarketingAuditPage() {
+  const checkoutReady = await isQuickAuditRuntimeLaunchEnabled()
 
   return (
     <main className="min-h-screen bg-background px-4 py-10 sm:px-6 lg:py-16">
