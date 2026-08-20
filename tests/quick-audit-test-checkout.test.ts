@@ -19,14 +19,16 @@ function request(cookie = "valid-admin-token") {
   })
 }
 
-function testEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+function testEnv(overrides: Partial<NodeJS.ProcessEnv> = {}): NodeJS.ProcessEnv {
   return {
-    NODE_ENV: "test",
-    INTERNAL_ADMIN_SECRET: adminSecret,
-    AMS_STRIPE_QUICK_AUDIT_SECRET_KEY: "sk_test_fixture",
-    AMS_STRIPE_QUICK_AUDIT_PRICE_ID: "price_test_fixture",
-    PUBLIC_APP_URL: "https://www.aspectmarketingsolutions.app",
     ...overrides,
+    NODE_ENV: overrides.NODE_ENV ?? "test",
+    INTERNAL_ADMIN_SECRET: overrides.INTERNAL_ADMIN_SECRET ?? adminSecret,
+    AMS_STRIPE_QUICK_AUDIT_SECRET_KEY:
+      overrides.AMS_STRIPE_QUICK_AUDIT_SECRET_KEY ?? "sk_test_fixture",
+    AMS_STRIPE_QUICK_AUDIT_PRICE_ID:
+      overrides.AMS_STRIPE_QUICK_AUDIT_PRICE_ID ?? "price_test_fixture",
+    PUBLIC_APP_URL: overrides.PUBLIC_APP_URL ?? "https://www.aspectmarketingsolutions.app",
   }
 }
 
