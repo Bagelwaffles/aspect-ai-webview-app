@@ -13,10 +13,17 @@ function configuredAny(...names: string[]): boolean {
   return names.some((name) => Boolean(process.env[name]?.trim()))
 }
 
+function nativeVercelGatewayAuthAvailable(): boolean {
+  return process.env.VERCEL === "1" && Boolean(process.env.VERCEL_ENV?.trim())
+}
+
 export async function GET() {
   const environment = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown"
   const redis = await checkRedisReadiness()
   const ready = redis.state === "ready"
+  const aiGatewayConfigured =
+    configuredAny("AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN") ||
+    nativeVercelGatewayAuthAvailable()
 
   return NextResponse.json(
     {
@@ -44,9 +51,7 @@ export async function GET() {
         )
           ? "configured"
           : "missing",
-        aiGateway: configuredAny("AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN")
-          ? "configured"
-          : "missing",
+        aiGateway: aiGatewayConfigured ? "configured" : "missing",
         stripeBilling: configured(
           "STRIPE_SECRET_KEY",
           "STRIPE_WEBHOOK_SECRET",
