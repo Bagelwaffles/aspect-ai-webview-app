@@ -3,7 +3,8 @@ import type { Redis } from "@upstash/redis"
 import { NextRequest, NextResponse } from "next/server"
 
 import { isStableCustomerSubject } from "../auth"
-import type { PlanSlug, StripeEventClaim, SubscriptionStatus } from "./entitlements"
+import type { StripeEventClaim, SubscriptionStatus } from "./entitlements"
+import { monthlyCreditsForPlan, type PlanSlug } from "./plan-credits"
 
 export type StripeWebhookMode = "test" | "live"
 
@@ -253,9 +254,7 @@ function statusRank(status: SubscriptionStatus): number {
 }
 
 function monthlyCredits(plan: PlanSlug): number {
-  if (plan === "starter") return 2000
-  if (plan === "growth") return 8000
-  return 20000
+  return monthlyCreditsForPlan(plan)
 }
 
 export function stripeWebhookModeFromEnv(
