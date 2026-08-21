@@ -1,0 +1,129 @@
+name: Diagnose Content Agent Gateway Provisioning
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/provision-content-agent-gateway-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    outputs:
+      issue_number: ${{ steps.issue.outputs.issue_number }}
+    steps:
+      - name: Create sanitized diagnostic issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="AMS Gateway Provisioning Diagnostic #${GITHUB_RUN_ID}"
+          body=$(cat <<EOF
+          Automated sanitized diagnostic for the AMS Content Agent AI Gateway provisioning path.
+
+          - Run id: ${GITHUB_RUN_ID}
+          - Commit: ${GITHUB_SHA}
+          - Stage: workflow started
+          - Secrets: not included
+          - Model request: none
+          - Content Agent launch: unchanged / paused
+          EOF
+          )
+          issue_url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body")
+          issue_number="${issue_url##*/}"
+          echo "issue_number=$issue_number" >> "$GITHUB_OUTPUT"
+
+  diagnose:
+    needs: announce
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      VERCEL_ORG_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
+      VERCEL_PROJECT_ID: prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      DIAGNOSTIC_ISSUE: ${{ needs.announce.outputs.issue_number }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Mark production job started
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh issue comment "$DIAGNOSTIC_ISSUE" --repo "$GITHUB_REPOSITORY" --body "Production-environment job started. This confirms the protected environment was entered. No secrets or model calls are involved."
+
+      - name: Check Vercel credential presence
+        id: vercel
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${VERCEL_TOKEN:-}" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            exit 21
+          fi
+
+      - name: Obtain project OIDC token
+        id: oidc
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          code=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/oidc.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            "https://api.vercel.com/v1/projects/${VERCEL_PROJECT_ID}/token?teamId=${VERCEL_ORG_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data '{"source":"github-actions:ams-gateway-diagnostic"}' || true)
+          echo "http=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" != "200" ]; then
+            exit 22
+          fi
+          token=$(node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("/tmp/oidc.json","utf8"));if(!j.token)process.exit(2);process.stdout.write(j.token)')
+          echo "::add-mask::$token"
+          printf '%s' "$token" > /tmp/oidc.token
+
+      - name: Check AI Gateway credits endpoint
+        id: credits
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          token=$(cat /tmp/oidc.token)
+          echo "::add-mask::$token"
+          code=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/credits.json \
+            --write-out '%{http_code}' \
+            "https://ai-gateway.vercel.sh/v1/credits" \
+            --header "Authorization: Bearer ${token}" \
+            --header "Content-Type: application/json" || true)
+          echo "http=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" != "200" ]; then
+            exit 23
+          fi
+          available=$(node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("/tmp/credits.json","utf8"));const n=Number(j.balance);process.stdout.write(Number.isFinite(n)&&n>0?"true":"false")')
+          echo "available=$available" >> "$GITHUB_OUTPUT"
+
+      - name: Report successful diagnostic
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh issue comment "$DIAGNOSTIC_ISSUE" --repo "$GITHUB_REPOSITORY" --body "Diagnostic completed: Vercel production credential is present; project OIDC token endpoint returned HTTP ${{ steps.oidc.outputs.http }}; AI Gateway credits endpoint returned HTTP ${{ steps.credits.outputs.http }}; credits available = ${{ steps.credits.outputs.available }}. No key was created, no model request was made, and Content Agent remains paused."
+
+      - name: Report failed diagnostic
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          message="Diagnostic failed after entering the production environment. Vercel credential present = ${{ steps.vercel.outputs.present || 'unknown' }}; project OIDC HTTP = ${{ steps.oidc.outputs.http || 'not reached' }}; Gateway credits HTTP = ${{ steps.credits.outputs.http || 'not reached' }}. No secrets are included; no key or model request was made."
+          gh issue comment "$DIAGNOSTIC_ISSUE" --repo "$GITHUB_REPOSITORY" --body "$message"
