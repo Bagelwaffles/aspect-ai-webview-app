@@ -17,19 +17,20 @@ const trackedKeys = [
   "AMS_CONTENT_AGENT_MODEL",
 ] as const
 
+const mutableEnv = process.env as Record<string, string | undefined>
 const previous = Object.fromEntries(
-  trackedKeys.map((key) => [key, process.env[key]]),
+  trackedKeys.map((key) => [key, mutableEnv[key]]),
 ) as Record<(typeof trackedKeys)[number], string | undefined>
 
 function clearProviderEnv() {
-  for (const key of trackedKeys) delete process.env[key]
+  for (const key of trackedKeys) delete mutableEnv[key]
 }
 
 test.after(() => {
   for (const key of trackedKeys) {
     const value = previous[key]
-    if (value === undefined) delete process.env[key]
-    else process.env[key] = value
+    if (value === undefined) delete mutableEnv[key]
+    else mutableEnv[key] = value
   }
 })
 
@@ -38,13 +39,13 @@ test("Content Agent uses a low-cost live AI Gateway model unless explicitly over
   assert.equal(DEFAULT_CONTENT_AGENT_MODEL, "openai/gpt-5.4-mini")
   assert.equal(getContentAgentModel(), DEFAULT_CONTENT_AGENT_MODEL)
 
-  process.env.AMS_CONTENT_AGENT_MODEL = "openai/example-model"
+  mutableEnv.AMS_CONTENT_AGENT_MODEL = "openai/example-model"
   assert.equal(getContentAgentModel(), "openai/example-model")
 })
 
 test("Content Agent remains disabled even when gateway auth exists until launch is explicit", () => {
   clearProviderEnv()
-  process.env.AI_GATEWAY_API_KEY = "gateway-test-key"
+  mutableEnv.AI_GATEWAY_API_KEY = "gateway-test-key"
 
   assert.equal(isContentAgentGatewayAuthAvailable(), true)
   assert.equal(isContentAgentProviderConfigured(), false)
@@ -52,7 +53,7 @@ test("Content Agent remains disabled even when gateway auth exists until launch 
 
 test("Content Agent fails closed off Vercel when launch is enabled without gateway authentication", () => {
   clearProviderEnv()
-  process.env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE = "true"
+  mutableEnv.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE = "true"
 
   assert.equal(isContentAgentGatewayAuthAvailable(), false)
   assert.equal(isContentAgentProviderConfigured(), false)
@@ -60,25 +61,25 @@ test("Content Agent fails closed off Vercel when launch is enabled without gatew
 
 test("Content Agent accepts explicit AI Gateway API-key authentication", () => {
   clearProviderEnv()
-  process.env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE = "true"
-  process.env.AI_GATEWAY_API_KEY = "gateway-test-key"
+  mutableEnv.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE = "true"
+  mutableEnv.AI_GATEWAY_API_KEY = "gateway-test-key"
 
   assert.equal(isContentAgentProviderConfigured(), true)
 })
 
 test("Content Agent accepts an explicitly supplied Vercel OIDC token", () => {
   clearProviderEnv()
-  process.env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE = "true"
-  process.env.VERCEL_OIDC_TOKEN = "oidc-test-token"
+  mutableEnv.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE = "true"
+  mutableEnv.VERCEL_OIDC_TOKEN = "oidc-test-token"
 
   assert.equal(isContentAgentProviderConfigured(), true)
 })
 
 test("Content Agent accepts Vercel-native Gateway OIDC on a real Vercel deployment", () => {
   clearProviderEnv()
-  process.env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE = "true"
-  process.env.VERCEL = "1"
-  process.env.VERCEL_ENV = "production"
+  mutableEnv.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE = "true"
+  mutableEnv.VERCEL = "1"
+  mutableEnv.VERCEL_ENV = "production"
 
   assert.equal(isContentAgentGatewayAuthAvailable(), true)
   assert.equal(isContentAgentProviderConfigured(), true)
@@ -86,12 +87,12 @@ test("Content Agent accepts Vercel-native Gateway OIDC on a real Vercel deployme
 
 test("Content Agent does not infer native OIDC from incomplete Vercel markers", () => {
   clearProviderEnv()
-  process.env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE = "true"
-  process.env.VERCEL = "1"
+  mutableEnv.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE = "true"
+  mutableEnv.VERCEL = "1"
 
   assert.equal(isContentAgentProviderConfigured(), false)
 
-  delete process.env.VERCEL
-  process.env.VERCEL_ENV = "production"
+  delete mutableEnv.VERCEL
+  mutableEnv.VERCEL_ENV = "production"
   assert.equal(isContentAgentProviderConfigured(), false)
 })
