@@ -20,8 +20,7 @@ const REQUIRED_KEYS = [
   "AMS_STRIPE_STARTER_PRICE_ID",
   "AMS_STRIPE_GROWTH_PRICE_ID",
   "AMS_STRIPE_PRO_PRICE_ID",
-  "XAI_API_KEY",
-  "XAI_MODEL",
+  "NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE",
 ] as const
 
 const PUBLIC_URL_KEYS = ["NEXT_PUBLIC_APP_URL", "PUBLIC_APP_URL", "NEXTAUTH_URL"] as const
@@ -165,6 +164,30 @@ export function validateStagingConfig(env: StagingEnvironment): string[] {
   }
   if (priceIds.length === PRICE_KEYS.length && new Set(priceIds).size !== PRICE_KEYS.length) {
     errors.push("STRIPE_PRICE_IDS: starter, growth, and pro must use distinct recurring prices")
+  }
+
+  const launchValue = env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE?.trim().toLowerCase() ?? ""
+  if (launchValue && launchValue !== "true" && launchValue !== "false") {
+    addError(errors, "NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE", "must equal true or false")
+  }
+
+  const gatewayApiKey = env.AI_GATEWAY_API_KEY?.trim() ?? ""
+  const oidcToken = env.VERCEL_OIDC_TOKEN?.trim() ?? ""
+  if (gatewayApiKey && isPlaceholder(gatewayApiKey)) {
+    addError(errors, "AI_GATEWAY_API_KEY", "still contains a placeholder")
+  }
+  if (oidcToken && isPlaceholder(oidcToken)) {
+    addError(errors, "VERCEL_OIDC_TOKEN", "still contains a placeholder")
+  }
+  if (launchValue === "true" && !gatewayApiKey && !oidcToken) {
+    errors.push(
+      "AI_GATEWAY_AUTH: AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN is required when Content Agent execution is enabled",
+    )
+  }
+
+  const contentModel = env.AMS_CONTENT_AGENT_MODEL?.trim() ?? ""
+  if (contentModel && !/^[A-Za-z0-9._-]+\/[A-Za-z0-9._:-]+$/u.test(contentModel)) {
+    addError(errors, "AMS_CONTENT_AGENT_MODEL", "must use provider/model format")
   }
 
   const requestLimit = env.AMS_AI_REQUESTS_PER_MINUTE?.trim()
