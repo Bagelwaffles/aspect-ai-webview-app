@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/provision-content-agent-gateway-diagnostic.yml"
+      - "ops/content-agent-gateway-proof.once"
   workflow_dispatch:
 
 permissions:
@@ -24,16 +25,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          title="AMS Gateway Provisioning Diagnostic #${GITHUB_RUN_ID}"
+          title="AMS Gateway Diagnostic / Proof #${GITHUB_RUN_ID}"
           body=$(cat <<EOF
-          Automated sanitized diagnostic for the AMS Content Agent AI Gateway provisioning path.
+          Automated sanitized diagnostic for the AMS Content Agent AI Gateway path.
 
           - Run id: ${GITHUB_RUN_ID}
           - Commit: ${GITHUB_SHA}
           - Stage: workflow started
           - Secrets: not included
-          - Model request: none
-          - Content Agent launch: unchanged / paused
+          - Model request: at most one, only when the one-shot proof marker is newly added in this exact commit and positive Gateway credits are confirmed
+          - Public Content Agent launch: must remain paused
+          - Customer credits / Stripe: not touched
           EOF
           )
           issue_url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body")
@@ -51,12 +53,31 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       DIAGNOSTIC_ISSUE: ${{ needs.announce.outputs.issue_number }}
       GH_TOKEN: ${{ github.token }}
+      PROOF_MARKER: ops/content-agent-gateway-proof.once
+      PROOF_MODEL: openai/gpt-5.4-mini
     steps:
+      - name: Checkout exact commit and parent
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect one-shot proof request
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=$(git diff-tree --no-commit-id --name-status -r "$GITHUB_SHA" -- "$PROOF_MARKER" | awk 'NR==1{print $1}')
+          requested=false
+          if [[ "$status" == A* ]] && [ -f "$PROOF_MARKER" ] && grep -qx 'CONTENT_AGENT_GATEWAY_PROOF_V1' "$PROOF_MARKER"; then
+            requested=true
+          fi
+          echo "requested=$requested" >> "$GITHUB_OUTPUT"
+
       - name: Mark production job started
         shell: bash
         run: |
           set -euo pipefail
-          gh issue comment "$DIAGNOSTIC_ISSUE" --repo "$GITHUB_REPOSITORY" --body "Production-environment job started. This confirms the protected environment was entered. No secrets or model calls are involved."
+          gh issue comment "$DIAGNOSTIC_ISSUE" --repo "$GITHUB_REPOSITORY" --body "Production-environment job started. One-shot proof requested = ${{ steps.request.outputs.requested }}. Public Content Agent execution remains paused."
 
       - name: Check Vercel credential presence
         id: vercel
@@ -68,6 +89,24 @@ jobs:
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
             exit 21
+          fi
+
+      - name: Verify live AMS remains paused before proof
+        id: live_before
+        shell: bash
+        run: |
+          set -euo pipefail
+          health_code=$(curl --max-time 15 --silent --show-error --output /tmp/health-before.json --write-out '%{http_code}' https://www.aspectmarketingsolutions.app/api/health || true)
+          page_code=$(curl --max-time 15 --silent --show-error --output /tmp/content-before.html --write-out '%{http_code}' https://www.aspectmarketingsolutions.app/content-agent || true)
+          gateway=$(node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("/tmp/health-before.json","utf8"));process.stdout.write(j?.dependencies?.aiGateway==="configured"?"configured":"not-configured")' 2>/dev/null || echo not-configured)
+          paused=false
+          if [ "$page_code" = "200" ] && grep -q 'Execution paused' /tmp/content-before.html; then paused=true; fi
+          echo "health_http=$health_code" >> "$GITHUB_OUTPUT"
+          echo "page_http=$page_code" >> "$GITHUB_OUTPUT"
+          echo "gateway=$gateway" >> "$GITHUB_OUTPUT"
+          echo "paused=$paused" >> "$GITHUB_OUTPUT"
+          if [ "$health_code" != "200" ] || [ "$page_code" != "200" ] || [ "$gateway" != "configured" ] || [ "$paused" != "true" ]; then
+            exit 24
           fi
 
       - name: Obtain project OIDC token
@@ -83,7 +122,7 @@ jobs:
             "https://api.vercel.com/v1/projects/${VERCEL_PROJECT_ID}/token?teamId=${VERCEL_ORG_ID}" \
             --header "Authorization: Bearer ${VERCEL_TOKEN}" \
             --header "Content-Type: application/json" \
-            --data '{"source":"github-actions:ams-gateway-diagnostic"}' || true)
+            --data '{"source":"github-actions:ams-gateway-proof"}' || true)
           echo "http=$code" >> "$GITHUB_OUTPUT"
           if [ "$code" != "200" ]; then
             exit 22
@@ -92,8 +131,8 @@ jobs:
           echo "::add-mask::$token"
           printf '%s' "$token" > /tmp/oidc.token
 
-      - name: Check AI Gateway credits endpoint
-        id: credits
+      - name: Check AI Gateway credits before proof
+        id: credits_before
         shell: bash
         run: |
           set -euo pipefail
@@ -101,7 +140,7 @@ jobs:
           token=$(cat /tmp/oidc.token)
           echo "::add-mask::$token"
           code=$(curl --max-time 15 --silent --show-error \
-            --output /tmp/credits.json \
+            --output /tmp/credits-before.json \
             --write-out '%{http_code}' \
             "https://ai-gateway.vercel.sh/v1/credits" \
             --header "Authorization: Bearer ${token}" \
@@ -110,20 +149,137 @@ jobs:
           if [ "$code" != "200" ]; then
             exit 23
           fi
-          available=$(node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("/tmp/credits.json","utf8"));const n=Number(j.balance);process.stdout.write(Number.isFinite(n)&&n>0?"true":"false")')
-          echo "available=$available" >> "$GITHUB_OUTPUT"
+          node <<'NODE' >> "$GITHUB_OUTPUT"
+          const fs=require('fs')
+          const j=JSON.parse(fs.readFileSync('/tmp/credits-before.json','utf8'))
+          const balance=Number(j.balance)
+          console.log(`available=${Number.isFinite(balance)&&balance>0?'true':'false'}`)
+          console.log(`balance=${Number.isFinite(balance)?balance:'nan'}`)
+          NODE
 
-      - name: Report successful diagnostic
-        if: success()
+      - name: Confirm proof model exists
+        id: model
+        if: steps.request.outputs.requested == 'true' && steps.credits_before.outputs.available == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          gh issue comment "$DIAGNOSTIC_ISSUE" --repo "$GITHUB_REPOSITORY" --body "Diagnostic completed: Vercel production credential is present; project OIDC token endpoint returned HTTP ${{ steps.oidc.outputs.http }}; AI Gateway credits endpoint returned HTTP ${{ steps.credits.outputs.http }}; credits available = ${{ steps.credits.outputs.available }}. No key was created, no model request was made, and Content Agent remains paused."
+          code=$(curl --max-time 15 --silent --show-error --output /tmp/models.json --write-out '%{http_code}' https://ai-gateway.vercel.sh/v1/models || true)
+          echo "http=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" != "200" ]; then exit 25; fi
+          found=$(node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("/tmp/models.json","utf8"));process.stdout.write(Array.isArray(j.data)&&j.data.some(m=>m&&m.id===process.env.PROOF_MODEL)?"true":"false")')
+          echo "found=$found" >> "$GITHUB_OUTPUT"
+          if [ "$found" != "true" ]; then exit 26; fi
 
-      - name: Report failed diagnostic
+      - name: Make exactly one tiny Gateway proof request
+        id: proof
+        if: steps.request.outputs.requested == 'true' && steps.credits_before.outputs.available == 'true' && steps.model.outputs.found == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          token=$(cat /tmp/oidc.token)
+          echo "::add-mask::$token"
+          echo "attempted=true" >> "$GITHUB_OUTPUT"
+          node <<'NODE'
+          const fs=require('fs')
+          fs.writeFileSync('/tmp/proof-request.json', JSON.stringify({
+            model: process.env.PROOF_MODEL,
+            input: 'Return exactly AMS_GATEWAY_PROOF_OK and nothing else.',
+            max_output_tokens: 16,
+          }))
+          NODE
+          code=$(curl --max-time 30 --silent --show-error \
+            --output /tmp/proof-response.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            "https://ai-gateway.vercel.sh/v1/responses" \
+            --header "Authorization: Bearer ${token}" \
+            --header "Content-Type: application/json" \
+            --data-binary @/tmp/proof-request.json || true)
+          echo "http=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" != "200" ]; then exit 27; fi
+          node <<'NODE' >> "$GITHUB_OUTPUT"
+          const fs=require('fs')
+          const j=JSON.parse(fs.readFileSync('/tmp/proof-response.json','utf8'))
+          const strings=[]
+          const walk=(v)=>{if(typeof v==='string') strings.push(v); else if(Array.isArray(v)) v.forEach(walk); else if(v&&typeof v==='object') Object.values(v).forEach(walk)}
+          walk(j)
+          const matched=strings.some(v=>v.trim()==='AMS_GATEWAY_PROOF_OK')
+          const u=j.usage||{}
+          const input=Number(u.input_tokens ?? u.inputTokens ?? 0)
+          const output=Number(u.output_tokens ?? u.outputTokens ?? 0)
+          console.log(`matched=${matched?'true':'false'}`)
+          console.log(`input_tokens=${Number.isFinite(input)?input:0}`)
+          console.log(`output_tokens=${Number.isFinite(output)?output:0}`)
+          if(!matched) process.exit(28)
+          NODE
+
+      - name: Check credits after proof and enforce tiny observed spend
+        id: credits_after
+        if: steps.proof.outputs.attempted == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          token=$(cat /tmp/oidc.token)
+          echo "::add-mask::$token"
+          code=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/credits-after.json \
+            --write-out '%{http_code}' \
+            "https://ai-gateway.vercel.sh/v1/credits" \
+            --header "Authorization: Bearer ${token}" \
+            --header "Content-Type: application/json" || true)
+          echo "http=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" != "200" ]; then exit 29; fi
+          before='${{ steps.credits_before.outputs.balance }}'
+          delta=$(node -e 'const fs=require("fs");const before=Number(process.argv[1]);const after=Number(JSON.parse(fs.readFileSync("/tmp/credits-after.json","utf8")).balance);const d=Number.isFinite(before)&&Number.isFinite(after)?Math.max(0,before-after):NaN;process.stdout.write(Number.isFinite(d)?d.toFixed(6):"nan")' "$before")
+          echo "delta=$delta" >> "$GITHUB_OUTPUT"
+          node -e 'const d=Number(process.argv[1]); if(!Number.isFinite(d)||d>0.01) process.exit(1)' "$delta"
+
+      - name: Verify AMS invariants after proof
+        id: live_after
+        if: always() && steps.request.outputs.requested == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          content_code=$(curl --max-time 15 --silent --show-error --output /tmp/content-after.html --write-out '%{http_code}' https://www.aspectmarketingsolutions.app/content-agent || true)
+          audit_code=$(curl --max-time 15 --silent --show-error --output /tmp/audit-after.html --write-out '%{http_code}' https://www.aspectmarketingsolutions.app/quick-marketing-audit || true)
+          paused=false
+          audit_live=false
+          if [ "$content_code" = "200" ] && grep -q 'Execution paused' /tmp/content-after.html; then paused=true; fi
+          if [ "$audit_code" = "200" ] && grep -q 'Continue to Stripe - \$49' /tmp/audit-after.html; then audit_live=true; fi
+          echo "content_http=$content_code" >> "$GITHUB_OUTPUT"
+          echo "audit_http=$audit_code" >> "$GITHUB_OUTPUT"
+          echo "paused=$paused" >> "$GITHUB_OUTPUT"
+          echo "audit_live=$audit_live" >> "$GITHUB_OUTPUT"
+          if [ "$paused" != "true" ] || [ "$audit_live" != "true" ]; then exit 30; fi
+
+      - name: Report successful diagnostic without proof
+        if: success() && steps.request.outputs.requested != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh issue comment "$DIAGNOSTIC_ISSUE" --repo "$GITHUB_REPOSITORY" --body "Diagnostic completed: Vercel production credential present; project OIDC HTTP ${{ steps.oidc.outputs.http }}; Gateway credits HTTP ${{ steps.credits_before.outputs.http }}; credits available = ${{ steps.credits_before.outputs.available }}. One-shot proof marker was not newly added, so no model request was made. Content Agent remains paused."
+
+      - name: Report proof skipped for no credits
+        if: success() && steps.request.outputs.requested == 'true' && steps.credits_before.outputs.available != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh issue comment "$DIAGNOSTIC_ISSUE" --repo "$GITHUB_REPOSITORY" --body "One-shot proof was requested, but positive AI Gateway credits were not available. No model request was made. Public Content Agent remains paused and Quick Audit was not touched."
+
+      - name: Report successful one-shot proof
+        if: success() && steps.proof.outputs.attempted == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh issue comment "$DIAGNOSTIC_ISSUE" --repo "$GITHUB_REPOSITORY" --body "CONTROLLED_GATEWAY_PROOF_PASSED: project OIDC HTTP ${{ steps.oidc.outputs.http }}; credits HTTP before/after ${{ steps.credits_before.outputs.http }}/${{ steps.credits_after.outputs.http }}; model ${PROOF_MODEL}; model endpoint HTTP ${{ steps.proof.outputs.http }}; expected marker matched = ${{ steps.proof.outputs.matched }}; input/output tokens = ${{ steps.proof.outputs.input_tokens }}/${{ steps.proof.outputs.output_tokens }}; observed Gateway credit delta <= USD 0.01 (measured ${{ steps.credits_after.outputs.delta }}). Exactly one model request was attempted. Customer credits and Stripe were not touched. Content Agent remained paused before/after = ${{ steps.live_before.outputs.paused }}/${{ steps.live_after.outputs.paused }}; Quick Audit remained live = ${{ steps.live_after.outputs.audit_live }}."
+
+      - name: Report failed diagnostic or proof
         if: failure()
         shell: bash
         run: |
           set +e
-          message="Diagnostic failed after entering the production environment. Vercel credential present = ${{ steps.vercel.outputs.present || 'unknown' }}; project OIDC HTTP = ${{ steps.oidc.outputs.http || 'not reached' }}; Gateway credits HTTP = ${{ steps.credits.outputs.http || 'not reached' }}. No secrets are included; no key or model request was made."
+          attempted='${{ steps.proof.outputs.attempted || 'false' }}'
+          message="Gateway diagnostic/proof failed after entering the production environment. Proof requested = ${{ steps.request.outputs.requested || 'unknown' }}; model request attempted = ${attempted}; Vercel credential present = ${{ steps.vercel.outputs.present || 'unknown' }}; project OIDC HTTP = ${{ steps.oidc.outputs.http || 'not reached' }}; Gateway credits HTTP = ${{ steps.credits_before.outputs.http || 'not reached' }}; model HTTP = ${{ steps.proof.outputs.http || 'not reached' }}. No secrets are included. Public Content Agent launch was not changed and no customer credit or Stripe mutation was performed."
           gh issue comment "$DIAGNOSTIC_ISSUE" --repo "$GITHUB_REPOSITORY" --body "$message"
