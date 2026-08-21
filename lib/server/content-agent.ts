@@ -1,10 +1,10 @@
-import { xai } from "@ai-sdk/xai"
 import { generateText, Output } from "ai"
 import { z } from "zod"
 
 import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 
 export const CONTENT_AGENT_VERSION = "content-v1" as const
+export const DEFAULT_CONTENT_AGENT_MODEL = "openai/gpt-5.6-luna-fast" as const
 
 export const contentAgentInputSchema = z
   .object({
@@ -55,25 +55,29 @@ export function buildContentAgentPrompt(input: ContentAgentInput): string {
   ].join("\n")
 }
 
-export function getContentAgentModel(): string | null {
-  const apiKey = process.env.XAI_API_KEY?.trim()
-  const model = process.env.XAI_MODEL?.trim()
-  return apiKey && model ? model : null
+export function getContentAgentModel(): string {
+  return process.env.AMS_CONTENT_AGENT_MODEL?.trim() || DEFAULT_CONTENT_AGENT_MODEL
+}
+
+export function isContentAgentGatewayAuthAvailable(): boolean {
+  return Boolean(
+    process.env.AI_GATEWAY_API_KEY?.trim() ||
+      process.env.VERCEL_OIDC_TOKEN?.trim(),
+  )
 }
 
 export function isContentAgentProviderConfigured(): boolean {
-  return isContentAgentLaunchEnabled() && getContentAgentModel() !== null
+  return isContentAgentLaunchEnabled() && isContentAgentGatewayAuthAvailable()
 }
 
 export async function runContentAgentProvider(input: ContentAgentInput): Promise<ContentAgentOutput> {
   const parsedInput = contentAgentInputSchema.parse(input)
-  const model = getContentAgentModel()
-  if (!isContentAgentLaunchEnabled() || !model) {
+  if (!isContentAgentProviderConfigured()) {
     throw new Error("CONTENT_AGENT_TEMPORARILY_UNAVAILABLE")
   }
 
   const result = await generateText({
-    model: xai.responses(model),
+    model: getContentAgentModel(),
     output: Output.object({ schema: contentAgentOutputSchema }),
     system: CONTENT_AGENT_SYSTEM_PROMPT,
     prompt: buildContentAgentPrompt(parsedInput),

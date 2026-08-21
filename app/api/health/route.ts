@@ -9,6 +9,10 @@ function configured(...names: string[]): boolean {
   return names.every((name) => Boolean(process.env[name]?.trim()))
 }
 
+function configuredAny(...names: string[]): boolean {
+  return names.some((name) => Boolean(process.env[name]?.trim()))
+}
+
 export async function GET() {
   const environment = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown"
   const redis = await checkRedisReadiness()
@@ -40,7 +44,9 @@ export async function GET() {
         )
           ? "configured"
           : "missing",
-        xai: configured("XAI_API_KEY", "XAI_MODEL") ? "configured" : "missing",
+        aiGateway: configuredAny("AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN")
+          ? "configured"
+          : "missing",
         stripeBilling: configured(
           "STRIPE_SECRET_KEY",
           "STRIPE_WEBHOOK_SECRET",

@@ -102,7 +102,16 @@ export default async function DashboardPage() {
     "NEXTAUTH_SECRET",
     "NEXTAUTH_URL",
   )
-  const xai = configured("XAI_API_KEY", "XAI_MODEL")
+  const contentAgentLaunchEnabled =
+    process.env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE?.trim().toLowerCase() === "true"
+  const aiGatewayAuth = Boolean(
+    process.env.AI_GATEWAY_API_KEY?.trim() || process.env.VERCEL_OIDC_TOKEN?.trim(),
+  )
+  const aiGatewayState = contentAgentLaunchEnabled
+    ? aiGatewayAuth
+      ? "configured"
+      : "missing"
+    : "not_required"
   const relevance = configured(
     "RELEVANCE_API_KEY",
     "RELEVANCE_AUTH_TOKEN",
@@ -143,7 +152,7 @@ export default async function DashboardPage() {
     ["n8n orchestrator webhook", n8nWebhook ? "configured" : "missing"],
     ["Stripe reporting", stripeState],
     ["Fiverr intake", telemetry.fiverr.intakeConfigured ? "configured" : "missing"],
-    ["xAI provider", xai ? "configured" : "missing"],
+    ["Content Agent AI Gateway", aiGatewayState],
     ["Relevance AI", relevance ? "configured" : "missing"],
     ["Internal API auth", internalApi ? "configured" : "missing"],
   ] as const
@@ -272,7 +281,15 @@ export default async function DashboardPage() {
                     ["n8n", telemetry.n8n.online, telemetry.n8n.online ? `${telemetry.n8n.latencyMs ?? "—"} ms` : "Offline"],
                     ["Stripe", telemetry.stripe.connected, telemetry.stripe.connected ? telemetry.stripe.mode : "Unavailable"],
                     ["Fiverr", telemetry.fiverr.intakeConfigured, telemetry.fiverr.intakeConfigured ? "Intake configured" : "Needs setup"],
-                    ["xAI", xai, xai ? "Configured" : "Needs setup"],
+                    [
+                      "AI Gateway",
+                      !contentAgentLaunchEnabled || aiGatewayAuth,
+                      contentAgentLaunchEnabled
+                        ? aiGatewayAuth
+                          ? "Configured"
+                          : "Needs setup"
+                        : "Execution paused",
+                    ],
                     ["Relevance", relevance, relevance ? "Configured" : "Needs setup"],
                     ["Customer Auth", customerAuth, customerAuth ? "Configured" : "Needs setup"],
                   ].map(([label, state, detail]) => (
@@ -314,7 +331,11 @@ export default async function DashboardPage() {
                 <Bot size={22} />
               </div>
               <div className={styles.lifecycle}>
-                <div><strong>{agentStatusCounts.live}</strong><span>Live</span></div>\n                <div><strong>{agentStatusCounts.beta}</strong><span>Beta</span></div>\n                <div><strong>{agentStatusCounts["setup-required"]}</strong><span>Setup required</span></div>\n                <div><strong>{agentStatusCounts.planned}</strong><span>Planned</span></div>\n                <div><strong>{agentStatusCounts.blocked}</strong><span>Blocked</span></div>
+                <div><strong>{agentStatusCounts.live}</strong><span>Live</span></div>
+                <div><strong>{agentStatusCounts.beta}</strong><span>Beta</span></div>
+                <div><strong>{agentStatusCounts["setup-required"]}</strong><span>Setup required</span></div>
+                <div><strong>{agentStatusCounts.planned}</strong><span>Planned</span></div>
+                <div><strong>{agentStatusCounts.blocked}</strong><span>Blocked</span></div>
               </div>
               <Link className={styles.panelLink} href="/agents">Review all {agents.length} agents →</Link>
             </article>
