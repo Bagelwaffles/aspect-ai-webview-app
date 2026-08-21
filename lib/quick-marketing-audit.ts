@@ -4,7 +4,6 @@ export const QUICK_MARKETING_AUDIT = {
   priceLabel: "$49 one-time",
   priceCents: 4900,
   deliveryWindow: "within 48 hours",
-  checkoutUrl: "https://book.stripe.com/fZu8wPfyIcLDdmJ4hUfEk01",
   landingPath: "/quick-marketing-audit",
   thankYouPath: "/quick-marketing-audit/thanks",
   deliverables: [
