@@ -1,0 +1,293 @@
+name: Provision Content Agent AI Gateway
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/provision-content-agent-gateway.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ams-content-agent-gateway-provision
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      VERCEL_ORG_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
+      VERCEL_PROJECT_ID: prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Require Vercel credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "::error::VERCEL_TOKEN is not configured for the production environment."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Link project and pull production environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN" >/tmp/vercel-pull.log 2>&1 || {
+            cat /tmp/vercel-pull.log
+            exit 1
+          }
+
+      - name: Verify launch is paused and check Gateway credits
+        id: credit_check
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          set -a
+          source .vercel/.env.production.local
+          set +a
+
+          if [ "${NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE:-false}" = "true" ]; then
+            echo "::error::Content Agent execution is already enabled. Refusing to provision credentials while launch is live."
+            exit 1
+          fi
+
+          existing_key=false
+          if [ -n "${AI_GATEWAY_API_KEY:-}" ]; then
+            existing_key=true
+          fi
+          echo "existing_key=$existing_key" >> "$GITHUB_OUTPUT"
+
+          oidc_code=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/ams-project-oidc.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            "https://api.vercel.com/v1/projects/${VERCEL_PROJECT_ID}/token?teamId=${VERCEL_ORG_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data '{"source":"github-actions:ams-content-agent-gateway-provision"}' || true)
+
+          if [ "$oidc_code" != "200" ]; then
+            echo "::error::Could not obtain a short-lived project OIDC token (HTTP ${oidc_code:-transport-error}). No Gateway key was created."
+            exit 1
+          fi
+
+          oidc_token=$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("/tmp/ams-project-oidc.json","utf8")); if(!j.token) process.exit(2); process.stdout.write(j.token)')
+          echo "::add-mask::$oidc_token"
+
+          credits_code=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/ams-gateway-credits.json \
+            --write-out '%{http_code}' \
+            "https://ai-gateway.vercel.sh/v1/credits" \
+            --header "Authorization: Bearer ${oidc_token}" \
+            --header "Content-Type: application/json" || true)
+
+          if [ "$credits_code" != "200" ]; then
+            echo "::error::AI Gateway credit check failed (HTTP ${credits_code:-transport-error}). No Gateway key was created."
+            exit 1
+          fi
+
+          credits_available=$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("/tmp/ams-gateway-credits.json","utf8")); const n=Number(j.balance); process.stdout.write(Number.isFinite(n)&&n>0?"true":"false")')
+          echo "credits_available=$credits_available" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## AMS Content Agent Gateway provisioning"
+            echo
+            if [ "$credits_available" = "true" ]; then
+              echo "- AI Gateway credits: available"
+            else
+              echo "- AI Gateway credits: unavailable"
+            fi
+            if [ "$existing_key" = "true" ]; then
+              echo "- Existing project Gateway credential: present"
+            else
+              echo "- Existing project Gateway credential: absent"
+            fi
+            echo "- Content Agent launch switch before provisioning: paused"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Leave Content Agent paused when credits are unavailable
+        if: steps.credit_check.outputs.credits_available != 'true'
+        shell: bash
+        run: |
+          {
+            echo "- Provisioning result: no credential created because credits are unavailable"
+            echo "- Content Agent remains paused; no model request was made"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Provision capped credential and store it safely
+        id: provision
+        if: steps.credit_check.outputs.credits_available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          set -a
+          source .vercel/.env.production.local
+          set +a
+
+          created_key=false
+          gateway_key_id=""
+          gateway_key="${AI_GATEWAY_API_KEY:-}"
+
+          revoke_created_key() {
+            if [ "$created_key" = "true" ] && [ -n "$gateway_key_id" ]; then
+              curl --max-time 15 --silent --show-error \
+                --request DELETE \
+                "https://api.vercel.com/v1/api-keys/${gateway_key_id}?teamId=${VERCEL_ORG_ID}" \
+                --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+                --output /dev/null || true
+            fi
+          }
+
+          if [ -z "$gateway_key" ]; then
+            node <<'NODE'
+          const fs = require('fs')
+          fs.writeFileSync('/tmp/ams-gateway-key-request.json', JSON.stringify({
+            purpose: 'ai-gateway',
+            name: 'AMS Content Agent',
+            projectId: process.env.VERCEL_PROJECT_ID,
+            aiGatewayQuota: {
+              limitAmount: 1,
+              refreshPeriod: 'monthly',
+            },
+          }))
+          NODE
+
+            create_code=$(curl --max-time 15 --silent --show-error \
+              --output /tmp/ams-gateway-key-response.json \
+              --write-out '%{http_code}' \
+              --request POST \
+              "https://api.vercel.com/v1/api-keys?teamId=${VERCEL_ORG_ID}" \
+              --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+              --header "Content-Type: application/json" \
+              --data-binary @/tmp/ams-gateway-key-request.json || true)
+
+            if [ "$create_code" != "200" ] && [ "$create_code" != "201" ]; then
+              echo "::error::Gateway key creation failed (HTTP ${create_code:-transport-error})."
+              exit 1
+            fi
+
+            gateway_key=$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("/tmp/ams-gateway-key-response.json","utf8")); if(!j.apiKeyString) process.exit(2); process.stdout.write(j.apiKeyString)')
+            gateway_key_id=$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("/tmp/ams-gateway-key-response.json","utf8")); if(!j.id) process.exit(2); process.stdout.write(j.id)')
+            created_key=true
+          fi
+
+          echo "::add-mask::$gateway_key"
+          if [ -n "$gateway_key_id" ]; then
+            echo "::add-mask::$gateway_key_id"
+          fi
+
+          GATEWAY_KEY="$gateway_key" node <<'NODE'
+          const fs = require('fs')
+          const key = process.env.GATEWAY_KEY
+          if (!key) process.exit(2)
+          fs.writeFileSync('/tmp/ams-env-payload.json', JSON.stringify([
+            {
+              key: 'AI_GATEWAY_API_KEY',
+              value: key,
+              type: 'sensitive',
+              target: ['production', 'preview'],
+              comment: 'Project-scoped AMS Content Agent AI Gateway credential; $1 monthly API-key ceiling.',
+            },
+            {
+              key: 'NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE',
+              value: 'false',
+              type: 'plain',
+              target: ['production', 'preview'],
+              comment: 'Explicit AMS Content Agent launch interlock. Keep false until production E2E proof.',
+            },
+          ]))
+          NODE
+
+          store_code=$(curl --max-time 20 --silent --show-error \
+            --output /tmp/ams-env-response.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?teamId=${VERCEL_ORG_ID}&upsert=true" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data-binary @/tmp/ams-env-payload.json || true)
+
+          if [ "$store_code" != "200" ] && [ "$store_code" != "201" ]; then
+            revoke_created_key
+            echo "::error::Vercel environment upsert failed (HTTP ${store_code:-transport-error}). A newly created key, if any, was revoked."
+            exit 1
+          fi
+
+          echo "stored=true" >> "$GITHUB_OUTPUT"
+          {
+            if [ "$created_key" = "true" ]; then
+              echo "- Gateway credential: newly created and stored as a sensitive Vercel project variable"
+              echo "- API-key ceiling: USD 1 per month"
+            else
+              echo "- Gateway credential: existing sensitive project credential retained"
+            fi
+            echo "- Content Agent launch switch after provisioning: forced paused"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Redeploy production with launch still paused
+        if: steps.credit_check.outputs.credits_available == 'true' && steps.provision.outputs.stored == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN" >/tmp/ams-gateway-deploy.log 2>&1 || {
+            cat /tmp/ams-gateway-deploy.log
+            exit 1
+          }
+          echo "- Production redeploy: completed with launch paused" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify production invariants
+        if: steps.credit_check.outputs.credits_available == 'true' && steps.provision.outputs.stored == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          health_code=$(curl --max-time 15 --silent --show-error --output /tmp/ams-health.json --write-out '%{http_code}' \
+            "https://www.aspectmarketingsolutions.app/api/health" || true)
+          if [ "$health_code" != "200" ]; then
+            echo "::error::AMS health endpoint returned HTTP ${health_code:-transport-error}."
+            exit 1
+          fi
+          node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("/tmp/ams-health.json","utf8")); if(j.dependencies?.aiGateway!=="configured") { console.error("AI Gateway health is not configured"); process.exit(1) }'
+
+          content_code=$(curl --max-time 15 --silent --show-error --output /tmp/ams-content-agent.html --write-out '%{http_code}' \
+            "https://www.aspectmarketingsolutions.app/content-agent" || true)
+          if [ "$content_code" != "200" ] || ! grep -Eq 'Private beta — execution paused|Execution paused — no charge' /tmp/ams-content-agent.html; then
+            echo "::error::Content Agent is not visibly paused after provisioning."
+            exit 1
+          fi
+
+          audit_code=$(curl --max-time 15 --silent --show-error --output /tmp/ams-quick-audit.html --write-out '%{http_code}' \
+            "https://www.aspectmarketingsolutions.app/quick-marketing-audit" || true)
+          if [ "$audit_code" != "200" ] || ! grep -q 'Continue to Stripe - \$49' /tmp/ams-quick-audit.html; then
+            echo "::error::Quick Marketing Audit revenue page failed its post-provisioning check."
+            exit 1
+          fi
+
+          agents_code=$(curl --max-time 15 --silent --show-error --output /tmp/ams-agents.json --write-out '%{http_code}' \
+            "https://www.aspectmarketingsolutions.app/api/agents" || true)
+          if [ "$agents_code" != "401" ]; then
+            echo "::error::Internal agent control-plane boundary returned HTTP ${agents_code:-transport-error}; expected 401."
+            exit 1
+          fi
+
+          {
+            echo "- Production health: AI Gateway authentication configured"
+            echo "- Content Agent: still paused; no model request made"
+            echo "- Quick Marketing Audit: healthy"
+            echo "- Internal agent API boundary: protected"
+          } >> "$GITHUB_STEP_SUMMARY"
