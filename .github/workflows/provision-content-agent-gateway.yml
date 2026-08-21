@@ -128,15 +128,33 @@ jobs:
             echo "- Content Agent remains paused; no model request was made"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Create capped project Gateway key
-        id: create_key
-        if: steps.credit_check.outputs.credits_available == 'true' && steps.credit_check.outputs.existing_key != 'true'
+      - name: Provision capped credential and store it safely
+        id: provision
+        if: steps.credit_check.outputs.credits_available == 'true'
         shell: bash
         run: |
           set -euo pipefail
           set +x
+          set -a
+          source .vercel/.env.production.local
+          set +a
 
-          node <<'NODE'
+          created_key=false
+          gateway_key_id=""
+          gateway_key="${AI_GATEWAY_API_KEY:-}"
+
+          revoke_created_key() {
+            if [ "$created_key" = "true" ] && [ -n "$gateway_key_id" ]; then
+              curl --max-time 15 --silent --show-error \
+                --request DELETE \
+                "https://api.vercel.com/v1/api-keys/${gateway_key_id}?teamId=${VERCEL_ORG_ID}" \
+                --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+                --output /dev/null || true
+            fi
+          }
+
+          if [ -z "$gateway_key" ]; then
+            node <<'NODE'
           const fs = require('fs')
           fs.writeFileSync('/tmp/ams-gateway-key-request.json', JSON.stringify({
             purpose: 'ai-gateway',
@@ -149,77 +167,31 @@ jobs:
           }))
           NODE
 
-          create_code=$(curl --max-time 15 --silent --show-error \
-            --output /tmp/ams-gateway-key-response.json \
-            --write-out '%{http_code}' \
-            --request POST \
-            "https://api.vercel.com/v1/api-keys?teamId=${VERCEL_ORG_ID}" \
-            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
-            --header "Content-Type: application/json" \
-            --data-binary @/tmp/ams-gateway-key-request.json || true)
+            create_code=$(curl --max-time 15 --silent --show-error \
+              --output /tmp/ams-gateway-key-response.json \
+              --write-out '%{http_code}' \
+              --request POST \
+              "https://api.vercel.com/v1/api-keys?teamId=${VERCEL_ORG_ID}" \
+              --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+              --header "Content-Type: application/json" \
+              --data-binary @/tmp/ams-gateway-key-request.json || true)
 
-          if [ "$create_code" != "200" ] && [ "$create_code" != "201" ]; then
-            echo "::error::Gateway key creation failed (HTTP ${create_code:-transport-error})."
-            exit 1
-          fi
+            if [ "$create_code" != "200" ] && [ "$create_code" != "201" ]; then
+              echo "::error::Gateway key creation failed (HTTP ${create_code:-transport-error})."
+              exit 1
+            fi
 
-          gateway_key=$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("/tmp/ams-gateway-key-response.json","utf8")); if(!j.apiKeyString) process.exit(2); process.stdout.write(j.apiKeyString)')
-          gateway_key_id=$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("/tmp/ams-gateway-key-response.json","utf8")); if(!j.id) process.exit(2); process.stdout.write(j.id)')
-          echo "::add-mask::$gateway_key"
-          echo "::add-mask::$gateway_key_id"
-
-          {
-            echo "gateway_key<<AMS_GATEWAY_KEY_EOF"
-            echo "$gateway_key"
-            echo "AMS_GATEWAY_KEY_EOF"
-            echo "gateway_key_id=$gateway_key_id"
-            echo "created=true"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Resolve Gateway credential for storage
-        id: credential
-        if: steps.credit_check.outputs.credits_available == 'true'
-        shell: bash
-        env:
-          NEW_GATEWAY_KEY: ${{ steps.create_key.outputs.gateway_key }}
-        run: |
-          set -euo pipefail
-          set +x
-          set -a
-          source .vercel/.env.production.local
-          set +a
-
-          if [ -n "${AI_GATEWAY_API_KEY:-}" ]; then
-            gateway_key="$AI_GATEWAY_API_KEY"
-            source_kind="existing"
-          elif [ -n "${NEW_GATEWAY_KEY:-}" ]; then
-            gateway_key="$NEW_GATEWAY_KEY"
-            source_kind="created"
-          else
-            echo "::error::No Gateway credential is available for storage."
-            exit 1
+            gateway_key=$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("/tmp/ams-gateway-key-response.json","utf8")); if(!j.apiKeyString) process.exit(2); process.stdout.write(j.apiKeyString)')
+            gateway_key_id=$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("/tmp/ams-gateway-key-response.json","utf8")); if(!j.id) process.exit(2); process.stdout.write(j.id)')
+            created_key=true
           fi
 
           echo "::add-mask::$gateway_key"
-          {
-            echo "gateway_key<<AMS_GATEWAY_KEY_EOF"
-            echo "$gateway_key"
-            echo "AMS_GATEWAY_KEY_EOF"
-            echo "source_kind=$source_kind"
-          } >> "$GITHUB_OUTPUT"
+          if [ -n "$gateway_key_id" ]; then
+            echo "::add-mask::$gateway_key_id"
+          fi
 
-      - name: Store credential safely and force launch paused
-        id: store_env
-        if: steps.credit_check.outputs.credits_available == 'true'
-        shell: bash
-        env:
-          GATEWAY_KEY: ${{ steps.credential.outputs.gateway_key }}
-        run: |
-          set -euo pipefail
-          set +x
-          echo "::add-mask::$GATEWAY_KEY"
-
-          node <<'NODE'
+          GATEWAY_KEY="$gateway_key" node <<'NODE'
           const fs = require('fs')
           const key = process.env.GATEWAY_KEY
           if (!key) process.exit(2)
@@ -251,36 +223,24 @@ jobs:
             --data-binary @/tmp/ams-env-payload.json || true)
 
           if [ "$store_code" != "200" ] && [ "$store_code" != "201" ]; then
-            echo "stored=false" >> "$GITHUB_OUTPUT"
-            echo "::error::Vercel environment upsert failed (HTTP ${store_code:-transport-error})."
+            revoke_created_key
+            echo "::error::Vercel environment upsert failed (HTTP ${store_code:-transport-error}). A newly created key, if any, was revoked."
             exit 1
           fi
 
           echo "stored=true" >> "$GITHUB_OUTPUT"
           {
-            echo "- Gateway credential: stored as a sensitive Vercel project variable"
-            echo "- API-key ceiling: USD 1 per month"
+            if [ "$created_key" = "true" ]; then
+              echo "- Gateway credential: newly created and stored as a sensitive Vercel project variable"
+              echo "- API-key ceiling: USD 1 per month"
+            else
+              echo "- Gateway credential: existing sensitive project credential retained"
+            fi
             echo "- Content Agent launch switch after provisioning: forced paused"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Revoke newly created key if storage failed
-        if: failure() && steps.create_key.outputs.created == 'true' && steps.store_env.outputs.stored != 'true'
-        shell: bash
-        env:
-          CREATED_KEY_ID: ${{ steps.create_key.outputs.gateway_key_id }}
-        run: |
-          set +e
-          set +x
-          if [ -n "${CREATED_KEY_ID:-}" ]; then
-            curl --max-time 15 --silent --show-error \
-              --request DELETE \
-              "https://api.vercel.com/v1/api-keys/${CREATED_KEY_ID}?teamId=${VERCEL_ORG_ID}" \
-              --header "Authorization: Bearer ${VERCEL_TOKEN}" \
-              --output /dev/null
-          fi
-
       - name: Redeploy production with launch still paused
-        if: steps.credit_check.outputs.credits_available == 'true' && steps.store_env.outputs.stored == 'true'
+        if: steps.credit_check.outputs.credits_available == 'true' && steps.provision.outputs.stored == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -291,7 +251,7 @@ jobs:
           echo "- Production redeploy: completed with launch paused" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify production invariants
-        if: steps.credit_check.outputs.credits_available == 'true' && steps.store_env.outputs.stored == 'true'
+        if: steps.credit_check.outputs.credits_available == 'true' && steps.provision.outputs.stored == 'true'
         shell: bash
         run: |
           set -euo pipefail
