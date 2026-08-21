@@ -4,7 +4,7 @@ import { z } from "zod"
 import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 
 export const CONTENT_AGENT_VERSION = "content-v1" as const
-export const DEFAULT_CONTENT_AGENT_MODEL = "openai/gpt-5.6-luna-fast" as const
+export const DEFAULT_CONTENT_AGENT_MODEL = "openai/gpt-5.4-mini" as const
 
 export const contentAgentInputSchema = z
   .object({
@@ -59,10 +59,15 @@ export function getContentAgentModel(): string {
   return process.env.AMS_CONTENT_AGENT_MODEL?.trim() || DEFAULT_CONTENT_AGENT_MODEL
 }
 
+function isNativeVercelGatewayAuthAvailable(): boolean {
+  return process.env.VERCEL === "1" && Boolean(process.env.VERCEL_ENV?.trim())
+}
+
 export function isContentAgentGatewayAuthAvailable(): boolean {
   return Boolean(
     process.env.AI_GATEWAY_API_KEY?.trim() ||
-      process.env.VERCEL_OIDC_TOKEN?.trim(),
+      process.env.VERCEL_OIDC_TOKEN?.trim() ||
+      isNativeVercelGatewayAuthAvailable(),
   )
 }
 
