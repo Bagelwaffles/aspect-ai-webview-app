@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { authOptions, isCustomerAuthConfigured } from "@/lib/auth"
 import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
-import { getEntitlementSnapshot } from "@/lib/server/entitlements"
+import { getEntitlementSnapshot, monthlyCreditsForPlan } from "@/lib/server/entitlements"
 
 export const dynamic = "force-dynamic"
 
@@ -19,9 +19,9 @@ function statusTone(status?: string | null) {
 }
 
 const PLANS = [
-  { slug: "starter" as const, name: "Starter", price: "$29/month", credits: "2,000 credits" },
-  { slug: "growth" as const, name: "Growth", price: "$79/month", credits: "8,000 credits" },
-  { slug: "pro" as const, name: "Pro", price: "$149/month", credits: "20,000 credits" },
+  { slug: "starter" as const, name: "Starter", price: "$29/month", credits: monthlyCreditsForPlan("starter") },
+  { slug: "growth" as const, name: "Growth", price: "$79/month", credits: monthlyCreditsForPlan("growth") },
+  { slug: "pro" as const, name: "Pro", price: "$149/month", credits: monthlyCreditsForPlan("pro") },
 ]
 
 export default async function BillingPage() {
@@ -43,7 +43,7 @@ export default async function BillingPage() {
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
             <h1 className="text-3xl font-bold">AMS billing</h1>
-            <p className="text-muted-foreground">Subscription and AI-credit access for the signed-in account.</p>
+            <p className="text-muted-foreground">Subscription and Content Agent credit access for the signed-in account.</p>
           </div>
           <Button asChild variant="outline">
             <Link href="/">Back to dashboard</Link>
@@ -55,7 +55,7 @@ export default async function BillingPage() {
             <CardHeader>
               <CardTitle>New paid AI subscriptions are paused</CardTitle>
               <CardDescription>
-                Content Agent is in private beta. Existing subscribers can still manage their subscription, but AMS will not open a new paid checkout for unavailable AI execution.
+                Content Agent has passed controlled provider testing but remains behind the production launch gate. Existing subscribers can still manage their subscription, and no new paid checkout opens while the gate is disabled.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -117,9 +117,13 @@ export default async function BillingPage() {
                 <CardDescription>{plan.price}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">{plan.credits} per billing cycle.</p>
                 <p className="text-sm text-muted-foreground">
-                  Content Agent access becomes available only after the live provider gate is explicitly enabled. Outreach and Analytics are not available.
+                  {plan.credits.toLocaleString()} Content Agent credits per billing cycle. One completed generation uses one credit.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {contentAgentLive
+                    ? "Content Agent is included with an active subscription. Outreach and Analytics are not available."
+                    : "Content Agent access begins only after the production launch gate is enabled. Outreach and Analytics are not available."}
                 </p>
                 {contentAgentLive ? (
                   <BillingActionButton label={`Choose ${plan.name}`} endpoint="/api/billing/checkout" plan={plan.slug} />
