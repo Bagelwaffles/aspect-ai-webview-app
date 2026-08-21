@@ -1,0 +1,272 @@
+name: Retry Content Agent AI Gateway Provisioning
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/provision-content-agent-gateway-retry.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ams-content-agent-gateway-provision-retry
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    outputs:
+      issue_number: ${{ steps.issue.outputs.issue_number }}
+    steps:
+      - name: Create sanitized provisioning issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="AMS Gateway Provisioning Retry #${GITHUB_RUN_ID}"
+          body=$(cat <<EOF
+          Automated one-time retry of AMS Content Agent AI Gateway provisioning.
+
+          - Run id: ${GITHUB_RUN_ID}
+          - Commit: ${GITHUB_SHA}
+          - Model request: none
+          - Customer charge: none
+          - Content Agent launch: forced paused
+          - Secret values: never reported
+          EOF
+          )
+          issue_url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body")
+          echo "issue_number=${issue_url##*/}" >> "$GITHUB_OUTPUT"
+
+  provision:
+    needs: announce
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      VERCEL_ORG_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
+      VERCEL_PROJECT_ID: prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      DIAGNOSTIC_ISSUE: ${{ needs.announce.outputs.issue_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Mark protected job started
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh issue comment "$DIAGNOSTIC_ISSUE" --repo "$GITHUB_REPOSITORY" --body "Protected production job started. Beginning fail-closed provisioning checks; no model request will be made."
+
+      - name: Pull production configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "::error::VERCEL_TOKEN missing"
+            exit 20
+          fi
+          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN" >/tmp/vercel-pull.log 2>&1 || {
+            cat /tmp/vercel-pull.log
+            exit 21
+          }
+
+      - name: Verify paused launch and Gateway credits
+        id: readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          set -a
+          source .vercel/.env.production.local
+          set +a
+
+          if [ "${NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE:-false}" = "true" ]; then
+            echo "::error::Content Agent is already enabled; refusing credential mutation."
+            exit 22
+          fi
+
+          code=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/oidc.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            "https://api.vercel.com/v1/projects/${VERCEL_PROJECT_ID}/token?teamId=${VERCEL_ORG_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data '{"source":"github-actions:ams-gateway-provision-retry"}' || true)
+          echo "oidc_http=$code" >> "$GITHUB_OUTPUT"
+          [ "$code" = "200" ] || exit 23
+
+          oidc_token=$(node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("/tmp/oidc.json","utf8"));if(!j.token)process.exit(2);process.stdout.write(j.token)')
+          echo "::add-mask::$oidc_token"
+
+          credits_code=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/credits.json \
+            --write-out '%{http_code}' \
+            "https://ai-gateway.vercel.sh/v1/credits" \
+            --header "Authorization: Bearer ${oidc_token}" \
+            --header "Content-Type: application/json" || true)
+          echo "credits_http=$credits_code" >> "$GITHUB_OUTPUT"
+          [ "$credits_code" = "200" ] || exit 24
+
+          credits_available=$(node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("/tmp/credits.json","utf8"));const n=Number(j.balance);process.stdout.write(Number.isFinite(n)&&n>0?"true":"false")')
+          echo "credits_available=$credits_available" >> "$GITHUB_OUTPUT"
+          [ "$credits_available" = "true" ] || exit 25
+
+          if [ -n "${AI_GATEWAY_API_KEY:-}" ]; then
+            echo "existing_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "existing_key=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Provision capped credential and store it
+        id: store
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          set -a
+          source .vercel/.env.production.local
+          set +a
+
+          gateway_key="${AI_GATEWAY_API_KEY:-}"
+          gateway_key_id=""
+          created_key=false
+
+          revoke_created_key() {
+            if [ "$created_key" = "true" ] && [ -n "$gateway_key_id" ]; then
+              curl --max-time 15 --silent --show-error \
+                --request DELETE \
+                "https://api.vercel.com/v1/api-keys/${gateway_key_id}?teamId=${VERCEL_ORG_ID}" \
+                --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+                --output /dev/null || true
+            fi
+          }
+
+          if [ -z "$gateway_key" ]; then
+            node <<'NODE'
+          const fs = require('fs')
+          fs.writeFileSync('/tmp/key-request.json', JSON.stringify({
+            purpose: 'ai-gateway',
+            name: 'AMS Content Agent',
+            projectId: process.env.VERCEL_PROJECT_ID,
+            aiGatewayQuota: { limitAmount: 1, refreshPeriod: 'monthly' },
+          }))
+          NODE
+
+            create_code=$(curl --max-time 15 --silent --show-error \
+              --output /tmp/key-response.json \
+              --write-out '%{http_code}' \
+              --request POST \
+              "https://api.vercel.com/v1/api-keys?teamId=${VERCEL_ORG_ID}" \
+              --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+              --header "Content-Type: application/json" \
+              --data-binary @/tmp/key-request.json || true)
+            echo "create_http=$create_code" >> "$GITHUB_OUTPUT"
+            if [ "$create_code" != "200" ] && [ "$create_code" != "201" ]; then
+              exit 26
+            fi
+
+            gateway_key=$(node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("/tmp/key-response.json","utf8"));if(!j.apiKeyString)process.exit(2);process.stdout.write(j.apiKeyString)')
+            gateway_key_id=$(node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("/tmp/key-response.json","utf8"));if(!j.id)process.exit(2);process.stdout.write(j.id)')
+            created_key=true
+          else
+            echo "create_http=existing" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "::add-mask::$gateway_key"
+          [ -n "$gateway_key_id" ] && echo "::add-mask::$gateway_key_id" || true
+
+          GATEWAY_KEY="$gateway_key" node <<'NODE'
+          const fs = require('fs')
+          const key = process.env.GATEWAY_KEY
+          if (!key) process.exit(2)
+          fs.writeFileSync('/tmp/env-payload.json', JSON.stringify([
+            {
+              key: 'AI_GATEWAY_API_KEY',
+              value: key,
+              type: 'sensitive',
+              target: ['production', 'preview'],
+              comment: 'Project-scoped AMS Content Agent AI Gateway credential; hard USD 1 monthly key quota.',
+            },
+            {
+              key: 'NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE',
+              value: 'false',
+              type: 'plain',
+              target: ['production', 'preview'],
+              comment: 'Content Agent launch interlock; remains false until controlled E2E proof.',
+            },
+          ]))
+          NODE
+
+          store_code=$(curl --max-time 20 --silent --show-error \
+            --output /tmp/env-response.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?teamId=${VERCEL_ORG_ID}&upsert=true" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data-binary @/tmp/env-payload.json || true)
+          echo "env_http=$store_code" >> "$GITHUB_OUTPUT"
+          if [ "$store_code" != "200" ] && [ "$store_code" != "201" ]; then
+            revoke_created_key
+            exit 27
+          fi
+
+          echo "created_key=$created_key" >> "$GITHUB_OUTPUT"
+
+      - name: Redeploy production while launch remains paused
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN" >/tmp/deploy.log 2>&1 || {
+            cat /tmp/deploy.log
+            exit 28
+          }
+
+      - name: Verify production invariants
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          health_code=$(curl --max-time 15 --silent --show-error --output /tmp/health.json --write-out '%{http_code}' \
+            "https://www.aspectmarketingsolutions.app/api/health" || true)
+          echo "health_http=$health_code" >> "$GITHUB_OUTPUT"
+          [ "$health_code" = "200" ] || exit 29
+          node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("/tmp/health.json","utf8"));if(j.dependencies?.aiGateway!=="configured")process.exit(1)'
+
+          content_code=$(curl --max-time 15 --silent --show-error --output /tmp/content.html --write-out '%{http_code}' \
+            "https://www.aspectmarketingsolutions.app/content-agent" || true)
+          echo "content_http=$content_code" >> "$GITHUB_OUTPUT"
+          [ "$content_code" = "200" ] || exit 30
+          grep -Eq 'Private beta — execution paused|Execution paused — no charge' /tmp/content.html || exit 31
+
+          audit_code=$(curl --max-time 15 --silent --show-error --output /tmp/audit.html --write-out '%{http_code}' \
+            "https://www.aspectmarketingsolutions.app/quick-marketing-audit" || true)
+          echo "audit_http=$audit_code" >> "$GITHUB_OUTPUT"
+          [ "$audit_code" = "200" ] || exit 32
+          grep -q 'Continue to Stripe - \$49' /tmp/audit.html || exit 33
+
+      - name: Report success
+        if: success()
+        shell: bash
+        run: |
+          gh issue comment "$DIAGNOSTIC_ISSUE" --repo "$GITHUB_REPOSITORY" --body "Provisioning succeeded. OIDC HTTP=${{ steps.readiness.outputs.oidc_http }}; credits HTTP=${{ steps.readiness.outputs.credits_http }}; credits available=${{ steps.readiness.outputs.credits_available }}; existing key before run=${{ steps.readiness.outputs.existing_key }}; key creation=${{ steps.store.outputs.create_http }}; Vercel env upsert HTTP=${{ steps.store.outputs.env_http }}; production health HTTP=${{ steps.verify.outputs.health_http }}; Content Agent HTTP=${{ steps.verify.outputs.content_http }}; Quick Audit HTTP=${{ steps.verify.outputs.audit_http }}. Content Agent remains paused and no model request was made."
+
+      - name: Report failure
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          gh issue comment "$DIAGNOSTIC_ISSUE" --repo "$GITHUB_REPOSITORY" --body "Provisioning retry failed. Sanitized checkpoints: OIDC HTTP=${{ steps.readiness.outputs.oidc_http || 'not reached' }}; credits HTTP=${{ steps.readiness.outputs.credits_http || 'not reached' }}; credits available=${{ steps.readiness.outputs.credits_available || 'unknown' }}; key creation=${{ steps.store.outputs.create_http || 'not reached' }}; Vercel env upsert HTTP=${{ steps.store.outputs.env_http || 'not reached' }}; production health HTTP=${{ steps.verify.outputs.health_http || 'not reached' }}. No secret values are included, no model request was made, and Content Agent launch remains unchanged."
