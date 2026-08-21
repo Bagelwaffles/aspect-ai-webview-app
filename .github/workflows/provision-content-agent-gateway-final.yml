@@ -1,0 +1,285 @@
+name: Finalize Content Agent AI Gateway Provisioning
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/provision-content-agent-gateway-final.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ams-content-agent-gateway-finalize
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    outputs:
+      issue_number: ${{ steps.issue.outputs.issue_number }}
+    steps:
+      - name: Create sanitized status issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          issue_url=$(gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "AMS Gateway Finalization #${GITHUB_RUN_ID}" \
+            --body "Final fail-closed AMS Content Agent AI Gateway provisioning. No model request, no customer charge, launch forced paused, no secret values reported.")
+          echo "issue_number=${issue_url##*/}" >> "$GITHUB_OUTPUT"
+
+  finalize:
+    needs: announce
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      VERCEL_ORG_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
+      VERCEL_PROJECT_ID: prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      STATUS_ISSUE: ${{ needs.announce.outputs.issue_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Pull production configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "${VERCEL_TOKEN:-}" ] || exit 20
+          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN" >/tmp/vercel-pull.log 2>&1 || {
+            cat /tmp/vercel-pull.log
+            exit 21
+          }
+
+      - name: Verify launch remains paused and credits exist
+        id: readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          set -a
+          source .vercel/.env.production.local
+          set +a
+
+          [ "${NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE:-false}" != "true" ] || exit 22
+
+          oidc_http=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/oidc.json --write-out '%{http_code}' \
+            --request POST \
+            "https://api.vercel.com/v1/projects/${VERCEL_PROJECT_ID}/token?teamId=${VERCEL_ORG_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data '{"source":"github-actions:ams-gateway-finalize"}' || true)
+          echo "oidc_http=$oidc_http" >> "$GITHUB_OUTPUT"
+          [ "$oidc_http" = "200" ] || exit 23
+
+          oidc=$(node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("/tmp/oidc.json","utf8"));if(!j.token)process.exit(2);process.stdout.write(j.token)')
+          echo "::add-mask::$oidc"
+
+          credits_http=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/credits.json --write-out '%{http_code}' \
+            "https://ai-gateway.vercel.sh/v1/credits" \
+            --header "Authorization: Bearer ${oidc}" || true)
+          echo "credits_http=$credits_http" >> "$GITHUB_OUTPUT"
+          [ "$credits_http" = "200" ] || exit 24
+
+          available=$(node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("/tmp/credits.json","utf8"));const n=Number(j.balance);process.stdout.write(Number.isFinite(n)&&n>0?"true":"false")')
+          echo "credits_available=$available" >> "$GITHUB_OUTPUT"
+          [ "$available" = "true" ] || exit 25
+
+      - name: Remove unusable AMS Content Agent keys
+        id: cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+
+          list_http=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/keys.json --write-out '%{http_code}' \
+            "https://api.vercel.com/v1/api-keys?teamId=${VERCEL_ORG_ID}&purpose=ai-gateway" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" || true)
+          echo "list_http=$list_http" >> "$GITHUB_OUTPUT"
+          [ "$list_http" = "200" ] || exit 26
+
+          node <<'NODE' > /tmp/delete-ids.txt
+          const fs=require('fs')
+          const j=JSON.parse(fs.readFileSync('/tmp/keys.json','utf8'))
+          const list=Array.isArray(j)?j:(Array.isArray(j.apiKeys)?j.apiKeys:(Array.isArray(j.data)?j.data:[]))
+          const pid=process.env.VERCEL_PROJECT_ID
+          for(const k of list){
+            if(!k||k.name!=='AMS Content Agent') continue
+            const projectId=k.projectId ?? k.project?.id ?? null
+            if(projectId && projectId!==pid) continue
+            const id=k.id ?? k.keyId ?? k.apiKeyId
+            if(typeof id==='string' && id) console.log(id)
+          }
+          NODE
+
+          deleted=0
+          while IFS= read -r id; do
+            [ -n "$id" ] || continue
+            echo "::add-mask::$id"
+            code=$(curl --max-time 15 --silent --show-error \
+              --output /dev/null --write-out '%{http_code}' \
+              --request DELETE \
+              "https://api.vercel.com/v1/api-keys/${id}?teamId=${VERCEL_ORG_ID}" \
+              --header "Authorization: Bearer ${VERCEL_TOKEN}" || true)
+            if [ "$code" = "200" ] || [ "$code" = "204" ]; then
+              deleted=$((deleted+1))
+            else
+              exit 27
+            fi
+          done < /tmp/delete-ids.txt
+          echo "deleted=$deleted" >> "$GITHUB_OUTPUT"
+
+      - name: Create one capped key and parse by stable prefixes
+        id: create
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+
+          node <<'NODE'
+          const fs=require('fs')
+          fs.writeFileSync('/tmp/key-request.json',JSON.stringify({
+            purpose:'ai-gateway',
+            name:'AMS Content Agent',
+            projectId:process.env.VERCEL_PROJECT_ID,
+            aiGatewayQuota:{limitAmount:1,refreshPeriod:'monthly'},
+          }))
+          NODE
+
+          create_http=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/key-response.json --write-out '%{http_code}' \
+            --request POST \
+            "https://api.vercel.com/v1/api-keys?teamId=${VERCEL_ORG_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data-binary @/tmp/key-request.json || true)
+          echo "create_http=$create_http" >> "$GITHUB_OUTPUT"
+          [ "$create_http" = "200" ] || [ "$create_http" = "201" ] || exit 28
+
+          node <<'NODE'
+          const fs=require('fs')
+          const j=JSON.parse(fs.readFileSync('/tmp/key-response.json','utf8'))
+          const strings=[]
+          const walk=(v)=>{
+            if(typeof v==='string'){strings.push(v);return}
+            if(Array.isArray(v)){for(const x of v)walk(x);return}
+            if(v&&typeof v==='object'){for(const x of Object.values(v))walk(x)}
+          }
+          walk(j)
+          const secret=strings.find(s=>s.startsWith('vck_'))
+          const id=strings.find(s=>s.startsWith('key_'))
+          if(!secret||!id) process.exit(2)
+          fs.writeFileSync('/tmp/gateway-secret',secret)
+          fs.writeFileSync('/tmp/gateway-id',id)
+          NODE
+
+          secret=$(cat /tmp/gateway-secret)
+          key_id=$(cat /tmp/gateway-id)
+          echo "::add-mask::$secret"
+          echo "::add-mask::$key_id"
+          echo "key_id=$key_id" >> "$GITHUB_OUTPUT"
+
+      - name: Store credential and force launch off
+        id: store
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          secret=$(cat /tmp/gateway-secret)
+          key_id=$(cat /tmp/gateway-id)
+          echo "::add-mask::$secret"
+          echo "::add-mask::$key_id"
+
+          cleanup_on_error() {
+            curl --max-time 15 --silent --show-error \
+              --request DELETE \
+              "https://api.vercel.com/v1/api-keys/${key_id}?teamId=${VERCEL_ORG_ID}" \
+              --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+              --output /dev/null || true
+          }
+
+          GATEWAY_KEY="$secret" node <<'NODE'
+          const fs=require('fs')
+          const key=process.env.GATEWAY_KEY
+          if(!key)process.exit(2)
+          fs.writeFileSync('/tmp/env-payload.json',JSON.stringify([
+            {key:'AI_GATEWAY_API_KEY',value:key,type:'sensitive',target:['production','preview'],comment:'Project-scoped AMS Content Agent AI Gateway key; hard USD 1 monthly quota.'},
+            {key:'NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE',value:'false',type:'plain',target:['production','preview'],comment:'Explicit Content Agent launch interlock; remains off until controlled E2E proof.'}
+          ]))
+          NODE
+
+          env_http=$(curl --max-time 20 --silent --show-error \
+            --output /tmp/env-response.json --write-out '%{http_code}' \
+            --request POST \
+            "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?teamId=${VERCEL_ORG_ID}&upsert=true" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data-binary @/tmp/env-payload.json || true)
+          echo "env_http=$env_http" >> "$GITHUB_OUTPUT"
+          if [ "$env_http" != "200" ] && [ "$env_http" != "201" ]; then
+            cleanup_on_error
+            exit 29
+          fi
+
+      - name: Redeploy production with execution still paused
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN" >/tmp/deploy.log 2>&1 || {
+            cat /tmp/deploy.log
+            exit 30
+          }
+
+      - name: Verify production state
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          health_http=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/health.json --write-out '%{http_code}' \
+            "https://www.aspectmarketingsolutions.app/api/health" || true)
+          echo "health_http=$health_http" >> "$GITHUB_OUTPUT"
+          [ "$health_http" = "200" ] || exit 31
+          node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("/tmp/health.json","utf8"));if(j.dependencies?.aiGateway!=="configured")process.exit(1)'
+
+          content_http=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/content.html --write-out '%{http_code}' \
+            "https://www.aspectmarketingsolutions.app/content-agent" || true)
+          echo "content_http=$content_http" >> "$GITHUB_OUTPUT"
+          [ "$content_http" = "200" ] || exit 32
+          grep -Eq 'Private beta — execution paused|Execution paused — no charge' /tmp/content.html || exit 33
+
+          audit_http=$(curl --max-time 15 --silent --show-error \
+            --output /tmp/audit.html --write-out '%{http_code}' \
+            "https://www.aspectmarketingsolutions.app/quick-marketing-audit" || true)
+          echo "audit_http=$audit_http" >> "$GITHUB_OUTPUT"
+          [ "$audit_http" = "200" ] || exit 34
+          grep -q 'Continue to Stripe - \$49' /tmp/audit.html || exit 35
+
+      - name: Report success
+        if: success()
+        shell: bash
+        run: |
+          gh issue comment "$STATUS_ISSUE" --repo "$GITHUB_REPOSITORY" --body "Gateway finalization succeeded. OIDC HTTP=${{ steps.readiness.outputs.oidc_http }}; credits HTTP=${{ steps.readiness.outputs.credits_http }}; credits available=${{ steps.readiness.outputs.credits_available }}; stale AMS keys removed=${{ steps.cleanup.outputs.deleted }}; key creation HTTP=${{ steps.create.outputs.create_http }}; env upsert HTTP=${{ steps.store.outputs.env_http }}; production health HTTP=${{ steps.verify.outputs.health_http }}; Content Agent HTTP=${{ steps.verify.outputs.content_http }}; Quick Audit HTTP=${{ steps.verify.outputs.audit_http }}. Content Agent remains paused; no model request or customer charge occurred."
+
+      - name: Report failure
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          gh issue comment "$STATUS_ISSUE" --repo "$GITHUB_REPOSITORY" --body "Gateway finalization failed. Sanitized checkpoints: OIDC=${{ steps.readiness.outputs.oidc_http || 'not reached' }}; credits=${{ steps.readiness.outputs.credits_http || 'not reached' }}; stale keys removed=${{ steps.cleanup.outputs.deleted || 'unknown' }}; create=${{ steps.create.outputs.create_http || 'not reached' }}; env=${{ steps.store.outputs.env_http || 'not reached' }}; health=${{ steps.verify.outputs.health_http || 'not reached' }}. No secret values are included; no model request or customer charge occurred."
