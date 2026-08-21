@@ -1,6 +1,3 @@
-import { xai } from "@ai-sdk/xai"
-import { generateText, streamText } from "ai"
-
 export type GrokAgentPersonality = "professional" | "friendly" | "technical" | "sales" | "support" | "witty"
 
 export interface GrokAgent {
@@ -20,6 +17,13 @@ export interface GrokAgent {
 
 export type GrokAgentConfig = GrokAgent
 
+/**
+ * Static launch metadata only.
+ *
+ * These records are not a database, do not represent durable agent instances,
+ * and must never be mutated to simulate production agent persistence. Customer
+ * execution belongs on the persisted Content Agent path, not this catalog.
+ */
 export const DEFAULT_GROK_AGENTS: GrokAgent[] = [
   {
     id: "grok-support",
@@ -46,8 +50,8 @@ Guidelines:
     capabilities: ["Order tracking", "Product information", "Issue resolution", "General support"],
     status: "inactive",
     personality: "support",
-    createdAt: new Date("2024-01-15"),
-    updatedAt: new Date(),
+    createdAt: new Date("2024-01-15T00:00:00.000Z"),
+    updatedAt: new Date("2024-01-15T00:00:00.000Z"),
   },
   {
     id: "grok-sales",
@@ -74,8 +78,8 @@ Guidelines:
     capabilities: ["Lead qualification", "Product recommendations", "Pricing guidance", "Demo scheduling"],
     status: "inactive",
     personality: "sales",
-    createdAt: new Date("2024-01-20"),
-    updatedAt: new Date(),
+    createdAt: new Date("2024-01-20T00:00:00.000Z"),
+    updatedAt: new Date("2024-01-20T00:00:00.000Z"),
   },
   {
     id: "grok-technical",
@@ -102,8 +106,8 @@ Guidelines:
     capabilities: ["API support", "Integration help", "Troubleshooting", "Code assistance"],
     status: "inactive",
     personality: "technical",
-    createdAt: new Date("2024-01-25"),
-    updatedAt: new Date(),
+    createdAt: new Date("2024-01-25T00:00:00.000Z"),
+    updatedAt: new Date("2024-01-25T00:00:00.000Z"),
   },
   {
     id: "grok-analytics",
@@ -130,8 +134,8 @@ Guidelines:
     capabilities: ["Data analysis", "Trend identification", "Report generation", "Business insights"],
     status: "inactive",
     personality: "professional",
-    createdAt: new Date("2024-02-01"),
-    updatedAt: new Date(),
+    createdAt: new Date("2024-02-01T00:00:00.000Z"),
+    updatedAt: new Date("2024-02-01T00:00:00.000Z"),
   },
   {
     id: "grok-content",
@@ -158,101 +162,37 @@ Guidelines:
     capabilities: ["Marketing copy", "Product descriptions", "Social media", "SEO content"],
     status: "training",
     personality: "friendly",
-    createdAt: new Date("2024-02-05"),
-    updatedAt: new Date(),
+    createdAt: new Date("2024-02-05T00:00:00.000Z"),
+    updatedAt: new Date("2024-02-05T00:00:00.000Z"),
   },
 ]
 
-export class GrokAgentManager {
-  private agents = new Map<string, GrokAgent>()
-
-  constructor() {
-    DEFAULT_GROK_AGENTS.forEach((agent) => this.agents.set(agent.id, agent))
-  }
-
-  getAllAgents(): GrokAgent[] {
-    return Array.from(this.agents.values())
-  }
-
-  getAgent(id: string): GrokAgent | undefined {
-    return this.agents.get(id)
-  }
-
-  createAgent(agentData: Omit<GrokAgent, "id" | "createdAt" | "updatedAt">): GrokAgent {
-    const agent: GrokAgent = {
-      ...agentData,
-      id: `grok-${Date.now()}`,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }
-    this.agents.set(agent.id, agent)
-    return agent
-  }
-
-  updateAgent(id: string, updates: Partial<GrokAgent>): GrokAgent | null {
-    const agent = this.agents.get(id)
-    if (!agent) return null
-    const updated = { ...agent, ...updates, updatedAt: new Date() }
-    this.agents.set(id, updated)
-    return updated
-  }
-
-  deleteAgent(id: string): boolean {
-    return this.agents.delete(id)
-  }
-
-  async generateResponse(
-    agentId: string,
-    message: string,
-    conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>,
-  ): Promise<string> {
-    const agent = this.getAgent(agentId)
-    if (!agent) throw new Error(`Agent ${agentId} not found`)
-
-    let prompt = `${agent.systemPrompt}\n\n`
-    if (conversationHistory?.length) {
-      prompt += "Previous conversation:\n"
-      conversationHistory.slice(-6).forEach((entry) => {
-        prompt += `${entry.role === "user" ? "User" : "Assistant"}: ${entry.content}\n`
-      })
-      prompt += "\n"
-    }
-    prompt += `Current user message: ${message}\n\nProvide a helpful response based on your role and expertise:`
-
-    const { text } = await generateText({
-      model: xai(agent.model),
-      prompt,
-      temperature: agent.temperature,
-      maxOutputTokens: agent.maxTokens,
-    })
-    return text
-  }
-
-  async streamResponse(
-    agentId: string,
-    message: string,
-    conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>,
-  ) {
-    const agent = this.getAgent(agentId)
-    if (!agent) throw new Error(`Agent ${agentId} not found`)
-
-    let prompt = `${agent.systemPrompt}\n\n`
-    if (conversationHistory?.length) {
-      prompt += "Previous conversation:\n"
-      conversationHistory.slice(-6).forEach((entry) => {
-        prompt += `${entry.role === "user" ? "User" : "Assistant"}: ${entry.content}\n`
-      })
-      prompt += "\n"
-    }
-    prompt += `Current user message: ${message}\n\nProvide a helpful response based on your role and expertise:`
-
-    return streamText({
-      model: xai(agent.model),
-      prompt,
-      temperature: agent.temperature,
-      maxOutputTokens: agent.maxTokens,
-    })
+function copyAgent(agent: GrokAgent): GrokAgent {
+  return {
+    ...agent,
+    capabilities: [...agent.capabilities],
+    createdAt: new Date(agent.createdAt),
+    updatedAt: new Date(agent.updatedAt),
   }
 }
 
-export const grokAgentManager = new GrokAgentManager()
+/**
+ * Read-only compatibility facade for launch metadata.
+ *
+ * The historical manager kept agent state in a process-local Map and exposed
+ * create/update/delete plus direct provider execution. Those behaviors were
+ * virtual state, not durable AMS infrastructure, and are intentionally gone.
+ */
+export class GrokAgentCatalog {
+  getAllAgents(): GrokAgent[] {
+    return DEFAULT_GROK_AGENTS.map(copyAgent)
+  }
+
+  getAgent(id: string): GrokAgent | undefined {
+    const agent = DEFAULT_GROK_AGENTS.find((candidate) => candidate.id === id)
+    return agent ? copyAgent(agent) : undefined
+  }
+}
+
+// Compatibility name retained for the existing read-only /api/grok/agents route.
+export const grokAgentManager = new GrokAgentCatalog()
