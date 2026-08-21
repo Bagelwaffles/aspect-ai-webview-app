@@ -23,7 +23,7 @@ function validEnvironment() {
     AMS_STRIPE_GROWTH_PRICE_ID: "price_growth",
     AMS_STRIPE_PRO_PRICE_ID: "price_pro",
     NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE: "false",
-    AMS_CONTENT_AGENT_MODEL: "openai/gpt-5.6-luna-fast",
+    AMS_CONTENT_AGENT_MODEL: "openai/gpt-5.4-mini",
     AI_GATEWAY_API_KEY: "",
     AMS_AI_REQUESTS_PER_MINUTE: "10",
     AMS_STAGING_WEB_PORT: "3000",
