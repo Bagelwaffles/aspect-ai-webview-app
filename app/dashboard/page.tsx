@@ -105,7 +105,9 @@ export default async function DashboardPage() {
   const contentAgentLaunchEnabled =
     process.env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE?.trim().toLowerCase() === "true"
   const aiGatewayAuth = Boolean(
-    process.env.AI_GATEWAY_API_KEY?.trim() || process.env.VERCEL_OIDC_TOKEN?.trim(),
+    process.env.AI_GATEWAY_API_KEY?.trim() ||
+      process.env.VERCEL_OIDC_TOKEN?.trim() ||
+      (process.env.VERCEL === "1" && process.env.VERCEL_ENV?.trim()),
   )
   const aiGatewayState = contentAgentLaunchEnabled
     ? aiGatewayAuth
