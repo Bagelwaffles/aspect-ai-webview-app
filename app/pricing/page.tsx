@@ -66,7 +66,7 @@ export default function PricingPage() {
           </p>
           <div className="flex flex-wrap gap-3">
             <Button asChild>
-              <Link href="/quick-marketing-audit">
+              <Link href={QUICK_MARKETING_AUDIT.landingPath}>
                 Get the $49 audit
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
@@ -125,10 +125,10 @@ export default function PricingPage() {
                 ))}
               </ul>
               <Button asChild size="lg">
-                <a href={QUICK_MARKETING_AUDIT.checkoutUrl} rel="noreferrer">
+                <Link href={QUICK_MARKETING_AUDIT.landingPath}>
                   Buy the audit — $49
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </a>
+                </Link>
               </Button>
             </CardContent>
           </Card>

@@ -4,11 +4,11 @@ import test from "node:test"
 import { ETHICAL_OFFERS } from "../lib/ethical-agent-farm"
 import { QUICK_MARKETING_AUDIT } from "../lib/quick-marketing-audit"
 
-test("quick marketing audit is a $49 one-time live Stripe offer", () => {
+test("quick marketing audit is a $49 one-time offer routed through the protected AMS landing page", () => {
   assert.equal(QUICK_MARKETING_AUDIT.priceCents, 4900)
   assert.equal(QUICK_MARKETING_AUDIT.priceLabel, "$49 one-time")
   assert.equal(QUICK_MARKETING_AUDIT.deliveryWindow, "within 48 hours")
-  assert.match(QUICK_MARKETING_AUDIT.checkoutUrl, /^https:\/\/(book|buy)\.stripe\.com\//)
+  assert.equal(QUICK_MARKETING_AUDIT.landingPath, "/quick-marketing-audit")
   assert.equal(QUICK_MARKETING_AUDIT.deliverables.length, 6)
 })
 
