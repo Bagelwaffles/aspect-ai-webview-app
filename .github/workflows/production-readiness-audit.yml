@@ -155,10 +155,14 @@ jobs:
             report "Internal API auth" "missing"
           fi
 
-          if all_present XAI_API_KEY XAI_MODEL; then
-            report "xAI provider" "configured (not invoked)"
+          content_launch="${NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE:-false}"
+          content_model="${AMS_CONTENT_AGENT_MODEL:-openai/gpt-5.6-luna-fast}"
+          if [ "$content_launch" != "true" ]; then
+            report "Content Agent AI Gateway" "execution paused; provider not invoked ($content_model)"
+          elif [ -n "${AI_GATEWAY_API_KEY:-}" ]; then
+            report "Content Agent AI Gateway" "launch enabled with API-key auth ($content_model); E2E proof still required"
           else
-            report "xAI provider" "missing variable(s)"
+            report "Content Agent AI Gateway" "launch enabled; Vercel runtime OIDC and E2E proof required ($content_model)"
           fi
 
           if all_present RELEVANCE_API_KEY RELEVANCE_AUTH_TOKEN RELEVANCE_REGION RELEVANCE_PROJECT_ID RELEVANCE_AGENT_API_URL; then
