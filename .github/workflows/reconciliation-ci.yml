@@ -144,10 +144,10 @@ jobs:
           done
 
           node -e 'const value=require("/tmp/health.json"); if(value.ok!==true||value.status!=="ready"||value.persistence?.redis?.status!=="ready") process.exit(1)'
-          curl --fail --silent http://127.0.0.1:3000/api/agents > /tmp/agents.json
-          node -e 'const value=require("/tmp/agents.json"); if(!Array.isArray(value.agents)||value.agents.length!==0) process.exit(1)'
-          curl --fail --silent http://127.0.0.1:3000/api/deployments > /tmp/deployments.json
-          node -e 'const value=require("/tmp/deployments.json"); if(!Array.isArray(value.deployments)||value.deployments.length!==0) process.exit(1)'
+          test "$(curl --silent --output /tmp/agents.json --write-out '%{http_code}' http://127.0.0.1:3000/api/agents)" = "401"
+          node -e 'const value=require("/tmp/agents.json"); if(value.code!=="INTERNAL_API_AUTH_REQUIRED") process.exit(1)'
+          test "$(curl --silent --output /tmp/deployments.json --write-out '%{http_code}' http://127.0.0.1:3000/api/deployments)" = "401"
+          node -e 'const value=require("/tmp/deployments.json"); if(value.code!=="INTERNAL_API_AUTH_REQUIRED") process.exit(1)'
           test "$(curl --silent --output /tmp/relevance.json --write-out '%{http_code}' http://127.0.0.1:3000/api/relevance/agents)" = "401"
           test "$(curl --silent --output /tmp/checkout.json --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/billing/checkout)" = "401"
           test "$(curl --silent --output /tmp/portal.json --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/billing/portal)" = "401"
