@@ -28,7 +28,7 @@ test("legacy Grok metadata cannot act as an in-memory production backend", async
     assert.equal(source.includes(forbidden), false, `virtual backend primitive present: ${forbidden}`)
   }
 
-  assert.match(source, /read-only launch catalog/i)
+  assert.match(source, /static launch metadata|read-only compatibility facade/i)
   assert.match(source, /not a database/i)
 })
 
