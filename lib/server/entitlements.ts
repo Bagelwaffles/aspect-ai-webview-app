@@ -33,10 +33,13 @@ export type EntitlementSnapshot = {
   stripeSubscriptionId: string | null
 }
 
+// One Content Agent generation consumes one credit. Keep allocations bounded to
+// protect subscription margins even when a generation reaches the configured
+// provider output ceiling.
 const PLAN_CREDITS: Record<PlanSlug, number> = {
-  starter: 2000,
-  growth: 8000,
-  pro: 20000,
+  starter: 100,
+  growth: 500,
+  pro: 1500,
 }
 
 const CORE_AGENT_SLUGS = new Set(["content", "outreach", "analytics"])
