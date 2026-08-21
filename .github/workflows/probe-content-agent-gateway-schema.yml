@@ -1,3 +1,4 @@
+# Registered workflow retrigger; no behavior change.
 name: Probe Content Agent Gateway Key Schema
 
 on:
