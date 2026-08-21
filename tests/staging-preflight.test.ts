@@ -22,15 +22,38 @@ function validEnvironment() {
     AMS_STRIPE_STARTER_PRICE_ID: "price_starter",
     AMS_STRIPE_GROWTH_PRICE_ID: "price_growth",
     AMS_STRIPE_PRO_PRICE_ID: "price_pro",
-    XAI_API_KEY: "xai-staging-only",
-    XAI_MODEL: "grok-staging",
+    NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE: "false",
+    AMS_CONTENT_AGENT_MODEL: "openai/gpt-5.6-luna-fast",
+    AI_GATEWAY_API_KEY: "",
     AMS_AI_REQUESTS_PER_MINUTE: "10",
     AMS_STAGING_WEB_PORT: "3000",
   }
 }
 
-test("staging preflight accepts one HTTPS origin and test-only configuration", () => {
+test("staging preflight accepts one HTTPS origin and provider-disabled test configuration", () => {
   assert.deepEqual(validateStagingConfig(validEnvironment()), [])
+})
+
+test("staging preflight requires AI Gateway auth only when Content Agent execution is enabled", () => {
+  const env = validEnvironment()
+  env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE = "true"
+
+  let errors = validateStagingConfig(env).join("\n")
+  assert.match(errors, /AI_GATEWAY_AUTH/u)
+
+  env.AI_GATEWAY_API_KEY = "gateway-staging-only"
+  errors = validateStagingConfig(env).join("\n")
+  assert.doesNotMatch(errors, /AI_GATEWAY_AUTH/u)
+})
+
+test("staging preflight validates the Content Agent launch switch and model format", () => {
+  const env = validEnvironment()
+  env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE = "maybe"
+  env.AMS_CONTENT_AGENT_MODEL = "invalid-model-name"
+
+  const errors = validateStagingConfig(env).join("\n")
+  assert.match(errors, /NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE: must equal true or false/u)
+  assert.match(errors, /AMS_CONTENT_AGENT_MODEL: must use provider\/model format/u)
 })
 
 test("staging preflight rejects loopback URLs and live Stripe mode", () => {
