@@ -32,13 +32,6 @@ function requestHasTrustedOrigin(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (process.env.AMS_OWNER_TEST_ENTITLEMENT_ENABLED !== "true") {
-    return noStore(
-      { ok: false, code: "OWNER_TEST_ENTITLEMENT_DISABLED", error: "Owner test grant is disabled" },
-      404,
-    )
-  }
-
   if (!requestHasTrustedOrigin(request)) {
     return noStore(
       { ok: false, code: "UNTRUSTED_ORIGIN", error: "Owner action origin was not accepted" },
@@ -55,7 +48,7 @@ export async function POST(request: NextRequest) {
     principal.billingEmail !== ownerEmail
   ) {
     return noStore(
-      { ok: false, code: "OWNER_SESSION_REQUIRED", error: "Signed owner session required" },
+      { ok: false, code: "OWNER_SESSION_REQUIRED", error: "Signed AMS owner session required" },
       403,
     )
   }
