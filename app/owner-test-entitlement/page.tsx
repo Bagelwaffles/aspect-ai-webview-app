@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth"
 
 import { authOptions } from "@/lib/auth"
+import OwnerContentProofClient from "./OwnerContentProofClient"
 
 export const dynamic = "force-dynamic"
 
@@ -15,22 +16,13 @@ export default async function OwnerTestEntitlementPage() {
     <main className="mx-auto flex min-h-screen max-w-2xl items-center px-6 py-16">
       <section className="w-full rounded-2xl border border-white/10 bg-black/40 p-8">
         <p className="text-xs uppercase tracking-[0.24em] text-cyan-300">AMS owner control</p>
-        <h1 className="mt-3 text-3xl font-semibold text-white">Content Agent test entitlement</h1>
+        <h1 className="mt-3 text-3xl font-semibold text-white">Content Agent production proof</h1>
         <p className="mt-4 text-sm leading-6 text-zinc-300">
-          Grants this signed owner account Content Agent access and three test credits.
-          It does not create a Stripe subscription or recurring charge, and it can be used only once.
+          This owner-only control grants the one-time Content Agent test entitlement and runs one fixed production generation through the AMS Vercel agent runtime. It does not create a Stripe subscription or recurring charge, and it does not post or send anything externally.
         </p>
 
         {authorized ? (
-          <form action="/api/internal/owner-test-entitlement" method="post" className="mt-8">
-            <input type="hidden" name="confirmation" value="GRANT_OWNER_CONTENT_TEST" />
-            <button
-              type="submit"
-              className="rounded-lg bg-cyan-400 px-5 py-3 font-semibold text-black hover:bg-cyan-300"
-            >
-              Grant one-time owner test access
-            </button>
-          </form>
+          <OwnerContentProofClient />
         ) : (
           <p className="mt-8 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
             This control is disabled or the signed session is not the AMS owner.
