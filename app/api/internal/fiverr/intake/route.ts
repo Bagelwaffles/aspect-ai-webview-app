@@ -6,6 +6,7 @@ import {
   buildFiverrOperatorBrief,
   normalizeFiverrNotification,
 } from "@/lib/server/fiverr-bridge"
+import { isUnsafeInternalApiKey } from "@/lib/server/internal-api-auth"
 import { recordFiverrOperation } from "@/lib/server/fiverr-operations"
 
 export const runtime = "nodejs"
@@ -21,7 +22,8 @@ function noStoreJson(body: Record<string, unknown>, status: number) {
 }
 
 function configuredKey() {
-  return process.env.AMS_N8N_INTERNAL_KEY?.trim() ?? ""
+  const key = process.env.AMS_INTERNAL_API_KEY?.trim() ?? ""
+  return isUnsafeInternalApiKey(key) ? "" : key
 }
 
 function safeEqual(left: string, right: string) {
