@@ -139,7 +139,7 @@ export default function ContentAgentPage() {
   async function submitBrief(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!launchEnabled) {
-      setSubmitError("CONTENT_AGENT_TEMPORARILY_UNAVAILABLE: Private beta execution is paused. No credit was reserved or charged.")
+      setSubmitError("CONTENT_AGENT_TEMPORARILY_UNAVAILABLE: Execution is paused. Your brief remains editable and no credit was reserved or charged.")
       return
     }
     if (isSubmitting) return
@@ -184,7 +184,7 @@ export default function ContentAgentPage() {
         <header className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
             <Badge variant={launchEnabled ? "secondary" : "outline"} className="w-fit">
-              {launchEnabled ? "Subscription workflow" : "Private beta — execution paused"}
+              {launchEnabled ? "Subscription workflow" : "Execution paused — brief remains editable"}
             </Badge>
             <div>
               <h1 className="text-2xl font-bold sm:text-3xl">Content Agent</h1>
@@ -206,9 +206,9 @@ export default function ContentAgentPage() {
         {!launchEnabled ? (
           <Card className="border-amber-500/40 bg-amber-500/10">
             <CardHeader>
-              <CardTitle>Content Agent is temporarily unavailable</CardTitle>
+              <CardTitle>Content Agent execution is temporarily unavailable</CardTitle>
               <CardDescription>
-                AMS is not charging for AI execution while provider access is unfunded. Existing run history remains readable, and the complete protected workflow is preserved for later activation.
+                You can still type, paste, and edit the complete brief below on mobile. The Generate button stays disabled until execution is available, so no credit can be reserved or charged accidentally.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-3">
@@ -228,22 +228,26 @@ export default function ContentAgentPage() {
               <CardTitle className="text-xl">Content brief</CardTitle>
               <CardDescription>
                 {launchEnabled
-                  ? "Requires a signed-in customer, active Content Agent access, available distributed services, and one credit."
-                  : "Brief entry is visible for product review, but execution is disabled and no credit can be reserved."}
+                  ? "Tap any field to type or paste. Generation requires a signed-in customer, active Content Agent access, available distributed services, and one credit."
+                  : "Tap any field to type or paste. Brief entry remains fully editable; only generation is unavailable."}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form className="space-y-5" onSubmit={submitBrief}>
-                <fieldset disabled={!launchEnabled || isSubmitting} className="space-y-5 disabled:opacity-70">
+              <form className="space-y-5" onSubmit={submitBrief} autoComplete="on">
+                <fieldset className="space-y-5">
                   <div className="space-y-2">
                     <Label htmlFor="businessName">Business name</Label>
                     <Input
                       id="businessName"
+                      name="businessName"
                       value={brief.businessName}
                       onChange={(event) => updateBrief({ businessName: event.target.value })}
+                      autoComplete="organization"
+                      inputMode="text"
                       minLength={2}
                       maxLength={120}
                       required
+                      className="h-11 text-base"
                     />
                   </div>
 
@@ -251,13 +255,16 @@ export default function ContentAgentPage() {
                     <Label htmlFor="audience">Audience</Label>
                     <Textarea
                       id="audience"
+                      name="audience"
                       value={brief.audience}
                       onChange={(event) => updateBrief({ audience: event.target.value })}
                       placeholder="Who should this content help or reach?"
+                      autoCapitalize="sentences"
+                      spellCheck
                       minLength={3}
                       maxLength={500}
                       required
-                      className="min-h-24"
+                      className="min-h-24 text-base"
                     />
                   </div>
 
@@ -265,13 +272,16 @@ export default function ContentAgentPage() {
                     <Label htmlFor="goal">Goal</Label>
                     <Textarea
                       id="goal"
+                      name="goal"
                       value={brief.goal}
                       onChange={(event) => updateBrief({ goal: event.target.value })}
                       placeholder="What should the draft communicate or encourage?"
+                      autoCapitalize="sentences"
+                      spellCheck
                       minLength={3}
                       maxLength={500}
                       required
-                      className="min-h-24"
+                      className="min-h-24 text-base"
                     />
                   </div>
 
@@ -280,9 +290,10 @@ export default function ContentAgentPage() {
                       <Label htmlFor="channel">Channel</Label>
                       <select
                         id="channel"
+                        name="channel"
                         value={brief.channel}
                         onChange={(event) => updateBrief({ channel: event.target.value as ContentRun["input"]["channel"] })}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base"
                       >
                         <option value="website">Website</option>
                         <option value="email">Email</option>
@@ -295,9 +306,10 @@ export default function ContentAgentPage() {
                       <Label htmlFor="tone">Tone</Label>
                       <select
                         id="tone"
+                        name="tone"
                         value={brief.tone}
                         onChange={(event) => updateBrief({ tone: event.target.value as ContentRun["input"]["tone"] })}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base"
                       >
                         <option value="professional">Professional</option>
                         <option value="friendly">Friendly</option>
@@ -312,11 +324,14 @@ export default function ContentAgentPage() {
                     <Label htmlFor="offer">Offer (optional)</Label>
                     <Textarea
                       id="offer"
+                      name="offer"
                       value={brief.offer ?? ""}
                       onChange={(event) => updateBrief({ offer: event.target.value })}
                       placeholder="Include only an offer that is currently accurate."
+                      autoCapitalize="sentences"
+                      spellCheck
                       maxLength={500}
-                      className="min-h-20"
+                      className="min-h-20 text-base"
                     />
                   </div>
                 </fieldset>
@@ -376,7 +391,7 @@ export default function ContentAgentPage() {
                   <p className="text-sm text-muted-foreground">
                     {launchEnabled
                       ? "Submit a valid brief to generate a draft. No generated result is shown until the protected workflow succeeds."
-                      : "New generation is paused. Previously completed runs remain available in account history."}
+                      : "New generation is paused. You can still prepare the complete brief above, and previously completed runs remain available in account history."}
                   </p>
                 )}
               </CardContent>
