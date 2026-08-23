@@ -1,7 +1,11 @@
-import { generateText, Output } from "ai"
 import { z } from "zod"
 
 import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
+import {
+  isAgentRuntimeConfigured,
+  isVercelAiGatewayAuthAvailable,
+  runStructuredAgent,
+} from "@/lib/server/agent-runtime"
 
 export const CONTENT_AGENT_VERSION = "content-v1" as const
 export const DEFAULT_CONTENT_AGENT_MODEL = "openai/gpt-5.4-mini" as const
@@ -59,36 +63,31 @@ export function getContentAgentModel(): string {
   return process.env.AMS_CONTENT_AGENT_MODEL?.trim() || DEFAULT_CONTENT_AGENT_MODEL
 }
 
-function isNativeVercelGatewayAuthAvailable(): boolean {
-  return process.env.VERCEL === "1" && Boolean(process.env.VERCEL_ENV?.trim())
-}
-
 export function isContentAgentGatewayAuthAvailable(): boolean {
-  return Boolean(
-    process.env.AI_GATEWAY_API_KEY?.trim() ||
-      process.env.VERCEL_OIDC_TOKEN?.trim() ||
-      isNativeVercelGatewayAuthAvailable(),
-  )
+  return isVercelAiGatewayAuthAvailable()
 }
 
 export function isContentAgentProviderConfigured(): boolean {
-  return isContentAgentLaunchEnabled() && isContentAgentGatewayAuthAvailable()
+  return isContentAgentLaunchEnabled() && isAgentRuntimeConfigured()
 }
 
 export async function runContentAgentProvider(input: ContentAgentInput): Promise<ContentAgentOutput> {
-  const parsedInput = contentAgentInputSchema.parse(input)
   if (!isContentAgentProviderConfigured()) {
     throw new Error("CONTENT_AGENT_TEMPORARILY_UNAVAILABLE")
   }
 
-  const result = await generateText({
-    model: getContentAgentModel(),
-    output: Output.object({ schema: contentAgentOutputSchema }),
-    system: CONTENT_AGENT_SYSTEM_PROMPT,
-    prompt: buildContentAgentPrompt(parsedInput),
-    temperature: 0.5,
-    maxOutputTokens: 1_200,
-  })
-
-  return contentAgentOutputSchema.parse(result.output)
+  return runStructuredAgent(
+    {
+      id: "content-agent",
+      version: CONTENT_AGENT_VERSION,
+      model: getContentAgentModel(),
+      inputSchema: contentAgentInputSchema,
+      outputSchema: contentAgentOutputSchema,
+      system: CONTENT_AGENT_SYSTEM_PROMPT,
+      buildPrompt: buildContentAgentPrompt,
+      temperature: 0.5,
+      maxOutputTokens: 1_200,
+    },
+    input,
+  )
 }
