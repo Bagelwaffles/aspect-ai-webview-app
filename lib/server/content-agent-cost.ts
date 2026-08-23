@@ -122,7 +122,13 @@ function finiteTokenCount(value: unknown): number | null {
 }
 
 export function parseGatewayCostUsd(value: unknown): number {
-  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim().length > 0
+        ? Number(value.trim())
+        : Number.NaN
+
   if (!Number.isFinite(parsed) || parsed < 0) {
     throw new ContentAgentCostGuardError(
       "CONTENT_AGENT_COST_METADATA_MISSING",
