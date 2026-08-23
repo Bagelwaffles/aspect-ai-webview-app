@@ -45,29 +45,73 @@ export function QuickAuditCheckoutForm() {
   }
 
   return (
-    <form className="space-y-4" id="quick-audit-checkout" onSubmit={submit}>
+    <form className="space-y-4" id="quick-audit-checkout" onSubmit={submit} autoComplete="on">
       <div className="space-y-2">
         <Label htmlFor="quick-audit-business">Business name</Label>
-        <Input id="quick-audit-business" maxLength={200} name="businessName" required />
+        <Input
+          id="quick-audit-business"
+          className="h-11 text-base"
+          maxLength={200}
+          name="businessName"
+          autoComplete="organization"
+          inputMode="text"
+          required
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor="quick-audit-website">Website URL</Label>
-        <Input id="quick-audit-website" maxLength={500} name="websiteUrl" placeholder="https://example.com" required type="url" />
+        <Input
+          id="quick-audit-website"
+          className="h-11 text-base"
+          maxLength={500}
+          name="websiteUrl"
+          placeholder="https://example.com"
+          autoCapitalize="none"
+          autoComplete="url"
+          inputMode="url"
+          spellCheck={false}
+          required
+          type="url"
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor="quick-audit-industry">Industry</Label>
-        <Input id="quick-audit-industry" maxLength={120} name="industry" required />
+        <Input
+          id="quick-audit-industry"
+          className="h-11 text-base"
+          maxLength={120}
+          name="industry"
+          inputMode="text"
+          required
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor="quick-audit-goals">Main marketing goal</Label>
-        <Textarea id="quick-audit-goals" maxLength={500} name="goals" required rows={3} />
+        <Textarea
+          id="quick-audit-goals"
+          className="min-h-24 text-base"
+          maxLength={500}
+          name="goals"
+          autoCapitalize="sentences"
+          spellCheck
+          required
+          rows={3}
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor="quick-audit-notes">Anything else we should know?</Label>
-        <Textarea id="quick-audit-notes" maxLength={500} name="notes" rows={3} />
+        <Textarea
+          id="quick-audit-notes"
+          className="min-h-24 text-base"
+          maxLength={500}
+          name="notes"
+          autoCapitalize="sentences"
+          spellCheck
+          rows={3}
+        />
       </div>
       {error ? <p aria-live="polite" className="text-sm text-destructive">{error}</p> : null}
-      <Button className="w-full" disabled={submitting} size="lg" type="submit">
+      <Button className="h-11 w-full" disabled={submitting} size="lg" type="submit">
         {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
         {submitting ? "Opening secure checkout" : "Continue to Stripe - $49"}
       </Button>
