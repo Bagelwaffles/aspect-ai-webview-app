@@ -101,7 +101,7 @@ export async function runContentAgentProvider(input: ContentAgentInput): Promise
 
   await recordContentAgentGatewayCost({
     model,
-    gatewayCost: result.finalStep.providerMetadata?.gateway?.cost,
+    gatewayCost: result.providerMetadata?.gateway?.cost,
     usage: result.usage,
     maxCostUsd: costGuard.maxCostUsd,
     store: costGuard.store,
