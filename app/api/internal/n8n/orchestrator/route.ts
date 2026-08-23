@@ -12,6 +12,7 @@ import {
   type AmsN8nWebhookResponse,
 } from "@/lib/server/ams-n8n-webhook-client"
 import { authorizeCustomerApiRequest } from "@/lib/server/customer-api-auth"
+import { isN8nExecutionEnabled } from "@/lib/server/n8n-runtime"
 import { consumeDistributedAiRateLimit } from "@/lib/server/rate-limit"
 
 export const runtime = "nodejs"
@@ -46,11 +47,6 @@ function dependenciesForRequest(): AmsN8nGatewayDependencies {
       ? {}
       : (globalThis as AmsN8nGatewayTestGlobals).__amsN8nGatewayTestDependencies ?? {}
   return { ...defaultDependencies, ...overrides }
-}
-
-export function isN8nExecutionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  if (env.NODE_ENV !== "production") return true
-  return env.AMS_N8N_ENABLED?.trim().toLowerCase() === "true"
 }
 
 function noStoreJson(body: Record<string, unknown>, status: number) {
