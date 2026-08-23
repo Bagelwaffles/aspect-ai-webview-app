@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import test from "node:test"
 
 import { agentStatusCounts, agents, getAgent } from "../app/agents/agentCatalog"
@@ -17,12 +18,21 @@ test("n8n automation is blocked while the former cloud worker is unavailable", (
   assert.doesNotMatch(agent.statusReason, /instance and orchestrator are online/i)
 })
 
-test("marketing audit reflects deployed native fulfillment without claiming live readiness", () => {
+test("marketing audit reflects the open production checkout without overstating paid proof", () => {
   const agent = getAgent("marketing-audit-agent")
   assert.ok(agent)
-  assert.equal(agent.status, "setup-required")
+  assert.equal(agent.status, "beta")
   assert.equal(agent.launchHref, "/quick-marketing-audit")
+  assert.match(agent.statusReason, /\$49 public checkout/i)
   assert.match(agent.statusReason, /native AMS fulfillment/i)
-  assert.match(agent.statusReason, /checkout remains intentionally paused/i)
-  assert.match(agent.nextMilestone, /Stripe test-mode checkout/i)
+  assert.match(agent.statusReason, /fresh real paid production fulfillment has not yet been re-verified/i)
+  assert.match(agent.nextMilestone, /first fresh real paid production audit/i)
+  assert.doesNotMatch(agent.statusReason, /checkout remains intentionally paused/i)
+})
+
+test("agent status page uses lifecycle-aware launch language", () => {
+  const source = readFileSync(new URL("../app/agents/[slug]/page.tsx", import.meta.url), "utf8")
+  assert.match(source, /status === "live"[^]*return "Open agent"/)
+  assert.match(source, /status === "beta"[^]*return "Open beta"/)
+  assert.doesNotMatch(source, /launchHref[^\n]*>Open beta/)
 })
