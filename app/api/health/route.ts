@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { isInternalApiConfigured } from "@/lib/server/internal-api-auth"
 import { checkRedisReadiness } from "@/lib/server/redis-readiness"
 
 export const runtime = "nodejs"
@@ -24,6 +25,7 @@ export async function GET() {
   const aiGatewayConfigured =
     configuredAny("AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN") ||
     nativeVercelGatewayAuthAvailable()
+  const n8nExplicitlyEnabled = process.env.AMS_N8N_ENABLED?.trim().toLowerCase() === "true"
 
   return NextResponse.json(
     {
@@ -70,16 +72,9 @@ export async function GET() {
         )
           ? "configured"
           : "missing",
-        n8n: configured(
-          "AMS_N8N_URL",
-          "AMS_N8N_ORCHESTRATOR_WEBHOOK_URL",
-          "AMS_N8N_INTERNAL_KEY",
-          "AMS_APP_URL",
-        )
-          ? "configured"
-          : "missing",
+        n8n: n8nExplicitlyEnabled ? "optional_enabled" : "disabled_optional",
         n8nApiKey: "not_required",
-        internalApiAuth: configured("AMS_INTERNAL_API_KEY") ? "configured" : "missing",
+        internalApiAuth: isInternalApiConfigured() ? "configured" : "missing",
       },
       dependencyConnectionsTested: {
         redis: redis.checked,
