@@ -2,6 +2,10 @@ import { generateText, Output } from "ai"
 import { z } from "zod"
 
 import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
+import {
+  assertContentAgentCostGuardReady,
+  recordContentAgentGatewayCost,
+} from "@/lib/server/content-agent-cost"
 
 export const CONTENT_AGENT_VERSION = "content-v1" as const
 export const DEFAULT_CONTENT_AGENT_MODEL = "openai/gpt-5.4-mini" as const
@@ -81,13 +85,26 @@ export async function runContentAgentProvider(input: ContentAgentInput): Promise
     throw new Error("CONTENT_AGENT_TEMPORARILY_UNAVAILABLE")
   }
 
+  // Validate the ledger and ceiling before spending provider credits. The
+  // existing route converts any later provider failure into a customer-credit
+  // refund and never releases unstaged output.
+  const costGuard = assertContentAgentCostGuardReady()
+  const model = getContentAgentModel()
   const result = await generateText({
-    model: getContentAgentModel(),
+    model,
     output: Output.object({ schema: contentAgentOutputSchema }),
     system: CONTENT_AGENT_SYSTEM_PROMPT,
     prompt: buildContentAgentPrompt(parsedInput),
     temperature: 0.5,
     maxOutputTokens: 1_200,
+  })
+
+  await recordContentAgentGatewayCost({
+    model,
+    gatewayCost: result.finalStep.providerMetadata?.gateway?.cost,
+    usage: result.usage,
+    maxCostUsd: costGuard.maxCostUsd,
+    store: costGuard.store,
   })
 
   return contentAgentOutputSchema.parse(result.output)
