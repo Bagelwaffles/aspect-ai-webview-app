@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { isN8nExecutionEnabled } from "../app/api/internal/n8n/orchestrator/route"
+import { isN8nExecutionEnabled } from "../lib/server/n8n-runtime"
 
 test("production n8n orchestrator is retired unless explicitly re-enabled", () => {
   assert.equal(
