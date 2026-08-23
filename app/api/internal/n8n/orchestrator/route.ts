@@ -12,6 +12,7 @@ import {
   type AmsN8nWebhookResponse,
 } from "@/lib/server/ams-n8n-webhook-client"
 import { authorizeCustomerApiRequest } from "@/lib/server/customer-api-auth"
+import { isN8nExecutionEnabled } from "@/lib/server/n8n-runtime"
 import { consumeDistributedAiRateLimit } from "@/lib/server/rate-limit"
 
 export const runtime = "nodejs"
@@ -99,6 +100,14 @@ function safeGatewayResult(result: AmsN8nWebhookResponse) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isN8nExecutionEnabled()) {
+    return structuredError(
+      410,
+      "N8N_EXECUTION_RETIRED",
+      "n8n execution is retired from AMS core production",
+    )
+  }
+
   const dependencies = dependenciesForRequest()
   const principal = await dependencies.authorize(request)
 
@@ -144,7 +153,7 @@ export async function POST(request: NextRequest) {
 
   const requestId = dependencies.idFactory()
   const hash = requestHash(principal.subject, rawBody)
-  const idempotencyKey = `ams-n8n-${hash.slice(0,48)}`
+  const idempotencyKey = `ams-n8n-${hash.slice(0, 48)}`
   const store = dependencies.getIdempotencyStore()
 
   try {

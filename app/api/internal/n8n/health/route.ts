@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { constantTimeStringEqual } from "@/lib/server/internal-api-auth"
+import {
+  constantTimeStringEqual,
+  isUnsafeInternalApiKey,
+} from "@/lib/server/internal-api-auth"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -8,7 +11,8 @@ export const dynamic = "force-dynamic"
 function isAuthorized(request: NextRequest): boolean {
   const expected = process.env.AMS_INTERNAL_API_KEY?.trim()
   const supplied = request.headers.get("x-vo-secret")?.trim()
-  return Boolean(expected && supplied && constantTimeStringEqual(supplied, expected))
+  if (isUnsafeInternalApiKey(expected)) return false
+  return Boolean(supplied && constantTimeStringEqual(supplied, expected!))
 }
 
 function sanitizeBaseUrl(raw?: string) {
@@ -69,6 +73,36 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  const enabled = process.env.AMS_N8N_ENABLED?.trim().toLowerCase() === "true"
+  if (!enabled) {
+    return NextResponse.json(
+      {
+        ok: true,
+        status: "disabled_optional",
+        n8n: {
+          required: false,
+          configured: false,
+          online: false,
+          latencyMs: 0,
+          statusCode: null,
+          error: null,
+          endpoint: null,
+        },
+        webhook: {
+          authMethod: "disabled",
+          requiredHeader: null,
+          internalKeyConfigured: false,
+          urlConfigured: false,
+          apiKeyRequired: false,
+          path: "retired",
+        },
+        warnings: ["n8n is retired from AMS core production execution and is not required for Quick Audit revenue fulfillment."],
+        timestamp: new Date().toISOString(),
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    )
+  }
+
   const baseUrl = process.env.AMS_N8N_URL?.trim()
   const health = await checkN8nHealth()
   const sanitizedUrl = sanitizeBaseUrl(baseUrl)
@@ -78,6 +112,7 @@ export async function GET(request: NextRequest) {
       ok: health.online,
       status: health.online ? "healthy" : "unhealthy",
       n8n: {
+        required: false,
         configured: Boolean(baseUrl),
         online: health.online,
         latencyMs: health.latencyMs,
