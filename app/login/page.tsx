@@ -10,12 +10,13 @@ import { authOptions, isCustomerAuthConfigured } from "@/lib/auth"
 export const dynamic = "force-dynamic"
 
 type LoginPageProps = {
-  searchParams?: Promise<{ next?: string; error?: string }>
+  searchParams?: Promise<{ next?: string; callbackUrl?: string; error?: string }>
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = (await searchParams) ?? {}
-  const callbackUrl = safeRelativeCallbackPath(params.next, "/grok-chat")
+  const requestedCallback = params.next ?? params.callbackUrl
+  const callbackUrl = safeRelativeCallbackPath(requestedCallback, "/grok-chat")
   const session = isCustomerAuthConfigured() ? await getServerSession(authOptions).catch(() => null) : null
 
   if (session?.user?.email) {
