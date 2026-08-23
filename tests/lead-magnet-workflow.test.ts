@@ -26,6 +26,23 @@ test("Lead Magnet workflow maps customer inputs into the verified Content Agent 
   assert.ok(brief.goal.length <= 500)
 })
 
+test("Lead Magnet max-length form values stay inside Content Agent goal limit", () => {
+  const brief = buildLeadMagnetContentBrief({
+    businessName: "B".repeat(120),
+    audience: "A".repeat(300),
+    type: "email-course",
+    problem: "P".repeat(160),
+    desiredOutcome: "O".repeat(160),
+    tone: "conversational",
+    offer: "F".repeat(300),
+  })
+
+  assert.ok(brief.goal.length <= 500)
+  assert.equal(brief.businessName.length, 120)
+  assert.equal(brief.audience.length, 300)
+  assert.equal(brief.offer?.length, 300)
+})
+
 test("Lead Magnet page keeps all customer text fields mobile-editable", () => {
   const source = readFileSync(new URL("../app/lead-magnet-agent/page.tsx", import.meta.url), "utf8")
   assert.doesNotMatch(source, /<(?:Input|Textarea)[^>]*disabled=/)
