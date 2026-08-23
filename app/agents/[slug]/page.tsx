@@ -1,11 +1,36 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { agents, getAgent, statusMeta } from "../agentCatalog"
+import { agents, getAgent, statusMeta, type AgentStatus } from "../agentCatalog"
 import styles from "../agents.module.css"
 
 export function generateStaticParams() {
   return agents.map((agent) => ({ slug: agent.slug }))
+}
+
+function launchLabel(status: AgentStatus) {
+  if (status === "live") return "Open agent"
+  if (status === "beta") return "Open beta"
+  return "Open workflow"
+}
+
+function ctaCopy(status: AgentStatus) {
+  if (status === "live") {
+    return {
+      heading: "This agent is online.",
+      body: "AMS marked this capability Live only after its named production activation gate passed.",
+    }
+  }
+  if (status === "beta") {
+    return {
+      heading: "Help complete the production proof.",
+      body: "This workflow is available in controlled testing and stays Beta until its own production evidence is complete.",
+    }
+  }
+  return {
+    heading: "Bring this agent online.",
+    body: "AMS promotes agents one at a time only after the named activation gate passes in production.",
+  }
 }
 
 export default async function AgentStatusPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -14,6 +39,7 @@ export default async function AgentStatusPage({ params }: { params: Promise<{ sl
   if (!agent) notFound()
 
   const meta = statusMeta[agent.status]
+  const cta = ctaCopy(agent.status)
 
   return (
     <main className={styles.network}>
@@ -30,7 +56,7 @@ export default async function AgentStatusPage({ params }: { params: Promise<{ sl
           <div className={styles.heroCopy}>
             <p>{agent.description}</p>
             <div className={styles.heroActions}>
-              {agent.launchHref ? <Link className={styles.primary} href={agent.launchHref}>Open beta <span>↗</span></Link> : null}
+              {agent.launchHref ? <Link className={styles.primary} href={agent.launchHref}>{launchLabel(agent.status)} <span>↗</span></Link> : null}
               <Link className={styles.secondary} href="/contact">Request access <span>↗</span></Link>
             </div>
           </div>
@@ -61,7 +87,7 @@ export default async function AgentStatusPage({ params }: { params: Promise<{ sl
         </div>
       </section>
 
-      <section className={styles.cta}><div className={styles.ctaInner}><div><h2>Bring this agent online.</h2><p>AMS promotes agents one at a time only after the named activation gate passes in production.</p></div><Link className={styles.ctaButton} href="/contact">Prioritize this agent <span>↗</span></Link></div></section>
+      <section className={styles.cta}><div className={styles.ctaInner}><div><h2>{cta.heading}</h2><p>{cta.body}</p></div>{agent.launchHref ? <Link className={styles.ctaButton} href={agent.launchHref}>{launchLabel(agent.status)} <span>↗</span></Link> : <Link className={styles.ctaButton} href="/contact">Prioritize this agent <span>↗</span></Link>}</div></section>
     </main>
   )
 }
