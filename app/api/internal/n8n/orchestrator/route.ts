@@ -48,6 +48,11 @@ function dependenciesForRequest(): AmsN8nGatewayDependencies {
   return { ...defaultDependencies, ...overrides }
 }
 
+function n8nExecutionEnabled(): boolean {
+  if (process.env.NODE_ENV !== "production") return true
+  return process.env.AMS_N8N_ENABLED?.trim().toLowerCase() === "true"
+}
+
 function noStoreJson(body: Record<string, unknown>, status: number) {
   return NextResponse.json(body, {
     status,
@@ -99,6 +104,14 @@ function safeGatewayResult(result: AmsN8nWebhookResponse) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!n8nExecutionEnabled()) {
+    return structuredError(
+      410,
+      "N8N_EXECUTION_RETIRED",
+      "n8n execution is retired from AMS core production",
+    )
+  }
+
   const dependencies = dependenciesForRequest()
   const principal = await dependencies.authorize(request)
 
@@ -144,7 +157,7 @@ export async function POST(request: NextRequest) {
 
   const requestId = dependencies.idFactory()
   const hash = requestHash(principal.subject, rawBody)
-  const idempotencyKey = `ams-n8n-${hash.slice(0,48)}`
+  const idempotencyKey = `ams-n8n-${hash.slice(0, 48)}`
   const store = dependencies.getIdempotencyStore()
 
   try {
