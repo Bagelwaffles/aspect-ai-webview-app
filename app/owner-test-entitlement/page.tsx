@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { getServerSession } from "next-auth"
 
 import { authOptions } from "@/lib/auth"
@@ -9,8 +10,14 @@ export default async function OwnerTestEntitlementPage() {
   const session = await getServerSession(authOptions)
   const ownerEmail = process.env.AMS_OWNER_EMAIL?.trim().toLowerCase()
   const signedInEmail = session?.user?.email?.trim().toLowerCase()
-  const enabled = process.env.AMS_OWNER_TEST_ENTITLEMENT_ENABLED === "true"
-  const authorized = Boolean(enabled && ownerEmail && signedInEmail === ownerEmail)
+  const authorized = Boolean(ownerEmail && signedInEmail === ownerEmail)
+
+  let accessMessage = "Sign in with the AMS owner account to run the production proof."
+  if (!ownerEmail) {
+    accessMessage = "The AMS owner identity is not configured in production."
+  } else if (signedInEmail && signedInEmail !== ownerEmail) {
+    accessMessage = "This browser is signed into AMS with a different account. Sign out, then sign in with the AMS owner account."
+  }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl items-center px-6 py-16">
@@ -24,9 +31,27 @@ export default async function OwnerTestEntitlementPage() {
         {authorized ? (
           <OwnerContentProofClient />
         ) : (
-          <p className="mt-8 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
-            This control is disabled or the signed session is not the AMS owner.
-          </p>
+          <div className="mt-8 space-y-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+            <p>{accessMessage}</p>
+            {ownerEmail ? (
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/login?callbackUrl=%2Fowner-test-entitlement"
+                  className="rounded-lg bg-cyan-400 px-4 py-2 font-semibold text-black hover:bg-cyan-300"
+                >
+                  Sign in to AMS
+                </Link>
+                {signedInEmail ? (
+                  <Link
+                    href="/api/auth/signout"
+                    className="rounded-lg border border-white/20 px-4 py-2 font-semibold text-white hover:bg-white/10"
+                  >
+                    Sign out current account
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         )}
       </section>
     </main>
