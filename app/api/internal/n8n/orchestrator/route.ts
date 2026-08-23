@@ -48,9 +48,9 @@ function dependenciesForRequest(): AmsN8nGatewayDependencies {
   return { ...defaultDependencies, ...overrides }
 }
 
-function n8nExecutionEnabled(): boolean {
-  if (process.env.NODE_ENV !== "production") return true
-  return process.env.AMS_N8N_ENABLED?.trim().toLowerCase() === "true"
+export function isN8nExecutionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.NODE_ENV !== "production") return true
+  return env.AMS_N8N_ENABLED?.trim().toLowerCase() === "true"
 }
 
 function noStoreJson(body: Record<string, unknown>, status: number) {
@@ -104,7 +104,7 @@ function safeGatewayResult(result: AmsN8nWebhookResponse) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!n8nExecutionEnabled()) {
+  if (!isN8nExecutionEnabled()) {
     return structuredError(
       410,
       "N8N_EXECUTION_RETIRED",
