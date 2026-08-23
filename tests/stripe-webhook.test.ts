@@ -5,6 +5,7 @@ import { NextRequest } from "next/server"
 import Stripe from "stripe"
 
 import { customerSubjectFromProviderSubject } from "../lib/auth"
+import { monthlyCreditsForPlan } from "../lib/server/plan-credits"
 import {
   createStripeWebhookPostHandler,
   decideStripeEntitlementTransition,
@@ -725,7 +726,10 @@ test("checkout, subscription creation, and paid invoice reset credits once per b
   })
 
   assert.equal(writer.resetCount, 1)
-  assert.equal(writer.states.get(accountSubject)?.planCredits, 2000)
+  assert.equal(
+    writer.states.get(accountSubject)?.planCredits,
+    monthlyCreditsForPlan("starter"),
+  )
   assert.equal(writer.states.get(accountSubject)?.stripeCreditCycle, "sub_primary:500")
 })
 

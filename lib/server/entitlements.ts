@@ -9,6 +9,7 @@ import {
   type CreditFinalizationResult,
   type CreditReservationResult,
 } from "./credit-ledger"
+import { monthlyCreditsForPlan, type PlanSlug } from "./plan-credits"
 import {
   UpstashStripeEntitlementWriter,
   type StripeEntitlementApplyResult,
@@ -16,7 +17,8 @@ import {
   type StripeSubscriptionRevocation,
 } from "./stripe-entitlements"
 
-export type PlanSlug = "starter" | "growth" | "pro"
+export { monthlyCreditsForPlan }
+export type { PlanSlug }
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled" | "inactive"
 
 export type EntitlementSnapshot = {
@@ -31,12 +33,6 @@ export type EntitlementSnapshot = {
   agentSlugs: string[]
   stripeCustomerId: string | null
   stripeSubscriptionId: string | null
-}
-
-const PLAN_CREDITS: Record<PlanSlug, number> = {
-  starter: 2000,
-  growth: 8000,
-  pro: 20000,
 }
 
 const CORE_AGENT_SLUGS = new Set(["content", "outreach", "analytics"])
@@ -97,10 +93,6 @@ function isSubscriptionStatus(value: unknown): value is SubscriptionStatus {
 
 export function isEntitlementStoreConfigured(): boolean {
   return Boolean(getRedis())
-}
-
-export function monthlyCreditsForPlan(plan: PlanSlug): number {
-  return PLAN_CREDITS[plan]
 }
 
 export async function getEntitlementSnapshot(subject: string): Promise<EntitlementSnapshot> {
