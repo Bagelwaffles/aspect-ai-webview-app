@@ -24,11 +24,11 @@ test("SEO workflow maps customer inputs into the verified Content Agent contract
   assert.match(brief.goal, /service page/i)
   assert.match(brief.goal, /affordable marketing audits/i)
   assert.match(brief.goal, /Kentucky/i)
-  assert.match(brief.goal, /never invent rankings, volume, traffic, competitor data, or live-search findings/i)
+  assert.match(brief.goal, /never invent rankings, search volume, traffic, competitor data, or live-search findings/i)
   assert.ok(brief.goal.length <= 500)
 })
 
-test("SEO max-length form values stay inside Content Agent schema limits", () => {
+test("SEO max-length form values stay inside Content Agent schema limits and preserve evidence guardrails", () => {
   const brief = buildSeoContentBrief({
     businessName: "B".repeat(120),
     audience: "A".repeat(300),
@@ -41,6 +41,7 @@ test("SEO max-length form values stay inside Content Agent schema limits", () =>
   })
 
   assert.ok(brief.goal.length <= 500)
+  assert.match(brief.goal, /never invent rankings, search volume, traffic, competitor data, or live-search findings/i)
   assert.equal(brief.businessName.length, 120)
   assert.equal(brief.audience.length, 300)
   assert.equal(brief.offer?.length, 300)
