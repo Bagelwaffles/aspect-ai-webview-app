@@ -124,7 +124,7 @@ export default function EmailCampaignAgentPage() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <header className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
-            <Badge variant="secondary" className="w-fit">Beta · human approval required</Badge>
+            <Badge variant="secondary" className="w-fit">Live · production verified · human approval required</Badge>
             <div>
               <h1 className="text-2xl font-bold sm:text-3xl">Email Campaign Agent</h1>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
