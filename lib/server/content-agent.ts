@@ -56,6 +56,7 @@ export function buildContentAgentPrompt(input: ContentAgentInput): string {
     "Match the requested audience, goal, channel, and tone.",
     "Include the offer only when supplied and supportable.",
     "Use safetyNotes for claims or facts the customer should verify before publishing.",
+    "Do not use safetyNotes merely to ask the customer to verify spelling or wording of exact validated brief values; use them only for claims introduced by the draft or facts requiring independent confirmation.",
   ].join("\n")
 }
 
