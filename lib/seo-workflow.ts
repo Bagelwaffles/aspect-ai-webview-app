@@ -54,12 +54,12 @@ export function buildSeoContentBrief(input: SeoWorkflowInput): ContentAgentBrief
   const offer = clean(input.offer ?? "")
 
   const goal = [
+    "Treat keywords as planning hypotheses only; never invent rankings, search volume, traffic, competitor data, or live-search findings.",
     `Create an on-page SEO optimization brief for a ${pageType}.`,
     `Topic/service: ${topic}.`,
     location ? `Geographic focus: ${location}.` : "",
     `Objective: ${objective}.`,
     "Recommend search intent, title/meta direction, page structure, headings, internal links, FAQs, and content improvements.",
-    "Treat keywords as hypotheses only; never invent rankings, volume, traffic, competitor data, or live-search findings.",
   ].filter(Boolean).join(" ").slice(0, 500).trim()
 
   return {
