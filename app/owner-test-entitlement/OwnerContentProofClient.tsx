@@ -28,6 +28,19 @@ type ProofResult = {
   }
 }
 
+type GrantResult = {
+  grant?: {
+    state?: string
+    credits?: number
+    dailyAllowance?: number
+    utcDay?: string
+    purpose?: string
+    recurringBilling?: boolean
+  }
+  code?: string
+  error?: string
+}
+
 function operationKey() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `owner-proof-${crypto.randomUUID()}`
@@ -46,18 +59,22 @@ export default function OwnerContentProofClient() {
     setResult(null)
 
     try {
-      setStatus("Granting one-time owner test access…")
+      setStatus("Checking today’s owner QA allowance…")
       const grantResponse = await fetch("/api/internal/owner-test-entitlement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirmation: "GRANT_OWNER_CONTENT_TEST" }),
       })
-      const grant = await grantResponse.json().catch(() => ({}))
+      const grant = (await grantResponse.json().catch(() => ({}))) as GrantResult
       if (!grantResponse.ok) {
-        throw new Error(`${grant.code ?? "GRANT_FAILED"}: ${grant.error ?? "Owner test access could not be granted"}`)
+        throw new Error(`${grant.code ?? "GRANT_FAILED"}: ${grant.error ?? "Owner QA allowance could not be granted"}`)
       }
 
-      setStatus("Running Content Agent through the production AMS runtime…")
+      const allowanceNote = grant.grant?.dailyAllowance
+        ? ` Owner QA allowance: ${grant.grant.dailyAllowance} credits per UTC day; no recurring billing.`
+        : ""
+      setStatus(`Running Content Agent through the production AMS runtime…${allowanceNote}`)
+
       const response = await fetch("/api/content-agent/runs", {
         method: "POST",
         headers: {
@@ -73,7 +90,7 @@ export default function OwnerContentProofClient() {
         throw new Error(`${body.code ?? "CONTENT_PROOF_FAILED"}: ${body.error ?? `Production proof failed (${response.status})`}`)
       }
 
-      setStatus("PRODUCTION PROOF PASSED — the Content Agent generated, saved, and committed a protected run.")
+      setStatus("PRODUCTION PROOF PASSED — the Content Agent generated, saved, and committed a protected run using the owner QA allowance.")
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Production proof failed")
     } finally {
@@ -88,6 +105,7 @@ export default function OwnerContentProofClient() {
         <p className="mt-2">Business: Aspect Marketing Solutions</p>
         <p>Goal: Promote the $49 Quick Marketing Audit</p>
         <p>Action: Generate one social draft only. Nothing is posted or sent externally.</p>
+        <p className="mt-2">Owner QA allowance: up to 3 non-billable proof credits per UTC day. This does not create recurring billing or alter customer entitlements.</p>
       </div>
 
       <button
