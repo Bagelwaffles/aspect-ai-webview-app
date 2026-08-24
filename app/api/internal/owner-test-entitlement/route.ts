@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { authorizeCustomerApiRequest } from "@/lib/server/customer-api-auth"
-import { grantOwnerContentTestEntitlement } from "@/lib/server/entitlements"
+import { grantOwnerDailyQaCredits } from "@/lib/server/owner-qa-credits"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -65,15 +65,18 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const grant = await grantOwnerContentTestEntitlement(principal.subject, 3)
+    const grant = await grantOwnerDailyQaCredits(principal.subject)
     return noStore(
       {
         ok: true,
         grant: {
           state: grant.state,
           agent: "content",
-          credits: grant.credits,
+          credits: grant.balance,
+          dailyAllowance: grant.dailyAllowance,
+          utcDay: grant.utcDay,
           recurringBilling: false,
+          purpose: "owner-qa",
         },
       },
       grant.state === "granted" ? 201 : 200,
@@ -82,8 +85,8 @@ export async function POST(request: NextRequest) {
     return noStore(
       {
         ok: false,
-        code: "OWNER_TEST_ENTITLEMENT_UNAVAILABLE",
-        error: "Owner test entitlement could not be granted",
+        code: "OWNER_QA_ALLOWANCE_UNAVAILABLE",
+        error: "Owner QA allowance could not be granted",
       },
       503,
     )
