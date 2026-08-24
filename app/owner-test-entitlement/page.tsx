@@ -25,7 +25,7 @@ export default async function OwnerTestEntitlementPage() {
         <p className="text-xs uppercase tracking-[0.24em] text-cyan-300">AMS owner control</p>
         <h1 className="mt-3 text-3xl font-semibold text-white">Content Agent production proof</h1>
         <p className="mt-4 text-sm leading-6 text-zinc-300">
-          This owner-only control grants the one-time Content Agent test entitlement and runs one fixed production generation through the AMS Vercel agent runtime. It does not create a Stripe subscription or recurring charge, and it does not post or send anything externally.
+          This owner-only control grants the bounded daily Content Agent QA allowance and runs one fixed production generation through the AMS Vercel agent runtime. It does not create a Stripe subscription or recurring charge, and it does not post or send anything externally.
         </p>
 
         {authorized ? (
