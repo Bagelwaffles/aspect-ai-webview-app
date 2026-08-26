@@ -8,27 +8,35 @@ import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 import { QUICK_MARKETING_AUDIT } from "@/lib/quick-marketing-audit"
 import { monthlyCreditsForPlan } from "@/lib/server/entitlements"
 
+const LIVE_AGENT_NAMES = [
+  "Content Agent",
+  "Lead Magnet Agent",
+  "Outreach Agent",
+  "SEO Agent",
+  "Email Campaign Agent",
+] as const
+
 const SAAS_PLANS = [
   {
     slug: "starter" as const,
     name: "Starter",
     price: "$29",
     credits: monthlyCreditsForPlan("starter"),
-    description: "Account access and a monthly credit allocation for verified workflows.",
+    description: "Entry access to the verified AMS marketing-agent suite with a shared monthly credit pool.",
   },
   {
     slug: "growth" as const,
     name: "Growth",
     price: "$79",
     credits: monthlyCreditsForPlan("growth"),
-    description: "Additional monthly capacity for verified workflow usage.",
+    description: "More shared monthly generation capacity across the verified AMS marketing-agent suite.",
   },
   {
     slug: "pro" as const,
     name: "Pro",
     price: "$149",
     credits: monthlyCreditsForPlan("pro"),
-    description: "Higher monthly capacity for verified workflow usage.",
+    description: "The largest standard shared monthly generation pool for verified AMS marketing workflows.",
   },
 ]
 
@@ -64,8 +72,8 @@ export default function PricingPage() {
           <h1 className="max-w-3xl text-4xl font-bold sm:text-5xl">Clear offers with honest launch status.</h1>
           <p className="max-w-2xl text-muted-foreground">
             {contentAgentLive
-              ? "The $49 Quick Marketing Audit is live, and Content Agent subscriptions are open with protected credit handling and verified AI Gateway execution."
-              : "The $49 Quick Marketing Audit is live now. Content Agent provider execution has passed its controlled production proof, while paid AI subscriptions remain paused until the launch gate is deliberately enabled."}
+              ? "The $49 Quick Marketing Audit is live, and AMS subscriptions now include the five production-verified marketing agents with one shared monthly credit pool."
+              : "The $49 Quick Marketing Audit is live now. Paid AMS agent subscriptions remain paused until the shared production execution gate is deliberately enabled."}
           </p>
           <div className="flex flex-wrap gap-3">
             <Button asChild>
@@ -94,7 +102,7 @@ export default function PricingPage() {
             <CardHeader>
               <CardTitle>Paid AI checkout is paused</CardTitle>
               <CardDescription>
-                SaaS subscriptions cannot charge while the AI execution gate is disabled. This does not affect the live one-time Quick Marketing Audit.
+                SaaS subscriptions cannot charge while the shared AI execution gate is disabled. This does not affect the live one-time Quick Marketing Audit.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -140,11 +148,24 @@ export default function PricingPage() {
         <section className="space-y-5">
           <div>
             <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">SaaS plans</p>
-            <h2 className="text-3xl font-bold">Monthly Content Agent capacity</h2>
-            <p className="max-w-2xl text-sm text-muted-foreground">
-              One Content Agent generation uses one credit. Unused monthly plan credits are not presented as cash value.
+            <h2 className="text-3xl font-bold">One subscription. Five Live marketing agents.</h2>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              Every standard plan includes Content Agent, Lead Magnet Agent, Outreach Agent, SEO Agent, and Email Campaign Agent. There is no separate per-agent surcharge for these five Live workflows. One completed generation from any included agent uses one shared credit.
             </p>
           </div>
+
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                {LIVE_AGENT_NAMES.map((agent) => (
+                  <span key={agent} className="rounded-full border border-border px-3 py-1">
+                    {agent}
+                  </span>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-6 md:grid-cols-3">
             {SAAS_PLANS.map((plan) => (
               <Card key={plan.slug} className={plan.slug === "growth" ? "border-primary shadow-lg" : undefined}>
@@ -161,10 +182,11 @@ export default function PricingPage() {
                     <span className="text-base font-normal text-muted-foreground">/month</span>
                   </div>
                   <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li>- {plan.credits.toLocaleString()} Content Agent credits per month</li>
-                    <li>- One completed Content Agent generation uses one credit</li>
-                    <li>- {contentAgentLive ? "Content Agent access included with an active subscription" : "Content Agent access begins only after the production launch gate is enabled"}</li>
-                    <li>- Outreach, Analytics, and other agents remain unavailable</li>
+                    <li>- {plan.credits.toLocaleString()} shared AI generation credits per month</li>
+                    <li>- All 5 currently Live marketing agents included</li>
+                    <li>- One completed generation from any included agent uses one shared credit</li>
+                    <li>- Human review and each agent&apos;s delivery guardrails remain in effect</li>
+                    <li>- New agents are added only after production verification</li>
                     <li>- Stripe billing portal for existing subscribers</li>
                   </ul>
                   {contentAgentLive ? (
