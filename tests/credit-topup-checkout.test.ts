@@ -9,8 +9,9 @@ import { customerSubjectFromProviderSubject } from "../lib/auth"
 import { creditTopupPack } from "../lib/credit-topups"
 import type { EntitlementSnapshot } from "../lib/server/entitlements"
 
-const subject = customerSubjectFromProviderSubject("credit-topup-checkout")
-if (!subject) throw new Error("Stable test subject is required")
+const subjectCandidate = customerSubjectFromProviderSubject("credit-topup-checkout")
+if (!subjectCandidate) throw new Error("Stable test subject is required")
+const subject: string = subjectCandidate
 
 const principal = {
   kind: "customer" as const,
@@ -71,8 +72,10 @@ function request(
 
 test("active subscriber receives a one-time Checkout Session for the exact approved pack", async () => {
   const pack = creditTopupPack("300")
-  let capturedParams: Stripe.Checkout.SessionCreateParams | null = null
-  let capturedOptions: Stripe.RequestOptions | null = null
+  const captured: {
+    params?: Stripe.Checkout.SessionCreateParams
+    options?: Stripe.RequestOptions
+  } = {}
 
   const handler = createCreditTopupCheckoutHandler({
     authorize: async () => principal,
@@ -88,34 +91,38 @@ test("active subscriber receives a one-time Checkout Session for the exact appro
       return price("300")
     },
     createSession: async (_secretKey, params, options) => {
-      capturedParams = params
-      capturedOptions = options
+      captured.params = params
+      captured.options = options
       return { id: "cs_topup_300", url: "https://checkout.stripe.com/c/pay/topup-fixture" }
     },
   })
 
   const response = await handler(request({ pack: "300", requestId: "request_1234567890abcdef" }))
   const payload = await response.json()
+  const checkoutParams = captured.params
+  const checkoutOptions = captured.options
 
   assert.equal(response.status, 200)
   assert.equal(payload.ok, true)
   assert.equal(payload.units, 300)
-  assert.equal(capturedParams?.mode, "payment")
-  assert.deepEqual(capturedParams?.payment_method_types, ["card"])
-  assert.equal(capturedParams?.client_reference_id, subject)
-  assert.equal(capturedParams?.customer, "cus_topup_fixture")
-  assert.deepEqual(capturedParams?.line_items, [{ price: "price_topup_300", quantity: 1 }])
-  assert.equal(capturedParams?.metadata?.ams_offer, "credit-topup")
-  assert.equal(capturedParams?.metadata?.customerSubject, subject)
-  assert.equal(capturedParams?.metadata?.topupUnits, String(pack.units))
-  assert.equal(capturedParams?.metadata?.priceLookupKey, pack.lookupKey)
-  assert.equal(capturedParams?.payment_intent_data?.metadata?.customerSubject, subject)
+  assert.ok(checkoutParams)
+  assert.ok(checkoutOptions)
+  assert.equal(checkoutParams.mode, "payment")
+  assert.deepEqual(checkoutParams.payment_method_types, ["card"])
+  assert.equal(checkoutParams.client_reference_id, subject)
+  assert.equal(checkoutParams.customer, "cus_topup_fixture")
+  assert.deepEqual(checkoutParams.line_items, [{ price: "price_topup_300", quantity: 1 }])
+  assert.equal(checkoutParams.metadata?.ams_offer, "credit-topup")
+  assert.equal(checkoutParams.metadata?.customerSubject, subject)
+  assert.equal(checkoutParams.metadata?.topupUnits, String(pack.units))
+  assert.equal(checkoutParams.metadata?.priceLookupKey, pack.lookupKey)
+  assert.equal(checkoutParams.payment_intent_data?.metadata?.customerSubject, subject)
   assert.equal(
-    capturedParams?.success_url,
+    checkoutParams.success_url,
     "https://www.aspectmarketingsolutions.app/billing/topup/success?session_id={CHECKOUT_SESSION_ID}",
   )
-  assert.equal(capturedParams?.cancel_url, "https://www.aspectmarketingsolutions.app/billing")
-  assert.match(String(capturedOptions?.idempotencyKey), /^ams-topup-checkout-[a-f0-9]{64}$/)
+  assert.equal(checkoutParams.cancel_url, "https://www.aspectmarketingsolutions.app/billing")
+  assert.match(String(checkoutOptions.idempotencyKey), /^ams-topup-checkout-[a-f0-9]{64}$/)
 })
 
 test("inactive accounts cannot buy subscriber-only top-up credits", async () => {
