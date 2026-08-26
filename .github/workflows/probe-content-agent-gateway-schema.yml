@@ -8,18 +8,34 @@ on:
     paths:
       - ".github/workflows/probe-content-agent-gateway-schema.yml"
       - "scripts/ops/probe-content-agent-gateway-schema.sh"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/probe-content-agent-gateway-schema.yml"
+      - "scripts/ops/probe-content-agent-gateway-schema.sh"
 
 permissions:
   contents: read
   issues: write
 
 concurrency:
-  group: ams-content-agent-gateway-schema-probe
+  group: ams-content-agent-gateway-schema-probe-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  registration-check:
+    name: registration-check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirm workflow registration
+        run: echo "Gateway probe workflow registered successfully."
+
   probe:
     name: probe
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: production
