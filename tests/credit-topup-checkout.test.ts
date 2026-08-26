@@ -4,9 +4,9 @@ import test from "node:test"
 import { NextRequest } from "next/server"
 import type Stripe from "stripe"
 
-import { createCreditTopupCheckoutHandler } from "../app/api/billing/topup/route"
 import { customerSubjectFromProviderSubject } from "../lib/auth"
 import { creditTopupPack } from "../lib/credit-topups"
+import { createCreditTopupCheckoutHandler } from "../lib/server/credit-topup-checkout"
 import type { EntitlementSnapshot } from "../lib/server/entitlements"
 
 const subjectCandidate = customerSubjectFromProviderSubject("credit-topup-checkout")
