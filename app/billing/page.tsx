@@ -3,6 +3,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { BillingActionButton } from "@/components/billing-actions"
+import { CreditTopupPurchasePanel } from "@/components/credit-topup-actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +25,8 @@ const PLANS = [
   { slug: "pro" as const, name: "Pro", price: "$149/month", credits: monthlyCreditsForPlan("pro") },
 ]
 
+const LIVE_MARKETING_AGENTS = "Content, Lead Magnet, Outreach, SEO, and Email Campaign"
+
 export default async function BillingPage() {
   if (!isCustomerAuthConfigured()) redirect("/login?next=/billing")
 
@@ -36,6 +39,13 @@ export default async function BillingPage() {
   const configured = Boolean(snapshot?.configured)
   const status = snapshot?.subscriptionStatus ?? "inactive"
   const contentAgentLive = isContentAgentLaunchEnabled()
+  const subscriptionActive = status === "active" || status === "trialing"
+  const monthlyAllowance = snapshot?.plan ? monthlyCreditsForPlan(snapshot.plan) : 0
+  const creditsRemaining = snapshot?.totalCredits ?? 0
+  const lowCreditThreshold = Math.max(1, Math.ceil(monthlyAllowance * 0.2))
+  const criticalCreditThreshold = Math.max(1, Math.ceil(monthlyAllowance * 0.1))
+  const creditWarning = subscriptionActive && monthlyAllowance > 0 && creditsRemaining <= lowCreditThreshold
+  const creditCritical = creditWarning && creditsRemaining <= criticalCreditThreshold
 
   return (
     <main className="min-h-screen bg-background px-6 py-10">
@@ -43,7 +53,7 @@ export default async function BillingPage() {
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
             <h1 className="text-3xl font-bold">AMS billing</h1>
-            <p className="text-muted-foreground">Subscription and Content Agent credit access for the signed-in account.</p>
+            <p className="text-muted-foreground">Subscription and shared AI credit access for the signed-in account.</p>
           </div>
           <Button asChild variant="outline">
             <Link href="/">Back to dashboard</Link>
@@ -63,6 +73,17 @@ export default async function BillingPage() {
                 <Link href="/ethical-agent-farm/request?offer=content-agent-beta">Join the beta list</Link>
               </Button>
             </CardContent>
+          </Card>
+        ) : null}
+
+        {creditWarning ? (
+          <Card className={creditCritical ? "border-destructive/50 bg-destructive/10" : "border-amber-500/40 bg-amber-500/10"}>
+            <CardHeader>
+              <CardTitle>{creditCritical ? "Credits are running critically low" : "Credits are running low"}</CardTitle>
+              <CardDescription>
+                {creditsRemaining.toLocaleString()} shared credits remain. Monthly plan credits reset with the billing cycle; purchased top-up credits remain until used.
+              </CardDescription>
+            </CardHeader>
           </Card>
         ) : null}
 
@@ -118,15 +139,21 @@ export default async function BillingPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  {plan.credits.toLocaleString()} Content Agent credits per billing cycle. One completed generation uses one credit.
+                  {plan.credits.toLocaleString()} shared AI generation credits per billing cycle. One completed generation from any included Live marketing agent uses one shared credit.
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {contentAgentLive
-                    ? "Content Agent is included with an active subscription. Outreach and Analytics are not available."
-                    : "Content Agent access begins only after the production launch gate is enabled. Outreach and Analytics are not available."}
+                  Includes {LIVE_MARKETING_AGENTS}. New agents join the subscription only after production verification.
                 </p>
                 {contentAgentLive ? (
-                  <BillingActionButton label={`Choose ${plan.name}`} endpoint="/api/billing/checkout" plan={plan.slug} />
+                  subscriptionActive ? (
+                    <div className="space-y-2">
+                      <Button type="button" disabled>
+                        {snapshot?.plan === plan.slug ? "Current plan" : "Use billing portal to change plan"}
+                      </Button>
+                    </div>
+                  ) : (
+                    <BillingActionButton label={`Choose ${plan.name}`} endpoint="/api/billing/checkout" plan={plan.slug} />
+                  )
                 ) : (
                   <div className="space-y-2">
                     <Button type="button" disabled>Checkout paused</Button>
@@ -138,10 +165,23 @@ export default async function BillingPage() {
           ))}
         </div>
 
+        {configured && subscriptionActive ? (
+          <CreditTopupPurchasePanel />
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Extra credits</CardTitle>
+              <CardDescription>
+                Manual credit top-ups become available after an AMS subscription is active.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+
         <div className="flex flex-wrap gap-3">
           <BillingActionButton label="Manage subscription" endpoint="/api/billing/portal" variant="outline" />
           <Button asChild variant="ghost">
-            <Link href="/content-agent">View Content Agent status</Link>
+            <Link href="/agents">View Live agents</Link>
           </Button>
         </div>
       </div>
