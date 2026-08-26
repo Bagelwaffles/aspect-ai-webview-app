@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Registration-only PR touch: no probe behavior change.
 set -euo pipefail
 set +x
 
