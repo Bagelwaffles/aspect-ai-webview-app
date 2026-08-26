@@ -21,6 +21,10 @@ import {
   defaultQuickAuditWebhookDependencies,
 } from "@/lib/server/quick-audit-webhook"
 import { normalizeQuickAuditLiveStripeSecret } from "@/lib/server/quick-audit-runtime"
+import {
+  createCreditTopupWebhookHandler,
+  defaultCreditTopupWebhookDependencies,
+} from "@/lib/server/credit-topup-webhook"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -53,11 +57,20 @@ const quickAuditPost = createQuickAuditWebhookHandler(defaultQuickAuditWebhookDe
   releaseEvent: releaseStripeEvent,
 }))
 
+const creditTopupPost = createCreditTopupWebhookHandler(defaultCreditTopupWebhookDependencies({
+  env: process.env,
+  claimEvent: claimStripeEvent,
+  completeEvent: completeStripeEvent,
+  releaseEvent: releaseStripeEvent,
+}))
+
 export async function POST(request: NextRequest) {
   const rawBody = await request.text()
   const init = { method: "POST", headers: request.headers, body: rawBody }
   const quickAuditResponse = await quickAuditPost(new NextRequest(request.url, init))
   if (quickAuditResponse) return quickAuditResponse
+  const creditTopupResponse = await creditTopupPost(new NextRequest(request.url, init))
+  if (creditTopupResponse) return creditTopupResponse
   return subscriptionPost(new NextRequest(request.url, init))
 }
 
