@@ -1,0 +1,2 @@
+GitHub Actions registration smoke test.
+No secrets, production systems, payments, or customer data are accessed.
