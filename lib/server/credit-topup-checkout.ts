@@ -2,6 +2,7 @@ import { createHash } from "node:crypto"
 
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
+import { Redis } from "@upstash/redis"
 
 import {
   creditTopupPack,
@@ -17,10 +18,16 @@ import {
   resolvePublicAppUrl,
 } from "./stripe-entitlements"
 
+type CheckoutRateLimitResult = {
+  allowed: boolean
+  retryAfterSeconds: number
+}
+
 type TopupCheckoutDependencies = {
   authorize: typeof authorizePaidApiRequest
   getEntitlements: typeof getEntitlementSnapshot
   env: NodeJS.ProcessEnv
+  checkRateLimit: (subject: string) => Promise<CheckoutRateLimitResult>
   resolvePrice: (secretKey: string, pack: CreditTopupPack) => Promise<Stripe.Price>
   createSession: (
     secretKey: string,
@@ -29,19 +36,75 @@ type TopupCheckoutDependencies = {
   ) => Promise<Pick<Stripe.Checkout.Session, "id" | "url">>
 }
 
+const CHECKOUT_RATE_LIMIT_MAX = 5
+const CHECKOUT_RATE_LIMIT_SECONDS = 10 * 60
+let rateLimitRedis: Redis | null | undefined
+
+function getRateLimitRedis(): Redis | null {
+  if (rateLimitRedis !== undefined) return rateLimitRedis
+  const url = (process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL)?.trim()
+  const token = (process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN)?.trim()
+  rateLimitRedis = url && token ? new Redis({ url, token }) : null
+  return rateLimitRedis
+}
+
+async function distributedCheckoutRateLimit(subject: string): Promise<CheckoutRateLimitResult> {
+  const redis = getRateLimitRedis()
+  if (!redis) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("CREDIT_TOPUP_RATE_LIMIT_STORE_NOT_CONFIGURED")
+    }
+    return { allowed: true, retryAfterSeconds: 0 }
+  }
+
+  const subjectHash = createHash("sha256").update(subject).digest("hex")
+  const key = `ams:rate-limit:credit-topup-checkout:${subjectHash}`
+  const script = `
+    local count = redis.call('INCR', KEYS[1])
+    if count == 1 then
+      redis.call('EXPIRE', KEYS[1], ARGV[1])
+    end
+    local ttl = redis.call('TTL', KEYS[1])
+    if ttl < 1 then ttl = tonumber(ARGV[1]) end
+    return {tostring(count), tostring(ttl)}
+  `
+  const raw = await redis.eval(script, [key], [CHECKOUT_RATE_LIMIT_SECONDS])
+  if (!Array.isArray(raw)) throw new Error("CREDIT_TOPUP_RATE_LIMIT_INVALID_RESPONSE")
+  const count = Number.parseInt(String(raw[0] ?? ""), 10)
+  const ttl = Number.parseInt(String(raw[1] ?? ""), 10)
+  if (!Number.isSafeInteger(count) || !Number.isSafeInteger(ttl) || count < 1 || ttl < 0) {
+    throw new Error("CREDIT_TOPUP_RATE_LIMIT_INVALID_RESPONSE")
+  }
+
+  return {
+    allowed: count <= CHECKOUT_RATE_LIMIT_MAX,
+    retryAfterSeconds: Math.max(1, ttl),
+  }
+}
+
+function expandedProduct(price: Stripe.Price): Stripe.Product | null {
+  const product = price.product
+  if (!product || typeof product === "string") return null
+  if ("deleted" in product && product.deleted) return null
+  return product as Stripe.Product
+}
+
 const defaultDependencies: TopupCheckoutDependencies = {
   authorize: authorizePaidApiRequest,
   getEntitlements: getEntitlementSnapshot,
   env: process.env,
+  checkRateLimit: distributedCheckoutRateLimit,
   resolvePrice: async (secretKey, pack) => {
     const stripe = new Stripe(secretKey)
     const result = await stripe.prices.list({
       active: true,
       lookup_keys: [pack.lookupKey],
       limit: 2,
+      expand: ["data.product"],
     })
     if (result.data.length !== 1) throw new Error("CREDIT_TOPUP_PRICE_NOT_UNIQUE")
     const price = result.data[0]
+    const product = expandedProduct(price)
     if (
       price.lookup_key !== pack.lookupKey ||
       price.type !== "one_time" ||
@@ -50,7 +113,15 @@ const defaultDependencies: TopupCheckoutDependencies = {
       price.unit_amount !== pack.priceCents ||
       price.metadata?.offer_type !== "credit_topup" ||
       price.metadata?.topup_units !== String(pack.units) ||
-      price.metadata?.subscriber_only !== "true"
+      price.metadata?.subscriber_only !== "true" ||
+      price.metadata?.non_expiring !== "true" ||
+      !product ||
+      product.active !== true ||
+      product.metadata?.offer_type !== "credit_topup" ||
+      product.metadata?.topup_units !== String(pack.units) ||
+      product.metadata?.subscriber_only !== "true" ||
+      product.metadata?.non_expiring !== "true" ||
+      product.metadata?.checkout_enabled !== "true"
     ) {
       throw new Error("CREDIT_TOPUP_PRICE_INVALID")
     }
@@ -62,8 +133,11 @@ const defaultDependencies: TopupCheckoutDependencies = {
   },
 }
 
-function noStoreJson(body: Record<string, unknown>, status: number) {
-  return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } })
+function noStoreJson(body: Record<string, unknown>, status: number, headers?: Record<string, string>) {
+  return NextResponse.json(body, {
+    status,
+    headers: { "Cache-Control": "no-store", ...headers },
+  })
 }
 
 function validRequestId(value: unknown): value is string {
@@ -136,6 +210,31 @@ export function createCreditTopupCheckoutHandler(
       )
     }
 
+    let rateLimit: CheckoutRateLimitResult
+    try {
+      rateLimit = await dependencies.checkRateLimit(principal.subject)
+    } catch {
+      return noStoreJson(
+        {
+          ok: false,
+          error: "Credit top-up checkout is temporarily unavailable",
+          code: "CREDIT_TOPUP_RATE_LIMIT_UNAVAILABLE",
+        },
+        503,
+      )
+    }
+    if (!rateLimit.allowed) {
+      return noStoreJson(
+        {
+          ok: false,
+          error: "Too many credit checkout attempts. Try again shortly.",
+          code: "CREDIT_TOPUP_RATE_LIMITED",
+        },
+        429,
+        { "Retry-After": String(rateLimit.retryAfterSeconds) },
+      )
+    }
+
     const pack = creditTopupPack(requested.pack)
     const stripeSecretKey = dependencies.env.STRIPE_SECRET_KEY?.trim()
     let publicAppUrl: string
@@ -164,7 +263,11 @@ export function createCreditTopupCheckoutHandler(
       price = await dependencies.resolvePrice(stripeSecretKey, pack)
     } catch {
       return noStoreJson(
-        { ok: false, error: "Credit top-up price is unavailable", code: "CREDIT_TOPUP_PRICE_UNAVAILABLE" },
+        {
+          ok: false,
+          error: "Credit top-up purchases are not enabled yet",
+          code: "CREDIT_TOPUP_PRICE_UNAVAILABLE",
+        },
         503,
       )
     }
@@ -197,6 +300,7 @@ export function createCreditTopupCheckoutHandler(
           allow_promotion_codes: false,
           billing_address_collection: "auto",
           automatic_tax: { enabled: false },
+          expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
         },
         {
           idempotencyKey: checkoutIdempotencyKey(
