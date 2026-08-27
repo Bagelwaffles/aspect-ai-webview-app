@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "pair": "tsx src/index.ts pair",
-    "start": "tsx src/index.ts run"
+    "start": "tsx src/index.ts run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "playwright-core": "^1.55.0"
   },
   "devDependencies": {
+    "@types/node": "^22",
     "tsx": "4.20.6",
     "typescript": "5.9.3"
   }

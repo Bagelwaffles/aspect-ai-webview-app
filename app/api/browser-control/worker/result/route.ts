@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { authenticateBrowserWorker, completeBrowserJob } from "@/lib/server/browser-control"
+import { authenticateBrowserWorker, completeBrowserJob, type BrowserOwnerAction } from "@/lib/server/browser-control"
+
+const ownerActions = new Set<BrowserOwnerAction>([
+  "login_required",
+  "mfa_required",
+  "captcha_required",
+  "consent_required",
+  "security_check_required",
+])
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,6 +30,10 @@ export async function POST(request: NextRequest) {
       durationMs: typeof body.durationMs === "number" ? body.durationMs : undefined,
       captureBase64: typeof body.captureBase64 === "string" ? body.captureBase64 : undefined,
       captureSha256: typeof body.captureSha256 === "string" ? body.captureSha256 : undefined,
+      ownerAction:
+        typeof body.ownerAction === "string" && ownerActions.has(body.ownerAction as BrowserOwnerAction)
+          ? (body.ownerAction as BrowserOwnerAction)
+          : undefined,
     })
     return NextResponse.json({ ok: true, job })
   } catch (error) {

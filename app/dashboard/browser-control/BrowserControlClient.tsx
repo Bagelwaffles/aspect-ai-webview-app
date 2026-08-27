@@ -20,6 +20,7 @@ type Job = {
     captureAvailable?: boolean
     captureSha256?: string
     durationMs?: number
+    ownerAction?: string
   }
 }
 
@@ -45,7 +46,7 @@ const EMPTY: Snapshot = { configured: false, killSwitch: true, worker: null, job
 
 function badgeClasses(value: string) {
   if (["online", "succeeded", "green", "queued"].includes(value)) return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
-  if (["yellow", "awaiting_approval", "running"].includes(value)) return "border-amber-400/30 bg-amber-400/10 text-amber-200"
+  if (["yellow", "awaiting_approval", "running", "owner_action_required"].includes(value)) return "border-amber-400/30 bg-amber-400/10 text-amber-200"
   if (["red", "failed", "offline"].includes(value)) return "border-rose-400/30 bg-rose-400/10 text-rose-200"
   return "border-slate-500/30 bg-slate-500/10 text-slate-300"
 }
@@ -268,6 +269,11 @@ export default function BrowserControlPage() {
                 </div>
                 <p className="mt-3 break-all text-xs text-slate-400">{job.url}</p>
                 {job.result?.title ? <p className="mt-3 text-sm"><span className="text-slate-500">Title:</span> {job.result.title}</p> : null}
+                {job.result?.ownerAction ? (
+                  <p className="mt-3 text-sm text-amber-200">
+                    Owner action required: {job.result.ownerAction.replaceAll("_", " ")}
+                  </p>
+                ) : null}
                 {job.error ? <p className="mt-3 text-sm text-rose-300">{job.error}</p> : null}
                 <div className="mt-3 flex flex-wrap gap-3 text-xs">
                   {job.status === "awaiting_approval" ? <button onClick={() => approve(job.id)} className="font-bold text-amber-300 underline">Approve this job</button> : null}

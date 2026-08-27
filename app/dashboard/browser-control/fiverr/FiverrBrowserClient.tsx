@@ -17,6 +17,7 @@ type FiverrJob = {
     text?: string
     captureAvailable?: boolean
     durationMs?: number
+    ownerAction?: string
   }
 }
 
@@ -204,6 +205,11 @@ export default function FiverrBrowserClient() {
                 </div>
                 {job.result?.title ? <p className="mt-3 text-sm"><span className="text-slate-500">Title:</span> {job.result.title}</p> : null}
                 {job.result?.text ? <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-xl bg-black/30 p-3 text-xs text-slate-300">{job.result.text.slice(0, 2500)}</pre> : null}
+                {job.result?.ownerAction ? (
+                  <p className="mt-3 text-sm text-amber-200">
+                    Owner action required: {job.result.ownerAction.replaceAll("_", " ")}
+                  </p>
+                ) : null}
                 {job.error ? <p className="mt-3 text-sm text-rose-300">{job.error}</p> : null}
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
                   {job.result?.captureAvailable ? <a href={`/api/browser-control/captures/${job.id}`} target="_blank" rel="noreferrer" className="font-bold text-cyan-300 underline">Open screenshot proof</a> : null}

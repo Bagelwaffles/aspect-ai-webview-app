@@ -9,6 +9,7 @@ export type BrowserJobInput = {
   selector?: string
   value?: string
   note?: string
+  idempotencyKey?: string
 }
 
 const RISK_BY_ACTION: Record<BrowserAction, BrowserRisk> = {
@@ -27,6 +28,22 @@ export const DEFAULT_BROWSER_ALLOWED_HOSTS = [
   "www.aspectmarketingsolutions.app",
   "github.com",
   "www.github.com",
+  "linkedin.com",
+  "www.linkedin.com",
+  "developers.linkedin.com",
+  "facebook.com",
+  "www.facebook.com",
+  "developers.facebook.com",
+  "instagram.com",
+  "www.instagram.com",
+  "pinterest.com",
+  "www.pinterest.com",
+  "developers.pinterest.com",
+  "youtube.com",
+  "www.youtube.com",
+  "console.cloud.google.com",
+  "play.google.com",
+  "vercel.com",
   "fiverr.com",
   "www.fiverr.com",
 ] as const
@@ -84,6 +101,7 @@ export function validateBrowserJobInput(input: unknown): { ok: true; value: Brow
   const selector = typeof candidate.selector === "string" ? candidate.selector.trim().slice(0, 500) : undefined
   const value = typeof candidate.value === "string" ? candidate.value.slice(0, 5000) : undefined
   const note = typeof candidate.note === "string" ? candidate.note.trim().slice(0, 500) : undefined
+  const idempotencyKey = typeof candidate.idempotencyKey === "string" ? candidate.idempotencyKey.trim().slice(0, 160) : undefined
 
   if (["click", "fill", "submit"].includes(action) && !selector) {
     return { ok: false, error: `${action} requires a selector` }
@@ -92,5 +110,9 @@ export function validateBrowserJobInput(input: unknown): { ok: true; value: Brow
     return { ok: false, error: "fill requires a value" }
   }
 
-  return { ok: true, value: { action, url: candidate.url, selector, value, note } }
+  if (idempotencyKey && !/^[A-Za-z0-9._:-]{8,160}$/.test(idempotencyKey)) {
+    return { ok: false, error: "idempotencyKey must be 8-160 safe characters" }
+  }
+
+  return { ok: true, value: { action, url: candidate.url, selector, value, note, idempotencyKey } }
 }

@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ job: await createBrowserJob(parsed.value) }, { status: 201 })
   } catch (error) {
     const message = error instanceof Error ? error.message : "job_creation_failed"
-    return NextResponse.json({ error: message }, { status: message === "BROWSER_CONTROL_STORAGE_UNAVAILABLE" ? 503 : 500 })
+    const status = message === "BROWSER_CONTROL_STORAGE_UNAVAILABLE" ? 503 : message === "BROWSER_CONTROL_DISABLED" ? 423 : 500
+    return NextResponse.json({ error: message }, { status })
   }
 }
