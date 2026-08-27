@@ -30,6 +30,7 @@ export const DEFAULT_BROWSER_ALLOWED_HOSTS = [
   "www.github.com",
   "linkedin.com",
   "www.linkedin.com",
+  "developer.linkedin.com",
   "developers.linkedin.com",
   "facebook.com",
   "www.facebook.com",
