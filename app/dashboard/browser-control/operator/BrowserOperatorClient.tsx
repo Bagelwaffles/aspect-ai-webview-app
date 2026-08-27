@@ -33,6 +33,7 @@ type WorkerSnapshot = {
 }
 
 const MAX_AUTONOMOUS_STEPS = 30
+const CURRENT_PAGE_ORIGIN_MISMATCH = "CURRENT_PAGE_ORIGIN_MISMATCH"
 
 export default function BrowserOperatorClient() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -178,6 +179,19 @@ export default function BrowserOperatorClient() {
         addMessage({ role: "assistant", text: `I stopped after ${MAX_AUTONOMOUS_STEPS} steps to prevent a runaway browser loop. Review the current page and tell me to continue if the goal is not complete.` })
         return
       }
+      const timer = window.setTimeout(() => void continueGoal(), 500)
+      return () => window.clearTimeout(timer)
+    }
+
+    if (job.status === "failed" && job.error?.startsWith(CURRENT_PAGE_ORIGIN_MISMATCH)) {
+      if (continuedJobs.current.has(job.id)) return
+      continuedJobs.current.add(job.id)
+      if (stepCount >= MAX_AUTONOMOUS_STEPS) {
+        setAutoMode(false)
+        addMessage({ role: "assistant", text: `I stopped after ${MAX_AUTONOMOUS_STEPS} steps to prevent a runaway browser loop. Review the current page and tell me to continue if the goal is not complete.` })
+        return
+      }
+      addMessage({ role: "assistant", text: "The dedicated browser is on a different site than the intended step. I am recovering the correct page automatically." })
       const timer = window.setTimeout(() => void continueGoal(), 500)
       return () => window.clearTimeout(timer)
     }

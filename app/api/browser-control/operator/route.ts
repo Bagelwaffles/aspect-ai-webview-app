@@ -21,6 +21,18 @@ function sanitizeUrlForModel(rawUrl?: string) {
   }
 }
 
+function isRecoverableCurrentPageMismatch(job: {
+  status?: string
+  error?: string
+  url?: string
+} | undefined) {
+  return Boolean(
+    job?.status === "failed" &&
+    job.error?.startsWith("CURRENT_PAGE_ORIGIN_MISMATCH") &&
+    job.url,
+  )
+}
+
 export async function POST(request: NextRequest) {
   if (!(await browserAdminAuthorized(request))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
@@ -34,6 +46,21 @@ export async function POST(request: NextRequest) {
     const snapshot = await getBrowserControlSnapshot()
     if (!snapshot.configured) return NextResponse.json({ error: "BROWSER_CONTROL_STORAGE_UNAVAILABLE" }, { status: 503 })
     if (snapshot.killSwitch) return NextResponse.json({ error: "BROWSER_CONTROL_DISABLED" }, { status: 423 })
+
+    const latestJob = snapshot.jobs[0]
+    if (isRecoverableCurrentPageMismatch(latestJob)) {
+      const job = await createBrowserJob({
+        action: "open",
+        url: latestJob.url,
+        note: "Browser Agent: recover from current-page origin mismatch before continuing.",
+      })
+      return NextResponse.json({
+        reply: "The dedicated browser is on a different site than the intended step. I am safely reopening the intended page, then I will continue automatically.",
+        state: "ready",
+        job,
+        rationale: "Recover the intended browser origin before resuming the goal.",
+      })
+    }
 
     const contextJob = snapshot.jobs.find((job) => job.status === "succeeded" && job.result?.finalUrl)
     const currentUrl = sanitizeUrlForModel(contextJob?.result?.finalUrl)

@@ -143,3 +143,15 @@ test("Browser Agent strict response schema uses required nullable proposed-job f
   assert.match(source, /Use null when a field is not applicable/)
   assert.doesNotMatch(source, /selector: z\.string\(\)\.max\(500\)\.optional\(\)/)
 })
+
+test("Browser Agent automatically recovers current-page origin mismatches", () => {
+  const route = readFileSync("app/api/browser-control/operator/route.ts", "utf8")
+  const client = readFileSync("app/dashboard/browser-control/operator/BrowserOperatorClient.tsx", "utf8")
+
+  assert.match(route, /CURRENT_PAGE_ORIGIN_MISMATCH/)
+  assert.match(route, /action: "open"/)
+  assert.match(route, /recover from current-page origin mismatch before continuing/)
+  assert.match(client, /CURRENT_PAGE_ORIGIN_MISMATCH/)
+  assert.match(client, /recovering the correct page automatically/)
+  assert.match(client, /window\.setTimeout\(\(\) => void continueGoal\(\), 500\)/)
+})
