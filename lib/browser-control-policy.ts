@@ -39,6 +39,7 @@ const RISK_BY_ACTION: Record<BrowserAction, BrowserRisk> = {
 }
 
 const INTERACTIVE_ACTIONS: BrowserAction[] = ["click", "fill", "upload", "capture_secret", "fill_secret", "submit"]
+const CURRENT_PAGE_ACTIONS: BrowserAction[] = ["describe", ...INTERACTIVE_ACTIONS]
 const SAFE_UPLOAD_FILENAME = /^[A-Za-z0-9][A-Za-z0-9._() -]{0,159}$/
 const SAFE_UPLOAD_EXTENSION = /\.(png|jpe?g|webp|gif|pdf|csv|txt|zip|aab|apk)$/i
 const SAFE_SECRET_REF = /^[A-Za-z0-9][A-Za-z0-9._:-]{2,79}$/
@@ -129,8 +130,8 @@ export function validateBrowserJobInput(input: unknown): { ok: true; value: Brow
   const idempotencyKey = typeof candidate.idempotencyKey === "string" ? candidate.idempotencyKey.trim().slice(0, 160) : undefined
   const useCurrentPage = candidate.useCurrentPage === true
 
-  if (useCurrentPage && !INTERACTIVE_ACTIONS.includes(action)) {
-    return { ok: false, error: "useCurrentPage is only supported for interactive browser actions" }
+  if (useCurrentPage && !CURRENT_PAGE_ACTIONS.includes(action)) {
+    return { ok: false, error: "useCurrentPage is only supported for describe or interactive browser actions" }
   }
 
   if (INTERACTIVE_ACTIONS.includes(action) && !selector) {
