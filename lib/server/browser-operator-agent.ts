@@ -40,7 +40,10 @@ export type BrowserOperatorInput = z.infer<typeof browserOperatorInputSchema>
 export type BrowserOperatorOutput = z.infer<typeof browserOperatorOutputSchema>
 
 function looksLikeRawSecret(value: string) {
-  return /\b(?:sk_(?:live|test)_[A-Za-z0-9]+|whsec_[A-Za-z0-9]+|gh[pousr]_[A-Za-z0-9]+|AIza[0-9A-Za-z_-]{20,}|Bearer\s+[A-Za-z0-9._~+/=-]{20,})\b/i.test(value)
+  return (
+    /\b(?:sk_(?:live|test)_[A-Za-z0-9]+|whsec_[A-Za-z0-9]+|gh[pousr]_[A-Za-z0-9]+|AIza[0-9A-Za-z_-]{20,}|Bearer\s+[A-Za-z0-9._~+/=-]{20,})\b/i.test(value) ||
+    /\b(?:api[-_ ]?key|client[-_ ]?secret|access[-_ ]?token|refresh[-_ ]?token|password|secret|token)\s*[:=]\s*[A-Za-z0-9._~+/=-]{16,}/i.test(value)
+  )
 }
 
 function sensitiveCredentialUrl(rawUrl: string) {
@@ -50,6 +53,21 @@ function sensitiveCredentialUrl(rawUrl: string) {
   } catch {
     return false
   }
+}
+
+function sameHttpsOrigin(left?: string, right?: string) {
+  if (!left || !right) return false
+  try {
+    const a = new URL(left)
+    const b = new URL(right)
+    return a.protocol === "https:" && b.protocol === "https:" && a.origin === b.origin
+  } catch {
+    return false
+  }
+}
+
+function selectorLooksCredentialSensitive(selector?: string) {
+  return Boolean(selector && /(?:password|secret|token|api[-_ ]?key|access[-_ ]?key)/i.test(selector))
 }
 
 const browserOperatorDefinition: StructuredAgentDefinition<
@@ -70,17 +88,18 @@ Security invariants:
 - Credentials are handled only by approval-gated capture_secret and fill_secret actions. Use a non-secret reference such as linkedin.client_secret or linkedin.access_token.
 - capture_secret means the Windows worker reads the exact selected DOM field locally and encrypts it with Windows DPAPI. The raw value never reaches you.
 - fill_secret means the Windows worker decrypts that reference locally and fills the selected target field. Never substitute a raw value.
+- Never use normal fill for a password, API key, token, client secret, or other credential field. Use fill_secret.
 - Never use inspect or screenshot to obtain credentials. Prefer describe, which returns structure without form values.
 - Never bypass login, MFA, CAPTCHA, consent, security checks, or anti-bot controls. If one is required, state owner_action_required and propose no bypass.
 - Never create, rotate, revoke, publish, submit, purchase, delete, or change settings without the existing Browser Control approval gates. submit, upload, capture_secret and fill_secret are red actions and require owner approval.
 - Prefer describe when selectors or the current page structure are uncertain.
 - Use resilient selectors from the sanitized page description: label=, role=, placeholder=, text=, testid=, or a narrow CSS selector.
-- Preserve multi-step forms with useCurrentPage=true for interactive actions when the current page is already on the correct HTTPS origin.
+- Preserve multi-step forms with useCurrentPage=true for describe or interactive actions when the current page is already on the correct HTTPS origin.
 - Propose only one next job. Do not invent success. If the goal is complete, proposedJob must be null and state goal_complete.
 
 Execution strategy:
 1. If current page/location is unknown, open the most relevant allowlisted site.
-2. If on the right page but structure is unknown, describe it.
+2. If on the right page but structure is unknown, describe it without reloading when possible.
 3. Then fill/click/upload/capture_secret/fill_secret/submit one step at a time.
 4. For integration credentials: reveal/click only with approval as required by the site, capture_secret locally, then navigate to the destination such as Vercel and fill_secret there.
 5. Report concise progress and the next action only.`,
@@ -106,12 +125,29 @@ export async function planBrowserOperator(input: unknown): Promise<BrowserOperat
   if (!planned.proposedJob) return planned
 
   const proposal = planned.proposedJob
+  if ([planned.reply, proposal.value || "", proposal.rationale].some(looksLikeRawSecret)) {
+    return {
+      reply: "I blocked a proposed step because it may have exposed a credential to the model. I will use the local encrypted credential vault instead.",
+      proposedJob: null,
+      state: "blocked",
+    }
+  }
+
+  if (proposal.action === "fill" && selectorLooksCredentialSensitive(proposal.selector)) {
+    return {
+      reply: "That target appears to be a credential field. I will not send a raw value through chat; use a saved credential reference with fill_secret.",
+      proposedJob: null,
+      state: "blocked",
+    }
+  }
+
   if ((proposal.action === "inspect" || proposal.action === "screenshot") && sensitiveCredentialUrl(proposal.url)) {
     return {
       reply: "That page may contain credentials. I will use the sanitized page description instead of exposing page values.",
       proposedJob: {
         action: "describe",
         url: proposal.url,
+        useCurrentPage: sameHttpsOrigin(parsedInput.currentUrl, proposal.url) || undefined,
         rationale: "Describe controls and labels without returning form values or credentials.",
       },
       state: "ready",
