@@ -1,18 +1,19 @@
 // AMS Browser Control provider registry.
 //
 // Browser Control operates on top-level job URLs. Provider-owned subdomains are
-// allowed here so normal OAuth, developer-console, dashboard, and documentation
-// redirects do not fail one hostname at a time. User-content multi-tenant domains
-// (for example arbitrary *.vercel.app, *.myshopify.com, github.io) are intentionally
-// NOT wildcarded.
+// allowed here so normal OAuth, developer-console, dashboard, documentation, and
+// product redirects do not fail one hostname at a time. User-content multi-tenant
+// domains (for example arbitrary *.vercel.app, *.myshopify.com, github.io) are
+// intentionally NOT wildcarded.
 
 export const AMS_BROWSER_PROVIDER_SUFFIXES = [
   // AMS-owned web properties
   "aspectmarketingsolutions.app",
 
-  // Source control / deployment control planes
+  // Source control / deployment / infrastructure control planes
   "github.com",
   "vercel.com",
+  "upstash.com",
 
   // LinkedIn + official LinkedIn/Microsoft documentation
   "linkedin.com",
@@ -61,8 +62,11 @@ export const AMS_BROWSER_PROVIDER_SUFFIXES = [
   "chatgpt.com",
   "anthropic.com",
   "claude.ai",
+  "v0.app",
   "v0.dev",
   "manus.im",
+  "manus.ai",
+  "manus.space",
 ] as const
 
 // Vercel's *.vercel.app namespace is multi-tenant user content, so never allow the
