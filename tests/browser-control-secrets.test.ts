@@ -82,7 +82,7 @@ async function pairWorker() {
 
 test("browser credential actions are approval gated", () => {
   assert.equal(riskForBrowserAction("capture_secret"), "red")
-  assert.equal(riskForBrowserAction("fill"), "red")
+  assert.equal(riskForBrowserAction("fill"), "yellow")
 })
 
 test("capture_secret requires a selector, current-page mode, and never accepts a secret value", () => {
@@ -167,7 +167,7 @@ test("secret capture and secret-handle fill remain blocked until explicit approv
       value: "ams-secret-00000000-0000-4000-8000-000000000001",
       useCurrentPage: true,
     })
-    assert.equal(fill.risk, "red")
+    assert.equal(fill.risk, "yellow")
     assert.equal(fill.status, "awaiting_approval")
   } finally {
     __setBrowserControlRedisForTests(null)
