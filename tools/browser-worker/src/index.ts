@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { mkdir, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises"
+import { lstat, mkdir, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import process from "node:process"
@@ -7,13 +7,17 @@ import readline from "node:readline/promises"
 
 import { chromium, type BrowserContext, type Page } from "playwright-core"
 
-const VERSION = "1.0.1"
+const VERSION = "1.1.0"
 const appRoot = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "AMS", "BrowserWorker")
 const credentialsPath = path.join(appRoot, "credentials.json")
 const profilePath = path.join(appRoot, "EdgeProfile")
 const logRoot = path.join(appRoot, "logs")
+const uploadRoot = path.join(appRoot, "Uploads")
 const MAX_LOG_BYTES = 1_000_000
 const MAX_OLD_LOGS = 5
+const MAX_UPLOAD_BYTES = 200 * 1024 * 1024
+const SAFE_UPLOAD_FILENAME = /^[A-Za-z0-9][A-Za-z0-9._() -]{0,159}$/
+const SAFE_UPLOAD_EXTENSION = /\.(png|jpe?g|webp|gif|pdf|csv|txt|zip|aab|apk)$/i
 
 interface Credentials {
   baseUrl: string
@@ -23,10 +27,11 @@ interface Credentials {
 
 interface BrowserJob {
   id: string
-  action: "open" | "inspect" | "screenshot" | "click" | "fill" | "submit"
+  action: "open" | "inspect" | "screenshot" | "click" | "fill" | "upload" | "submit"
   url: string
   selector?: string
   value?: string
+  useCurrentPage?: boolean
 }
 
 type OwnerAction =
@@ -145,7 +150,10 @@ function workerHeaders(creds: Credentials) {
 }
 
 async function launchContext(): Promise<BrowserContext> {
-  await mkdir(profilePath, { recursive: true })
+  await Promise.all([
+    mkdir(profilePath, { recursive: true }),
+    mkdir(uploadRoot, { recursive: true }),
+  ])
   const requested = process.env.AMS_BROWSER_CHANNEL?.trim() || "msedge"
   const channels = Array.from(new Set([requested, "msedge", "chrome"]))
   let lastError: unknown
@@ -198,6 +206,10 @@ function isReadOnlyAction(action: BrowserJob["action"]) {
   return action === "open" || action === "inspect" || action === "screenshot"
 }
 
+function isInteractiveAction(action: BrowserJob["action"]) {
+  return action === "click" || action === "fill" || action === "upload" || action === "submit"
+}
+
 function isClosedBrowserError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
   return /target page, context or browser has been closed|browser has been closed|page has been closed/i.test(message)
@@ -206,6 +218,31 @@ function isClosedBrowserError(error: unknown) {
 async function navigate(page: Page, url: string) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 })
   await page.waitForTimeout(500)
+}
+
+function pageOrigin(page: Page): string | null {
+  try {
+    const current = new URL(page.url())
+    if (current.protocol !== "https:") return null
+    return current.origin
+  } catch {
+    return null
+  }
+}
+
+async function preparePage(page: Page, job: BrowserJob) {
+  if (!job.useCurrentPage) {
+    await navigate(page, job.url)
+    return
+  }
+  if (!isInteractiveAction(job.action)) throw new Error("useCurrentPage is only allowed for interactive actions")
+
+  const currentOrigin = pageOrigin(page)
+  const targetOrigin = new URL(job.url).origin
+  if (!currentOrigin || currentOrigin !== targetOrigin) {
+    throw new Error(`CURRENT_PAGE_ORIGIN_MISMATCH: expected ${targetOrigin}`)
+  }
+  await page.waitForTimeout(200)
 }
 
 function locatorFor(page: Page, selector: string) {
@@ -224,6 +261,26 @@ function locatorFor(page: Page, selector: string) {
   return page.getByTestId(value).first()
 }
 
+function safeUploadPath(fileName: string) {
+  const trimmed = fileName.trim()
+  if (!SAFE_UPLOAD_FILENAME.test(trimmed) || !SAFE_UPLOAD_EXTENSION.test(trimmed) || trimmed.includes("..")) {
+    throw new Error("UPLOAD_FILENAME_NOT_ALLOWED")
+  }
+  if (path.basename(trimmed) !== trimmed) throw new Error("UPLOAD_PATH_NOT_ALLOWED")
+  return path.join(uploadRoot, trimmed)
+}
+
+async function uploadFile(page: Page, selector: string, fileName: string) {
+  const filePath = safeUploadPath(fileName)
+  const info = await lstat(filePath).catch(() => null)
+  if (!info || !info.isFile() || info.isSymbolicLink()) {
+    throw new Error(`UPLOAD_FILE_NOT_FOUND: ${fileName}`)
+  }
+  if (info.size > MAX_UPLOAD_BYTES) throw new Error("UPLOAD_FILE_TOO_LARGE")
+  await locatorFor(page, selector).setInputFiles(filePath, { timeout: 15_000 })
+  await page.waitForTimeout(500)
+}
+
 async function detectOwnerAction(page: Page): Promise<OwnerAction | null> {
   const text = (await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "")).toLowerCase()
   const url = page.url().toLowerCase()
@@ -237,7 +294,7 @@ async function detectOwnerAction(page: Page): Promise<OwnerAction | null> {
 
 async function execute(page: Page, job: BrowserJob) {
   const started = Date.now()
-  await navigate(page, job.url)
+  await preparePage(page, job)
   const ownerAction = await detectOwnerAction(page)
   if (ownerAction) throw new OwnerActionRequired(ownerAction, `Owner action required: ${ownerAction}`)
 
@@ -267,6 +324,11 @@ async function execute(page: Page, job: BrowserJob) {
     await locatorFor(page, job.selector).fill(job.value, { timeout: 15_000 })
   }
 
+  if (job.action === "upload") {
+    if (!job.selector || !job.value) throw new Error("upload requires selector and filename")
+    await uploadFile(page, job.selector, job.value)
+  }
+
   const finalOwnerAction = await detectOwnerAction(page)
   if (finalOwnerAction) throw new OwnerActionRequired(finalOwnerAction, `Owner action required: ${finalOwnerAction}`)
 
@@ -289,6 +351,7 @@ async function run() {
 
   log("AMS Browser Worker started. Close this process or use the AMS emergency stop to prevent new jobs.")
   log(`Dedicated profile: ${profilePath}`)
+  log(`Approved local upload folder: ${uploadRoot}`)
 
   process.on("SIGINT", async () => {
     if (session) await session.context.close().catch(() => undefined)
@@ -327,7 +390,7 @@ async function run() {
 
       const job = claimed.job
       currentJobId = job.id
-      log(`[${job.id}] ${job.action} ${job.url}`)
+      log(`[${job.id}] ${job.action} ${job.url}${job.useCurrentPage ? " · current-page" : ""}`)
       const started = Date.now()
       try {
         session = await ensureSession(session)

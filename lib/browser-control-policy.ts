@@ -1,4 +1,4 @@
-export const BROWSER_ACTIONS = ["open", "inspect", "screenshot", "click", "fill", "submit"] as const
+export const BROWSER_ACTIONS = ["open", "inspect", "screenshot", "click", "fill", "upload", "submit"] as const
 
 export type BrowserAction = (typeof BROWSER_ACTIONS)[number]
 export type BrowserRisk = "green" | "yellow" | "red"
@@ -10,6 +10,7 @@ export type BrowserJobInput = {
   value?: string
   note?: string
   idempotencyKey?: string
+  useCurrentPage?: boolean
 }
 
 const RISK_BY_ACTION: Record<BrowserAction, BrowserRisk> = {
@@ -18,8 +19,13 @@ const RISK_BY_ACTION: Record<BrowserAction, BrowserRisk> = {
   screenshot: "green",
   click: "yellow",
   fill: "yellow",
+  upload: "red",
   submit: "red",
 }
+
+const INTERACTIVE_ACTIONS: BrowserAction[] = ["click", "fill", "upload", "submit"]
+const SAFE_UPLOAD_FILENAME = /^[A-Za-z0-9][A-Za-z0-9._() -]{0,159}$/
+const SAFE_UPLOAD_EXTENSION = /\.(png|jpe?g|webp|gif|pdf|csv|txt|zip|aab|apk)$/i
 
 // Phase-1 perimeter: keep browser control intentionally narrow.
 // Add business sites one at a time only after a dedicated onboarding/proof pass.
@@ -100,20 +106,43 @@ export function validateBrowserJobInput(input: unknown): { ok: true; value: Brow
   }
 
   const selector = typeof candidate.selector === "string" ? candidate.selector.trim().slice(0, 500) : undefined
-  const value = typeof candidate.value === "string" ? candidate.value.slice(0, 5000) : undefined
+  let value = typeof candidate.value === "string" ? candidate.value.slice(0, 5000) : undefined
   const note = typeof candidate.note === "string" ? candidate.note.trim().slice(0, 500) : undefined
   const idempotencyKey = typeof candidate.idempotencyKey === "string" ? candidate.idempotencyKey.trim().slice(0, 160) : undefined
+  const useCurrentPage = candidate.useCurrentPage === true
 
-  if (["click", "fill", "submit"].includes(action) && !selector) {
+  if (useCurrentPage && !INTERACTIVE_ACTIONS.includes(action)) {
+    return { ok: false, error: "useCurrentPage is only supported for interactive browser actions" }
+  }
+
+  if (INTERACTIVE_ACTIONS.includes(action) && !selector) {
     return { ok: false, error: `${action} requires a selector` }
   }
   if (action === "fill" && value === undefined) {
     return { ok: false, error: "fill requires a value" }
+  }
+  if (action === "upload") {
+    value = value?.trim()
+    if (!value) return { ok: false, error: "upload requires a filename" }
+    if (!SAFE_UPLOAD_FILENAME.test(value) || !SAFE_UPLOAD_EXTENSION.test(value) || value.includes("..")) {
+      return { ok: false, error: "upload filename must be a safe local filename with an approved extension" }
+    }
   }
 
   if (idempotencyKey && !/^[A-Za-z0-9._:-]{8,160}$/.test(idempotencyKey)) {
     return { ok: false, error: "idempotencyKey must be 8-160 safe characters" }
   }
 
-  return { ok: true, value: { action, url: candidate.url, selector, value, note, idempotencyKey } }
+  return {
+    ok: true,
+    value: {
+      action,
+      url: candidate.url,
+      selector,
+      value,
+      note,
+      idempotencyKey,
+      useCurrentPage: useCurrentPage || undefined,
+    },
+  }
 }

@@ -94,6 +94,7 @@ test("browser control classifies read-only and write actions by risk", () => {
   assert.equal(riskForBrowserAction("screenshot"), "green")
   assert.equal(riskForBrowserAction("click"), "yellow")
   assert.equal(riskForBrowserAction("fill"), "yellow")
+  assert.equal(riskForBrowserAction("upload"), "red")
   assert.equal(riskForBrowserAction("submit"), "red")
 })
 
@@ -102,6 +103,7 @@ test("browser control only accepts exact phase-1 allowlisted HTTPS hosts", () =>
   assert.equal(isAllowedBrowserUrl("https://github.com/Bagelwaffles"), true)
   assert.equal(isAllowedBrowserUrl("https://www.fiverr.com/"), true)
   assert.equal(isAllowedBrowserUrl("https://www.linkedin.com/developers/apps"), true)
+  assert.equal(isAllowedBrowserUrl("https://developer.linkedin.com"), true)
   assert.equal(isAllowedBrowserUrl("https://developers.facebook.com/apps/"), true)
   assert.equal(isAllowedBrowserUrl("https://developers.pinterest.com/apps/"), true)
   assert.equal(isAllowedBrowserUrl("https://console.cloud.google.com/apis/credentials"), true)
@@ -113,23 +115,69 @@ test("browser control only accepts exact phase-1 allowlisted HTTPS hosts", () =>
   assert.equal(isAllowedBrowserUrl("https://user:pass@github.com/"), false)
 })
 
-test("browser control validates selectors and fill values", () => {
-  assert.deepEqual(
+test("browser control validates selectors, values, current-page mode, and safe upload filenames", () => {
+  assert.equal(
     validateBrowserJobInput({ action: "click", url: "https://www.aspectmarketingsolutions.app/", selector: "a[href='/collaborate']" }).ok,
     true,
   )
-  assert.deepEqual(
+  assert.equal(
     validateBrowserJobInput({ action: "click", url: "https://www.aspectmarketingsolutions.app/" }).ok,
     false,
   )
-  assert.deepEqual(
-    validateBrowserJobInput({ action: "fill", url: "https://www.aspectmarketingsolutions.app/", selector: "input", value: "test" }).ok,
-    true,
-  )
-  assert.deepEqual(
+  const fill = validateBrowserJobInput({
+    action: "fill",
+    url: "https://www.linkedin.com/developers/apps/new",
+    selector: "label=App name",
+    value: "Aspect Marketing Solutions",
+    useCurrentPage: true,
+  })
+  assert.equal(fill.ok, true)
+  if (fill.ok) assert.equal(fill.value.useCurrentPage, true)
+
+  assert.equal(
     validateBrowserJobInput({ action: "fill", url: "https://www.aspectmarketingsolutions.app/", selector: "input" }).ok,
     false,
   )
+
+  assert.equal(
+    validateBrowserJobInput({
+      action: "upload",
+      url: "https://www.linkedin.com/developers/apps/new",
+      selector: "input[type='file']",
+      value: "ams-logo.png",
+      useCurrentPage: true,
+    }).ok,
+    true,
+  )
+  assert.equal(
+    validateBrowserJobInput({
+      action: "upload",
+      url: "https://www.linkedin.com/developers/apps/new",
+      selector: "input[type='file']",
+      value: "../credentials.json",
+      useCurrentPage: true,
+    }).ok,
+    false,
+  )
+  assert.equal(
+    validateBrowserJobInput({
+      action: "upload",
+      url: "https://www.linkedin.com/developers/apps/new",
+      selector: "input[type='file']",
+      value: "secret.env",
+      useCurrentPage: true,
+    }).ok,
+    false,
+  )
+  assert.equal(
+    validateBrowserJobInput({
+      action: "inspect",
+      url: "https://www.linkedin.com/developers/apps/new",
+      useCurrentPage: true,
+    }).ok,
+    false,
+  )
+
   const parsed = validateBrowserJobInput({
     action: "inspect",
     url: "https://www.aspectmarketingsolutions.app/",
@@ -195,6 +243,32 @@ test("browser control approval gates and kill switch block new browser work", as
     assert.equal(claimed.disabled, false)
     assert.equal(claimed.job?.id, clickJob.id)
     assert.equal(claimed.job?.attemptCount, 1)
+  } finally {
+    __setBrowserControlRedisForTests(null)
+  }
+})
+
+test("browser control upload jobs are red and preserve current-page intent after approval", async () => {
+  useMemoryRedis()
+  try {
+    const { workerId } = await pairWorker()
+    const uploadJob = await createBrowserJob({
+      action: "upload",
+      url: "https://www.linkedin.com/developers/apps/new",
+      selector: "input[type='file']",
+      value: "ams-logo.png",
+      useCurrentPage: true,
+    })
+    assert.equal(uploadJob.risk, "red")
+    assert.equal(uploadJob.status, "awaiting_approval")
+    assert.equal(uploadJob.useCurrentPage, true)
+    assert.equal((await claimBrowserJob(workerId)).job, null)
+
+    await approveBrowserJob(uploadJob.id)
+    const claimed = await claimBrowserJob(workerId)
+    assert.equal(claimed.job?.id, uploadJob.id)
+    assert.equal(claimed.job?.value, "ams-logo.png")
+    assert.equal(claimed.job?.useCurrentPage, true)
   } finally {
     __setBrowserControlRedisForTests(null)
   }
