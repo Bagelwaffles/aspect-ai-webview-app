@@ -102,10 +102,10 @@ test(
       })
       assert.equal(dispute.applied, true)
       assert.equal(dispute.targetUnits, 300)
-      assert.equal(dispute.withheldUnits, 250)
-      assert.equal(dispute.unrecoveredUnits, 50)
+      assert.equal(dispute.withheldUnits, 300)
+      assert.equal(dispute.unrecoveredUnits, 0)
       assert.equal(Number(await redis.get(balances.topup)), 0)
-      assert.equal(Number(await redis.get(balances.plan)), 0)
+      assert.equal(Number(await redis.get(balances.plan)), 100)
 
       const disputeWon = await reconcileCreditTopupReversal({
         subject,
@@ -119,8 +119,8 @@ test(
       assert.equal(disputeWon.targetUnits, 150)
       assert.equal(disputeWon.withheldUnits, 150)
       assert.equal(disputeWon.unrecoveredUnits, 0)
-      assert.equal(Number(await redis.get(balances.topup)), 100)
-      assert.equal(Number(await redis.get(balances.plan)), 0)
+      assert.equal(Number(await redis.get(balances.topup)), 150)
+      assert.equal(Number(await redis.get(balances.plan)), 100)
 
       const refundReplay = await reconcileCreditTopupReversal({
         subject,
@@ -133,8 +133,8 @@ test(
       assert.equal(refundReplay.applied, false)
       assert.equal(refundReplay.idempotent, true)
       assert.equal(refundReplay.targetUnits, 150)
-      assert.equal(Number(await redis.get(balances.topup)), 100)
-      assert.equal(Number(await redis.get(balances.plan)), 0)
+      assert.equal(Number(await redis.get(balances.topup)), 150)
+      assert.equal(Number(await redis.get(balances.plan)), 100)
     } finally {
       await redis.del(...cleanupKeys)
     }
