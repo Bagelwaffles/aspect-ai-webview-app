@@ -77,9 +77,11 @@ test("active subscriber receives a one-time Checkout Session for the exact appro
     options?: Stripe.RequestOptions
   } = {}
 
+  const before = Math.floor(Date.now() / 1000)
   const handler = createCreditTopupCheckoutHandler({
     authorize: async () => principal,
     getEntitlements: async () => snapshot("active"),
+    checkRateLimit: async () => ({ allowed: true, retryAfterSeconds: 0 }),
     env: {
       NODE_ENV: "test",
       STRIPE_SECRET_KEY: "sk_test_credit_topup_fixture",
@@ -122,6 +124,9 @@ test("active subscriber receives a one-time Checkout Session for the exact appro
     "https://www.aspectmarketingsolutions.app/billing/topup/success?session_id={CHECKOUT_SESSION_ID}",
   )
   assert.equal(checkoutParams.cancel_url, "https://www.aspectmarketingsolutions.app/billing")
+  assert.ok(typeof checkoutParams.expires_at === "number")
+  assert.ok(checkoutParams.expires_at! >= before + 29 * 60)
+  assert.ok(checkoutParams.expires_at! <= before + 31 * 60)
   assert.match(String(checkoutOptions.idempotencyKey), /^ams-topup-checkout-[a-f0-9]{64}$/)
 })
 
@@ -151,6 +156,31 @@ test("inactive accounts cannot buy subscriber-only top-up credits", async () => 
 
   assert.equal(response.status, 403)
   assert.equal(payload.code, "ACTIVE_SUBSCRIPTION_REQUIRED")
+  assert.equal(stripeTouched, false)
+})
+
+test("distributed rate limit stops checkout before Stripe is touched", async () => {
+  let stripeTouched = false
+  const handler = createCreditTopupCheckoutHandler({
+    authorize: async () => principal,
+    getEntitlements: async () => snapshot("active"),
+    checkRateLimit: async () => ({ allowed: false, retryAfterSeconds: 123 }),
+    resolvePrice: async () => {
+      stripeTouched = true
+      return price("100")
+    },
+    createSession: async () => {
+      stripeTouched = true
+      return { id: "unexpected", url: "https://example.test/unexpected" }
+    },
+  })
+
+  const response = await handler(request({ pack: "100", requestId: "request_1234567890abcdef" }))
+  const payload = await response.json()
+
+  assert.equal(response.status, 429)
+  assert.equal(payload.code, "CREDIT_TOPUP_RATE_LIMITED")
+  assert.equal(response.headers.get("Retry-After"), "123")
   assert.equal(stripeTouched, false)
 })
 
