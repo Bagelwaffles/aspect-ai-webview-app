@@ -67,6 +67,12 @@ export type SocialChannelDeliveryStatus = z.infer<typeof socialChannelDeliverySt
 export type SocialChannelDelivery = z.infer<typeof socialChannelDeliverySchema>
 export type SocialCampaignRecord = z.infer<typeof socialCampaignRecordSchema>
 
+export function isSocialCampaignStoreConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  const url = (env.UPSTASH_REDIS_REST_URL ?? env.KV_REST_API_URL)?.trim()
+  const token = (env.UPSTASH_REDIS_REST_TOKEN ?? env.KV_REST_API_TOKEN)?.trim()
+  return Boolean(url && token)
+}
+
 function getRedis(): Redis {
   const url = (process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL)?.trim()
   const token = (process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN)?.trim()
@@ -82,7 +88,7 @@ function campaignKey(id: string) {
   return `${PREFIX}:campaign:${id}`
 }
 
-function idempotencyKey(key: string) {
+function idempotencyRedisKey(key: string) {
   return `${PREFIX}:idempotency:${digest(key)}`
 }
 
@@ -94,8 +100,8 @@ function normalizeIdempotencyKey(value: string): string {
   return normalized
 }
 
-function fingerprint(input: SocialCampaignInput) {
-  return digest(JSON.stringify(input))
+export function socialCampaignInputFingerprint(input: SocialCampaignInput) {
+  return digest(JSON.stringify(socialCampaignInputSchema.parse(input)))
 }
 
 async function putRecord(redis: Redis, record: SocialCampaignRecord) {
@@ -107,6 +113,16 @@ async function remember(redis: Redis, id: string) {
   await redis.ltrim(RECENT_KEY, 0, MAX_RECENT - 1)
 }
 
+export async function findSocialCampaignRecordByIdempotencyKey(
+  value: string,
+): Promise<SocialCampaignRecord | null> {
+  const key = normalizeIdempotencyKey(value)
+  const redis = getRedis()
+  const id = await redis.get<string>(idempotencyRedisKey(key))
+  if (!id) return null
+  return getSocialCampaignRecord(id)
+}
+
 export async function createSocialCampaignRecord(input: {
   idempotencyKey: string
   campaign: SocialCampaignInput
@@ -116,8 +132,8 @@ export async function createSocialCampaignRecord(input: {
   const key = normalizeIdempotencyKey(input.idempotencyKey)
   const campaign = socialCampaignInputSchema.parse(input.campaign)
   const output = socialCampaignOutputSchema.parse(input.output)
-  const inputFingerprint = fingerprint(campaign)
-  const idemKey = idempotencyKey(key)
+  const inputFingerprint = socialCampaignInputFingerprint(campaign)
+  const idemKey = idempotencyRedisKey(key)
 
   const newId = `social-campaign-${randomUUID()}`
   const reserved = await redis.set(idemKey, newId, { nx: true, ex: RETENTION_SECONDS })
@@ -175,7 +191,7 @@ export async function getSocialCampaignRecord(id: string): Promise<SocialCampaig
 export async function listSocialCampaignRecords(limit = 20): Promise<SocialCampaignRecord[]> {
   const redis = getRedis()
   const safeLimit = Math.min(50, Math.max(1, Math.floor(limit)))
-  const ids = await redis.lrange<string[]>(RECENT_KEY, 0, safeLimit - 1)
+  const ids = await redis.lrange<string>(RECENT_KEY, 0, safeLimit - 1)
   const records = await Promise.all(ids.map((id) => redis.get<unknown>(campaignKey(id))))
   return records
     .filter((record): record is unknown => Boolean(record))
