@@ -5,6 +5,7 @@ import { BillingActionButton } from "@/components/billing-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
+import { CREDIT_TOPUP_PACKS } from "@/lib/credit-topups"
 import { QUICK_MARKETING_AUDIT } from "@/lib/quick-marketing-audit"
 import { monthlyCreditsForPlan } from "@/lib/server/entitlements"
 
@@ -201,6 +202,32 @@ export default function PricingPage() {
               </Card>
             ))}
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Need more credits without changing plans?</CardTitle>
+              <CardDescription>
+                Active subscribers can buy one-time shared-credit top-ups from the web billing portal.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-3">
+                {CREDIT_TOPUP_PACKS.map((pack) => (
+                  <div key={pack.slug} className="rounded-lg border p-4">
+                    <div className="text-sm text-muted-foreground">{pack.name}</div>
+                    <div className="mt-1 text-2xl font-bold">{pack.priceLabel}</div>
+                    <div className="mt-2 text-xs text-muted-foreground">One-time purchase · subscriber-only</div>
+                  </div>
+                ))}
+              </div>
+              <p className="max-w-3xl text-sm text-muted-foreground">
+                Purchased top-up credits remain available until consumed unless the payment is refunded or reversed. Monthly plan credits are used first. Top-up checkout is available on the web and is not offered inside the Android app while Google Play billing requirements are handled separately.
+              </p>
+              <Button asChild variant="outline">
+                <Link href="/billing">Open account billing</Link>
+              </Button>
+            </CardContent>
+          </Card>
         </section>
 
         <section className="space-y-5">
