@@ -133,3 +133,13 @@ test("Browser Agent planner forbids model-visible raw credentials and routes sec
   assert.match(source, /looksLikeRawSecret/)
   assert.match(source, /selectorLooksCredentialSensitive/)
 })
+
+test("Browser Agent strict response schema uses required nullable proposed-job fields", () => {
+  const source = readFileSync("lib/server/browser-operator-agent.ts", "utf8")
+  assert.match(source, /selector: z\.string\(\)\.max\(500\)\.nullable\(\)/)
+  assert.match(source, /value: z\.string\(\)\.max\(5_000\)\.nullable\(\)/)
+  assert.match(source, /secretRef: z\.string\(\)\.max\(80\)\.nullable\(\)/)
+  assert.match(source, /useCurrentPage: z\.boolean\(\)\.nullable\(\)/)
+  assert.match(source, /Use null when a field is not applicable/)
+  assert.doesNotMatch(source, /selector: z\.string\(\)\.max\(500\)\.optional\(\)/)
+})
