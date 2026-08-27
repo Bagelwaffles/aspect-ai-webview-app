@@ -1,4 +1,4 @@
-# AMS Browser Worker v1
+# AMS Browser Worker v1.1
 
 This is the workstation-side browser executor for AMS Browser Control.
 
@@ -14,8 +14,29 @@ This is the workstation-side browser executor for AMS Browser Control.
 - Uses an explicit hostname allowlist enforced by the AMS server.
 - Green actions (`open`, `inspect`, `screenshot`) can queue immediately.
 - Yellow actions (`click`, `fill`) require owner approval.
-- Red actions (`submit`) require owner approval.
+- Red actions (`upload`, `submit`) require owner approval.
 - The AMS emergency stop prevents workers from claiming new jobs.
+
+## Multi-step forms
+
+Interactive jobs can opt into **Use current page**. In this mode, the worker does not reload the target page before a `click`, `fill`, `upload`, or `submit` action. This preserves live form state across a sequence of approved jobs.
+
+Safety rules:
+
+- Current-page mode is rejected for read-only `open`, `inspect`, and `screenshot` actions.
+- The worker verifies that the currently open page and the job URL have the same HTTPS origin before acting.
+- Current-page actions remain approval-gated according to their risk level.
+- CAPTCHA, MFA, security-check, login, and consent states still stop and return `owner_action_required`.
+
+## Safe local uploads
+
+The worker can upload only files placed in:
+
+`%LOCALAPPDATA%\AMS\BrowserWorker\Uploads`
+
+The dashboard sends only the filename (for example `ams-logo.png`), never an arbitrary local path. The worker rejects path traversal, symlinks, unsupported extensions, and files over 200 MB before calling the target site's file input.
+
+Approved extensions currently include PNG, JPEG, WebP, GIF, PDF, CSV, TXT, ZIP, AAB, and APK.
 
 ## Install on Windows
 
@@ -32,7 +53,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 5. Return to the dashboard and wait for `Worker Online`.
 6. Run the harmless proof test. It opens `/collaborate`, reads the title, takes a screenshot, and reports the evidence to AMS.
 
-The installer creates a current-user `AMS Browser Worker` scheduled task that starts at Windows logon. If Windows blocks task creation, run `start.ps1` manually.
+The installer first attempts a limited-privilege current-user scheduled task. If Windows denies task creation, it falls back to a current-user Startup entry and launches the worker immediately. Existing pairing credentials are reused on subsequent installs/upgrades.
 
 ## Login sessions
 
@@ -42,6 +63,7 @@ Do not put website passwords, API keys, recovery codes, or payment details in so
 
 - Credentials: `%LOCALAPPDATA%\AMS\BrowserWorker\credentials.json`
 - Browser profile: `%LOCALAPPDATA%\AMS\BrowserWorker\EdgeProfile`
+- Safe uploads: `%LOCALAPPDATA%\AMS\BrowserWorker\Uploads`
 - Logs: `%LOCALAPPDATA%\AMS\BrowserWorker\logs\worker.log`
 
 ## Browser selection
@@ -54,4 +76,4 @@ $env:AMS_BROWSER_CHANNEL = "msedge"
 
 ## Stop locally
 
-You can use the AMS dashboard emergency stop for new jobs, end the `AMS Browser Worker` scheduled task, or close the local worker process.
+Use the AMS dashboard emergency stop to prevent new jobs. You can also close the local worker process or remove/disable the current-user startup entry created by the installer.
