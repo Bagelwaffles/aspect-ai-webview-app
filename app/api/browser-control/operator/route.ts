@@ -6,6 +6,7 @@ import {
   createBrowserJob,
   getBrowserControlSnapshot,
 } from "@/lib/server/browser-control"
+import { browserKillSwitchEnabled } from "@/lib/server/browser-kill-switch"
 
 function sanitizeUrlForModel(rawUrl?: string) {
   if (!rawUrl) return undefined
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
   try {
     const snapshot = await getBrowserControlSnapshot()
     if (!snapshot.configured) return NextResponse.json({ error: "BROWSER_CONTROL_STORAGE_UNAVAILABLE" }, { status: 503 })
-    if (snapshot.killSwitch) return NextResponse.json({ error: "BROWSER_CONTROL_DISABLED" }, { status: 423 })
+    if (await browserKillSwitchEnabled()) return NextResponse.json({ error: "BROWSER_CONTROL_DISABLED" }, { status: 423 })
 
     const latestJob = snapshot.jobs[0]
     if (isRecoverableCurrentPageMismatch(latestJob)) {
@@ -89,6 +90,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ reply: planned.reply, state: planned.state, job: null })
     }
 
+    if (await browserKillSwitchEnabled()) return NextResponse.json({ error: "BROWSER_CONTROL_DISABLED" }, { status: 423 })
+
     const job = await createBrowserJob({
       action: planned.proposedJob.action,
       url: planned.proposedJob.url,
@@ -107,7 +110,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : "browser_operator_failed"
-    const status = message === "AMS_AGENT_RUNTIME_UNAVAILABLE" ? 503 : 500
+    const status = message === "AMS_AGENT_RUNTIME_UNAVAILABLE" ? 503 : message === "BROWSER_CONTROL_STORAGE_UNAVAILABLE" ? 503 : message === "BROWSER_CONTROL_DISABLED" ? 423 : 500
     return NextResponse.json({ error: message }, { status })
   }
 }
