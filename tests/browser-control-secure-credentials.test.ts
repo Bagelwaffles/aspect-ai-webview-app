@@ -7,6 +7,7 @@ import { riskForBrowserAction, validateBrowserJobInput } from "../lib/browser-co
 test("browser credential capture and fill are red owner-approved actions", () => {
   assert.equal(riskForBrowserAction("capture_secret"), "red")
   assert.equal(riskForBrowserAction("fill_secret"), "red")
+  assert.equal(riskForBrowserAction("describe"), "green")
 })
 
 test("browser credential actions accept only safe secret references and never accept a raw value", () => {
@@ -65,4 +66,27 @@ test("Windows worker vault uses CurrentUser DPAPI and pipes raw values over stdi
   assert.match(source, /capture_secret/)
   assert.match(source, /fill_secret/)
   assert.doesNotMatch(source, /spawn\([^\n]+rawSecret/)
+})
+
+test("sanitized describe action enumerates controls without reading form values", () => {
+  const source = readFileSync("tools/browser-worker/src/index.ts", "utf8")
+  const describeStart = source.indexOf("async function describePage")
+  const ownerActionStart = source.indexOf("async function detectOwnerAction")
+  assert.ok(describeStart >= 0)
+  assert.ok(ownerActionStart > describeStart)
+  const describeSource = source.slice(describeStart, ownerActionStart)
+  assert.match(describeSource, /querySelectorAll\("input,textarea,select,button,a/)
+  assert.match(describeSource, /placeholder/)
+  assert.match(describeSource, /label:/)
+  assert.doesNotMatch(describeSource, /\.value/)
+  assert.doesNotMatch(describeSource, /inputValue/)
+})
+
+test("Browser Agent planner forbids model-visible raw credentials and routes secrets through references", () => {
+  const source = readFileSync("lib/server/browser-operator-agent.ts", "utf8")
+  assert.match(source, /NEVER ask for, emit, repeat/)
+  assert.match(source, /capture_secret/)
+  assert.match(source, /fill_secret/)
+  assert.match(source, /Never use inspect or screenshot to obtain credentials/)
+  assert.match(source, /looksLikeRawSecret/)
 })
