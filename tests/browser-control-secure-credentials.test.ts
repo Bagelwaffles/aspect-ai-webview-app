@@ -10,6 +10,25 @@ test("browser credential capture and fill are red owner-approved actions", () =>
   assert.equal(riskForBrowserAction("describe"), "green")
 })
 
+test("sanitized describe can inspect the current live form without reloading it", () => {
+  const described = validateBrowserJobInput({
+    action: "describe",
+    url: "https://www.linkedin.com/developers/apps/new",
+    useCurrentPage: true,
+  })
+  assert.equal(described.ok, true)
+  if (described.ok) assert.equal(described.value.useCurrentPage, true)
+
+  assert.equal(
+    validateBrowserJobInput({
+      action: "inspect",
+      url: "https://www.linkedin.com/developers/apps/new",
+      useCurrentPage: true,
+    }).ok,
+    false,
+  )
+})
+
 test("browser credential actions accept only safe secret references and never accept a raw value", () => {
   const capture = validateBrowserJobInput({
     action: "capture_secret",
@@ -89,4 +108,5 @@ test("Browser Agent planner forbids model-visible raw credentials and routes sec
   assert.match(source, /fill_secret/)
   assert.match(source, /Never use inspect or screenshot to obtain credentials/)
   assert.match(source, /looksLikeRawSecret/)
+  assert.match(source, /selectorLooksCredentialSensitive/)
 })
