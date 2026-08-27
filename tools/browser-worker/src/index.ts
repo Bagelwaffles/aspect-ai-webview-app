@@ -5,9 +5,11 @@ import path from "node:path"
 import process from "node:process"
 import readline from "node:readline/promises"
 
-import { chromium, type BrowserContext, type Page } from "playwright-core"
+import { chromium, type BrowserContext, type Locator, type Page } from "playwright-core"
 
-const VERSION = "1.1.0"
+import { LocalSecretVault } from "./local-secret-vault.js"
+
+const VERSION = "1.2.0"
 const appRoot = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "AMS", "BrowserWorker")
 const credentialsPath = path.join(appRoot, "credentials.json")
 const profilePath = path.join(appRoot, "EdgeProfile")
@@ -18,6 +20,7 @@ const MAX_OLD_LOGS = 5
 const MAX_UPLOAD_BYTES = 200 * 1024 * 1024
 const SAFE_UPLOAD_FILENAME = /^[A-Za-z0-9][A-Za-z0-9._() -]{0,159}$/
 const SAFE_UPLOAD_EXTENSION = /\.(png|jpe?g|webp|gif|pdf|csv|txt|zip|aab|apk)$/i
+const secretVault = new LocalSecretVault()
 
 interface Credentials {
   baseUrl: string
@@ -27,7 +30,7 @@ interface Credentials {
 
 interface BrowserJob {
   id: string
-  action: "open" | "inspect" | "screenshot" | "click" | "fill" | "upload" | "submit"
+  action: "open" | "inspect" | "screenshot" | "click" | "fill" | "upload" | "capture_secret" | "submit"
   url: string
   selector?: string
   value?: string
@@ -207,7 +210,7 @@ function isReadOnlyAction(action: BrowserJob["action"]) {
 }
 
 function isInteractiveAction(action: BrowserJob["action"]) {
-  return action === "click" || action === "fill" || action === "upload" || action === "submit"
+  return action === "click" || action === "fill" || action === "upload" || action === "capture_secret" || action === "submit"
 }
 
 function isClosedBrowserError(error: unknown) {
@@ -281,6 +284,19 @@ async function uploadFile(page: Page, selector: string, fileName: string) {
   await page.waitForTimeout(500)
 }
 
+async function secretValueFrom(locator: Locator): Promise<string> {
+  const inputValue = await locator.inputValue({ timeout: 15_000 }).catch(() => "")
+  if (inputValue.trim()) return inputValue
+
+  const valueAttribute = await locator.getAttribute("value", { timeout: 5_000 }).catch(() => null)
+  if (valueAttribute?.trim()) return valueAttribute
+
+  const text = await locator.textContent({ timeout: 5_000 }).catch(() => null)
+  if (text?.trim()) return text
+
+  throw new Error("SECRET_VALUE_EMPTY")
+}
+
 async function detectOwnerAction(page: Page): Promise<OwnerAction | null> {
   const text = (await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "")).toLowerCase()
   const url = page.url().toLowerCase()
@@ -301,6 +317,7 @@ async function execute(page: Page, job: BrowserJob) {
   let text: string | undefined
   let captureBase64: string | undefined
   let captureSha256: string | undefined
+  let secretHandle: string | undefined
 
   if (job.action === "inspect") {
     text = (await page.locator("body").innerText({ timeout: 10_000 })).slice(0, 20_000)
@@ -321,12 +338,19 @@ async function execute(page: Page, job: BrowserJob) {
 
   if (job.action === "fill") {
     if (!job.selector || job.value === undefined) throw new Error("fill requires selector and value")
-    await locatorFor(page, job.selector).fill(job.value, { timeout: 15_000 })
+    const value = secretVault.isHandle(job.value) ? secretVault.resolve(job.value) : job.value
+    await locatorFor(page, job.selector).fill(value, { timeout: 15_000 })
   }
 
   if (job.action === "upload") {
     if (!job.selector || !job.value) throw new Error("upload requires selector and filename")
     await uploadFile(page, job.selector, job.value)
+  }
+
+  if (job.action === "capture_secret") {
+    if (!job.selector) throw new Error("capture_secret requires a selector")
+    const value = await secretValueFrom(locatorFor(page, job.selector))
+    secretHandle = secretVault.capture(value)
   }
 
   const finalOwnerAction = await detectOwnerAction(page)
@@ -338,6 +362,7 @@ async function execute(page: Page, job: BrowserJob) {
     text,
     captureBase64,
     captureSha256,
+    secretHandle,
     durationMs: Date.now() - started,
   }
 }
@@ -352,8 +377,10 @@ async function run() {
   log("AMS Browser Worker started. Close this process or use the AMS emergency stop to prevent new jobs.")
   log(`Dedicated profile: ${profilePath}`)
   log(`Approved local upload folder: ${uploadRoot}`)
+  log("API secrets captured by Browser Control stay only in volatile worker memory and expire automatically.")
 
   process.on("SIGINT", async () => {
+    secretVault.clear()
     if (session) await session.context.close().catch(() => undefined)
     process.exit(0)
   })
