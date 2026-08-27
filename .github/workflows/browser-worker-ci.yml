@@ -38,3 +38,16 @@ jobs:
       - name: Typecheck browser worker
         working-directory: tools/browser-worker
         run: npm run typecheck
+
+      - name: Build browser worker with TypeScript compiler
+        working-directory: tools/browser-worker
+        run: npm run build
+
+      - name: Reject transpiler helper leakage into browser callbacks
+        working-directory: tools/browser-worker
+        shell: bash
+        run: |
+          if grep -q '__name(' dist/index.js; then
+            echo 'Compiled worker contains esbuild __name helper; page.evaluate callbacks may fail in browser context.' >&2
+            exit 1
+          fi
