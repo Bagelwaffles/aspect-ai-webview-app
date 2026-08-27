@@ -126,7 +126,10 @@ export async function publishSocialChannel(
   record: SocialCampaignRecord,
   channel: SocialChannel,
 ): Promise<SocialPublisherResult> {
-  if (!record.approvedAt || !["approved", "publishing", "partial"].includes(record.status)) {
+  if (
+    !record.approvedAt ||
+    !["approved", "publishing", "partial", "failed"].includes(record.status)
+  ) {
     return {
       channel,
       status: "failed",
