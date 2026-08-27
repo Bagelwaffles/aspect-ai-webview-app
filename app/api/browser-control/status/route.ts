@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { browserAdminAuthorized, getBrowserControlSnapshot } from "@/lib/server/browser-control"
+import { browserKillSwitchEnabled } from "@/lib/server/browser-kill-switch"
 
 export const dynamic = "force-dynamic"
 
@@ -10,5 +11,10 @@ export async function GET(request: NextRequest) {
   }
 
   const snapshot = await getBrowserControlSnapshot()
-  return NextResponse.json(snapshot, { headers: { "Cache-Control": "no-store" } })
+  const killSwitch = snapshot.configured ? await browserKillSwitchEnabled() : true
+  return NextResponse.json({
+    ...snapshot,
+    killSwitch,
+    worker: snapshot.worker ? { ...snapshot.worker, online: snapshot.worker.online && !killSwitch } : null,
+  }, { headers: { "Cache-Control": "no-store" } })
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { browserAdminAuthorized, setBrowserKillSwitch } from "@/lib/server/browser-control"
+import { browserAdminAuthorized } from "@/lib/server/browser-control"
+import { setVerifiedBrowserKillSwitch } from "@/lib/server/browser-kill-switch"
 
 export async function POST(request: NextRequest) {
   if (!(await browserAdminAuthorized(request))) {
@@ -13,8 +14,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await setBrowserKillSwitch(body.disabled)
-    return NextResponse.json({ ok: true, disabled: body.disabled })
+    const disabled = await setVerifiedBrowserKillSwitch(body.disabled)
+    return NextResponse.json({ ok: true, disabled })
   } catch (error) {
     const message = error instanceof Error ? error.message : "kill_switch_failed"
     return NextResponse.json({ error: message }, { status: message === "BROWSER_CONTROL_STORAGE_UNAVAILABLE" ? 503 : 500 })
