@@ -404,7 +404,6 @@ export async function processCreditTopupReversal(input: {
     pack: pack.slug,
     units: pack.units,
     source,
-    targetUnits,
     ...reconciliation,
   }
 }
