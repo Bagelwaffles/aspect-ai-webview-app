@@ -26,6 +26,7 @@ export type StructuredAgentDefinition<
   id: string
   version: string
   model: string
+  fallbackModels?: string[]
   inputSchema: TInputSchema
   outputSchema: TOutputSchema
   system: string
@@ -46,6 +47,14 @@ export async function runStructuredAgent<
   }
 
   const parsedInput = definition.inputSchema.parse(input)
+  const fallbackModels = Array.from(
+    new Set(
+      (definition.fallbackModels ?? [])
+        .map((model) => model.trim())
+        .filter((model) => model && model !== definition.model),
+    ),
+  ).slice(0, 4)
+
   const result = await generateText({
     model: definition.model,
     output: Output.object({ schema: definition.outputSchema }),
@@ -53,6 +62,15 @@ export async function runStructuredAgent<
     prompt: definition.buildPrompt(parsedInput),
     temperature: definition.temperature ?? 0.4,
     maxOutputTokens: definition.maxOutputTokens ?? 1_200,
+    ...(fallbackModels.length > 0
+      ? {
+          providerOptions: {
+            gateway: {
+              models: fallbackModels,
+            },
+          },
+        }
+      : {}),
   })
 
   return definition.outputSchema.parse(result.output)
