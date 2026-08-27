@@ -9,6 +9,7 @@ type Job = {
   action: BrowserAction
   url: string
   selector?: string
+  secretRef?: string
   risk: BrowserRisk
   status: string
   createdAt: string
@@ -43,7 +44,8 @@ type Snapshot = {
 }
 
 const EMPTY: Snapshot = { configured: false, killSwitch: true, worker: null, jobs: [], audit: [] }
-const INTERACTIVE_ACTIONS: BrowserAction[] = ["click", "fill", "upload", "submit"]
+const INTERACTIVE_ACTIONS: BrowserAction[] = ["click", "fill", "upload", "capture_secret", "fill_secret", "submit"]
+const SECRET_ACTIONS: BrowserAction[] = ["capture_secret", "fill_secret"]
 
 function badgeClasses(value: string) {
   if (["online", "succeeded", "green", "queued"].includes(value)) return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
@@ -62,6 +64,7 @@ export default function BrowserControlPage() {
   const [url, setUrl] = useState("https://www.aspectmarketingsolutions.app/collaborate")
   const [selector, setSelector] = useState("")
   const [value, setValue] = useState("")
+  const [secretRef, setSecretRef] = useState("")
   const [useCurrentPage, setUseCurrentPage] = useState(false)
 
   const refresh = useCallback(async () => {
@@ -96,6 +99,7 @@ export default function BrowserControlPage() {
     const payload: Record<string, string | boolean> = { action, url }
     if (selector) payload.selector = selector
     if (action === "fill" || action === "upload") payload.value = value
+    if (SECRET_ACTIONS.includes(action) && secretRef) payload.secretRef = secretRef
     if (useCurrentPage && INTERACTIVE_ACTIONS.includes(action)) payload.useCurrentPage = true
     const response = await fetch("/api/browser-control/jobs", {
       method: "POST",
@@ -115,6 +119,7 @@ export default function BrowserControlPage() {
     setAction("screenshot")
     setUrl("https://www.aspectmarketingsolutions.app/collaborate")
     setSelector("")
+    setSecretRef("")
     setUseCurrentPage(false)
     const response = await fetch("/api/browser-control/jobs", {
       method: "POST",
@@ -147,6 +152,7 @@ export default function BrowserControlPage() {
 
   const workerState = snapshot.worker?.online ? "online" : "offline"
   const interactiveAction = INTERACTIVE_ACTIONS.includes(action)
+  const secretAction = SECRET_ACTIONS.includes(action)
 
   return (
     <main className="min-h-screen bg-[#050711] px-4 py-8 text-slate-100 md:px-8">
@@ -156,7 +162,7 @@ export default function BrowserControlPage() {
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-300">AMS // Browser Control</p>
               <h1 className="mt-3 text-4xl font-black tracking-tight md:text-6xl">Give AMS a safe pair of hands.</h1>
-              <p className="mt-4 max-w-3xl text-slate-400">Owner-controlled browser automation with a dedicated Windows profile, one-time pairing, heartbeat proof, domain allowlists, approvals, captures, audit history, and an emergency stop.</p>
+              <p className="mt-4 max-w-3xl text-slate-400">Owner-controlled browser automation with a dedicated Windows profile, one-time pairing, heartbeat proof, domain allowlists, approvals, captures, audit history, a local encrypted credential vault, and an emergency stop.</p>
             </div>
             <div className={`rounded-full border px-4 py-2 text-sm font-bold uppercase tracking-wider ${badgeClasses(workerState)}`}>
               {workerState === "online" ? "● Worker Online" : "○ Worker Offline"}
@@ -222,6 +228,7 @@ export default function BrowserControlPage() {
               <p className="font-bold text-slate-200">Windows install path:</p>
               <code className="mt-2 block break-all">tools/browser-worker/install.ps1</code>
               <p className="mt-2">Approved upload folder: <code>%LOCALAPPDATA%\AMS\BrowserWorker\Uploads</code></p>
+              <p className="mt-2">Credential vault: Windows DPAPI CurrentUser encryption. Raw secret values never cross the Browser Control API.</p>
             </div>
           </article>
 
@@ -249,6 +256,7 @@ export default function BrowserControlPage() {
                   const nextAction = event.target.value as BrowserAction
                   setAction(nextAction)
                   if (!INTERACTIVE_ACTIONS.includes(nextAction)) setUseCurrentPage(false)
+                  if (!SECRET_ACTIONS.includes(nextAction)) setSecretRef("")
                 }}
                 className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3"
               >
@@ -273,6 +281,20 @@ export default function BrowserControlPage() {
                   className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3"
                 />
                 {action === "upload" ? <span className="mt-1 block text-xs font-normal text-slate-500">File must already be in %LOCALAPPDATA%\AMS\BrowserWorker\Uploads. The worker never accepts arbitrary local paths.</span> : null}
+              </label>
+            ) : null}
+            {secretAction ? (
+              <label className="text-sm font-semibold text-slate-300">Secret reference
+                <input
+                  value={secretRef}
+                  onChange={(event) => setSecretRef(event.target.value)}
+                  placeholder="linkedin.client_secret"
+                  autoComplete="off"
+                  className="mt-2 w-full rounded-xl border border-rose-400/30 bg-slate-900 px-4 py-3"
+                />
+                <span className="mt-1 block text-xs font-normal text-rose-200/70">
+                  This is only a label. The raw credential is captured or filled locally on the Windows worker and is never returned to this dashboard, chat, logs, Redis, or screenshots.
+                </span>
               </label>
             ) : null}
             {interactiveAction ? (
@@ -302,6 +324,7 @@ export default function BrowserControlPage() {
                   <strong className="text-sm uppercase">{job.action}</strong>
                 </div>
                 <p className="mt-3 break-all text-xs text-slate-400">{job.url}</p>
+                {job.secretRef ? <p className="mt-2 text-xs text-rose-200">Credential reference: <code>{job.secretRef}</code> · raw value never stored by AMS</p> : null}
                 {job.result?.title ? <p className="mt-3 text-sm"><span className="text-slate-500">Title:</span> {job.result.title}</p> : null}
                 {job.result?.ownerAction ? (
                   <p className="mt-3 text-sm text-amber-200">
@@ -328,7 +351,7 @@ export default function BrowserControlPage() {
           </div>
         </section>
 
-        <p className="pb-8 text-center text-xs text-slate-600">{loading ? "Checking browser control…" : "AMS Browser Control v1.1 · multi-step forms with owner control"}</p>
+        <p className="pb-8 text-center text-xs text-slate-600">{loading ? "Checking browser control…" : "AMS Browser Control v1.2 · multi-step forms + local encrypted credential vault"}</p>
       </div>
     </main>
   )
