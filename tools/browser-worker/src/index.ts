@@ -31,7 +31,7 @@ interface Credentials {
 
 interface BrowserJob {
   id: string
-  action: "open" | "inspect" | "screenshot" | "click" | "fill" | "upload" | "capture_secret" | "fill_secret" | "submit"
+  action: "open" | "describe" | "inspect" | "screenshot" | "click" | "fill" | "upload" | "capture_secret" | "fill_secret" | "submit"
   url: string
   selector?: string
   value?: string
@@ -278,7 +278,7 @@ async function ensureSession(session: BrowserSession | null): Promise<BrowserSes
 }
 
 function isReadOnlyAction(action: BrowserJob["action"]) {
-  return action === "open" || action === "inspect" || action === "screenshot"
+  return action === "open" || action === "describe" || action === "inspect" || action === "screenshot"
 }
 
 function isInteractiveAction(action: BrowserJob["action"]) {
@@ -370,6 +370,54 @@ async function fillSecret(page: Page, selector: string, secretRef: string) {
   await locatorFor(page, selector).fill(rawSecret, { timeout: 15_000 })
 }
 
+async function describePage(page: Page) {
+  const description = await page.evaluate(() => {
+    const clean = (value: string | null | undefined) => (value || "").replace(/\s+/g, " ").trim().slice(0, 160)
+    const labelFor = (element: Element) => {
+      if (!(element instanceof HTMLElement)) return ""
+      const aria = clean(element.getAttribute("aria-label"))
+      if (aria) return aria
+      const id = element.id
+      if (id) {
+        const label = document.querySelector(`label[for="${CSS.escape(id)}"]`)
+        const labelText = clean(label?.textContent)
+        if (labelText) return labelText
+      }
+      const parentLabel = element.closest("label")
+      return clean(parentLabel?.textContent)
+    }
+
+    const headings = Array.from(document.querySelectorAll("h1,h2,h3"))
+      .slice(0, 30)
+      .map((element) => clean(element.textContent))
+      .filter(Boolean)
+
+    const controls = Array.from(document.querySelectorAll("input,textarea,select,button,a,[role='button']"))
+      .slice(0, 200)
+      .map((element) => {
+        const html = element as HTMLElement
+        const input = element instanceof HTMLInputElement ? element : null
+        return {
+          tag: element.tagName.toLowerCase(),
+          type: input?.type || undefined,
+          name: clean(element.getAttribute("name")) || undefined,
+          id: clean(html.id) || undefined,
+          label: labelFor(element) || undefined,
+          placeholder: clean(element.getAttribute("placeholder")) || undefined,
+          role: clean(element.getAttribute("role")) || undefined,
+          text: input || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement
+            ? undefined
+            : clean(element.textContent) || undefined,
+          href: element instanceof HTMLAnchorElement ? clean(element.getAttribute("href")) || undefined : undefined,
+          disabled: "disabled" in element ? Boolean((element as HTMLButtonElement).disabled) : undefined,
+        }
+      })
+
+    return { headings, controls }
+  })
+  return JSON.stringify(description).slice(0, 20_000)
+}
+
 async function detectOwnerAction(page: Page): Promise<OwnerAction | null> {
   const text = (await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "")).toLowerCase()
   const url = page.url().toLowerCase()
@@ -391,6 +439,10 @@ async function execute(page: Page, job: BrowserJob) {
   let captureBase64: string | undefined
   let captureSha256: string | undefined
   let secretRef: string | undefined
+
+  if (job.action === "describe") {
+    text = await describePage(page)
+  }
 
   if (job.action === "inspect") {
     text = (await page.locator("body").innerText({ timeout: 10_000 })).slice(0, 20_000)
