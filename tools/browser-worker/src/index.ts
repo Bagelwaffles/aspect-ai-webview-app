@@ -8,7 +8,7 @@ import readline from "node:readline/promises"
 
 import { chromium, type BrowserContext, type Page } from "playwright-core"
 
-const VERSION = "1.2.0"
+const VERSION = "1.3.0"
 const appRoot = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "AMS", "BrowserWorker")
 const credentialsPath = path.join(appRoot, "credentials.json")
 const profilePath = path.join(appRoot, "EdgeProfile")
@@ -31,7 +31,7 @@ interface Credentials {
 
 interface BrowserJob {
   id: string
-  action: "open" | "describe" | "inspect" | "screenshot" | "click" | "fill" | "upload" | "capture_secret" | "fill_secret" | "submit"
+  action: "open" | "describe" | "inspect" | "screenshot" | "focus_browser" | "click" | "fill" | "upload" | "capture_secret" | "fill_secret" | "submit"
   url: string
   selector?: string
   value?: string
@@ -277,8 +277,33 @@ async function ensureSession(session: BrowserSession | null): Promise<BrowserSes
   return newSession()
 }
 
+async function focusBrowserWindow(page: Page) {
+  await page.bringToFront()
+  if (process.platform !== "win32") return
+
+  const escapedProfile = profilePath.replace(/'/g, "''")
+  const script = [
+    "$ErrorActionPreference='Stop'",
+    `$profile='${escapedProfile}'`,
+    "$shell=New-Object -ComObject WScript.Shell",
+    "$candidates=Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'msedge.exe' -or $_.Name -eq 'chrome.exe') -and $_.CommandLine -and $_.CommandLine.Contains($profile) }",
+    "$activated=$false",
+    "foreach($candidate in $candidates){ $p=Get-Process -Id $candidate.ProcessId -ErrorAction SilentlyContinue; if($p -and $p.MainWindowHandle -ne 0){ if($shell.AppActivate($p.Id)){ $activated=$true; break } } }",
+    "if(-not $activated){ exit 2 }",
+  ].join("; ")
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+      windowsHide: true,
+      stdio: ["ignore", "ignore", "ignore"],
+    })
+    child.on("error", () => reject(new Error("BROWSER_FOCUS_UNAVAILABLE")))
+    child.on("close", (code) => code === 0 ? resolve() : reject(new Error("BROWSER_FOCUS_FAILED")))
+  })
+}
+
 function isReadOnlyAction(action: BrowserJob["action"]) {
-  return action === "open" || action === "describe" || action === "inspect" || action === "screenshot"
+  return action === "open" || action === "describe" || action === "inspect" || action === "screenshot" || action === "focus_browser"
 }
 
 function isInteractiveAction(action: BrowserJob["action"]) {
@@ -435,6 +460,16 @@ async function detectOwnerAction(page: Page): Promise<OwnerAction | null> {
 
 async function execute(page: Page, job: BrowserJob) {
   const started = Date.now()
+
+  if (job.action === "focus_browser") {
+    await focusBrowserWindow(page)
+    return {
+      title: (await page.title()).slice(0, 500),
+      finalUrl: page.url(),
+      durationMs: Date.now() - started,
+    }
+  }
+
   await preparePage(page, job)
   const ownerAction = await detectOwnerAction(page)
   if (ownerAction) throw new OwnerActionRequired(ownerAction, `Owner action required: ${ownerAction}`)
