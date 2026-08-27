@@ -7,6 +7,20 @@ import {
   getBrowserControlSnapshot,
 } from "@/lib/server/browser-control"
 
+function sanitizeUrlForModel(rawUrl?: string) {
+  if (!rawUrl) return undefined
+  try {
+    const url = new URL(rawUrl)
+    url.username = ""
+    url.password = ""
+    url.search = ""
+    url.hash = ""
+    return url.toString()
+  } catch {
+    return undefined
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!(await browserAdminAuthorized(request))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
@@ -22,13 +36,13 @@ export async function POST(request: NextRequest) {
     if (snapshot.killSwitch) return NextResponse.json({ error: "BROWSER_CONTROL_DISABLED" }, { status: 423 })
 
     const contextJob = snapshot.jobs.find((job) => job.status === "succeeded" && job.result?.finalUrl)
-    const currentUrl = contextJob?.result?.finalUrl
+    const currentUrl = sanitizeUrlForModel(contextJob?.result?.finalUrl)
     const currentTitle = contextJob?.result?.title
     const descriptionJob = snapshot.jobs.find((job) =>
       job.action === "describe" &&
       job.status === "succeeded" &&
       Boolean(job.result?.text) &&
-      (!currentUrl || job.result?.finalUrl === currentUrl),
+      (!currentUrl || sanitizeUrlForModel(job.result?.finalUrl) === currentUrl),
     )
 
     const planned = await planBrowserOperator({
@@ -39,7 +53,7 @@ export async function POST(request: NextRequest) {
       recentJobs: snapshot.jobs.slice(0, 8).map((job) => ({
         action: job.action,
         status: job.status,
-        url: job.url,
+        url: sanitizeUrlForModel(job.url) || "https://www.aspectmarketingsolutions.app/",
         error: job.error,
       })),
     })
