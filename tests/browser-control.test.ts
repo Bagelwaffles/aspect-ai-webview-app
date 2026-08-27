@@ -1,11 +1,92 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
+import { NextRequest } from "next/server"
+
 import {
   isAllowedBrowserUrl,
   riskForBrowserAction,
   validateBrowserJobInput,
 } from "../lib/browser-control-policy"
+import {
+  __setBrowserControlRedisForTests,
+  approveBrowserJob,
+  authenticateBrowserWorker,
+  claimBrowserJob,
+  completeBrowserJob,
+  createBrowserJob,
+  createBrowserPairingCode,
+  getBrowserControlSnapshot,
+  pairBrowserWorker,
+  setBrowserKillSwitch,
+  type BrowserJob,
+} from "../lib/server/browser-control"
+import { POST as postBrowserWorkerResult } from "../app/api/browser-control/worker/result/route"
+
+class MemoryRedis {
+  store = new Map<string, unknown>()
+  lists = new Map<string, unknown[]>()
+
+  async get<T>(key: string): Promise<T | null> {
+    return (this.store.get(key) as T | undefined) ?? null
+  }
+
+  async set(key: string, value: unknown): Promise<"OK"> {
+    this.store.set(key, value)
+    return "OK"
+  }
+
+  async del(key: string): Promise<number> {
+    const deleted = this.store.delete(key) ? 1 : 0
+    this.lists.delete(key)
+    return deleted
+  }
+
+  async lpush(key: string, value: unknown): Promise<number> {
+    const list = this.lists.get(key) ?? []
+    list.unshift(value)
+    this.lists.set(key, list)
+    return list.length
+  }
+
+  async rpush(key: string, value: unknown): Promise<number> {
+    const list = this.lists.get(key) ?? []
+    list.push(value)
+    this.lists.set(key, list)
+    return list.length
+  }
+
+  async lpop<T>(key: string): Promise<T | null> {
+    const list = this.lists.get(key) ?? []
+    const value = list.shift()
+    this.lists.set(key, list)
+    return (value as T | undefined) ?? null
+  }
+
+  async lrange<T>(key: string, start: number, stop: number): Promise<T[]> {
+    const list = this.lists.get(key) ?? []
+    const normalizedStop = stop < 0 ? list.length + stop : stop
+    return list.slice(start, normalizedStop + 1) as T[]
+  }
+
+  async ltrim(key: string, start: number, stop: number): Promise<"OK"> {
+    const list = this.lists.get(key) ?? []
+    const normalizedStop = stop < 0 ? list.length + stop : stop
+    this.lists.set(key, list.slice(start, normalizedStop + 1))
+    return "OK"
+  }
+}
+
+function useMemoryRedis() {
+  const redis = new MemoryRedis()
+  __setBrowserControlRedisForTests(redis as never)
+  return redis
+}
+
+async function pairWorker() {
+  const { code } = await createBrowserPairingCode()
+  return pairBrowserWorker({ code, name: "Windows workstation", version: "test", platform: "win32", browser: "Edge" })
+}
 
 test("browser control classifies read-only and write actions by risk", () => {
   assert.equal(riskForBrowserAction("open"), "green")
@@ -20,8 +101,13 @@ test("browser control only accepts exact phase-1 allowlisted HTTPS hosts", () =>
   assert.equal(isAllowedBrowserUrl("https://www.aspectmarketingsolutions.app/collaborate"), true)
   assert.equal(isAllowedBrowserUrl("https://github.com/Bagelwaffles"), true)
   assert.equal(isAllowedBrowserUrl("https://www.fiverr.com/"), true)
+  assert.equal(isAllowedBrowserUrl("https://www.linkedin.com/developers/apps"), true)
+  assert.equal(isAllowedBrowserUrl("https://developers.facebook.com/apps/"), true)
+  assert.equal(isAllowedBrowserUrl("https://developers.pinterest.com/apps/"), true)
+  assert.equal(isAllowedBrowserUrl("https://console.cloud.google.com/apis/credentials"), true)
+  assert.equal(isAllowedBrowserUrl("https://play.google.com/console/"), true)
+  assert.equal(isAllowedBrowserUrl("https://vercel.com/kimberleyaversbiz-4131s-projects"), true)
   assert.equal(isAllowedBrowserUrl("https://dashboard.stripe.com/"), false)
-  assert.equal(isAllowedBrowserUrl("https://www.linkedin.com/"), false)
   assert.equal(isAllowedBrowserUrl("https://evil.example/"), false)
   assert.equal(isAllowedBrowserUrl("https://github.com.evil.example/"), false)
   assert.equal(isAllowedBrowserUrl("https://user:pass@github.com/"), false)
@@ -44,4 +130,192 @@ test("browser control validates selectors and fill values", () => {
     validateBrowserJobInput({ action: "fill", url: "https://www.aspectmarketingsolutions.app/", selector: "input" }).ok,
     false,
   )
+  const parsed = validateBrowserJobInput({
+    action: "inspect",
+    url: "https://www.aspectmarketingsolutions.app/",
+    idempotencyKey: "proof-test:2026-08-27",
+  })
+  assert.equal(parsed.ok, true)
+  if (parsed.ok) assert.equal(parsed.value.idempotencyKey, "proof-test:2026-08-27")
+  assert.equal(
+    validateBrowserJobInput({
+      action: "inspect",
+      url: "https://www.aspectmarketingsolutions.app/",
+      idempotencyKey: "not safe!",
+    }).ok,
+    false,
+  )
+})
+
+test("browser control pairs a worker with one-time code and authenticates bearer token", async () => {
+  useMemoryRedis()
+  try {
+    const { code } = await createBrowserPairingCode()
+    const paired = await pairBrowserWorker({ code, name: "AMS Worker" })
+    assert.ok(paired.workerId)
+    assert.ok(paired.token)
+    await assert.rejects(() => pairBrowserWorker({ code }), /INVALID_OR_EXPIRED_PAIRING_CODE/)
+
+    const request = new NextRequest("https://www.aspectmarketingsolutions.app/api/browser-control/worker/claim", {
+      headers: {
+        authorization: `Bearer ${paired.token}`,
+        "x-ams-worker-id": paired.workerId,
+      },
+    })
+    assert.equal(await authenticateBrowserWorker(request), paired.workerId)
+  } finally {
+    __setBrowserControlRedisForTests(null)
+  }
+})
+
+test("browser control approval gates and kill switch block new browser work", async () => {
+  useMemoryRedis()
+  try {
+    const { workerId } = await pairWorker()
+    const clickJob = await createBrowserJob({
+      action: "click",
+      url: "https://www.aspectmarketingsolutions.app/",
+      selector: "text=Pricing",
+    })
+    assert.equal(clickJob.status, "awaiting_approval")
+    assert.equal((await claimBrowserJob(workerId)).job, null)
+
+    const approved = await approveBrowserJob(clickJob.id)
+    assert.equal(approved.status, "queued")
+
+    await setBrowserKillSwitch(true)
+    assert.deepEqual(await claimBrowserJob(workerId), { disabled: true, job: null })
+    await assert.rejects(
+      () => createBrowserJob({ action: "inspect", url: "https://www.aspectmarketingsolutions.app/" }),
+      /BROWSER_CONTROL_DISABLED/,
+    )
+
+    await setBrowserKillSwitch(false)
+    const claimed = await claimBrowserJob(workerId)
+    assert.equal(claimed.disabled, false)
+    assert.equal(claimed.job?.id, clickJob.id)
+    assert.equal(claimed.job?.attemptCount, 1)
+  } finally {
+    __setBrowserControlRedisForTests(null)
+  }
+})
+
+test("browser control idempotency keys and result replay are duplicate safe", async () => {
+  useMemoryRedis()
+  try {
+    const { workerId } = await pairWorker()
+    const first = await createBrowserJob({
+      action: "inspect",
+      url: "https://www.aspectmarketingsolutions.app/",
+      idempotencyKey: "browser-proof:one",
+    })
+    const second = await createBrowserJob({
+      action: "inspect",
+      url: "https://www.aspectmarketingsolutions.app/",
+      idempotencyKey: "browser-proof:one",
+    })
+    assert.equal(second.id, first.id)
+
+    const claimed = await claimBrowserJob(workerId)
+    assert.equal(claimed.job?.id, first.id)
+
+    const completed = await completeBrowserJob(workerId, {
+      jobId: first.id,
+      ok: true,
+      title: "Aspect Marketing Solutions",
+      finalUrl: "https://www.aspectmarketingsolutions.app/",
+      text: "Aspect Marketing Solutions dashboard",
+    })
+    assert.equal(completed.status, "succeeded")
+
+    const replayed = await completeBrowserJob(workerId, {
+      jobId: first.id,
+      ok: true,
+      title: "Replay",
+    })
+    assert.equal(replayed.id, first.id)
+    assert.equal(replayed.result?.title, "Aspect Marketing Solutions")
+  } finally {
+    __setBrowserControlRedisForTests(null)
+  }
+})
+
+test("browser control recovers expired running jobs for worker restart safety", async () => {
+  const redis = useMemoryRedis()
+  try {
+    const { workerId } = await pairWorker()
+    const job = await createBrowserJob({ action: "inspect", url: "https://www.aspectmarketingsolutions.app/" })
+    const claimed = await claimBrowserJob(workerId)
+    assert.equal(claimed.job?.id, job.id)
+
+    const jobStorageKey = [...redis.store.keys()].find((key) => key.endsWith(`:job:${job.id}`))
+    assert.ok(jobStorageKey)
+    const staleJob = redis.store.get(jobStorageKey) as BrowserJob
+    redis.store.set(jobStorageKey, {
+      ...staleJob,
+      leaseExpiresAt: new Date(Date.now() - 1000).toISOString(),
+    })
+
+    const recovered = await claimBrowserJob(workerId)
+    assert.equal(recovered.job?.id, job.id)
+    assert.equal(recovered.job?.attemptCount, 2)
+  } finally {
+    __setBrowserControlRedisForTests(null)
+  }
+})
+
+test("browser control stores owner-action-required results without marking success", async () => {
+  useMemoryRedis()
+  try {
+    const { workerId } = await pairWorker()
+    const job = await createBrowserJob({ action: "inspect", url: "https://play.google.com/console/" })
+    const claimed = await claimBrowserJob(workerId)
+    assert.equal(claimed.job?.id, job.id)
+
+    const completed = await completeBrowserJob(workerId, {
+      jobId: job.id,
+      ok: false,
+      ownerAction: "mfa_required",
+      error: "Owner action required: mfa_required",
+    })
+    assert.equal(completed.status, "owner_action_required")
+    assert.equal(completed.result?.ownerAction, "mfa_required")
+
+    const snapshot = await getBrowserControlSnapshot()
+    assert.equal(snapshot.jobs[0]?.status, "owner_action_required")
+  } finally {
+    __setBrowserControlRedisForTests(null)
+  }
+})
+
+test("browser control worker result route preserves structured owner action", async () => {
+  useMemoryRedis()
+  try {
+    const { workerId, token } = await pairWorker()
+    const job = await createBrowserJob({ action: "inspect", url: "https://play.google.com/console/" })
+    const claimed = await claimBrowserJob(workerId)
+    assert.equal(claimed.job?.id, job.id)
+
+    const request = new NextRequest("https://www.aspectmarketingsolutions.app/api/browser-control/worker/result", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+        "x-ams-worker-id": workerId,
+      },
+      body: JSON.stringify({
+        jobId: job.id,
+        ok: false,
+        ownerAction: "captcha_required",
+        error: "Owner action required: captcha_required",
+      }),
+    })
+    const response = await postBrowserWorkerResult(request)
+    assert.equal(response.status, 200)
+    const body = await response.json()
+    assert.equal(body.job.status, "owner_action_required")
+    assert.equal(body.job.result.ownerAction, "captcha_required")
+  } finally {
+    __setBrowserControlRedisForTests(null)
+  }
 })

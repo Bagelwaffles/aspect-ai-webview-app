@@ -19,7 +19,10 @@ const KILL_SWITCH_KEY = `${PREFIX}:kill-switch`
 const PAIRING_TTL_SECONDS = 10 * 60
 const CAPTURE_TTL_SECONDS = 24 * 60 * 60
 const ONLINE_WINDOW_MS = 45_000
+const JOB_LEASE_MS = 2 * 60_000
+const JOB_TTL_SECONDS = 7 * 24 * 60 * 60
 const MAX_CAPTURE_BASE64 = 850_000
+let redisForTests: Redis | null = null
 
 export type BrowserJobStatus =
   | "awaiting_approval"
@@ -28,6 +31,7 @@ export type BrowserJobStatus =
   | "succeeded"
   | "failed"
   | "cancelled"
+  | "owner_action_required"
 
 export type BrowserWorkerRecord = {
   id: string
@@ -47,7 +51,15 @@ export type BrowserJobResult = {
   captureAvailable?: boolean
   captureSha256?: string
   durationMs?: number
+  ownerAction?: BrowserOwnerAction
 }
+
+export type BrowserOwnerAction =
+  | "login_required"
+  | "mfa_required"
+  | "captcha_required"
+  | "consent_required"
+  | "security_check_required"
 
 export type BrowserJob = BrowserJobInput & {
   id: string
@@ -56,8 +68,11 @@ export type BrowserJob = BrowserJobInput & {
   createdAt: string
   approvedAt?: string
   claimedAt?: string
+  leaseExpiresAt?: string
   completedAt?: string
   claimedBy?: string
+  attemptCount?: number
+  idempotencyKey?: string
   result?: BrowserJobResult
   error?: string
 }
@@ -78,7 +93,12 @@ export type BrowserControlSnapshot = {
   audit: BrowserAuditEvent[]
 }
 
+export function __setBrowserControlRedisForTests(redis: Redis | null) {
+  redisForTests = redis
+}
+
 function getRedis(): Redis {
+  if (redisForTests) return redisForTests
   const url = (process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL)?.trim()
   const token = (process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN)?.trim()
   if (!url || !token) throw new Error("BROWSER_CONTROL_STORAGE_UNAVAILABLE")
@@ -105,6 +125,10 @@ function captureKey(jobId: string) {
   return `${PREFIX}:capture:${jobId}`
 }
 
+function idempotencyKey(value: string) {
+  return `${PREFIX}:idempotency:${sha256(value)}`
+}
+
 function sha256(value: string) {
   return createHash("sha256").update(value, "utf8").digest("hex")
 }
@@ -123,7 +147,7 @@ function safeEqual(left: string, right: string) {
 }
 
 async function putJob(redis: Redis, job: BrowserJob) {
-  await redis.set(jobKey(job.id), job)
+  await redis.set(jobKey(job.id), job, { ex: JOB_TTL_SECONDS })
 }
 
 async function getJob(redis: Redis, id: string): Promise<BrowserJob | null> {
@@ -138,6 +162,36 @@ async function audit(redis: Redis, event: BrowserAuditEvent) {
 async function rememberJob(redis: Redis, id: string) {
   await redis.lpush(RECENT_JOBS_KEY, id)
   await redis.ltrim(RECENT_JOBS_KEY, 0, 49)
+}
+
+function isLeaseExpired(job: BrowserJob, now = Date.now()) {
+  return job.status === "running" && (!job.leaseExpiresAt || Date.parse(job.leaseExpiresAt) <= now)
+}
+
+async function recoverStaleRunningJobs(redis: Redis) {
+  const ids = await redis.lrange<string>(RECENT_JOBS_KEY, 0, 49)
+  const now = Date.now()
+  for (const id of ids) {
+    const job = await getJob(redis, id)
+    if (!job || !isLeaseExpired(job, now)) continue
+    const updated: BrowserJob = {
+      ...job,
+      status: "queued",
+      claimedAt: undefined,
+      claimedBy: undefined,
+      leaseExpiresAt: undefined,
+      error: "Worker lease expired before result was reported; job returned to queue.",
+    }
+    await putJob(redis, updated)
+    await redis.rpush(QUEUE_KEY, id)
+    await audit(redis, {
+      at: new Date().toISOString(),
+      type: "job.recovered",
+      detail: "Expired worker lease returned job to queue",
+      jobId: id,
+      workerId: job.claimedBy,
+    })
+  }
 }
 
 export async function browserAdminAuthorized(request: NextRequest): Promise<boolean> {
@@ -165,8 +219,8 @@ export async function pairBrowserWorker(input: {
 }): Promise<{ workerId: string; token: string }> {
   const redis = getRedis()
   const key = pairingKey(input.code)
-  const pairing = await redis.get<string>(key)
-  if (pairing !== "1") throw new Error("INVALID_OR_EXPIRED_PAIRING_CODE")
+  const pairing = await redis.get<string | number>(key)
+  if (pairing !== "1" && pairing !== 1) throw new Error("INVALID_OR_EXPIRED_PAIRING_CODE")
   await redis.del(key)
 
   const workerId = randomUUID()
@@ -227,6 +281,14 @@ export async function recordBrowserHeartbeat(
 
 export async function createBrowserJob(input: BrowserJobInput): Promise<BrowserJob> {
   const redis = getRedis()
+  if ((await redis.get<string>(KILL_SWITCH_KEY)) === "1") throw new Error("BROWSER_CONTROL_DISABLED")
+  if (input.idempotencyKey) {
+    const existingId = await redis.get<string>(idempotencyKey(input.idempotencyKey))
+    if (existingId) {
+      const existing = await getJob(redis, existingId)
+      if (existing) return existing
+    }
+  }
   const risk = riskForBrowserAction(input.action)
   const status: BrowserJobStatus = risk === "green" ? "queued" : "awaiting_approval"
   const job: BrowserJob = {
@@ -235,9 +297,11 @@ export async function createBrowserJob(input: BrowserJobInput): Promise<BrowserJ
     risk,
     status,
     createdAt: new Date().toISOString(),
+    attemptCount: 0,
   }
 
   await putJob(redis, job)
+  if (input.idempotencyKey) await redis.set(idempotencyKey(input.idempotencyKey), job.id, { ex: JOB_TTL_SECONDS })
   await rememberJob(redis, job.id)
   if (status === "queued") await redis.rpush(QUEUE_KEY, job.id)
   await audit(redis, {
@@ -251,6 +315,7 @@ export async function createBrowserJob(input: BrowserJobInput): Promise<BrowserJ
 
 export async function approveBrowserJob(id: string): Promise<BrowserJob> {
   const redis = getRedis()
+  if ((await redis.get<string>(KILL_SWITCH_KEY)) === "1") throw new Error("BROWSER_CONTROL_DISABLED")
   const job = await getJob(redis, id)
   if (!job) throw new Error("JOB_NOT_FOUND")
   if (job.status !== "awaiting_approval") throw new Error("JOB_NOT_AWAITING_APPROVAL")
@@ -265,6 +330,7 @@ export async function approveBrowserJob(id: string): Promise<BrowserJob> {
 export async function claimBrowserJob(workerId: string): Promise<{ disabled: boolean; job: BrowserJob | null }> {
   const redis = getRedis()
   if ((await redis.get<string>(KILL_SWITCH_KEY)) === "1") return { disabled: true, job: null }
+  await recoverStaleRunningJobs(redis)
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const id = await redis.lpop<string>(QUEUE_KEY)
@@ -272,8 +338,16 @@ export async function claimBrowserJob(workerId: string): Promise<{ disabled: boo
     const job = await getJob(redis, id)
     if (!job || job.status !== "queued") continue
 
-    const claimedAt = new Date().toISOString()
-    const updated: BrowserJob = { ...job, status: "running", claimedAt, claimedBy: workerId }
+    const now = Date.now()
+    const claimedAt = new Date(now).toISOString()
+    const updated: BrowserJob = {
+      ...job,
+      status: "running",
+      claimedAt,
+      claimedBy: workerId,
+      leaseExpiresAt: new Date(now + JOB_LEASE_MS).toISOString(),
+      attemptCount: (job.attemptCount ?? 0) + 1,
+    }
     await putJob(redis, updated)
 
     const worker = await redis.get<BrowserWorkerRecord>(workerKey(workerId))
@@ -297,12 +371,16 @@ export async function completeBrowserJob(
     durationMs?: number
     captureBase64?: string
     captureSha256?: string
+    ownerAction?: BrowserOwnerAction
   },
 ): Promise<BrowserJob> {
   const redis = getRedis()
   const job = await getJob(redis, input.jobId)
   if (!job) throw new Error("JOB_NOT_FOUND")
-  if (job.status !== "running" || job.claimedBy !== workerId) throw new Error("JOB_NOT_CLAIMED_BY_WORKER")
+  if (job.status !== "running" || job.claimedBy !== workerId) {
+    if (["succeeded", "failed", "owner_action_required", "cancelled"].includes(job.status) && job.claimedBy === workerId) return job
+    throw new Error("JOB_NOT_CLAIMED_BY_WORKER")
+  }
 
   let captureAvailable = false
   if (input.captureBase64 && input.captureBase64.length <= MAX_CAPTURE_BASE64 && /^[A-Za-z0-9+/=]+$/.test(input.captureBase64)) {
@@ -318,13 +396,16 @@ export async function completeBrowserJob(
     durationMs: Number.isFinite(input.durationMs) ? Math.max(0, Math.round(input.durationMs!)) : undefined,
     captureAvailable,
     captureSha256: input.captureSha256?.slice(0, 128),
+    ownerAction: input.ownerAction,
   }
+  const status: BrowserJobStatus = input.ownerAction ? "owner_action_required" : input.ok ? "succeeded" : "failed"
   const updated: BrowserJob = {
     ...job,
-    status: input.ok ? "succeeded" : "failed",
+    status,
     completedAt,
+    leaseExpiresAt: undefined,
     result,
-    error: input.ok ? undefined : input.error?.slice(0, 2000) || "Browser worker reported failure",
+    error: input.ok && !input.ownerAction ? undefined : input.error?.slice(0, 2000) || "Browser worker reported failure",
   }
 
   await putJob(redis, updated)
@@ -332,8 +413,8 @@ export async function completeBrowserJob(
   if (worker) await redis.set(workerKey(workerId), { ...worker, currentJobId: null, lastSeenAt: completedAt })
   await audit(redis, {
     at: completedAt,
-    type: input.ok ? "job.succeeded" : "job.failed",
-    detail: input.ok ? job.action : updated.error || "failed",
+    type: input.ownerAction ? "job.owner_action_required" : input.ok ? "job.succeeded" : "job.failed",
+    detail: input.ownerAction ? input.ownerAction : input.ok ? job.action : updated.error || "failed",
     jobId: job.id,
     workerId,
   })
@@ -368,6 +449,8 @@ export async function getBrowserControlSnapshot(): Promise<BrowserControlSnapsho
   } catch {
     return { configured: false, killSwitch: true, worker: null, jobs: [], audit: [] }
   }
+
+  await recoverStaleRunningJobs(redis)
 
   const [workerId, killSwitch, recentIds, auditEvents] = await Promise.all([
     redis.get<string>(PRIMARY_WORKER_KEY),

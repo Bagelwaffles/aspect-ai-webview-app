@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import process from "node:process"
@@ -11,6 +11,9 @@ const VERSION = "1.0.1"
 const appRoot = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "AMS", "BrowserWorker")
 const credentialsPath = path.join(appRoot, "credentials.json")
 const profilePath = path.join(appRoot, "EdgeProfile")
+const logRoot = path.join(appRoot, "logs")
+const MAX_LOG_BYTES = 1_000_000
+const MAX_OLD_LOGS = 5
 
 interface Credentials {
   baseUrl: string
@@ -24,6 +27,19 @@ interface BrowserJob {
   url: string
   selector?: string
   value?: string
+}
+
+type OwnerAction =
+  | "login_required"
+  | "mfa_required"
+  | "captcha_required"
+  | "consent_required"
+  | "security_check_required"
+
+class OwnerActionRequired extends Error {
+  constructor(public ownerAction: OwnerAction, message: string) {
+    super(message)
+  }
 }
 
 interface BrowserSession {
@@ -47,6 +63,42 @@ async function jsonRequest<T>(url: string, init: RequestInit): Promise<T> {
   const body = await response.json().catch(() => ({})) as Record<string, unknown>
   if (!response.ok) throw new Error(typeof body.error === "string" ? body.error : `HTTP_${response.status}`)
   return body as T
+}
+
+function redact(value: string) {
+  return value
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [redacted]")
+    .replace(/(token|secret|password|code|authorization)([\"':=\s]+)[^\"'\s,}]+/gi, "$1$2[redacted]")
+    .replace(/sk_(live|test)_[A-Za-z0-9]+/g, "sk_$1_[redacted]")
+    .replace(/pk_(live|test)_[A-Za-z0-9]+/g, "pk_$1_[redacted]")
+    .replace(/whsec_[A-Za-z0-9]+/g, "whsec_[redacted]")
+}
+
+async function rotateLogsIfNeeded() {
+  await mkdir(logRoot, { recursive: true })
+  const file = path.join(logRoot, "worker.log")
+  const info = await stat(file).catch(() => null)
+  if (info && info.size >= MAX_LOG_BYTES) {
+    await rename(file, path.join(logRoot, `worker-${Date.now()}.log`)).catch(() => undefined)
+  }
+  const oldLogs = (await readdir(logRoot).catch(() => []))
+    .filter((name) => /^worker-\d+\.log$/.test(name))
+    .sort()
+  for (const name of oldLogs.slice(0, Math.max(0, oldLogs.length - MAX_OLD_LOGS))) {
+    await unlink(path.join(logRoot, name)).catch(() => undefined)
+  }
+}
+
+function log(message: string) {
+  console.log(redact(message))
+}
+
+function warn(message: string) {
+  console.warn(redact(message))
+}
+
+function logError(message: string) {
+  console.error(redact(message))
 }
 
 async function pair() {
@@ -73,7 +125,7 @@ async function pair() {
 
   await mkdir(appRoot, { recursive: true })
   await writeFile(credentialsPath, JSON.stringify({ baseUrl, workerId: paired.workerId, token: paired.token }, null, 2), { mode: 0o600 })
-  console.log(`Paired worker ${paired.workerId}. The worker token was stored locally and was not printed.`)
+  log(`Paired worker ${paired.workerId}. The worker token was stored locally and was not printed.`)
 }
 
 async function credentials(): Promise<Credentials> {
@@ -100,7 +152,7 @@ async function launchContext(): Promise<BrowserContext> {
 
   for (const channel of channels) {
     try {
-      console.log(`Launching dedicated AMS browser profile with channel: ${channel}`)
+      log(`Launching dedicated AMS browser profile with channel: ${channel}`)
       return await chromium.launchPersistentContext(profilePath, {
         channel,
         headless: false,
@@ -138,7 +190,7 @@ function sessionIsUsable(session: BrowserSession | null) {
 async function ensureSession(session: BrowserSession | null): Promise<BrowserSession> {
   if (sessionIsUsable(session)) return session as BrowserSession
   if (session) await session.context.close().catch(() => undefined)
-  console.warn("AMS browser session was closed. Relaunching the dedicated profile.")
+  warn("AMS browser session was closed. Relaunching the dedicated profile.")
   return newSession()
 }
 
@@ -156,9 +208,38 @@ async function navigate(page: Page, url: string) {
   await page.waitForTimeout(500)
 }
 
+function locatorFor(page: Page, selector: string) {
+  const trimmed = selector.trim()
+  const match = /^(role|text|label|placeholder|testid)=(.+)$/i.exec(trimmed)
+  if (!match) return page.locator(trimmed).first()
+  const [, kind, value] = match
+  if (kind.toLowerCase() === "role") {
+    const roleMatch = /^([^:]+):(.+)$/.exec(value)
+    if (roleMatch) return page.getByRole(roleMatch[1] as never, { name: roleMatch[2] }).first()
+    return page.getByRole(value as never).first()
+  }
+  if (kind.toLowerCase() === "text") return page.getByText(value).first()
+  if (kind.toLowerCase() === "label") return page.getByLabel(value).first()
+  if (kind.toLowerCase() === "placeholder") return page.getByPlaceholder(value).first()
+  return page.getByTestId(value).first()
+}
+
+async function detectOwnerAction(page: Page): Promise<OwnerAction | null> {
+  const text = (await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "")).toLowerCase()
+  const url = page.url().toLowerCase()
+  if (/captcha|recaptcha|i'm not a robot|verify you are human/.test(text)) return "captcha_required"
+  if (/two-factor|two factor|2fa|mfa|verification code|authenticator|security code|approve this sign-in/.test(text)) return "mfa_required"
+  if (/consent|authorize app|allow access|permissions requested/.test(text)) return "consent_required"
+  if (/suspicious|security check|verify your identity|unusual activity/.test(text)) return "security_check_required"
+  if (/login|log in|sign in|signin|accounts.google.com|checkpoint/.test(url) || /sign in|log in|login required/.test(text)) return "login_required"
+  return null
+}
+
 async function execute(page: Page, job: BrowserJob) {
   const started = Date.now()
   await navigate(page, job.url)
+  const ownerAction = await detectOwnerAction(page)
+  if (ownerAction) throw new OwnerActionRequired(ownerAction, `Owner action required: ${ownerAction}`)
 
   let text: string | undefined
   let captureBase64: string | undefined
@@ -170,20 +251,24 @@ async function execute(page: Page, job: BrowserJob) {
 
   if (job.action === "screenshot") {
     const capture = await page.screenshot({ type: "png", fullPage: true })
-    captureSha256 = createHash("sha256").update(capture).digest("hex")
-    if (capture.byteLength <= 620_000) captureBase64 = capture.toString("base64")
+    const captureBuffer = Buffer.from(capture)
+    captureSha256 = createHash("sha256").update(captureBuffer).digest("hex")
+    if (captureBuffer.byteLength <= 620_000) captureBase64 = captureBuffer.toString("base64")
   }
 
   if (job.action === "click" || job.action === "submit") {
     if (!job.selector) throw new Error(`${job.action} requires a selector`)
-    await page.locator(job.selector).first().click({ timeout: 15_000 })
+    await locatorFor(page, job.selector).click({ timeout: 15_000 })
     await page.waitForTimeout(800)
   }
 
   if (job.action === "fill") {
     if (!job.selector || job.value === undefined) throw new Error("fill requires selector and value")
-    await page.locator(job.selector).first().fill(job.value, { timeout: 15_000 })
+    await locatorFor(page, job.selector).fill(job.value, { timeout: 15_000 })
   }
+
+  const finalOwnerAction = await detectOwnerAction(page)
+  if (finalOwnerAction) throw new OwnerActionRequired(finalOwnerAction, `Owner action required: ${finalOwnerAction}`)
 
   return {
     title: (await page.title()).slice(0, 500),
@@ -197,12 +282,13 @@ async function execute(page: Page, job: BrowserJob) {
 
 async function run() {
   const creds = await credentials()
+  await rotateLogsIfNeeded()
   let session: BrowserSession | null = await newSession()
   let currentJobId: string | null = null
   let lastHeartbeat = 0
 
-  console.log("AMS Browser Worker started. Close this process or use the AMS emergency stop to prevent new jobs.")
-  console.log(`Dedicated profile: ${profilePath}`)
+  log("AMS Browser Worker started. Close this process or use the AMS emergency stop to prevent new jobs.")
+  log(`Dedicated profile: ${profilePath}`)
 
   process.on("SIGINT", async () => {
     if (session) await session.context.close().catch(() => undefined)
@@ -241,7 +327,7 @@ async function run() {
 
       const job = claimed.job
       currentJobId = job.id
-      console.log(`[${job.id}] ${job.action} ${job.url}`)
+      log(`[${job.id}] ${job.action} ${job.url}`)
       const started = Date.now()
       try {
         session = await ensureSession(session)
@@ -250,7 +336,7 @@ async function run() {
           result = await execute(session.page, job)
         } catch (error) {
           if (!isReadOnlyAction(job.action) || !isClosedBrowserError(error)) throw error
-          console.warn(`[${job.id}] Browser closed during read-only job. Relaunching and retrying once.`)
+          warn(`[${job.id}] Browser closed during read-only job. Relaunching and retrying once.`)
           await session.context.close().catch(() => undefined)
           session = await newSession()
           result = await execute(session.page, job)
@@ -261,7 +347,7 @@ async function run() {
           headers: workerHeaders(creds),
           body: JSON.stringify({ jobId: job.id, ok: true, ...result }),
         })
-        console.log(`[${job.id}] PASS · ${result.title}`)
+        log(`[${job.id}] PASS · ${result.title}`)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         const finalUrl = session && !session.page.isClosed() ? session.page.url() : undefined
@@ -272,15 +358,22 @@ async function run() {
         await jsonRequest(`${creds.baseUrl}/api/browser-control/worker/result`, {
           method: "POST",
           headers: workerHeaders(creds),
-          body: JSON.stringify({ jobId: job.id, ok: false, error: message, durationMs: Date.now() - started, finalUrl }),
+          body: JSON.stringify({
+            jobId: job.id,
+            ok: false,
+            error: message,
+            ownerAction: error instanceof OwnerActionRequired ? error.ownerAction : undefined,
+            durationMs: Date.now() - started,
+            finalUrl,
+          }),
         }).catch(() => undefined)
-        console.error(`[${job.id}] FAIL · ${message}`)
+        logError(`[${job.id}] FAIL · ${message}`)
       } finally {
         currentJobId = null
         lastHeartbeat = 0
       }
     } catch (error) {
-      console.error(`Worker loop: ${error instanceof Error ? error.message : String(error)}`)
+      logError(`Worker loop: ${error instanceof Error ? error.message : String(error)}`)
       await sleep(5_000)
     }
   }

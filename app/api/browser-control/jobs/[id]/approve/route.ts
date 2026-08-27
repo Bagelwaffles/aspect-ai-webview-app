@@ -15,7 +15,7 @@ export async function POST(
     return NextResponse.json({ job: await approveBrowserJob(id) })
   } catch (error) {
     const message = error instanceof Error ? error.message : "approval_failed"
-    const status = message === "JOB_NOT_FOUND" ? 404 : message === "JOB_NOT_AWAITING_APPROVAL" ? 409 : 500
+    const status = message === "JOB_NOT_FOUND" ? 404 : message === "JOB_NOT_AWAITING_APPROVAL" ? 409 : message === "BROWSER_CONTROL_DISABLED" ? 423 : 500
     return NextResponse.json({ error: message }, { status })
   }
 }
