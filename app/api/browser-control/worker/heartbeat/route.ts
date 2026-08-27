@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { authenticateBrowserWorker, recordBrowserHeartbeat } from "@/lib/server/browser-control"
+import { browserKillSwitchEnabled } from "@/lib/server/browser-kill-switch"
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +18,8 @@ export async function POST(request: NextRequest) {
           ? body.currentJobId
           : undefined,
     })
-    return NextResponse.json({ ok: true, ...result })
+    const disabled = await browserKillSwitchEnabled()
+    return NextResponse.json({ ok: true, ...result, disabled })
   } catch (error) {
     const message = error instanceof Error ? error.message : "heartbeat_failed"
     return NextResponse.json({ error: message }, { status: message === "BROWSER_CONTROL_STORAGE_UNAVAILABLE" ? 503 : 500 })
