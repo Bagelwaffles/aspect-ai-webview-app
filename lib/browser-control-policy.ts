@@ -1,3 +1,8 @@
+import {
+  AMS_BROWSER_PROVIDER_SUFFIXES,
+  isAmsBrowserProviderHost,
+} from "./browser-control-host-registry"
+
 export const BROWSER_ACTIONS = [
   "open",
   "describe",
@@ -46,33 +51,10 @@ const SAFE_UPLOAD_FILENAME = /^[A-Za-z0-9][A-Za-z0-9._() -]{0,159}$/
 const SAFE_UPLOAD_EXTENSION = /\.(png|jpe?g|webp|gif|pdf|csv|txt|zip|aab|apk)$/i
 const SAFE_SECRET_REF = /^[A-Za-z0-9][A-Za-z0-9._:-]{2,79}$/
 
-// Keep browser control intentionally narrow. Add business sites one at a time only
-// after a dedicated onboarding/proof pass.
-export const DEFAULT_BROWSER_ALLOWED_HOSTS = [
-  "aspectmarketingsolutions.app",
-  "www.aspectmarketingsolutions.app",
-  "github.com",
-  "www.github.com",
-  "linkedin.com",
-  "www.linkedin.com",
-  "developer.linkedin.com",
-  "developers.linkedin.com",
-  "facebook.com",
-  "www.facebook.com",
-  "developers.facebook.com",
-  "instagram.com",
-  "www.instagram.com",
-  "pinterest.com",
-  "www.pinterest.com",
-  "developers.pinterest.com",
-  "youtube.com",
-  "www.youtube.com",
-  "console.cloud.google.com",
-  "play.google.com",
-  "vercel.com",
-  "fiverr.com",
-  "www.fiverr.com",
-] as const
+// Browser Control is provider-scoped rather than page-scoped. An approved provider
+// root covers every HTTPS path and provider-owned subdomain. Shared multi-tenant
+// hosting namespaces remain restricted by browser-control-host-registry.ts.
+export const DEFAULT_BROWSER_ALLOWED_HOSTS = [...AMS_BROWSER_PROVIDER_SUFFIXES] as const
 
 export function riskForBrowserAction(action: BrowserAction): BrowserRisk {
   return RISK_BY_ACTION[action]
@@ -84,13 +66,31 @@ export function parseBrowserAction(value: unknown): BrowserAction | null {
     : null
 }
 
+function normalizeConfiguredHost(value: string): string | null {
+  const trimmed = value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "")
+  if (!trimmed || trimmed.includes("/") || trimmed.includes(":") || trimmed.includes("@")) return null
+  if (!/^[a-z0-9.-]+$/.test(trimmed) || trimmed.startsWith(".") || trimmed.endsWith(".")) return null
+  return trimmed
+}
+
 export function browserAllowedHosts(configured = process.env.AMS_BROWSER_ALLOWED_HOSTS): string[] {
   const custom = configured
     ?.split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean)
+    .map(normalizeConfiguredHost)
+    .filter((value): value is string => Boolean(value)) ?? []
 
-  return custom?.length ? Array.from(new Set(custom)) : [...DEFAULT_BROWSER_ALLOWED_HOSTS]
+  // Configuration extends the AMS registry; it never silently replaces the safety
+  // defaults. This avoids production drift when an older env var is still present.
+  return Array.from(new Set([...DEFAULT_BROWSER_ALLOWED_HOSTS, ...custom]))
+}
+
+function matchesConfiguredDomain(hostname: string, configuredHosts?: string): boolean {
+  const custom = configuredHosts
+    ?.split(",")
+    .map(normalizeConfiguredHost)
+    .filter((value): value is string => Boolean(value)) ?? []
+
+  return custom.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`))
 }
 
 export function isAllowedBrowserUrl(rawUrl: string, configuredHosts?: string): boolean {
@@ -109,8 +109,8 @@ export function isAllowedBrowserUrl(rawUrl: string, configuredHosts?: string): b
     return false
   }
 
-  const hostname = url.hostname.toLowerCase()
-  return browserAllowedHosts(configuredHosts).includes(hostname)
+  const hostname = url.hostname.toLowerCase().replace(/\.$/, "")
+  return isAmsBrowserProviderHost(hostname) || matchesConfiguredDomain(hostname, configuredHosts)
 }
 
 export function validateBrowserJobInput(input: unknown): { ok: true; value: BrowserJobInput } | { ok: false; error: string } {
