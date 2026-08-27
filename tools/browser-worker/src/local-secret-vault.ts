@@ -1,8 +1,7 @@
-import { randomUUID } from "node:crypto"
-
 const DEFAULT_TTL_MS = 15 * 60_000
 const MAX_SECRET_CHARS = 32_768
 const HANDLE_PREFIX = "ams-secret-"
+const SAFE_HANDLE = /^ams-secret-[0-9a-f-]{36}$/i
 
 type SecretRecord = {
   value: string
@@ -15,14 +14,14 @@ export class LocalSecretVault {
 
   constructor(private readonly ttlMs = DEFAULT_TTL_MS) {}
 
-  capture(rawValue: string, uses = 3): string {
+  capture(rawValue: string, handle: string, uses = 3): string {
     const value = rawValue.trim()
     if (!value) throw new Error("SECRET_VALUE_EMPTY")
     if (value.length > MAX_SECRET_CHARS) throw new Error("SECRET_VALUE_TOO_LARGE")
+    if (!SAFE_HANDLE.test(handle)) throw new Error("SECRET_HANDLE_INVALID")
     if (!Number.isInteger(uses) || uses < 1 || uses > 10) throw new Error("SECRET_USE_COUNT_INVALID")
 
     this.prune()
-    const handle = `${HANDLE_PREFIX}${randomUUID()}`
     this.records.set(handle, {
       value,
       expiresAt: Date.now() + this.ttlMs,
@@ -51,7 +50,7 @@ export class LocalSecretVault {
   }
 
   isHandle(value: string): boolean {
-    return value.startsWith(HANDLE_PREFIX)
+    return SAFE_HANDLE.test(value.trim())
   }
 
   size(): number {
