@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { lstat, mkdir, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises"
 import os from "node:os"
@@ -7,17 +8,20 @@ import readline from "node:readline/promises"
 
 import { chromium, type BrowserContext, type Page } from "playwright-core"
 
-const VERSION = "1.1.0"
+const VERSION = "1.2.0"
 const appRoot = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "AMS", "BrowserWorker")
 const credentialsPath = path.join(appRoot, "credentials.json")
 const profilePath = path.join(appRoot, "EdgeProfile")
 const logRoot = path.join(appRoot, "logs")
 const uploadRoot = path.join(appRoot, "Uploads")
+const secretRoot = path.join(appRoot, "Secrets")
 const MAX_LOG_BYTES = 1_000_000
 const MAX_OLD_LOGS = 5
 const MAX_UPLOAD_BYTES = 200 * 1024 * 1024
+const MAX_SECRET_BYTES = 64 * 1024
 const SAFE_UPLOAD_FILENAME = /^[A-Za-z0-9][A-Za-z0-9._() -]{0,159}$/
 const SAFE_UPLOAD_EXTENSION = /\.(png|jpe?g|webp|gif|pdf|csv|txt|zip|aab|apk)$/i
+const SAFE_SECRET_REF = /^[A-Za-z0-9][A-Za-z0-9._:-]{2,79}$/
 
 interface Credentials {
   baseUrl: string
@@ -27,10 +31,11 @@ interface Credentials {
 
 interface BrowserJob {
   id: string
-  action: "open" | "inspect" | "screenshot" | "click" | "fill" | "upload" | "submit"
+  action: "open" | "inspect" | "screenshot" | "click" | "fill" | "upload" | "capture_secret" | "fill_secret" | "submit"
   url: string
   selector?: string
   value?: string
+  secretRef?: string
   useCurrentPage?: boolean
 }
 
@@ -106,6 +111,75 @@ function logError(message: string) {
   console.error(redact(message))
 }
 
+function sha256(value: string) {
+  return createHash("sha256").update(value, "utf8").digest("hex")
+}
+
+function safeSecretRef(secretRef: string) {
+  const value = secretRef.trim()
+  if (!SAFE_SECRET_REF.test(value)) throw new Error("SECRET_REF_NOT_ALLOWED")
+  return value
+}
+
+function secretPath(secretRef: string) {
+  return path.join(secretRoot, `${sha256(safeSecretRef(secretRef))}.dpapi`)
+}
+
+async function runPowerShellDpapi(mode: "protect" | "unprotect", input: string): Promise<string> {
+  if (process.platform !== "win32") throw new Error("SECRET_VAULT_WINDOWS_ONLY")
+  const protectScript = [
+    "$ErrorActionPreference='Stop'",
+    "$OutputEncoding = New-Object System.Text.UTF8Encoding($false)",
+    "$v=[Console]::In.ReadToEnd()",
+    "$b=[Text.Encoding]::UTF8.GetBytes($v)",
+    "$p=[Security.Cryptography.ProtectedData]::Protect($b,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser)",
+    "[Console]::Out.Write([Convert]::ToBase64String($p))",
+  ].join("; ")
+  const unprotectScript = [
+    "$ErrorActionPreference='Stop'",
+    "$OutputEncoding = New-Object System.Text.UTF8Encoding($false)",
+    "$v=[Console]::In.ReadToEnd()",
+    "$b=[Convert]::FromBase64String($v)",
+    "$p=[Security.Cryptography.ProtectedData]::Unprotect($b,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser)",
+    "[Console]::Out.Write([Text.Encoding]::UTF8.GetString($p))",
+  ].join("; ")
+  const script = mode === "protect" ? protectScript : unprotectScript
+
+  return new Promise((resolve, reject) => {
+    const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"],
+    })
+    const stdout: Buffer[] = []
+    let stderrLength = 0
+    child.stdout.on("data", (chunk: Buffer) => stdout.push(Buffer.from(chunk)))
+    child.stderr.on("data", (chunk: Buffer) => { stderrLength += chunk.length })
+    child.on("error", () => reject(new Error("SECRET_VAULT_DPAPI_UNAVAILABLE")))
+    child.on("close", (code) => {
+      if (code !== 0 || stderrLength > 0) return reject(new Error("SECRET_VAULT_DPAPI_FAILED"))
+      resolve(Buffer.concat(stdout).toString("utf8"))
+    })
+    child.stdin.end(input, "utf8")
+  })
+}
+
+async function saveSecret(secretRef: string, rawSecret: string) {
+  const normalizedRef = safeSecretRef(secretRef)
+  if (!rawSecret || Buffer.byteLength(rawSecret, "utf8") > MAX_SECRET_BYTES) throw new Error("SECRET_VALUE_INVALID")
+  await mkdir(secretRoot, { recursive: true })
+  const protectedValue = await runPowerShellDpapi("protect", rawSecret)
+  await writeFile(secretPath(normalizedRef), protectedValue, { encoding: "utf8", mode: 0o600 })
+}
+
+async function loadSecret(secretRef: string) {
+  const normalizedRef = safeSecretRef(secretRef)
+  const protectedValue = await readFile(secretPath(normalizedRef), "utf8").catch(() => "")
+  if (!protectedValue) throw new Error("SECRET_REF_NOT_FOUND")
+  const rawSecret = await runPowerShellDpapi("unprotect", protectedValue)
+  if (!rawSecret || Buffer.byteLength(rawSecret, "utf8") > MAX_SECRET_BYTES) throw new Error("SECRET_VALUE_INVALID")
+  return rawSecret
+}
+
 async function pair() {
   const baseUrl = normalizeBaseUrl(flag("--url") || "https://www.aspectmarketingsolutions.app")
   let code = flag("--code")?.trim()
@@ -153,6 +227,7 @@ async function launchContext(): Promise<BrowserContext> {
   await Promise.all([
     mkdir(profilePath, { recursive: true }),
     mkdir(uploadRoot, { recursive: true }),
+    mkdir(secretRoot, { recursive: true }),
   ])
   const requested = process.env.AMS_BROWSER_CHANNEL?.trim() || "msedge"
   const channels = Array.from(new Set([requested, "msedge", "chrome"]))
@@ -207,7 +282,7 @@ function isReadOnlyAction(action: BrowserJob["action"]) {
 }
 
 function isInteractiveAction(action: BrowserJob["action"]) {
-  return action === "click" || action === "fill" || action === "upload" || action === "submit"
+  return ["click", "fill", "upload", "capture_secret", "fill_secret", "submit"].includes(action)
 }
 
 function isClosedBrowserError(error: unknown) {
@@ -281,6 +356,20 @@ async function uploadFile(page: Page, selector: string, fileName: string) {
   await page.waitForTimeout(500)
 }
 
+async function captureSecret(page: Page, selector: string, secretRef: string) {
+  const locator = locatorFor(page, selector)
+  let rawSecret = await locator.inputValue({ timeout: 15_000 }).catch(() => "")
+  if (!rawSecret) rawSecret = (await locator.textContent({ timeout: 15_000 }).catch(() => "")) || ""
+  rawSecret = rawSecret.trim()
+  if (!rawSecret) throw new Error("SECRET_CAPTURE_EMPTY")
+  await saveSecret(secretRef, rawSecret)
+}
+
+async function fillSecret(page: Page, selector: string, secretRef: string) {
+  const rawSecret = await loadSecret(secretRef)
+  await locatorFor(page, selector).fill(rawSecret, { timeout: 15_000 })
+}
+
 async function detectOwnerAction(page: Page): Promise<OwnerAction | null> {
   const text = (await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "")).toLowerCase()
   const url = page.url().toLowerCase()
@@ -301,6 +390,7 @@ async function execute(page: Page, job: BrowserJob) {
   let text: string | undefined
   let captureBase64: string | undefined
   let captureSha256: string | undefined
+  let secretRef: string | undefined
 
   if (job.action === "inspect") {
     text = (await page.locator("body").innerText({ timeout: 10_000 })).slice(0, 20_000)
@@ -329,6 +419,18 @@ async function execute(page: Page, job: BrowserJob) {
     await uploadFile(page, job.selector, job.value)
   }
 
+  if (job.action === "capture_secret") {
+    if (!job.selector || !job.secretRef) throw new Error("capture_secret requires selector and secretRef")
+    await captureSecret(page, job.selector, job.secretRef)
+    secretRef = job.secretRef
+  }
+
+  if (job.action === "fill_secret") {
+    if (!job.selector || !job.secretRef) throw new Error("fill_secret requires selector and secretRef")
+    await fillSecret(page, job.selector, job.secretRef)
+    secretRef = job.secretRef
+  }
+
   const finalOwnerAction = await detectOwnerAction(page)
   if (finalOwnerAction) throw new OwnerActionRequired(finalOwnerAction, `Owner action required: ${finalOwnerAction}`)
 
@@ -338,6 +440,7 @@ async function execute(page: Page, job: BrowserJob) {
     text,
     captureBase64,
     captureSha256,
+    secretRef,
     durationMs: Date.now() - started,
   }
 }
@@ -352,6 +455,7 @@ async function run() {
   log("AMS Browser Worker started. Close this process or use the AMS emergency stop to prevent new jobs.")
   log(`Dedicated profile: ${profilePath}`)
   log(`Approved local upload folder: ${uploadRoot}`)
+  log(`Local credential vault: Windows DPAPI CurrentUser under ${secretRoot}`)
 
   process.on("SIGINT", async () => {
     if (session) await session.context.close().catch(() => undefined)
