@@ -1,6 +1,7 @@
 const DEFAULT_TTL_MS = 15 * 60_000
 const MAX_SECRET_CHARS = 32_768
 const HANDLE_PREFIX = "ams-secret-"
+const DEFAULT_HANDLE = `${HANDLE_PREFIX}00000000-0000-4000-8000-000000000001`
 const SAFE_HANDLE = /^ams-secret-[0-9a-f-]{36}$/i
 
 type SecretRecord = {
@@ -14,7 +15,7 @@ export class LocalSecretVault {
 
   constructor(private readonly ttlMs = DEFAULT_TTL_MS) {}
 
-  capture(rawValue: string, handle: string, uses = 3): string {
+  capture(rawValue: string, handle = DEFAULT_HANDLE, uses = 3): string {
     const value = rawValue.trim()
     if (!value) throw new Error("SECRET_VALUE_EMPTY")
     if (value.length > MAX_SECRET_CHARS) throw new Error("SECRET_VALUE_TOO_LARGE")
@@ -67,3 +68,4 @@ export class LocalSecretVault {
 }
 
 export const SECRET_HANDLE_PREFIX = HANDLE_PREFIX
+export const DEFAULT_SECRET_HANDLE = DEFAULT_HANDLE
