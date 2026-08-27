@@ -1,4 +1,14 @@
-export const BROWSER_ACTIONS = ["open", "inspect", "screenshot", "click", "fill", "upload", "submit"] as const
+export const BROWSER_ACTIONS = [
+  "open",
+  "inspect",
+  "screenshot",
+  "click",
+  "fill",
+  "upload",
+  "capture_secret",
+  "fill_secret",
+  "submit",
+] as const
 
 export type BrowserAction = (typeof BROWSER_ACTIONS)[number]
 export type BrowserRisk = "green" | "yellow" | "red"
@@ -8,6 +18,7 @@ export type BrowserJobInput = {
   url: string
   selector?: string
   value?: string
+  secretRef?: string
   note?: string
   idempotencyKey?: string
   useCurrentPage?: boolean
@@ -20,15 +31,18 @@ const RISK_BY_ACTION: Record<BrowserAction, BrowserRisk> = {
   click: "yellow",
   fill: "yellow",
   upload: "red",
+  capture_secret: "red",
+  fill_secret: "red",
   submit: "red",
 }
 
-const INTERACTIVE_ACTIONS: BrowserAction[] = ["click", "fill", "upload", "submit"]
+const INTERACTIVE_ACTIONS: BrowserAction[] = ["click", "fill", "upload", "capture_secret", "fill_secret", "submit"]
 const SAFE_UPLOAD_FILENAME = /^[A-Za-z0-9][A-Za-z0-9._() -]{0,159}$/
 const SAFE_UPLOAD_EXTENSION = /\.(png|jpe?g|webp|gif|pdf|csv|txt|zip|aab|apk)$/i
+const SAFE_SECRET_REF = /^[A-Za-z0-9][A-Za-z0-9._:-]{2,79}$/
 
-// Phase-1 perimeter: keep browser control intentionally narrow.
-// Add business sites one at a time only after a dedicated onboarding/proof pass.
+// Keep browser control intentionally narrow. Add business sites one at a time only
+// after a dedicated onboarding/proof pass.
 export const DEFAULT_BROWSER_ALLOWED_HOSTS = [
   "aspectmarketingsolutions.app",
   "www.aspectmarketingsolutions.app",
@@ -107,6 +121,8 @@ export function validateBrowserJobInput(input: unknown): { ok: true; value: Brow
 
   const selector = typeof candidate.selector === "string" ? candidate.selector.trim().slice(0, 500) : undefined
   let value = typeof candidate.value === "string" ? candidate.value.slice(0, 5000) : undefined
+  const rawSecretRef = typeof candidate.secretRef === "string" ? candidate.secretRef.trim() : undefined
+  const secretRef = rawSecretRef?.slice(0, 80)
   const note = typeof candidate.note === "string" ? candidate.note.trim().slice(0, 500) : undefined
   const idempotencyKey = typeof candidate.idempotencyKey === "string" ? candidate.idempotencyKey.trim().slice(0, 160) : undefined
   const useCurrentPage = candidate.useCurrentPage === true
@@ -128,6 +144,12 @@ export function validateBrowserJobInput(input: unknown): { ok: true; value: Brow
       return { ok: false, error: "upload filename must be a safe local filename with an approved extension" }
     }
   }
+  if (action === "capture_secret" || action === "fill_secret") {
+    if (!secretRef || !SAFE_SECRET_REF.test(secretRef)) {
+      return { ok: false, error: `${action} requires a safe secretRef (3-80 characters)` }
+    }
+    value = undefined
+  }
 
   if (idempotencyKey && !/^[A-Za-z0-9._:-]{8,160}$/.test(idempotencyKey)) {
     return { ok: false, error: "idempotencyKey must be 8-160 safe characters" }
@@ -140,6 +162,7 @@ export function validateBrowserJobInput(input: unknown): { ok: true; value: Brow
       url: candidate.url,
       selector,
       value,
+      secretRef,
       note,
       idempotencyKey,
       useCurrentPage: useCurrentPage || undefined,
