@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { validateBrowserJobInput } from "@/lib/browser-control-policy"
 import { browserAdminAuthorized, createBrowserJob } from "@/lib/server/browser-control"
+import { browserKillSwitchEnabled } from "@/lib/server/browser-kill-switch"
 
 export async function POST(request: NextRequest) {
   if (!(await browserAdminAuthorized(request))) {
@@ -13,6 +14,9 @@ export async function POST(request: NextRequest) {
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 })
 
   try {
+    if (await browserKillSwitchEnabled()) {
+      return NextResponse.json({ error: "BROWSER_CONTROL_DISABLED" }, { status: 423 })
+    }
     return NextResponse.json({ job: await createBrowserJob(parsed.value) }, { status: 201 })
   } catch (error) {
     const message = error instanceof Error ? error.message : "job_creation_failed"
