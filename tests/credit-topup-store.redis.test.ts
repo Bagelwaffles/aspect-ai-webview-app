@@ -11,7 +11,8 @@ import {
   reconcileCreditTopupReversal,
 } from "../lib/server/credit-topup-store"
 
-const integrationEnabled = process.env.AMS_REDIS_INTEGRATION === "1"
+const reconciliationCi = process.env.GITHUB_WORKFLOW === "AMS Reconciliation CI"
+const integrationEnabled = process.env.AMS_REDIS_INTEGRATION === "1" || reconciliationCi
 
 function hash(value: string) {
   return createHash("sha256").update(value).digest("hex")
@@ -21,10 +22,14 @@ test(
   "real Redis top-up grant and refund/dispute reconciliation are idempotent",
   { skip: integrationEnabled ? false : "set AMS_REDIS_INTEGRATION=1 to run" },
   async () => {
-    const url = process.env.UPSTASH_REDIS_REST_URL?.trim()
+    const url =
+      process.env.UPSTASH_REDIS_REST_URL?.trim() ||
+      (reconciliationCi ? "http://127.0.0.1:8079" : "")
     const token = (
-      process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.AMS_STAGING_REDIS_REST_TOKEN
-    )?.trim()
+      process.env.UPSTASH_REDIS_REST_TOKEN ??
+      process.env.AMS_STAGING_REDIS_REST_TOKEN ??
+      (reconciliationCi ? "ci-only-redis-rest-token" : "")
+    ).trim()
     assert.ok(url, "UPSTASH_REDIS_REST_URL is required")
     assert.ok(token, "a Redis REST token is required")
 
