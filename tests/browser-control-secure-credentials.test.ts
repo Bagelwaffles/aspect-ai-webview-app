@@ -29,13 +29,12 @@ test("sanitized describe can inspect the current live form without reloading it"
   )
 })
 
-test("browser credential actions accept only safe secret references and never accept a raw value", () => {
+test("browser credential actions accept only safe secret references and reject raw values outright", () => {
   const capture = validateBrowserJobInput({
     action: "capture_secret",
     url: "https://www.linkedin.com/developers/apps/example/auth",
     selector: "label=Client secret",
     secretRef: "linkedin.client_secret",
-    value: "must-never-cross-control-plane",
     useCurrentPage: true,
   })
   assert.equal(capture.ok, true)
@@ -45,6 +44,18 @@ test("browser credential actions accept only safe secret references and never ac
     assert.equal(capture.value.useCurrentPage, true)
   }
 
+  assert.equal(
+    validateBrowserJobInput({
+      action: "capture_secret",
+      url: "https://www.linkedin.com/developers/apps/example/auth",
+      selector: "label=Client secret",
+      secretRef: "linkedin.client_secret",
+      value: "must-never-cross-control-plane",
+      useCurrentPage: true,
+    }).ok,
+    false,
+  )
+
   const fill = validateBrowserJobInput({
     action: "fill_secret",
     url: "https://vercel.com/example/project/settings/environment-variables",
@@ -53,6 +64,18 @@ test("browser credential actions accept only safe secret references and never ac
     useCurrentPage: true,
   })
   assert.equal(fill.ok, true)
+
+  assert.equal(
+    validateBrowserJobInput({
+      action: "fill_secret",
+      url: "https://vercel.com/example/project/settings/environment-variables",
+      selector: "input[name='value']",
+      secretRef: "linkedin.client_secret",
+      value: "must-never-cross-control-plane",
+      useCurrentPage: true,
+    }).ok,
+    false,
+  )
 
   assert.equal(
     validateBrowserJobInput({
