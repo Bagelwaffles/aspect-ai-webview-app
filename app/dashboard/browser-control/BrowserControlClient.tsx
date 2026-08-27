@@ -43,7 +43,8 @@ type Snapshot = {
 }
 
 const EMPTY: Snapshot = { configured: false, killSwitch: true, worker: null, jobs: [], audit: [] }
-const INTERACTIVE_ACTIONS: BrowserAction[] = ["click", "fill", "upload", "submit"]
+const INTERACTIVE_ACTIONS: BrowserAction[] = ["click", "fill", "upload", "capture_secret", "submit"]
+const DEFAULT_SECRET_HANDLE = "ams-secret-00000000-0000-4000-8000-000000000001"
 
 function badgeClasses(value: string) {
   if (["online", "succeeded", "green", "queued"].includes(value)) return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
@@ -156,7 +157,7 @@ export default function BrowserControlPage() {
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-300">AMS // Browser Control</p>
               <h1 className="mt-3 text-4xl font-black tracking-tight md:text-6xl">Give AMS a safe pair of hands.</h1>
-              <p className="mt-4 max-w-3xl text-slate-400">Owner-controlled browser automation with a dedicated Windows profile, one-time pairing, heartbeat proof, domain allowlists, approvals, captures, audit history, and an emergency stop.</p>
+              <p className="mt-4 max-w-3xl text-slate-400">Owner-controlled browser automation with a dedicated Windows profile, one-time pairing, heartbeat proof, domain allowlists, approvals, captures, audit history, local-only API secret handoff, and an emergency stop.</p>
             </div>
             <div className={`rounded-full border px-4 py-2 text-sm font-bold uppercase tracking-wider ${badgeClasses(workerState)}`}>
               {workerState === "online" ? "● Worker Online" : "○ Worker Offline"}
@@ -269,11 +270,19 @@ export default function BrowserControlPage() {
                 <input
                   value={value}
                   onChange={(event) => setValue(event.target.value)}
-                  placeholder={action === "upload" ? "ams-logo.png" : undefined}
+                  placeholder={action === "upload" ? "ams-logo.png" : action === "fill" ? DEFAULT_SECRET_HANDLE : undefined}
                   className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3"
                 />
                 {action === "upload" ? <span className="mt-1 block text-xs font-normal text-slate-500">File must already be in %LOCALAPPDATA%\AMS\BrowserWorker\Uploads. The worker never accepts arbitrary local paths.</span> : null}
+                {action === "fill" ? <span className="mt-1 block text-xs font-normal text-slate-500">For credentials captured locally, use the opaque handle shown below instead of the secret value.</span> : null}
               </label>
+            ) : null}
+            {action === "capture_secret" ? (
+              <div className="rounded-2xl border border-rose-400/25 bg-rose-400/5 p-4 text-sm text-rose-100">
+                <strong>Local-only credential capture.</strong>
+                <p className="mt-2 text-xs leading-5 text-rose-100/70">After owner approval, the selected field is read into volatile memory on the Windows worker. The value never enters AMS, Redis, logs, screenshots, or chat. Use this opaque handle in a later fill job:</p>
+                <code className="mt-2 block break-all text-xs text-rose-200">{DEFAULT_SECRET_HANDLE}</code>
+              </div>
             ) : null}
             {interactiveAction ? (
               <label className="flex items-start gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 p-4 text-sm text-amber-100 lg:col-span-2">
@@ -303,6 +312,7 @@ export default function BrowserControlPage() {
                 </div>
                 <p className="mt-3 break-all text-xs text-slate-400">{job.url}</p>
                 {job.result?.title ? <p className="mt-3 text-sm"><span className="text-slate-500">Title:</span> {job.result.title}</p> : null}
+                {job.action === "capture_secret" && job.status === "succeeded" ? <p className="mt-3 text-sm text-rose-200">Credential captured locally. Secret value was not returned to AMS.</p> : null}
                 {job.result?.ownerAction ? (
                   <p className="mt-3 text-sm text-amber-200">
                     Owner action required: {job.result.ownerAction.replaceAll("_", " ")}
@@ -328,7 +338,7 @@ export default function BrowserControlPage() {
           </div>
         </section>
 
-        <p className="pb-8 text-center text-xs text-slate-600">{loading ? "Checking browser control…" : "AMS Browser Control v1.1 · multi-step forms with owner control"}</p>
+        <p className="pb-8 text-center text-xs text-slate-600">{loading ? "Checking browser control…" : "AMS Browser Control v1.2 · multi-step forms + local-only credential handoff"}</p>
       </div>
     </main>
   )
