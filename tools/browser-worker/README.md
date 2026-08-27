@@ -1,6 +1,6 @@
-# AMS Browser Worker v1.1
+# AMS Browser Worker v1.2
 
-This is the workstation-side browser executor for AMS Browser Control.
+This is the workstation-side browser executor for AMS Browser Control and Browser Agent chat.
 
 ## Design
 
@@ -12,18 +12,24 @@ This is the workstation-side browser executor for AMS Browser Control.
 - Polls the AMS queue for approved jobs.
 - Does not accept arbitrary JavaScript execution.
 - Uses an explicit hostname allowlist enforced by the AMS server.
-- Green actions (`open`, `inspect`, `screenshot`) can queue immediately.
+- Green actions (`open`, `describe`, `inspect`, `screenshot`) can queue immediately.
 - Yellow actions (`click`, `fill`) require owner approval.
-- Red actions (`upload`, `submit`) require owner approval.
+- Red actions (`upload`, `capture_secret`, `fill_secret`, `submit`) require owner approval.
 - The AMS emergency stop prevents workers from claiming new jobs.
+
+## Browser Agent chat
+
+The protected Browser Agent page at `/dashboard/browser-control/operator` accepts natural-language goals and converts them into one safe Browser Control job at a time. The planner uses the same approval gates and allowlist as the advanced command queue.
+
+When the operator needs page structure, it uses `describe`, which returns headings and control metadata such as labels, roles, placeholders, names, and link text. It intentionally does **not** return input/textarea/select values. This lets the model reason about forms without receiving passwords, tokens, API keys, or other field values.
 
 ## Multi-step forms
 
-Interactive jobs can opt into **Use current page**. In this mode, the worker does not reload the target page before a `click`, `fill`, `upload`, or `submit` action. This preserves live form state across a sequence of approved jobs.
+Interactive jobs can opt into **Use current page**. In this mode, the worker does not reload the target page before a `click`, `fill`, `upload`, `capture_secret`, `fill_secret`, or `submit` action. This preserves live form state across a sequence of approved jobs.
 
 Safety rules:
 
-- Current-page mode is rejected for read-only `open`, `inspect`, and `screenshot` actions.
+- Current-page mode is rejected for read-only `open`, `describe`, `inspect`, and `screenshot` actions.
 - The worker verifies that the currently open page and the job URL have the same HTTPS origin before acting.
 - Current-page actions remain approval-gated according to their risk level.
 - CAPTCHA, MFA, security-check, login, and consent states still stop and return `owner_action_required`.
@@ -37,6 +43,21 @@ The worker can upload only files placed in:
 The dashboard sends only the filename (for example `ams-logo.png`), never an arbitrary local path. The worker rejects path traversal, symlinks, unsupported extensions, and files over 200 MB before calling the target site's file input.
 
 Approved extensions currently include PNG, JPEG, WebP, GIF, PDF, CSV, TXT, ZIP, AAB, and APK.
+
+## Local encrypted credential vault
+
+Approval-gated credential actions keep raw secrets off the AMS control plane:
+
+- `capture_secret`: reads the selected credential field locally and stores it under a non-secret reference such as `linkedin.client_secret`.
+- `fill_secret`: retrieves that reference locally and fills the selected destination field without sending the raw value through AMS.
+
+Vault files are stored under:
+
+`%LOCALAPPDATA%\AMS\BrowserWorker\Secrets`
+
+The value is encrypted with Windows DPAPI using `DataProtectionScope.CurrentUser`. Only the same Windows user context can decrypt it. The raw secret is passed to the DPAPI PowerShell helper over stdin, not on the process command line. Browser Control stores only the non-secret reference label in Redis/job history.
+
+Never paste passwords, API keys, OAuth tokens, client secrets, recovery codes, or MFA codes into Browser Agent chat. If a provider requires a credential to be revealed, the owner approves the reveal/capture browser action; the worker captures it locally.
 
 ## Install on Windows
 
@@ -61,9 +82,10 @@ Do not put website passwords, API keys, recovery codes, or payment details in so
 
 ## Local data
 
-- Credentials: `%LOCALAPPDATA%\AMS\BrowserWorker\credentials.json`
+- Pairing credentials: `%LOCALAPPDATA%\AMS\BrowserWorker\credentials.json`
 - Browser profile: `%LOCALAPPDATA%\AMS\BrowserWorker\EdgeProfile`
 - Safe uploads: `%LOCALAPPDATA%\AMS\BrowserWorker\Uploads`
+- DPAPI credential vault: `%LOCALAPPDATA%\AMS\BrowserWorker\Secrets`
 - Logs: `%LOCALAPPDATA%\AMS\BrowserWorker\logs\worker.log`
 
 ## Browser selection
