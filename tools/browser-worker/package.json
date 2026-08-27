@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "pair": "tsx src/index.ts pair",
-    "start": "tsx src/index.ts run",
+    "build": "tsc -p tsconfig.build.json",
+    "pair": "npm run build --silent && node dist/index.js pair",
+    "start": "npm run build --silent && node dist/index.js run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
