@@ -1,5 +1,6 @@
 export const BROWSER_ACTIONS = [
   "open",
+  "describe",
   "inspect",
   "screenshot",
   "click",
@@ -26,6 +27,7 @@ export type BrowserJobInput = {
 
 const RISK_BY_ACTION: Record<BrowserAction, BrowserRisk> = {
   open: "green",
+  describe: "green",
   inspect: "green",
   screenshot: "green",
   click: "yellow",
