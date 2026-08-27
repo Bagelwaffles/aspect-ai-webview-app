@@ -33,6 +33,11 @@ test(
     assert.ok(url, "UPSTASH_REDIS_REST_URL is required")
     assert.ok(token, "a Redis REST token is required")
 
+    const previousUrl = process.env.UPSTASH_REDIS_REST_URL
+    const previousToken = process.env.UPSTASH_REDIS_REST_TOKEN
+    process.env.UPSTASH_REDIS_REST_URL = url
+    process.env.UPSTASH_REDIS_REST_TOKEN = token
+
     const redis = new Redis({ url, token })
     const providerSubject = `credit-topup-redis-${randomUUID()}`
     const subjectCandidate = customerSubjectFromProviderSubject(providerSubject)
@@ -142,6 +147,10 @@ test(
       assert.equal(Number(await redis.get(balances.plan)), 100)
     } finally {
       await redis.del(...cleanupKeys)
+      if (previousUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL
+      else process.env.UPSTASH_REDIS_REST_URL = previousUrl
+      if (previousToken === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN
+      else process.env.UPSTASH_REDIS_REST_TOKEN = previousToken
     }
   },
 )
