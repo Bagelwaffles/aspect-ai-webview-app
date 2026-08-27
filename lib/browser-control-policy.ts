@@ -148,6 +148,9 @@ export function validateBrowserJobInput(input: unknown): { ok: true; value: Brow
     }
   }
   if (action === "capture_secret" || action === "fill_secret") {
+    if (candidate.value !== undefined) {
+      return { ok: false, error: `${action} never accepts a raw value; use secretRef only` }
+    }
     if (!secretRef || !SAFE_SECRET_REF.test(secretRef)) {
       return { ok: false, error: `${action} requires a safe secretRef (3-80 characters)` }
     }
