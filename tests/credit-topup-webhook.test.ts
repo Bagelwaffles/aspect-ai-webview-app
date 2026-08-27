@@ -12,9 +12,11 @@ import {
 } from "../lib/server/credit-topup-webhook"
 import type { EntitlementSnapshot } from "../lib/server/entitlements"
 
-const subject = customerSubjectFromProviderSubject("credit-topup-webhook")
-const otherSubject = customerSubjectFromProviderSubject("credit-topup-other")
-if (!subject || !otherSubject) throw new Error("Stable test subjects are required")
+const subjectCandidate = customerSubjectFromProviderSubject("credit-topup-webhook")
+const otherSubjectCandidate = customerSubjectFromProviderSubject("credit-topup-other")
+if (!subjectCandidate || !otherSubjectCandidate) throw new Error("Stable test subjects are required")
+const subject: string = subjectCandidate
+const otherSubject: string = otherSubjectCandidate
 
 function entitlement(status: EntitlementSnapshot["subscriptionStatus"]): EntitlementSnapshot {
   const active = status === "active" || status === "trialing"
