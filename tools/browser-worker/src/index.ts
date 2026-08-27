@@ -285,6 +285,10 @@ function isInteractiveAction(action: BrowserJob["action"]) {
   return ["click", "fill", "upload", "capture_secret", "fill_secret", "submit"].includes(action)
 }
 
+function isCurrentPageAction(action: BrowserJob["action"]) {
+  return action === "describe" || isInteractiveAction(action)
+}
+
 function isClosedBrowserError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
   return /target page, context or browser has been closed|browser has been closed|page has been closed/i.test(message)
@@ -310,7 +314,7 @@ async function preparePage(page: Page, job: BrowserJob) {
     await navigate(page, job.url)
     return
   }
-  if (!isInteractiveAction(job.action)) throw new Error("useCurrentPage is only allowed for interactive actions")
+  if (!isCurrentPageAction(job.action)) throw new Error("useCurrentPage is only allowed for describe or interactive actions")
 
   const currentOrigin = pageOrigin(page)
   const targetOrigin = new URL(job.url).origin
