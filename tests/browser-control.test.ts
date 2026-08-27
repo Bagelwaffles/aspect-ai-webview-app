@@ -98,21 +98,41 @@ test("browser control classifies read-only and write actions by risk", () => {
   assert.equal(riskForBrowserAction("submit"), "red")
 })
 
-test("browser control only accepts exact phase-1 allowlisted HTTPS hosts", () => {
+test("browser control accepts AMS provider domains while blocking lookalikes and shared-hosting wildcards", () => {
   assert.equal(isAllowedBrowserUrl("https://www.aspectmarketingsolutions.app/collaborate"), true)
   assert.equal(isAllowedBrowserUrl("https://github.com/Bagelwaffles"), true)
+  assert.equal(isAllowedBrowserUrl("https://docs.github.com/en/rest"), true)
   assert.equal(isAllowedBrowserUrl("https://www.fiverr.com/"), true)
   assert.equal(isAllowedBrowserUrl("https://www.linkedin.com/developers/apps"), true)
   assert.equal(isAllowedBrowserUrl("https://developer.linkedin.com"), true)
+  assert.equal(isAllowedBrowserUrl("https://learn.microsoft.com/en-us/linkedin/"), true)
   assert.equal(isAllowedBrowserUrl("https://developers.facebook.com/apps/"), true)
+  assert.equal(isAllowedBrowserUrl("https://business.facebook.com/"), true)
   assert.equal(isAllowedBrowserUrl("https://developers.pinterest.com/apps/"), true)
   assert.equal(isAllowedBrowserUrl("https://console.cloud.google.com/apis/credentials"), true)
+  assert.equal(isAllowedBrowserUrl("https://accounts.google.com/"), true)
   assert.equal(isAllowedBrowserUrl("https://play.google.com/console/"), true)
+  assert.equal(isAllowedBrowserUrl("https://studio.youtube.com/"), true)
   assert.equal(isAllowedBrowserUrl("https://vercel.com/kimberleyaversbiz-4131s-projects"), true)
-  assert.equal(isAllowedBrowserUrl("https://dashboard.stripe.com/"), false)
+  assert.equal(isAllowedBrowserUrl("https://dashboard.stripe.com/"), true)
+  assert.equal(isAllowedBrowserUrl("https://api.slack.com/apps"), true)
+  assert.equal(isAllowedBrowserUrl("https://www.reddit.com/prefs/apps"), true)
+  assert.equal(isAllowedBrowserUrl("https://developers.tiktok.com/"), true)
+  assert.equal(isAllowedBrowserUrl("https://aspect-ai-overlord-git-main-kimberleyaversbiz-4131s-projects.vercel.app/"), true)
+
   assert.equal(isAllowedBrowserUrl("https://evil.example/"), false)
   assert.equal(isAllowedBrowserUrl("https://github.com.evil.example/"), false)
+  assert.equal(isAllowedBrowserUrl("https://linkedin.com.evil.example/"), false)
+  assert.equal(isAllowedBrowserUrl("https://evil-linkedin.com/"), false)
+  assert.equal(isAllowedBrowserUrl("https://random-customer-project.vercel.app/"), false)
   assert.equal(isAllowedBrowserUrl("https://user:pass@github.com/"), false)
+})
+
+test("configured browser domains extend defaults and include their subdomains", () => {
+  assert.equal(isAllowedBrowserUrl("https://portal.example-ams-vendor.com/path", "example-ams-vendor.com"), true)
+  assert.equal(isAllowedBrowserUrl("https://deep.portal.example-ams-vendor.com/path", "example-ams-vendor.com"), true)
+  assert.equal(isAllowedBrowserUrl("https://example-ams-vendor.com.evil.example/", "example-ams-vendor.com"), false)
+  assert.equal(isAllowedBrowserUrl("https://dashboard.stripe.com/", "example-ams-vendor.com"), true)
 })
 
 test("browser control validates selectors, values, current-page mode, and safe upload filenames", () => {
