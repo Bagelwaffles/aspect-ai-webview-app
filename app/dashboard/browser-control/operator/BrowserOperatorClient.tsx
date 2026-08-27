@@ -12,7 +12,7 @@ type OperatorJob = {
   selector?: string
   secretRef?: string
   error?: string
-  result?: { ownerAction?: string }
+  result?: { ownerAction?: string; finalUrl?: string }
 }
 
 type ChatMessage = {
@@ -34,17 +34,25 @@ type WorkerSnapshot = {
 
 const MAX_AUTONOMOUS_STEPS = 30
 const CURRENT_PAGE_ORIGIN_MISMATCH = "CURRENT_PAGE_ORIGIN_MISMATCH"
+const STOP_COMMANDS = new Set(["stop", "pause", "halt", "stop browser", "stop browser agent", "pause browser", "pause browser agent"])
+const RESUME_COMMANDS = new Set(["resume", "resume browser", "resume browser agent", "continue browser agent", "unpause browser"])
+const SHOW_COMMANDS = new Set(["show browser", "show me the browser", "bring browser forward", "bring browser to front", "watch browser"])
+
+function normalizedCommand(value: string) {
+  return value.trim().toLowerCase().replace(/[.!?]+$/, "")
+}
 
 export default function BrowserOperatorClient() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       role: "assistant",
-      text: "Tell me the end goal. I will keep working through safe steps automatically and stop only when you need to approve an action, complete login/MFA/CAPTCHA/consent/security verification, resolve a failure, or when the goal is finished. I can securely capture and reuse credentials through the local encrypted Windows vault. Never paste a password, API key, token, or secret into this chat.",
+      text: "Tell me the end goal. I will keep working through safe steps automatically and stop only when you need to approve an action, complete login/MFA/CAPTCHA/consent/security verification, resolve a failure, or when the goal is finished. I can securely capture and reuse credentials through the local encrypted Windows vault. Type ‘show browser’ to bring the dedicated AMS browser forward, or ‘stop’ at any time to halt autonomous work. Never paste a password, API key, token, or secret into this chat.",
     },
   ])
   const [input, setInput] = useState("")
   const [busy, setBusy] = useState(false)
+  const [controlBusy, setControlBusy] = useState(false)
   const [rootGoal, setRootGoal] = useState("")
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [autoMode, setAutoMode] = useState(false)
@@ -120,11 +128,112 @@ export default function BrowserOperatorClient() {
     }
   }, [addMessage])
 
+  const setEmergencyStop = useCallback(async (disabled: boolean) => {
+    const response = await fetch("/api/browser-control/kill-switch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ disabled }),
+    })
+    const body = await response.json()
+    if (!response.ok) throw new Error(body.error || "Kill switch update failed")
+    await refresh()
+  }, [refresh])
+
+  const stopAgent = useCallback(async (showUser = false) => {
+    if (showUser) addMessage({ role: "user", text: "stop" })
+    setAutoMode(false)
+    setActiveJobId(null)
+    setControlBusy(true)
+    try {
+      await setEmergencyStop(true)
+      addMessage({
+        role: "assistant",
+        text: "STOPPED. Autonomous continuation is off and Browser Control is blocking new jobs. If a browser action was already in progress, that single action may finish, but I will not take another step until you Resume.",
+      })
+    } catch (error) {
+      addMessage({ role: "assistant", text: error instanceof Error ? error.message : "Could not stop Browser Control." })
+    } finally {
+      setControlBusy(false)
+    }
+  }, [addMessage, setEmergencyStop])
+
+  const resumeAgent = useCallback(async (showUser = false) => {
+    if (showUser) addMessage({ role: "user", text: "resume" })
+    setControlBusy(true)
+    try {
+      await setEmergencyStop(false)
+      addMessage({
+        role: "assistant",
+        text: rootGoal
+          ? "Browser Control is enabled again. Press Continue and I will resume the existing goal from the current page state."
+          : "Browser Control is enabled again. Send me the next goal when you are ready.",
+      })
+    } catch (error) {
+      addMessage({ role: "assistant", text: error instanceof Error ? error.message : "Could not resume Browser Control." })
+    } finally {
+      setControlBusy(false)
+    }
+  }, [addMessage, rootGoal, setEmergencyStop])
+
+  const showBrowser = useCallback(async (showUser = false) => {
+    if (showUser) addMessage({ role: "user", text: "show browser" })
+    if (snapshot.killSwitch) {
+      addMessage({ role: "assistant", text: "Browser Control is stopped. Resume it first, then I can bring the dedicated browser forward." })
+      return
+    }
+    if (!snapshot.worker?.online) {
+      addMessage({ role: "assistant", text: "The Browser Worker is offline, so I cannot bring its browser forward yet." })
+      return
+    }
+
+    const currentUrl = snapshot.jobs.find((job) => job.result?.finalUrl)?.result?.finalUrl
+      || snapshot.jobs[0]?.url
+      || "https://www.aspectmarketingsolutions.app/"
+
+    setControlBusy(true)
+    try {
+      const response = await fetch("/api/browser-control/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "focus_browser",
+          url: currentUrl,
+          note: "Browser Agent owner requested foreground monitoring",
+          idempotencyKey: `focus-browser:${Date.now()}`,
+        }),
+      })
+      const body = await response.json()
+      if (!response.ok) throw new Error(body.error || "Could not focus the dedicated browser")
+      addMessage({ role: "assistant", text: "Bringing the dedicated AMS browser to the foreground so you can monitor it.", job: body.job })
+      await refresh()
+    } catch (error) {
+      addMessage({ role: "assistant", text: error instanceof Error ? error.message : "Could not bring the browser forward." })
+    } finally {
+      setControlBusy(false)
+    }
+  }, [addMessage, refresh, snapshot.jobs, snapshot.killSwitch, snapshot.worker?.online])
+
   async function sendGoal(raw: string) {
     const message = raw.trim()
-    if (!message || busy) return
-    setRootGoal(message)
+    if (!message) return
     setInput("")
+    const command = normalizedCommand(message)
+    if (STOP_COMMANDS.has(command)) return stopAgent(true)
+    if (RESUME_COMMANDS.has(command)) return resumeAgent(true)
+    if (SHOW_COMMANDS.has(command)) return showBrowser(true)
+    if (busy) return
+    if (snapshot.killSwitch) {
+      addMessage({ role: "user", text: message })
+      addMessage({ role: "assistant", text: "Browser Control is stopped. Type ‘resume’ or press Resume before starting another browser goal." })
+      return
+    }
+    if (!snapshot.worker?.online) {
+      addMessage({ role: "user", text: message })
+      addMessage({ role: "assistant", text: "The Browser Worker is offline. I cannot start browser work until its heartbeat returns." })
+      return
+    }
+
+    setRootGoal(message)
     setAutoMode(true)
     setStepCount(0)
     setActiveJobId(null)
@@ -223,7 +332,14 @@ export default function BrowserOperatorClient() {
               <span className={`rounded-full border px-3 py-2 ${snapshot.worker?.online ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200" : "border-rose-400/30 bg-rose-400/10 text-rose-200"}`}>
                 {snapshot.worker?.online ? `● Worker ${snapshot.worker.version}` : "○ Worker offline"}
               </span>
-              {autoMode ? <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-cyan-200">● Auto-running</span> : null}
+              {snapshot.killSwitch ? <span className="rounded-full border border-rose-400/40 bg-rose-400/10 px-3 py-2 text-rose-200">■ STOPPED</span> : null}
+              {!snapshot.killSwitch && autoMode ? <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-cyan-200">● Auto-running</span> : null}
+              <button disabled={controlBusy || !canOperate} onClick={() => void showBrowser()} className="rounded-full border border-violet-400/30 bg-violet-400/10 px-3 py-2 text-violet-200 disabled:opacity-40">Show browser</button>
+              {snapshot.killSwitch ? (
+                <button disabled={controlBusy} onClick={() => void resumeAgent()} className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-emerald-200 disabled:opacity-40">Resume</button>
+              ) : (
+                <button disabled={controlBusy} onClick={() => void stopAgent()} className="rounded-full border border-rose-400/40 bg-rose-400/10 px-3 py-2 text-rose-200 disabled:opacity-40">STOP</button>
+              )}
               <Link href="/dashboard/browser-control" className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-slate-300">Advanced controls</Link>
             </div>
           </div>
@@ -259,19 +375,19 @@ export default function BrowserOperatorClient() {
         <section className="mt-4 rounded-3xl border border-slate-800 bg-slate-950 p-4 md:p-5">
           {!canOperate ? (
             <p className="mb-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 px-4 py-3 text-sm text-amber-100">
-              {!snapshot.worker?.online ? "Browser Worker is offline." : "Browser jobs are stopped by the emergency switch."}
+              {snapshot.killSwitch ? "Browser Agent is STOPPED. Type ‘resume’ or press Resume to allow browser jobs again." : "Browser Worker is offline."}
             </p>
           ) : null}
           <form onSubmit={submit} className="flex flex-col gap-3 md:flex-row">
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Example: Finish LinkedIn end to end. Create the AMS developer app, use ams-linkedin-logo.png, retrieve and securely store the credentials we need, configure Vercel, and stop only for my approval or security verification. Never expose raw credentials."
+              placeholder="Example: Finish LinkedIn end to end. Or type: show browser · stop · resume"
               rows={3}
               className="min-h-24 flex-1 resize-none rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm outline-none focus:border-cyan-400"
             />
             <div className="flex gap-2 md:w-44 md:flex-col">
-              <button disabled={busy || !input.trim() || !canOperate} type="submit" className="flex-1 rounded-2xl bg-cyan-300 px-4 py-3 font-black text-slate-950 disabled:opacity-40">Start goal</button>
+              <button disabled={busy || !input.trim()} type="submit" className="flex-1 rounded-2xl bg-cyan-300 px-4 py-3 font-black text-slate-950 disabled:opacity-40">Send</button>
               <button disabled={busy || !rootGoal || !canOperate} type="button" onClick={() => void continueGoal()} className="flex-1 rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 font-black text-slate-200 disabled:opacity-40">Continue</button>
             </div>
           </form>
