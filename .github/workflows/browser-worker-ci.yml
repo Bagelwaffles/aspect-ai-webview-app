@@ -1,0 +1,40 @@
+name: AMS Browser Worker CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/browser-worker/**"
+      - "lib/browser-control-policy.ts"
+      - "app/dashboard/browser-control/**"
+      - "tests/browser-control.test.ts"
+      - ".github/workflows/browser-worker-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ams-browser-worker-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install browser worker dependencies
+        working-directory: tools/browser-worker
+        run: npm ci
+
+      - name: Typecheck browser worker
+        working-directory: tools/browser-worker
+        run: npm run typecheck
