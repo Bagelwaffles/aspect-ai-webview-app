@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import {
   BROWSER_ACTIONS,
+  isAllowedBrowserUrl,
   validateBrowserJobInput,
   type BrowserJobInput,
 } from "@/lib/browser-control-policy"
@@ -101,7 +102,7 @@ const browserOperatorDefinition: StructuredAgentDefinition<
   typeof browserOperatorOutputSchema
 > = {
   id: "browser-operator",
-  version: "1.0.1",
+  version: "1.0.2",
   model: process.env.AMS_BROWSER_OPERATOR_MODEL?.trim() || "openai/gpt-5.4-mini",
   inputSchema: browserOperatorInputSchema,
   outputSchema: browserOperatorOutputSchema,
@@ -217,6 +218,23 @@ export async function planBrowserOperator(input: unknown): Promise<BrowserOperat
     note: `Browser Agent: ${proposal.rationale}`,
   })
   if (!validated.ok) {
+    if (
+      validated.error === "URL is not on the browser-control allowlist" &&
+      parsedInput.currentUrl &&
+      isAllowedBrowserUrl(parsedInput.currentUrl)
+    ) {
+      return {
+        reply: "That proposed destination is outside the approved provider registry. I will stay on the current trusted page, describe it safely, and continue from there.",
+        proposedJob: {
+          action: "describe",
+          url: parsedInput.currentUrl,
+          useCurrentPage: true,
+          rationale: "Recover from an untrusted planner destination by describing the current allowlisted page without leaving it.",
+        },
+        state: "ready",
+      }
+    }
+
     return {
       reply: `I could not safely queue that step: ${validated.error}. I need a sanitized page description or a more specific target before continuing.`,
       proposedJob: null,
