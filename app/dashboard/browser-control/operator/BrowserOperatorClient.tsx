@@ -32,14 +32,57 @@ type WorkerSnapshot = {
   jobs: OperatorJob[]
 }
 
+type PersistedOperatorRun = {
+  savedAt: number
+  rootGoal: string
+  messages: ChatMessage[]
+  activeJobId: string | null
+  stepCount: number
+}
+
 const MAX_AUTONOMOUS_STEPS = 30
 const CURRENT_PAGE_ORIGIN_MISMATCH = "CURRENT_PAGE_ORIGIN_MISMATCH"
+const OPERATOR_RUN_STORAGE_KEY = "ams.browser-operator.run.v1"
+const OPERATOR_RUN_MAX_AGE_MS = 12 * 60 * 60 * 1_000
+const MAX_PERSISTED_MESSAGES = 80
 const STOP_COMMANDS = new Set(["stop", "pause", "halt", "stop browser", "stop browser agent", "pause browser", "pause browser agent"])
 const RESUME_COMMANDS = new Set(["resume", "resume browser", "resume browser agent", "continue browser agent", "unpause browser"])
 const SHOW_COMMANDS = new Set(["show browser", "show me the browser", "bring browser forward", "bring browser to front", "watch browser"])
 
 function normalizedCommand(value: string) {
   return value.trim().toLowerCase().replace(/[.!?]+$/, "")
+}
+
+function readPersistedOperatorRun(raw: string): PersistedOperatorRun | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<PersistedOperatorRun>
+    if (
+      typeof parsed.savedAt !== "number" ||
+      typeof parsed.rootGoal !== "string" ||
+      !parsed.rootGoal.trim() ||
+      !Array.isArray(parsed.messages) ||
+      (parsed.activeJobId !== null && typeof parsed.activeJobId !== "string") ||
+      typeof parsed.stepCount !== "number"
+    ) return null
+
+    const messages = parsed.messages.filter((message): message is ChatMessage => Boolean(
+      message &&
+      typeof message === "object" &&
+      typeof message.id === "string" &&
+      (message.role === "user" || message.role === "assistant") &&
+      typeof message.text === "string",
+    )).slice(-MAX_PERSISTED_MESSAGES)
+
+    return {
+      savedAt: parsed.savedAt,
+      rootGoal: parsed.rootGoal.trim(),
+      messages,
+      activeJobId: parsed.activeJobId ?? null,
+      stepCount: Math.max(0, Math.min(MAX_AUTONOMOUS_STEPS, Math.floor(parsed.stepCount))),
+    }
+  } catch {
+    return null
+  }
 }
 
 export default function BrowserOperatorClient() {
@@ -57,9 +100,51 @@ export default function BrowserOperatorClient() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [autoMode, setAutoMode] = useState(false)
   const [stepCount, setStepCount] = useState(0)
+  const [hydrated, setHydrated] = useState(false)
+  const [recoveredRun, setRecoveredRun] = useState(false)
   const [snapshot, setSnapshot] = useState<WorkerSnapshot>({ killSwitch: false, worker: null, jobs: [] })
   const continuedJobs = useRef(new Set<string>())
   const announcedStops = useRef(new Set<string>())
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(OPERATOR_RUN_STORAGE_KEY)
+      if (!raw) return
+      const persisted = readPersistedOperatorRun(raw)
+      if (!persisted || Date.now() - persisted.savedAt > OPERATOR_RUN_MAX_AGE_MS) {
+        window.localStorage.removeItem(OPERATOR_RUN_STORAGE_KEY)
+        return
+      }
+
+      setRootGoal(persisted.rootGoal)
+      if (persisted.messages.length) setMessages(persisted.messages)
+      setActiveJobId(persisted.activeJobId)
+      setStepCount(persisted.stepCount)
+      setAutoMode(false)
+      setRecoveredRun(true)
+      continuedJobs.current.clear()
+      announcedStops.current.clear()
+    } finally {
+      setHydrated(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated) return
+    if (!rootGoal) {
+      window.localStorage.removeItem(OPERATOR_RUN_STORAGE_KEY)
+      return
+    }
+
+    const persisted: PersistedOperatorRun = {
+      savedAt: Date.now(),
+      rootGoal,
+      messages: messages.slice(-MAX_PERSISTED_MESSAGES),
+      activeJobId,
+      stepCount,
+    }
+    window.localStorage.setItem(OPERATOR_RUN_STORAGE_KEY, JSON.stringify(persisted))
+  }, [activeJobId, hydrated, messages, rootGoal, stepCount])
 
   const refresh = useCallback(async () => {
     const response = await fetch("/api/browser-control/status", { cache: "no-store" })
@@ -233,6 +318,7 @@ export default function BrowserOperatorClient() {
       return
     }
 
+    setRecoveredRun(false)
     setRootGoal(message)
     setAutoMode(true)
     setStepCount(0)
@@ -253,6 +339,7 @@ export default function BrowserOperatorClient() {
       const response = await fetch(`/api/browser-control/jobs/${job.id}/approve`, { method: "POST" })
       const body = await response.json()
       if (response.ok) {
+        setRecoveredRun(false)
         setAutoMode(true)
         setActiveJobId(job.id)
         addMessage({ role: "assistant", text: `Approved ${job.action}. I will continue automatically after the Windows worker finishes it.` })
@@ -268,6 +355,7 @@ export default function BrowserOperatorClient() {
 
   const continueGoal = useCallback(async () => {
     if (!rootGoal || busy || !canOperate) return
+    setRecoveredRun(false)
     setAutoMode(true)
     await callOperator(
       `Continue this goal: ${rootGoal}. Use the latest Browser Control job results and current page state. Do exactly one safe next step.`,
@@ -373,6 +461,11 @@ export default function BrowserOperatorClient() {
         </section>
 
         <section className="mt-4 rounded-3xl border border-slate-800 bg-slate-950 p-4 md:p-5">
+          {recoveredRun && rootGoal ? (
+            <p className="mb-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-sm text-cyan-100">
+              Previous Browser Agent run recovered after refresh. It is paused to prevent duplicate actions. Press Continue to resume from the current browser state.
+            </p>
+          ) : null}
           {!canOperate ? (
             <p className="mb-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 px-4 py-3 text-sm text-amber-100">
               {snapshot.killSwitch ? "Browser Agent is STOPPED. Type ‘resume’ or press Resume to allow browser jobs again." : "Browser Worker is offline."}
