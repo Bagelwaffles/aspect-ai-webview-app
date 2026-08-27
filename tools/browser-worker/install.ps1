@@ -47,8 +47,15 @@ if ($HasExistingPairing -and -not $ForcePairing -and [string]::IsNullOrWhiteSpac
 if (Test-Path $CredentialFile) {
   try {
     $CurrentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-    & icacls.exe $CredentialFile /inheritance:r /grant:r "${CurrentIdentity}:(R,W)" 2>$null | Out-Null
-    if ($LASTEXITCODE -ne 0) {
+    $PreviousErrorActionPreference = $ErrorActionPreference
+    try {
+      $ErrorActionPreference = "Continue"
+      & icacls.exe $CredentialFile /inheritance:r /grant:r "${CurrentIdentity}:(R,W)" 2>$null | Out-Null
+      $AclExitCode = $LASTEXITCODE
+    } finally {
+      $ErrorActionPreference = $PreviousErrorActionPreference
+    }
+    if ($AclExitCode -ne 0) {
       Write-Warning "Could not tighten credentials ACL automatically. The token remains stored only on this workstation."
     }
   } catch {
@@ -61,8 +68,16 @@ $TaskCommand = "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy B
 $TaskCreated = $false
 
 Write-Host "Creating limited-privilege startup task '$TaskName'..." -ForegroundColor Cyan
-& schtasks.exe /Create /TN $TaskName /SC ONLOGON /TR $TaskCommand /RL LIMITED /IT /F 2>$null | Out-Null
-if ($LASTEXITCODE -eq 0) {
+$PreviousErrorActionPreference = $ErrorActionPreference
+try {
+  $ErrorActionPreference = "Continue"
+  & schtasks.exe /Create /TN $TaskName /SC ONLOGON /TR $TaskCommand /RL LIMITED /IT /F 2>$null | Out-Null
+  $TaskCreateExitCode = $LASTEXITCODE
+} finally {
+  $ErrorActionPreference = $PreviousErrorActionPreference
+}
+
+if ($TaskCreateExitCode -eq 0) {
   $TaskCreated = $true
   if (Test-Path $StartupCommandFile) {
     Remove-Item -LiteralPath $StartupCommandFile -Force -ErrorAction SilentlyContinue
@@ -78,8 +93,15 @@ if ($LASTEXITCODE -eq 0) {
 
 if ($TaskCreated) {
   Write-Host "Starting AMS Browser Worker through the limited-privilege task..." -ForegroundColor Cyan
-  & schtasks.exe /Run /TN $TaskName 2>$null | Out-Null
-  if ($LASTEXITCODE -ne 0) {
+  $PreviousErrorActionPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = "Continue"
+    & schtasks.exe /Run /TN $TaskName 2>$null | Out-Null
+    $TaskRunExitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $PreviousErrorActionPreference
+  }
+  if ($TaskRunExitCode -ne 0) {
     Write-Warning "Scheduled task could not be started immediately. Starting the worker directly as the current user instead."
     $StartArgs = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$StartScript`""
     Start-Process -FilePath "powershell.exe" -ArgumentList $StartArgs -WindowStyle Hidden
