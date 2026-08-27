@@ -8,7 +8,11 @@ import {
   updateSocialCampaignDelivery,
 } from "@/lib/server/social-campaign-store"
 import { socialChannelSchema } from "@/lib/server/social-campaign-agent"
-import { getSocialPublisherConfiguration, publishSocialChannel } from "@/lib/server/social-publisher"
+import {
+  getSocialPublisherConfiguration,
+  publishSocialChannel,
+  type SocialPublisherResult,
+} from "@/lib/server/social-publisher"
 import {
   isInternalApiAuthorized,
   unauthorizedInternalApiResponse,
@@ -100,7 +104,7 @@ export async function POST(request: NextRequest) {
     return errorJson(503, "SOCIAL_CAMPAIGN_STORE_UNAVAILABLE", "Social campaign storage is unavailable")
   }
   if (!campaign) return errorJson(404, "SOCIAL_CAMPAIGN_NOT_FOUND", "Social campaign was not found")
-  if (!campaign.approvedAt || !["approved", "partial"].includes(campaign.status)) {
+  if (!campaign.approvedAt || !["approved", "partial", "failed"].includes(campaign.status)) {
     return errorJson(409, "SOCIAL_CAMPAIGN_APPROVAL_REQUIRED", "Campaign approval is required before publishing")
   }
 
@@ -111,7 +115,7 @@ export async function POST(request: NextRequest) {
     return errorJson(400, "SOCIAL_CAMPAIGN_CHANNEL_NOT_FOUND", "Requested channel is not present in this campaign")
   }
 
-  const results = []
+  const results: SocialPublisherResult[] = []
   for (const channel of uniqueChannels) {
     try {
       campaign = await updateSocialCampaignDelivery({
