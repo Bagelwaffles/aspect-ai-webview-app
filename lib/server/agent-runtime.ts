@@ -3,6 +3,12 @@ import { z } from "zod"
 
 export const AMS_AGENT_RUNTIME_DISABLED_ENV = "AMS_AGENT_RUNTIME_DISABLED" as const
 
+const DEFAULT_BROWSER_OPERATOR_FALLBACK_MODELS = [
+  "google/gemini-2.5-flash-lite",
+  "openai/gpt-4.1-nano",
+  "alibaba/qwen-3-14b",
+] as const
+
 export function isAgentRuntimeEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.AMS_AGENT_RUNTIME_DISABLED?.trim().toLowerCase() !== "true"
 }
@@ -35,6 +41,31 @@ export type StructuredAgentDefinition<
   maxOutputTokens?: number
 }
 
+function configuredBrowserOperatorFallbackModels(env: NodeJS.ProcessEnv = process.env): string[] {
+  const configured = env.AMS_BROWSER_OPERATOR_FALLBACK_MODELS
+    ?.split(",")
+    .map((model) => model.trim())
+    .filter(Boolean)
+
+  return configured?.length ? configured : [...DEFAULT_BROWSER_OPERATOR_FALLBACK_MODELS]
+}
+
+function fallbackModelsForDefinition(
+  definition: { id: string; model: string; fallbackModels?: string[] },
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
+  const requested = definition.fallbackModels ??
+    (definition.id === "browser-operator" ? configuredBrowserOperatorFallbackModels(env) : [])
+
+  return Array.from(
+    new Set(
+      requested
+        .map((model) => model.trim())
+        .filter((model) => model && model !== definition.model),
+    ),
+  ).slice(0, 4)
+}
+
 export async function runStructuredAgent<
   TInputSchema extends z.ZodTypeAny,
   TOutputSchema extends z.ZodTypeAny,
@@ -47,13 +78,7 @@ export async function runStructuredAgent<
   }
 
   const parsedInput = definition.inputSchema.parse(input)
-  const fallbackModels = Array.from(
-    new Set(
-      (definition.fallbackModels ?? [])
-        .map((model) => model.trim())
-        .filter((model) => model && model !== definition.model),
-    ),
-  ).slice(0, 4)
+  const fallbackModels = fallbackModelsForDefinition(definition)
 
   const result = await generateText({
     model: definition.model,
