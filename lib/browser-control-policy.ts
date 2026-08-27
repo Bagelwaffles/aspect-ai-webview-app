@@ -1,4 +1,4 @@
-export const BROWSER_ACTIONS = ["open", "inspect", "screenshot", "click", "fill", "upload", "submit"] as const
+export const BROWSER_ACTIONS = ["open", "inspect", "screenshot", "click", "fill", "upload", "capture_secret", "submit"] as const
 
 export type BrowserAction = (typeof BROWSER_ACTIONS)[number]
 export type BrowserRisk = "green" | "yellow" | "red"
@@ -20,12 +20,14 @@ const RISK_BY_ACTION: Record<BrowserAction, BrowserRisk> = {
   click: "yellow",
   fill: "yellow",
   upload: "red",
+  capture_secret: "red",
   submit: "red",
 }
 
-const INTERACTIVE_ACTIONS: BrowserAction[] = ["click", "fill", "upload", "submit"]
+const INTERACTIVE_ACTIONS: BrowserAction[] = ["click", "fill", "upload", "capture_secret", "submit"]
 const SAFE_UPLOAD_FILENAME = /^[A-Za-z0-9][A-Za-z0-9._() -]{0,159}$/
 const SAFE_UPLOAD_EXTENSION = /\.(png|jpe?g|webp|gif|pdf|csv|txt|zip|aab|apk)$/i
+const SECRET_HANDLE = /^ams-secret-[0-9a-f-]{36}$/i
 
 // Phase-1 perimeter: keep browser control intentionally narrow.
 // Add business sites one at a time only after a dedicated onboarding/proof pass.
@@ -94,6 +96,10 @@ export function isAllowedBrowserUrl(rawUrl: string, configuredHosts?: string): b
   return browserAllowedHosts(configuredHosts).includes(hostname)
 }
 
+export function isBrowserSecretHandle(value: string): boolean {
+  return SECRET_HANDLE.test(value.trim())
+}
+
 export function validateBrowserJobInput(input: unknown): { ok: true; value: BrowserJobInput } | { ok: false; error: string } {
   if (!input || typeof input !== "object") return { ok: false, error: "Job body must be an object" }
 
@@ -119,7 +125,7 @@ export function validateBrowserJobInput(input: unknown): { ok: true; value: Brow
     return { ok: false, error: `${action} requires a selector` }
   }
   if (action === "fill" && value === undefined) {
-    return { ok: false, error: "fill requires a value" }
+    return { ok: false, error: "fill requires a value or an opaque AMS secret handle" }
   }
   if (action === "upload") {
     value = value?.trim()
@@ -127,6 +133,12 @@ export function validateBrowserJobInput(input: unknown): { ok: true; value: Brow
     if (!SAFE_UPLOAD_FILENAME.test(value) || !SAFE_UPLOAD_EXTENSION.test(value) || value.includes("..")) {
       return { ok: false, error: "upload filename must be a safe local filename with an approved extension" }
     }
+  }
+  if (action === "capture_secret" && value !== undefined) {
+    return { ok: false, error: "capture_secret does not accept a value; the secret stays on the worker" }
+  }
+  if (action === "fill" && value?.startsWith("ams-secret-") && !isBrowserSecretHandle(value)) {
+    return { ok: false, error: "Invalid AMS secret handle" }
   }
 
   if (idempotencyKey && !/^[A-Za-z0-9._:-]{8,160}$/.test(idempotencyKey)) {
