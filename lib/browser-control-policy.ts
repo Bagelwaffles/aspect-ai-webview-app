@@ -18,7 +18,7 @@ const RISK_BY_ACTION: Record<BrowserAction, BrowserRisk> = {
   inspect: "green",
   screenshot: "green",
   click: "yellow",
-  fill: "red",
+  fill: "yellow",
   upload: "red",
   capture_secret: "red",
   submit: "red",
