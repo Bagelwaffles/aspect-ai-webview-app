@@ -12,9 +12,6 @@ export const metadata: Metadata = {
   applicationName: "Aspect Marketing Solutions",
   title,
   description,
-  alternates: {
-    canonical: "/",
-  },
   keywords: [
     "AI marketing agents",
     "small business marketing",
