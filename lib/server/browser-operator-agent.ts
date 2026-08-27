@@ -23,10 +23,10 @@ const browserOperatorInputSchema = z.object({
 const proposedJobSchema = z.object({
   action: z.enum(BROWSER_ACTIONS),
   url: z.string().max(2_048),
-  selector: z.string().max(500).optional(),
-  value: z.string().max(5_000).optional(),
-  secretRef: z.string().max(80).optional(),
-  useCurrentPage: z.boolean().optional(),
+  selector: z.string().max(500).nullable(),
+  value: z.string().max(5_000).nullable(),
+  secretRef: z.string().max(80).nullable(),
+  useCurrentPage: z.boolean().nullable(),
   rationale: z.string().max(600),
 })
 
@@ -37,7 +37,19 @@ const browserOperatorOutputSchema = z.object({
 })
 
 export type BrowserOperatorInput = z.infer<typeof browserOperatorInputSchema>
-export type BrowserOperatorOutput = z.infer<typeof browserOperatorOutputSchema>
+export type BrowserOperatorOutput = {
+  reply: string
+  proposedJob: {
+    action: (typeof BROWSER_ACTIONS)[number]
+    url: string
+    selector?: string
+    value?: string
+    secretRef?: string
+    useCurrentPage?: boolean
+    rationale: string
+  } | null
+  state: "ready" | "goal_complete" | "owner_action_required" | "blocked"
+}
 
 const WRITE_ACTIONS = new Set(["click", "fill", "upload", "capture_secret", "fill_secret", "submit"])
 const AMS_VERCEL_PROJECT_PATH = "/kimberleyaversbiz-4131s-projects/aspect-ai-overlord"
@@ -89,7 +101,7 @@ const browserOperatorDefinition: StructuredAgentDefinition<
   typeof browserOperatorOutputSchema
 > = {
   id: "browser-operator",
-  version: "1.0.0",
+  version: "1.0.1",
   model: process.env.AMS_BROWSER_OPERATOR_MODEL?.trim() || "openai/gpt-5.4-mini",
   inputSchema: browserOperatorInputSchema,
   outputSchema: browserOperatorOutputSchema,
@@ -112,6 +124,7 @@ Security invariants:
 - Use resilient selectors from the sanitized page description: label=, role=, placeholder=, text=, testid=, or a narrow CSS selector.
 - Preserve multi-step forms with useCurrentPage=true for describe or interactive actions when the current page is already on the correct HTTPS origin.
 - Propose only one next job. Do not invent success. If the goal is complete, proposedJob must be null and state goal_complete.
+- For every proposedJob object, return selector, value, secretRef, and useCurrentPage explicitly. Use null when a field is not applicable.
 
 Execution strategy:
 1. If current page/location is unknown, open the most relevant allowlisted site.
@@ -137,7 +150,23 @@ export async function planBrowserOperator(input: unknown): Promise<BrowserOperat
     }
   }
 
-  const planned = await runStructuredAgent(browserOperatorDefinition, parsedInput)
+  const modelPlanned = await runStructuredAgent(browserOperatorDefinition, parsedInput)
+  const planned: BrowserOperatorOutput = {
+    reply: modelPlanned.reply,
+    state: modelPlanned.state,
+    proposedJob: modelPlanned.proposedJob
+      ? {
+          action: modelPlanned.proposedJob.action,
+          url: modelPlanned.proposedJob.url,
+          selector: modelPlanned.proposedJob.selector ?? undefined,
+          value: modelPlanned.proposedJob.value ?? undefined,
+          secretRef: modelPlanned.proposedJob.secretRef ?? undefined,
+          useCurrentPage: modelPlanned.proposedJob.useCurrentPage ?? undefined,
+          rationale: modelPlanned.proposedJob.rationale,
+        }
+      : null,
+  }
+
   if (!planned.proposedJob) return planned
 
   const proposal = planned.proposedJob
