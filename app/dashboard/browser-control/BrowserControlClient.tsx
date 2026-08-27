@@ -43,6 +43,7 @@ type Snapshot = {
 }
 
 const EMPTY: Snapshot = { configured: false, killSwitch: true, worker: null, jobs: [], audit: [] }
+const INTERACTIVE_ACTIONS: BrowserAction[] = ["click", "fill", "upload", "submit"]
 
 function badgeClasses(value: string) {
   if (["online", "succeeded", "green", "queued"].includes(value)) return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
@@ -55,11 +56,13 @@ export default function BrowserControlPage() {
   const [snapshot, setSnapshot] = useState<Snapshot>(EMPTY)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState("")
+  const [commandMessage, setCommandMessage] = useState("")
   const [pairingCode, setPairingCode] = useState("")
   const [action, setAction] = useState<BrowserAction>("screenshot")
   const [url, setUrl] = useState("https://www.aspectmarketingsolutions.app/collaborate")
   const [selector, setSelector] = useState("")
   const [value, setValue] = useState("")
+  const [useCurrentPage, setUseCurrentPage] = useState(false)
 
   const refresh = useCallback(async () => {
     const response = await fetch("/api/browser-control/status", { cache: "no-store" })
@@ -89,18 +92,22 @@ export default function BrowserControlPage() {
 
   async function submitJob(event?: FormEvent) {
     event?.preventDefault()
-    setMessage("")
-    const payload: Record<string, string> = { action, url }
+    setCommandMessage("")
+    const payload: Record<string, string | boolean> = { action, url }
     if (selector) payload.selector = selector
-    if (action === "fill") payload.value = value
+    if (action === "fill" || action === "upload") payload.value = value
+    if (useCurrentPage && INTERACTIVE_ACTIONS.includes(action)) payload.useCurrentPage = true
     const response = await fetch("/api/browser-control/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     })
     const body = await response.json()
-    if (!response.ok) return setMessage(body.error || "Could not create browser job")
-    setMessage(body.job.status === "awaiting_approval" ? "Job created and held for approval." : "Job queued for the browser worker.")
+    if (!response.ok) {
+      setCommandMessage(body.error || "Could not create browser job")
+      return
+    }
+    setCommandMessage(body.job.status === "awaiting_approval" ? "Job created and held for approval." : "Job queued for the browser worker.")
     await refresh()
   }
 
@@ -108,6 +115,7 @@ export default function BrowserControlPage() {
     setAction("screenshot")
     setUrl("https://www.aspectmarketingsolutions.app/collaborate")
     setSelector("")
+    setUseCurrentPage(false)
     const response = await fetch("/api/browser-control/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -138,6 +146,7 @@ export default function BrowserControlPage() {
   }
 
   const workerState = snapshot.worker?.online ? "online" : "offline"
+  const interactiveAction = INTERACTIVE_ACTIONS.includes(action)
 
   return (
     <main className="min-h-screen bg-[#050711] px-4 py-8 text-slate-100 md:px-8">
@@ -210,9 +219,9 @@ export default function BrowserControlPage() {
               </div>
             ) : null}
             <div className="mt-5 rounded-2xl bg-black/30 p-4 text-xs leading-6 text-slate-400">
-              <p className="font-bold text-slate-200">Windows install path after this feature merges:</p>
+              <p className="font-bold text-slate-200">Windows install path:</p>
               <code className="mt-2 block break-all">tools/browser-worker/install.ps1</code>
-              <p className="mt-2">The installer asks for this temporary code and creates an AMS Browser Worker startup task.</p>
+              <p className="mt-2">Approved upload folder: <code>%LOCALAPPDATA%\AMS\BrowserWorker\Uploads</code></p>
             </div>
           </article>
 
@@ -234,25 +243,50 @@ export default function BrowserControlPage() {
           </div>
           <form onSubmit={submitJob} className="mt-6 grid gap-4 lg:grid-cols-2">
             <label className="text-sm font-semibold text-slate-300">Action
-              <select value={action} onChange={(event) => setAction(event.target.value as BrowserAction)} className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3">
+              <select
+                value={action}
+                onChange={(event) => {
+                  const nextAction = event.target.value as BrowserAction
+                  setAction(nextAction)
+                  if (!INTERACTIVE_ACTIONS.includes(nextAction)) setUseCurrentPage(false)
+                }}
+                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3"
+              >
                 {BROWSER_ACTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </label>
             <label className="text-sm font-semibold text-slate-300">URL
               <input value={url} onChange={(event) => setUrl(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3" />
             </label>
-            {["click", "fill", "submit"].includes(action) ? (
-              <label className="text-sm font-semibold text-slate-300">CSS selector
-                <input value={selector} onChange={(event) => setSelector(event.target.value)} placeholder="button[type='submit']" className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3" />
+            {interactiveAction ? (
+              <label className="text-sm font-semibold text-slate-300">Selector
+                <input value={selector} onChange={(event) => setSelector(event.target.value)} placeholder="role=button:Create app or button[type='submit']" className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3" />
+                <span className="mt-1 block text-xs font-normal text-slate-500">Supports CSS plus role=, text=, label=, placeholder=, and testid= selectors.</span>
               </label>
             ) : null}
-            {action === "fill" ? (
-              <label className="text-sm font-semibold text-slate-300">Value
-                <input value={value} onChange={(event) => setValue(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3" />
+            {action === "fill" || action === "upload" ? (
+              <label className="text-sm font-semibold text-slate-300">{action === "upload" ? "Upload filename" : "Value"}
+                <input
+                  value={value}
+                  onChange={(event) => setValue(event.target.value)}
+                  placeholder={action === "upload" ? "ams-logo.png" : undefined}
+                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3"
+                />
+                {action === "upload" ? <span className="mt-1 block text-xs font-normal text-slate-500">File must already be in %LOCALAPPDATA%\AMS\BrowserWorker\Uploads. The worker never accepts arbitrary local paths.</span> : null}
+              </label>
+            ) : null}
+            {interactiveAction ? (
+              <label className="flex items-start gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 p-4 text-sm text-amber-100 lg:col-span-2">
+                <input type="checkbox" checked={useCurrentPage} onChange={(event) => setUseCurrentPage(event.target.checked)} className="mt-1" />
+                <span>
+                  <strong>Use current page — preserve form state.</strong>
+                  <span className="mt-1 block text-xs font-normal text-amber-100/70">Skips navigation and acts on the page already open in the dedicated AMS browser. The worker verifies that the current page and job URL have the same HTTPS origin.</span>
+                </span>
               </label>
             ) : null}
             <div className="lg:col-span-2">
               <button type="submit" disabled={!snapshot.configured} className="rounded-xl bg-violet-300 px-5 py-3 font-black text-slate-950 disabled:opacity-40">Create job</button>
+              {commandMessage ? <p className="mt-3 rounded-xl border border-violet-400/20 bg-violet-400/5 px-4 py-3 text-sm text-violet-100">{commandMessage}</p> : null}
             </div>
           </form>
         </section>
@@ -294,7 +328,7 @@ export default function BrowserControlPage() {
           </div>
         </section>
 
-        <p className="pb-8 text-center text-xs text-slate-600">{loading ? "Checking browser control…" : "AMS Browser Control v1 · proof over theater"}</p>
+        <p className="pb-8 text-center text-xs text-slate-600">{loading ? "Checking browser control…" : "AMS Browser Control v1.1 · multi-step forms with owner control"}</p>
       </div>
     </main>
   )
