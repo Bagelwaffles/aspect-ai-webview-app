@@ -12,7 +12,11 @@ export const dynamic = "force-dynamic"
 
 const nextAuthHandler = NextAuth(authOptions)
 
-async function handler(request: Request) {
+type AuthRouteContext = {
+  params: Promise<{ nextauth: string[] }>
+}
+
+async function handler(request: Request, context: AuthRouteContext) {
   const callbackUrl = await authCallbackUrlFromRequest(request)
 
   if (callbackUrl !== null && !isSafeAuthCallbackUrl(callbackUrl, request.url)) {
@@ -34,7 +38,7 @@ async function handler(request: Request) {
     )
   }
 
-  return nextAuthHandler(request)
+  return nextAuthHandler(request, context)
 }
 
 export { handler as GET, handler as POST }
