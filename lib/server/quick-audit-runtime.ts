@@ -21,6 +21,10 @@ function trimmed(value: string | undefined) {
   return result || null
 }
 
+function enabled(value: string | undefined) {
+  return value?.trim().toLowerCase() === "true"
+}
+
 export function resolveQuickAuditRedisConfig(env: NodeJS.ProcessEnv = process.env): RedisConfig | null {
   const upstashUrl = trimmed(env.UPSTASH_REDIS_REST_URL)
   const upstashToken = trimmed(env.UPSTASH_REDIS_REST_TOKEN)
@@ -44,6 +48,10 @@ function runtimeRedis(env: NodeJS.ProcessEnv, options: RuntimeOptions) {
 
 function launchValueEnabled(value: unknown) {
   return value === true || value === "true" || value === "enabled" || value === 1 || value === "1"
+}
+
+export function quickAuditE2EProven(env: NodeJS.ProcessEnv = process.env) {
+  return enabled(env.AMS_QUICK_AUDIT_E2E_PROVEN)
 }
 
 export function normalizeQuickAuditLiveStripeSecret(env: NodeJS.ProcessEnv = process.env) {
@@ -78,6 +86,7 @@ export async function isQuickAuditRuntimeLaunchEnabled(
   env: NodeJS.ProcessEnv = process.env,
   options: RuntimeOptions = {},
 ) {
+  if (!quickAuditE2EProven(env)) return false
   if (!quickAuditInfrastructureReady(env)) return false
 
   const redis = runtimeRedis(env, options)
@@ -105,6 +114,10 @@ export async function setQuickAuditRuntimeLaunchEnabled(
   env: NodeJS.ProcessEnv = process.env,
   options: RuntimeOptions = {},
 ) {
+  if (launchEnabled && !quickAuditE2EProven(env)) {
+    throw new Error("QUICK_AUDIT_E2E_NOT_PROVEN")
+  }
+
   if (launchEnabled && !quickAuditInfrastructureReady(env)) {
     throw new Error("QUICK_AUDIT_INFRASTRUCTURE_NOT_READY")
   }
