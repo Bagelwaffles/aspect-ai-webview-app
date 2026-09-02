@@ -12,6 +12,7 @@ import {
 function env(overrides: Partial<NodeJS.ProcessEnv> = {}): NodeJS.ProcessEnv {
   return {
     NODE_ENV: "test",
+    AMS_QUICK_AUDIT_E2E_PROVEN: "true",
     AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: ["sk", "live", "fixture"].join("_"),
     AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: "price_fixture",
     AMS_STRIPE_QUICK_AUDIT_LIVE_WEBHOOK_SECRET: ["whsec", "fixture"].join("_"),
@@ -73,6 +74,27 @@ test("durable Redis launch state overrides stale enabled process flags", async (
   const redis = fakeRedis("disabled")
 
   assert.equal(await isQuickAuditRuntimeLaunchEnabled(input, { redis: redis.client }), false)
+})
+
+test("E2E proof gate keeps public launch closed even when durable switch is enabled", async () => {
+  const input = env({ AMS_QUICK_AUDIT_E2E_PROVEN: "" })
+  const redis = fakeRedis("enabled")
+
+  assert.equal(await isQuickAuditRuntimeLaunchEnabled(input, { redis: redis.client }), false)
+  assert.equal(await ensureQuickAuditRuntimeLaunchState(input, { redis: redis.client }), false)
+  assert.equal(input.AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED, "false")
+  assert.equal(input.AMS_QUICK_AUDIT_FULFILLMENT_READY, "false")
+})
+
+test("operator cannot enable public launch before E2E proof is recorded", async () => {
+  const input = env({ AMS_QUICK_AUDIT_E2E_PROVEN: "false" })
+  const redis = fakeRedis("disabled")
+
+  await assert.rejects(
+    () => setQuickAuditRuntimeLaunchEnabled(true, input, { redis: redis.client }),
+    /QUICK_AUDIT_E2E_NOT_PROVEN/,
+  )
+  assert.equal(redis.writes.length, 0)
 })
 
 test("checkout preparation clears stale enabled flags when durable switch is disabled", async () => {
