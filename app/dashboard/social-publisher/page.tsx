@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
 import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie"
+import { getLinkedInOrganizationCutoverStatus } from "@/lib/server/linkedin-organization-cutover"
 import { isSocialCampaignAgentConfigured } from "@/lib/server/social-campaign-agent"
 import {
   isSocialCampaignStoreConfigured,
@@ -48,7 +49,9 @@ export default async function SocialPublisherStatusPage() {
 
   const agentConfigured = isSocialCampaignAgentConfigured()
   const storeConfigured = isSocialCampaignStoreConfigured()
-  const publishers = getSocialPublisherConfiguration()
+  const linkedinCutover = getLinkedInOrganizationCutoverStatus()
+  const rawPublishers = getSocialPublisherConfiguration()
+  const publishers = { ...rawPublishers, linkedin: linkedinCutover.configured }
   let campaigns: SocialCampaignRecord[] = []
   let storeReadError = false
 
@@ -94,6 +97,15 @@ export default async function SocialPublisherStatusPage() {
           </div>
         </section>
 
+        {linkedinCutover.legacyCredentialPresent ? (
+          <section className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5">
+            <p className="font-bold text-amber-200">LinkedIn legacy identity quarantined</p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              AMS detected an older LinkedIn credential but will not use it. LinkedIn publishing stays blocked until a fresh organization-only connection is authorized for the Aspect Marketing Solutions Page and the new connection generation is installed.
+            </p>
+          </section>
+        ) : null}
+
         <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -109,17 +121,28 @@ export default async function SocialPublisherStatusPage() {
             {Object.entries(publishers).map(([channel, configured]) => {
               const label = channelLabels[channel as keyof typeof channelLabels]
               const intentionallyClosed = channel === "youtube-shorts"
+              const linkedinHeld = channel === "linkedin" && linkedinCutover.legacyCredentialPresent
               return (
                 <div key={channel} className={`rounded-xl border p-4 ${statusClasses(configured)}`}>
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-bold">{label}</p>
                     <span className="text-xs font-black uppercase tracking-[0.15em]">
-                      {configured ? "Ready" : intentionallyClosed ? "Held closed" : "Not ready"}
+                      {configured
+                        ? "Ready"
+                        : intentionallyClosed
+                          ? "Held closed"
+                          : linkedinHeld
+                            ? "Cutover required"
+                            : "Not ready"}
                     </span>
                   </div>
                   {intentionallyClosed ? (
                     <p className="mt-2 text-xs leading-5 text-slate-400">
                       Upload stays disabled until a verified server-side Shorts uploader completes a controlled test.
+                    </p>
+                  ) : linkedinHeld ? (
+                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                      Only a fresh Aspect Marketing Solutions organization connection can re-enable LinkedIn publishing.
                     </p>
                   ) : null}
                 </div>
