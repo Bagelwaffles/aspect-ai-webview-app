@@ -16,6 +16,7 @@ import {
 const PREFIX = "ams:social-campaign:v1"
 const RECENT_KEY = `${PREFIX}:recent`
 const RETENTION_SECONDS = 60 * 60 * 24 * 90
+const PUBLISH_LOCK_SECONDS = 120
 const MAX_RECENT = 100
 
 export const socialCampaignStatusSchema = z.enum([
@@ -55,7 +56,7 @@ export const socialCampaignRecordSchema = z
     input: socialCampaignInputSchema,
     output: socialCampaignOutputSchema,
     status: socialCampaignStatusSchema,
-    deliveries: z.array(socialChannelDeliverySchema).min(1).max(4),
+    deliveries: z.array(socialChannelDeliverySchema).min(1).max(5),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
     approvedAt: z.string().datetime().nullable(),
@@ -66,6 +67,12 @@ export type SocialCampaignStatus = z.infer<typeof socialCampaignStatusSchema>
 export type SocialChannelDeliveryStatus = z.infer<typeof socialChannelDeliveryStatusSchema>
 export type SocialChannelDelivery = z.infer<typeof socialChannelDeliverySchema>
 export type SocialCampaignRecord = z.infer<typeof socialCampaignRecordSchema>
+
+export type SocialCampaignDeliveryClaim = {
+  claimed: boolean
+  token: string | null
+  record: SocialCampaignRecord
+}
 
 export function isSocialCampaignStoreConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
   const url = (env.UPSTASH_REDIS_REST_URL ?? env.KV_REST_API_URL)?.trim()
@@ -86,6 +93,10 @@ function digest(value: string): string {
 
 function campaignKey(id: string) {
   return `${PREFIX}:campaign:${id}`
+}
+
+function publishLockKey(id: string) {
+  return `${PREFIX}:publish-lock:${id}`
 }
 
 function idempotencyRedisKey(key: string) {
@@ -221,6 +232,69 @@ export async function approveSocialCampaignRecord(id: string): Promise<SocialCam
   })
   await putRecord(redis, next)
   return next
+}
+
+export async function claimSocialCampaignDelivery(input: {
+  id: string
+  channel: SocialChannel
+}): Promise<SocialCampaignDeliveryClaim> {
+  const redis = getRedis()
+  const token = randomUUID()
+  const locked = await redis.set(publishLockKey(input.id), token, {
+    nx: true,
+    ex: PUBLISH_LOCK_SECONDS,
+  })
+
+  if (locked !== "OK") {
+    const current = await getSocialCampaignRecord(input.id)
+    if (!current) throw new Error("SOCIAL_CAMPAIGN_NOT_FOUND")
+    return { claimed: false, token: null, record: current }
+  }
+
+  try {
+    const record = await getSocialCampaignRecord(input.id)
+    if (!record) throw new Error("SOCIAL_CAMPAIGN_NOT_FOUND")
+    const delivery = record.deliveries.find((item) => item.channel === input.channel)
+    if (!delivery) throw new Error("SOCIAL_CAMPAIGN_CHANNEL_NOT_FOUND")
+    if (delivery.status === "published") {
+      await releaseSocialCampaignDeliveryClaim({ id: input.id, token })
+      return { claimed: false, token: null, record }
+    }
+
+    const now = new Date().toISOString()
+    const deliveries = record.deliveries.map((item) =>
+      item.channel === input.channel
+        ? socialChannelDeliverySchema.parse({
+            ...item,
+            status: "publishing",
+            externalId: null,
+            errorCode: null,
+            updatedAt: now,
+          })
+        : item,
+    )
+    const next = socialCampaignRecordSchema.parse({
+      ...record,
+      status: "publishing",
+      deliveries,
+      updatedAt: now,
+    })
+    await putRecord(redis, next)
+    return { claimed: true, token, record: next }
+  } catch (error) {
+    await releaseSocialCampaignDeliveryClaim({ id: input.id, token }).catch(() => undefined)
+    throw error
+  }
+}
+
+export async function releaseSocialCampaignDeliveryClaim(input: {
+  id: string
+  token: string
+}): Promise<void> {
+  const redis = getRedis()
+  const key = publishLockKey(input.id)
+  const currentToken = await redis.get<string>(key)
+  if (currentToken === input.token) await redis.del(key)
 }
 
 export async function updateSocialCampaignDelivery(input: {
