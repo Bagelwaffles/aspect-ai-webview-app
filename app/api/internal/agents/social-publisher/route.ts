@@ -27,7 +27,7 @@ const mutationSchema = z.discriminatedUnion("action", [
     .object({
       action: z.literal("publish"),
       campaignId: z.string().min(20).max(120),
-      channels: z.array(socialChannelSchema).min(1).max(4).optional(),
+      channels: z.array(socialChannelSchema).min(1).max(5).optional(),
     })
     .strict(),
 ])
@@ -117,6 +117,17 @@ export async function POST(request: NextRequest) {
 
   const results: SocialPublisherResult[] = []
   for (const channel of uniqueChannels) {
+    const delivery = campaign.deliveries.find((item) => item.channel === channel)
+    if (delivery?.status === "published") {
+      results.push({
+        channel,
+        status: "published",
+        externalId: delivery.externalId,
+        errorCode: null,
+      })
+      continue
+    }
+
     try {
       campaign = await updateSocialCampaignDelivery({
         id: campaign.id,

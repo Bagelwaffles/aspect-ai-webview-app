@@ -55,7 +55,7 @@ export const socialCampaignRecordSchema = z
     input: socialCampaignInputSchema,
     output: socialCampaignOutputSchema,
     status: socialCampaignStatusSchema,
-    deliveries: z.array(socialChannelDeliverySchema).min(1).max(4),
+    deliveries: z.array(socialChannelDeliverySchema).min(1).max(5),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
     approvedAt: z.string().datetime().nullable(),
