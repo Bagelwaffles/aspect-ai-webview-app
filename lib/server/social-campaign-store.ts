@@ -18,6 +18,13 @@ const RECENT_KEY = `${PREFIX}:recent`
 const RETENTION_SECONDS = 60 * 60 * 24 * 90
 const PUBLISH_LOCK_SECONDS = 120
 const MAX_RECENT = 100
+const RELEASE_PUBLISH_LOCK_SCRIPT = `
+  local current = redis.call('GET', KEYS[1])
+  if current == ARGV[1] then
+    return redis.call('DEL', KEYS[1])
+  end
+  return 0
+`
 
 export const socialCampaignStatusSchema = z.enum([
   "draft",
@@ -292,9 +299,7 @@ export async function releaseSocialCampaignDeliveryClaim(input: {
   token: string
 }): Promise<void> {
   const redis = getRedis()
-  const key = publishLockKey(input.id)
-  const currentToken = await redis.get<string>(key)
-  if (currentToken === input.token) await redis.del(key)
+  await redis.eval(RELEASE_PUBLISH_LOCK_SCRIPT, [publishLockKey(input.id)], [input.token])
 }
 
 export async function updateSocialCampaignDelivery(input: {
