@@ -8,6 +8,7 @@ export const DEFAULT_SOCIAL_CAMPAIGN_MODEL = "openai/gpt-5.4-mini" as const
 export const socialChannelSchema = z.enum([
   "linkedin",
   "facebook",
+  "instagram",
   "pinterest",
   "youtube-shorts",
 ])
@@ -19,11 +20,12 @@ export const socialCampaignInputSchema = z
     goal: z.string().trim().min(3).max(500),
     offer: z.string().trim().min(2).max(500),
     destinationUrl: z.string().url().max(2_000).optional(),
+    mediaUrl: z.string().url().max(2_000).optional(),
     campaignName: z.string().trim().min(2).max(120),
     tone: z
       .enum(["professional", "friendly", "confident", "educational", "conversational"])
       .default("conversational"),
-    channels: z.array(socialChannelSchema).min(1).max(4),
+    channels: z.array(socialChannelSchema).min(1).max(5),
   })
   .strict()
   .superRefine((input, context) => {
@@ -50,7 +52,7 @@ export const socialDraftSchema = z
 export const socialCampaignOutputSchema = z
   .object({
     campaignName: z.string().trim().min(1).max(120),
-    posts: z.array(socialDraftSchema).min(1).max(4),
+    posts: z.array(socialDraftSchema).min(1).max(5),
     safetyNotes: z.array(z.string().trim().min(1).max(300)).max(10),
   })
   .strict()
@@ -86,9 +88,10 @@ export function buildSocialCampaignPrompt(input: SocialCampaignInput): string {
     "Create exactly one draft for every requested channel and no others.",
     "Campaign brief:",
     JSON.stringify(input),
-    "Preserve the supplied offer and destination URL exactly when used.",
+    "Preserve the supplied offer, destination URL, and media URL exactly when used.",
     "LinkedIn: useful, credible, professional/conversational; avoid engagement bait.",
     "Facebook: readable, direct, community-friendly; no fabricated urgency.",
+    "Instagram: concise caption copy for an approved visual asset; include a mediaBrief because publishing requires media.",
     "Pinterest: provide a concise title, search-friendly description, hashtags, and a mediaBrief because a Pin needs visual media.",
     "YouTube Shorts: title plus a short spoken-script style body and a mediaBrief; do not claim a video exists or was uploaded.",
     "Use safetyNotes only for claims or facts that require human verification before publishing.",
