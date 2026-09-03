@@ -25,6 +25,10 @@ const validInput = {
   channels: ["linkedin", "facebook"] as const,
 }
 
+function testEnv(values: Record<string, string>): NodeJS.ProcessEnv {
+  return { NODE_ENV: "test", ...values }
+}
+
 function approvedRecord(channel: SocialChannel, overrides: Record<string, unknown> = {}) {
   const now = new Date().toISOString()
   const draft = {
@@ -112,8 +116,7 @@ test("social campaign output rejects duplicate platform drafts", () => {
 })
 
 test("social publishers fail closed when credentials are absent", () => {
-  const env = {} as NodeJS.ProcessEnv
-  assert.deepEqual(getSocialPublisherConfiguration(env), {
+  assert.deepEqual(getSocialPublisherConfiguration(testEnv({})), {
     linkedin: false,
     facebook: false,
     instagram: false,
@@ -123,7 +126,7 @@ test("social publishers fail closed when credentials are absent", () => {
 })
 
 test("social publisher configuration rejects placeholder identifiers and keeps YouTube closed", () => {
-  const env = {
+  const env = testEnv({
     AMS_LINKEDIN_ACCESS_TOKEN: "token_1234567890123456789012345",
     AMS_LINKEDIN_AUTHOR_URN: "urn:li:person:realperson123",
     AMS_LINKEDIN_API_VERSION: "202608",
@@ -137,7 +140,7 @@ test("social publisher configuration rejects placeholder identifiers and keeps Y
     AMS_YOUTUBE_CLIENT_SECRET: "youtube-secret-123456789012345678",
     AMS_YOUTUBE_REFRESH_TOKEN: "youtube-refresh-123456789012345678",
     AMS_YOUTUBE_CHANNEL_ID: "UC1234567890123456789012",
-  } as NodeJS.ProcessEnv
+  })
 
   assert.deepEqual(getSocialPublisherConfiguration(env), {
     linkedin: true,
@@ -162,11 +165,11 @@ test("Instagram publishes the approved media URL without replacing the destinati
   const record = approvedRecord("instagram")
   const result = await publishSocialChannel(record, "instagram", {
     fetch: fetcher,
-    env: {
+    env: testEnv({
       AMS_META_ACCESS_TOKEN: "meta_1234567890123456789012345",
       AMS_META_GRAPH_API_VERSION: "v24.0",
       AMS_INSTAGRAM_USER_ID: "instagram_12345",
-    } as NodeJS.ProcessEnv,
+    }),
   })
 
   assert.equal(result.status, "published")
@@ -179,9 +182,9 @@ test("Instagram publishes the approved media URL without replacing the destinati
 })
 
 test("Pinterest uses separate media/link URLs and enforces provider text limits", async () => {
-  let payload: Record<string, unknown> | null = null
+  const payloads: Record<string, unknown>[] = []
   const fetcher = (async (_input: URL | RequestInfo, init?: RequestInit) => {
-    payload = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+    payloads.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>)
     return new Response(JSON.stringify({ id: "pin-123" }), {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -196,19 +199,20 @@ test("Pinterest uses separate media/link URLs and enforces provider text limits"
   })
   const result = await publishSocialChannel(record, "pinterest", {
     fetch: fetcher,
-    env: {
+    env: testEnv({
       AMS_PINTEREST_ACCESS_TOKEN: "pin_12345678901234567890123456",
       AMS_PINTEREST_BOARD_ID: "board_123456",
-    } as NodeJS.ProcessEnv,
+    }),
   })
 
   assert.equal(result.status, "published")
   assert.equal(result.externalId, "pin-123")
+  const payload = payloads[0]
   assert.ok(payload)
-  assert.equal(String(payload!.title).length, 100)
-  assert.equal(String(payload!.description).length, 800)
-  assert.equal(payload!.link, validInput.destinationUrl)
-  assert.equal((payload!.media_source as { url: string }).url, validInput.mediaUrl)
+  assert.equal(String(payload.title).length, 100)
+  assert.equal(String(payload.description).length, 800)
+  assert.equal(payload.link, validInput.destinationUrl)
+  assert.equal((payload.media_source as { url: string }).url, validInput.mediaUrl)
 })
 
 test("provider timeout remains active while a response body is being consumed", async () => {
@@ -224,11 +228,11 @@ test("provider timeout remains active while a response body is being consumed", 
   const result = await publishSocialChannel(record, "facebook", {
     fetch: fetcher,
     timeoutMs: 10,
-    env: {
+    env: testEnv({
       AMS_META_ACCESS_TOKEN: "meta_1234567890123456789012345",
       AMS_META_GRAPH_API_VERSION: "v24.0",
       AMS_FACEBOOK_PAGE_ID: "facebook_12345",
-    } as NodeJS.ProcessEnv,
+    }),
   })
 
   assert.equal(result.status, "failed")
