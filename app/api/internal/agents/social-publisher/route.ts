@@ -3,8 +3,10 @@ import { z } from "zod"
 
 import {
   approveSocialCampaignRecord,
+  claimSocialCampaignDelivery,
   getSocialCampaignRecord,
   listSocialCampaignRecords,
+  releaseSocialCampaignDeliveryClaim,
   updateSocialCampaignDelivery,
 } from "@/lib/server/social-campaign-store"
 import { socialChannelSchema } from "@/lib/server/social-campaign-agent"
@@ -27,7 +29,7 @@ const mutationSchema = z.discriminatedUnion("action", [
     .object({
       action: z.literal("publish"),
       campaignId: z.string().min(20).max(120),
-      channels: z.array(socialChannelSchema).min(1).max(4).optional(),
+      channels: z.array(socialChannelSchema).min(1).max(5).optional(),
     })
     .strict(),
 ])
@@ -117,12 +119,43 @@ export async function POST(request: NextRequest) {
 
   const results: SocialPublisherResult[] = []
   for (const channel of uniqueChannels) {
-    try {
-      campaign = await updateSocialCampaignDelivery({
-        id: campaign.id,
+    const existing = campaign.deliveries.find((item) => item.channel === channel)
+    if (existing?.status === "published") {
+      results.push({
         channel,
-        status: "publishing",
+        status: "published",
+        externalId: existing.externalId,
+        errorCode: null,
       })
+      continue
+    }
+
+    let claimToken: string | null = null
+    try {
+      const claim = await claimSocialCampaignDelivery({ id: campaign.id, channel })
+      campaign = claim.record
+      claimToken = claim.token
+
+      if (!claim.claimed) {
+        const delivery = campaign.deliveries.find((item) => item.channel === channel)
+        if (delivery?.status === "published") {
+          results.push({
+            channel,
+            status: "published",
+            externalId: delivery.externalId,
+            errorCode: null,
+          })
+        } else {
+          results.push({
+            channel,
+            status: "failed",
+            externalId: null,
+            errorCode: "SOCIAL_PUBLISH_ALREADY_IN_PROGRESS",
+          })
+        }
+        continue
+      }
+
       const result = await publishSocialChannel(campaign, channel)
       campaign = await updateSocialCampaignDelivery({
         id: campaign.id,
@@ -149,6 +182,12 @@ export async function POST(request: NextRequest) {
         externalId: null,
         errorCode: "SOCIAL_PUBLISH_STATE_FAILED",
       })
+    } finally {
+      if (claimToken) {
+        await releaseSocialCampaignDeliveryClaim({ id: campaign.id, token: claimToken }).catch(
+          () => undefined,
+        )
+      }
     }
   }
 
