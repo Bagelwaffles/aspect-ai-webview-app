@@ -15,6 +15,7 @@ import {
   publishSocialChannel,
   type SocialPublisherResult,
 } from "@/lib/server/social-publisher"
+import { getLinkedInOrganizationCutoverStatus } from "@/lib/server/linkedin-organization-cutover"
 import {
   isInternalApiAuthorized,
   unauthorizedInternalApiResponse,
@@ -56,6 +57,14 @@ function campaignError(error: unknown) {
   return errorJson(503, "SOCIAL_CAMPAIGN_STORE_UNAVAILABLE", "Social campaign storage is unavailable")
 }
 
+function effectivePublisherConfiguration() {
+  const publishers = getSocialPublisherConfiguration()
+  return {
+    ...publishers,
+    linkedin: getLinkedInOrganizationCutoverStatus().configured,
+  }
+}
+
 export async function GET(request: NextRequest) {
   if (!isInternalApiAuthorized(request)) return unauthorizedInternalApiResponse()
 
@@ -67,7 +76,7 @@ export async function GET(request: NextRequest) {
       return noStoreJson({
         ok: true,
         campaign,
-        publishers: getSocialPublisherConfiguration(),
+        publishers: effectivePublisherConfiguration(),
       })
     }
 
@@ -75,7 +84,7 @@ export async function GET(request: NextRequest) {
     return noStoreJson({
       ok: true,
       campaigns,
-      publishers: getSocialPublisherConfiguration(),
+      publishers: effectivePublisherConfiguration(),
     })
   } catch {
     return errorJson(503, "SOCIAL_CAMPAIGN_STORE_UNAVAILABLE", "Social campaign storage is unavailable")
@@ -127,6 +136,28 @@ export async function POST(request: NextRequest) {
         externalId: existing.externalId,
         errorCode: null,
       })
+      continue
+    }
+
+    if (channel === "linkedin" && !getLinkedInOrganizationCutoverStatus().configured) {
+      const result: SocialPublisherResult = {
+        channel,
+        status: "not_configured",
+        externalId: null,
+        errorCode: "LINKEDIN_ORGANIZATION_REAUTH_REQUIRED",
+      }
+      try {
+        campaign = await updateSocialCampaignDelivery({
+          id: campaign.id,
+          channel,
+          status: result.status,
+          externalId: null,
+          errorCode: result.errorCode,
+        })
+      } catch {
+        // Keep the external provider fail-closed even if state persistence is temporarily unavailable.
+      }
+      results.push(result)
       continue
     }
 
