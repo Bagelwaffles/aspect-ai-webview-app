@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     return errorJson(503, "SOCIAL_CAMPAIGN_STORE_UNAVAILABLE", "Social campaign storage is unavailable")
   }
   if (!campaign) return errorJson(404, "SOCIAL_CAMPAIGN_NOT_FOUND", "Social campaign was not found")
-  if (!campaign.approvedAt || !["approved", "partial", "failed"].includes(campaign.status)) {
+  if (!campaign.approvedAt || !["approved", "publishing", "partial", "failed"].includes(campaign.status)) {
     return errorJson(409, "SOCIAL_CAMPAIGN_APPROVAL_REQUIRED", "Campaign approval is required before publishing")
   }
 
