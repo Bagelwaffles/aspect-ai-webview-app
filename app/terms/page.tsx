@@ -18,7 +18,7 @@ export default function TermsPage() {
           <h2 className="text-xl font-semibold text-foreground">1. Agreement to these terms</h2>
           <p className="mt-2">
             These Terms of Service govern your access to and use of Aspect Marketing Solutions
-            ("AMS") websites, software, AI-assisted tools, automation services, marketing audits,
+            (&quot;AMS&quot;) websites, software, AI-assisted tools, automation services, marketing audits,
             subscriptions, and related services. By using a paid or free AMS service, you agree to
             these terms and any service-specific terms shown at checkout or during enrollment.
           </p>
@@ -97,7 +97,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-xl font-semibold text-foreground">9. Disclaimers and limitation of liability</h2>
           <p className="mt-2">
-            AMS services are provided on an "as available" basis to the extent permitted by law. AMS
+            AMS services are provided on an &quot;as available&quot; basis to the extent permitted by law. AMS
             does not guarantee uninterrupted operation, specific rankings, leads, revenue, conversion
             rates, or other business outcomes. To the maximum extent permitted by law, AMS will not be
             liable for indirect, incidental, special, consequential, or punitive damages arising from
