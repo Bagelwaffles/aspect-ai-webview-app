@@ -128,7 +128,7 @@ export default function NurtureAgentPage() {
             <div>
               <h1 className="text-2xl font-bold sm:text-3xl">Nurture Agent</h1>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-                Build a 3, 5, or 7-nurture sequence sequence for review. AMS does not send, schedule, enroll contacts, or collect addresses from this page.
+                Build a 3, 5, or 7-email nurture sequence for review. AMS does not send, schedule, enroll contacts, or collect addresses from this page.
               </p>
             </div>
           </div>
