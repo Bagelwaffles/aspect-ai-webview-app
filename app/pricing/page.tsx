@@ -98,7 +98,7 @@ export default function PricingPage() {
           <h1 className="max-w-3xl text-4xl font-bold sm:text-5xl">Clear offers with honest launch status.</h1>
           <p className="max-w-2xl text-muted-foreground">
             {contentAgentLive
-              ? "Use a Live AMS marketing agent from $12 per completed standalone run, or subscribe from $29/month for shared credits across all five production-verified marketing agents."
+              ? "Subscribe from $29/month for shared credits across five production-verified marketing agents. Standalone rates are listed below, but standalone checkout is not yet available."
               : "The $49 Quick Marketing Audit is live now. Standalone agent rates are published for transparency, while paid AI checkout remains paused until the shared production execution gate is deliberately enabled."}
           </p>
           <div className="flex flex-wrap gap-3">
@@ -174,9 +174,9 @@ export default function PricingPage() {
         <section className="space-y-5" id="live-agent-pricing">
           <div>
             <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Standalone Live-agent pricing</p>
-            <h2 className="text-3xl font-bold">Pay for one completed run, or subscribe for better value.</h2>
+            <h2 className="text-3xl font-bold">Standalone rates — checkout not yet available.</h2>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              These are the approved pay-as-you-go rates for customers who want a single completed generation without committing to a subscription. Subscribers do not pay these standalone rates; each completed generation instead uses one shared plan credit.
+              These are the listed rates for a future single-run purchase option, not an available checkout offer. Current access uses shared subscription credits. Subscribers do not pay these standalone rates; each completed generation instead uses one shared plan credit.
             </p>
           </div>
 
@@ -193,7 +193,7 @@ export default function PricingPage() {
                     <span className="text-sm text-muted-foreground"> / completed run</span>
                   </div>
                   <p className="flex-1 text-sm text-muted-foreground">{agent.description}</p>
-                  <p className="text-xs text-muted-foreground">Included with subscriber shared credits.</p>
+                  <p className="text-xs text-muted-foreground">Standalone checkout unavailable. Included with subscriber shared credits.</p>
                   <Button asChild variant="outline">
                     <Link href={agent.href}>View agent</Link>
                   </Button>
