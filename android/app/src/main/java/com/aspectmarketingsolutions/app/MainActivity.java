@@ -70,7 +70,7 @@ public final class MainActivity extends Activity {
         root.addView(title);
 
         TextView subtitle = text(
-                "A secure, consumption-only Android companion for platform status and the verified AMS Agent Network.",
+                "A secure, consumption-only Android companion for live platform health and verified AMS Agent Network release status.",
                 16,
                 COLOR_MUTED,
                 false
@@ -97,7 +97,7 @@ public final class MainActivity extends Activity {
         root.addView(agentHeading);
 
         TextView agentIntro = text(
-                "Release 1 surfaces the launch network without pretending unfinished agents are live.",
+                "This app version records the verified launch status of selected customer-facing AMS agents. Platform health above is refreshed live; agent lifecycle changes are reflected in later app releases.",
                 14,
                 COLOR_MUTED,
                 false
@@ -105,12 +105,14 @@ public final class MainActivity extends Activity {
         agentIntro.setPadding(0, 0, 0, dp(12));
         root.addView(agentIntro);
 
-        addAgent(root, "AMS Fiverr Bridge", "BETA", "Controlled Fiverr event classification and operator routing.", COLOR_PRIMARY);
-        addAgent(root, "Content Agent", "IN DEVELOPMENT", "Customer-facing marketing content generation; paid execution remains gated until the provider path is verified.", COLOR_WARN);
-        addAgent(root, "Aspect Overmind", "IN DEVELOPMENT", "Orchestration layer for specialized AMS agents, tools, and owner-approved actions.", COLOR_WARN);
-        addAgent(root, "YouTube Uploader Agent", "IN DEVELOPMENT", "Owner-authorized video publishing workflow with controlled metadata and upload handling.", COLOR_WARN);
-        addAgent(root, "Social Publisher Agent", "IN DEVELOPMENT", "Approval-first social publishing infrastructure for controlled distribution.", COLOR_WARN);
-        addAgent(root, "Android Build Agent", "IN DEVELOPMENT", "Build automation for APK/AAB packaging and Google Play release workflows.", COLOR_WARN);
+        addAgent(root, "Content Agent", "LIVE", "Protected marketing and business content generation with authenticated production execution.", COLOR_GOOD);
+        addAgent(root, "Lead Magnet Agent", "LIVE", "Creates customer-defined lead magnets and conversion assets through the verified AMS content runtime.", COLOR_GOOD);
+        addAgent(root, "Email Campaign Agent", "LIVE", "Builds human-reviewed 3, 5, or 7-email campaign drafts without sending or enrolling contacts.", COLOR_GOOD);
+        addAgent(root, "Nurture Agent", "LIVE", "Builds consent-aware nurture sequences for human review without sending, scheduling, or enrollment.", COLOR_GOOD);
+        addAgent(root, "Outreach Agent", "LIVE", "Creates one human-reviewed prospect message at a time without scraping, enrichment, or automatic contact.", COLOR_GOOD);
+        addAgent(root, "SEO Agent", "LIVE", "Builds on-page SEO briefs without fabricating rankings, traffic, search volume, or live-search findings.", COLOR_GOOD);
+        addAgent(root, "Product Creator Agent", "LIVE", "Turns concepts into structured product-offer drafts without publishing, fulfillment, or sales actions.", COLOR_GOOD);
+        addAgent(root, "Marketing Audit Agent", "BETA", "The $49 public audit path is deployed; the agent remains Beta until a fresh real paid native fulfillment is verified.", COLOR_PRIMARY);
 
         LinearLayout purchaseNotice = panel();
         TextView purchaseTitle = text("Android purchase policy", 17, COLOR_TEXT, true);
