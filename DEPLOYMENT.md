@@ -23,13 +23,13 @@ vercel --prod
 1. Go to your Vercel dashboard
 2. Navigate to your project settings
 3. Go to "Domains" section
-4. Add `vo.aspectmarketingsolutions.app` as a custom domain
+4. Add `www.aspectmarketingsolutions.app` as the canonical custom domain and redirect the apex domain to it
 5. Configure DNS records as instructed by Vercel
 
 ### 3. Environment Variables
 In your Vercel dashboard, add these environment variables:
 - `NEXT_PUBLIC_APP_NAME`: Aspect Marketing Solutions
-- `NEXT_PUBLIC_APP_URL`: https://vo.aspectmarketingsolutions.app
+- `NEXT_PUBLIC_APP_URL`: https://www.aspectmarketingsolutions.app
 - `N8N_BASE_URL`: https://flow.aspectmarketingsolutions.app
 - `N8N_WEBHOOK_PATH`: /webhook/vo-app
 - `N8N_WEBHOOK_SECRET`: [Your secure webhook secret]
@@ -51,10 +51,10 @@ Vercel automatically provisions SSL certificates for custom domains.
 
 ### 6. Webhook Configuration
 Update your Stripe webhook endpoint to:
-`https://vo.aspectmarketingsolutions.app/api/billing/webhook`
+`https://www.aspectmarketingsolutions.app/api/billing/webhook`
 
 ## Post-Deployment Checklist
-- [ ] Test health endpoint: `https://vo.aspectmarketingsolutions.app/api/health`
+- [ ] Test health endpoint: `https://www.aspectmarketingsolutions.app/api/health`
 - [ ] Verify n8n webhook connectivity
 - [ ] Test Stripe checkout flow
 - [ ] Confirm Printify API integration
