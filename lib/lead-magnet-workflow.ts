@@ -38,8 +38,8 @@ function cleanAndLimit(value: string, maxLength: number): string {
 
 export function buildLeadMagnetContentBrief(input: LeadMagnetWorkflowInput): ContentAgentBrief {
   const typeLabel = TYPE_LABELS[input.type]
-  const problem = cleanAndLimit(input.problem, 120)
-  const outcome = cleanAndLimit(input.desiredOutcome, 120)
+  const problem = cleanAndLimit(input.problem, 90)
+  const outcome = cleanAndLimit(input.desiredOutcome, 90)
   const offer = clean(input.offer ?? "")
 
   const goal = [
