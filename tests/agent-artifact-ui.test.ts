@@ -11,7 +11,7 @@ test("Lead Magnet exposes a downloadable and printable customer artifact", () =>
   assert.match(page, /Download lead magnet/)
   assert.match(page, /Print \/ Save PDF/)
   assert.match(page, /buildBrandedHtmlArtifact/)
-  assert.doesNotMatch(page, /publish, email, enroll, or contact anyone for you/gi)
+  assert.match(page, /does not publish, email, enroll, or contact anyone for you/i)
 })
 
 test("Product Creator separates real customer product and seller launch kit", () => {
@@ -28,6 +28,6 @@ test("paid Quick Audit exposes a durable downloadable report without changing ch
   assert.match(page, /Download report/)
   assert.match(page, /Print \/ Save PDF/)
   assert.match(page, /buildAuditArtifact/)
-  assert.match(page, /five|5 Priority Marketing Problems and Fixes/i)
+  assert.match(page, /5 Priority Marketing Problems and Fixes/i)
   assert.match(page, /7-Day Action Plan/)
 })
