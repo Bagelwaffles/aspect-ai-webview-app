@@ -20,6 +20,8 @@ const actionParameterSchema = z.union([
   z.null(),
 ])
 
+const idempotencyKeySchema = z.string().trim().min(8).max(200).regex(/^[A-Za-z0-9._:-]+$/)
+
 export const overmindActionDescriptorSchema = z
   .object({
     agentSlug: z.string().trim().min(1).max(120),
@@ -54,7 +56,7 @@ export const overmindTaskSchema = z
     objective: z.string().trim().min(10).max(2_000),
     action: overmindActionDescriptorSchema,
     actionDigest: z.string().regex(/^[a-f0-9]{64}$/),
-    status: z.enum(["planned", "ready", "pending_approval", "approved", "cancelled"]),
+    status: z.enum(["planned", "ready", "pending_approval", "approved", "rejected", "cancelled"]),
     approvalRequired: z.boolean(),
     executionEligible: z.boolean(),
     createdAt: z.string().datetime(),
@@ -62,6 +64,8 @@ export const overmindTaskSchema = z
     approvedAt: z.string().datetime().nullable(),
     approvalExpiresAt: z.string().datetime().nullable(),
     approvalActorHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+    rejectedAt: z.string().datetime().nullable().default(null),
+    rejectionActorHash: z.string().regex(/^[a-f0-9]{64}$/).nullable().default(null),
     cancelledAt: z.string().datetime().nullable(),
     cancellationActorHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
   })
@@ -73,7 +77,7 @@ const auditEventSchema = z
   .object({
     id: z.string().uuid(),
     taskId: z.string().uuid(),
-    type: z.enum(["task.created", "task.approved", "task.cancelled"]),
+    type: z.enum(["task.created", "task.approved", "task.rejected", "task.cancelled"]),
     actorHash: z.string().regex(/^[a-f0-9]{64}$/),
     at: z.string().datetime(),
     actionDigest: z.string().regex(/^[a-f0-9]{64}$/),
@@ -125,6 +129,13 @@ function auditKey(id: string) {
 
 function actorHash(subject: string) {
   return createHash("sha256").update(subject).digest("hex")
+}
+
+function deterministicTaskId(actorSubject: string, idempotencyKey: string) {
+  const hex = createHash("sha256")
+    .update(`overmind-task\u0000${actorSubject}\u0000${idempotencyKey}`)
+    .digest("hex")
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
 function canonical(value: unknown): string {
@@ -209,7 +220,7 @@ export function overmindTaskApprovalValid(task: OvermindTask, now = new Date()) 
 }
 
 export async function createOvermindTask(
-  input: { objective: string; action: unknown },
+  input: { objective: string; action: unknown; idempotencyKey?: string },
   actorSubject: string,
   options: StoreOptions = {},
 ) {
@@ -218,6 +229,8 @@ export async function createOvermindTask(
 
   const action = overmindActionDescriptorSchema.parse(input.action)
   const objective = z.string().trim().min(10).max(2_000).parse(input.objective)
+  const idempotencyKey = input.idempotencyKey === undefined ? null : idempotencyKeySchema.parse(input.idempotencyKey)
+  const actionDigest = overmindActionDigest(action)
   const contract = resolveContract(action.agentSlug, options)
   if (!contract) throw new Error("OVERMIND_AGENT_NOT_REGISTERED")
 
@@ -232,6 +245,20 @@ export async function createOvermindTask(
     throw new Error("OVERMIND_BILLING_OWNER_APPROVAL_REQUIRED")
   }
 
+  const taskId = idempotencyKey
+    ? deterministicTaskId(actorSubject, idempotencyKey)
+    : (options.id ?? randomUUID)()
+
+  if (idempotencyKey) {
+    const existing = parseTask(await redis.get<unknown>(taskKey(taskId)))
+    if (existing) {
+      if (existing.actionDigest !== actionDigest || existing.objective !== objective) {
+        throw new Error("OVERMIND_IDEMPOTENCY_CONFLICT")
+      }
+      return existing
+    }
+  }
+
   const eligible = contract.status === "live"
   const now = (options.now ?? (() => new Date()))().toISOString()
   const status: OvermindTask["status"] = !eligible
@@ -241,10 +268,10 @@ export async function createOvermindTask(
       : "ready"
 
   const task = overmindTaskSchema.parse({
-    id: (options.id ?? randomUUID)(),
+    id: taskId,
     objective,
     action,
-    actionDigest: overmindActionDigest(action),
+    actionDigest,
     status,
     approvalRequired: requiresApproval,
     executionEligible: eligible,
@@ -253,6 +280,8 @@ export async function createOvermindTask(
     approvedAt: null,
     approvalExpiresAt: null,
     approvalActorHash: null,
+    rejectedAt: null,
+    rejectionActorHash: null,
     cancelledAt: null,
     cancellationActorHash: null,
   })
@@ -276,8 +305,12 @@ export async function listOvermindTasks(options: StoreOptions = {}) {
   if (!redis) throw new Error("OVERMIND_TASK_STORE_UNAVAILABLE")
   const ids = await redis.lrange<string>(TASK_INDEX_KEY, 0, MAX_TASKS - 1)
   const tasks: OvermindTask[] = []
+  const seen = new Set<string>()
   for (const id of ids) {
-    const task = parseTask(await redis.get<unknown>(taskKey(String(id))))
+    const normalizedId = String(id)
+    if (seen.has(normalizedId)) continue
+    seen.add(normalizedId)
+    const task = parseTask(await redis.get<unknown>(taskKey(normalizedId)))
     if (task) tasks.push(task)
   }
   return tasks
@@ -302,8 +335,12 @@ export async function approveOvermindTask(
   const task = await getOvermindTask(id, { ...options, redis })
   if (!task) throw new Error("OVERMIND_TASK_NOT_FOUND")
   if (task.status === "cancelled") throw new Error("OVERMIND_TASK_CANCELLED")
+  if (task.status === "rejected") throw new Error("OVERMIND_TASK_REJECTED")
   if (!task.approvalRequired) throw new Error("OVERMIND_TASK_APPROVAL_NOT_REQUIRED")
   if (task.actionDigest !== input.actionDigest) throw new Error("OVERMIND_ACTION_DIGEST_MISMATCH")
+
+  const nowDate = (options.now ?? (() => new Date()))()
+  if (overmindTaskApprovalValid(task, nowDate)) return task
 
   const contract = resolveContract(task.action.agentSlug, options)
   if (!contract || contract.status !== "live") throw new Error("OVERMIND_AGENT_NOT_LIVE")
@@ -314,7 +351,6 @@ export async function approveOvermindTask(
   }
 
   const minutes = z.number().int().min(1).max(30).parse(input.expiresInMinutes ?? 15)
-  const nowDate = (options.now ?? (() => new Date()))()
   const approved = overmindTaskSchema.parse({
     ...task,
     status: "approved",
@@ -323,10 +359,43 @@ export async function approveOvermindTask(
     approvedAt: nowDate.toISOString(),
     approvalExpiresAt: new Date(nowDate.getTime() + minutes * 60_000).toISOString(),
     approvalActorHash: actorHash(actorSubject),
+    rejectedAt: null,
+    rejectionActorHash: null,
   })
   await redis.set(taskKey(id), JSON.stringify(approved))
   await recordAudit(redis, approved, "task.approved", actorSubject, `Approval expires in ${minutes} minutes.`, options)
   return approved
+}
+
+export async function rejectOvermindTask(
+  id: string,
+  actorSubject: string,
+  options: StoreOptions = {},
+) {
+  const redis = runtimeRedis(options)
+  if (!redis) throw new Error("OVERMIND_TASK_STORE_UNAVAILABLE")
+  const task = await getOvermindTask(id, { ...options, redis })
+  if (!task) throw new Error("OVERMIND_TASK_NOT_FOUND")
+  if (task.status === "rejected") return task
+  if (task.status === "cancelled") throw new Error("OVERMIND_TASK_CANCELLED")
+  if (task.status === "approved") throw new Error("OVERMIND_TASK_ALREADY_APPROVED")
+  if (!task.approvalRequired) throw new Error("OVERMIND_TASK_REJECTION_NOT_REQUIRED")
+
+  const now = (options.now ?? (() => new Date()))().toISOString()
+  const rejected = overmindTaskSchema.parse({
+    ...task,
+    status: "rejected",
+    executionEligible: false,
+    updatedAt: now,
+    approvedAt: null,
+    approvalExpiresAt: null,
+    approvalActorHash: null,
+    rejectedAt: now,
+    rejectionActorHash: actorHash(actorSubject),
+  })
+  await redis.set(taskKey(id), JSON.stringify(rejected))
+  await recordAudit(redis, rejected, "task.rejected", actorSubject, "Task rejected before execution.", options)
+  return rejected
 }
 
 export async function cancelOvermindTask(
@@ -339,6 +408,7 @@ export async function cancelOvermindTask(
   const task = await getOvermindTask(id, { ...options, redis })
   if (!task) throw new Error("OVERMIND_TASK_NOT_FOUND")
   if (task.status === "cancelled") return task
+  if (task.status === "rejected") throw new Error("OVERMIND_TASK_REJECTED")
 
   const now = (options.now ?? (() => new Date()))().toISOString()
   const cancelled = overmindTaskSchema.parse({
