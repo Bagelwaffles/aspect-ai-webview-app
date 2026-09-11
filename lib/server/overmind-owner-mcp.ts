@@ -34,6 +34,13 @@ const READ_ONLY = {
 const WRITE_SAFE = {
   readOnlyHint: false,
   destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: false,
+} as const
+
+const CREATE_IDEMPOTENT = {
+  readOnlyHint: false,
+  destructiveHint: false,
   idempotentHint: true,
   openWorldHint: false,
 } as const
@@ -103,7 +110,7 @@ export const OWNER_OVERMIND_TOOLS: OwnerMcpToolDefinition[] = [
         idempotencyKey: { type: "string", minLength: 8, maxLength: 200, pattern: "^[A-Za-z0-9._:-]+$" },
       },
     },
-    annotations: WRITE_SAFE,
+    annotations: CREATE_IDEMPOTENT,
     requiredScope: "overmind.control",
   },
   {
