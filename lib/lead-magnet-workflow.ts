@@ -32,10 +32,14 @@ function clean(value: string): string {
   return value.trim().replace(/\s+/g, " ")
 }
 
+function cleanAndLimit(value: string, maxLength: number): string {
+  return clean(value).slice(0, maxLength).trim()
+}
+
 export function buildLeadMagnetContentBrief(input: LeadMagnetWorkflowInput): ContentAgentBrief {
   const typeLabel = TYPE_LABELS[input.type]
-  const problem = clean(input.problem)
-  const outcome = clean(input.desiredOutcome)
+  const problem = cleanAndLimit(input.problem, 120)
+  const outcome = cleanAndLimit(input.desiredOutcome, 120)
   const offer = clean(input.offer ?? "")
 
   const goal = [
