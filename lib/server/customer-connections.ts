@@ -1,4 +1,11 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto"
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createSecretKey,
+  randomBytes,
+  type KeyObject,
+} from "node:crypto"
 
 import { Redis } from "@upstash/redis"
 import { z } from "zod"
@@ -74,13 +81,16 @@ function runtimeRedis(options: Options) {
   return resolveRedis(options.env ?? process.env)
 }
 
-export function resolveConnectionEncryptionKey(env: NodeJS.ProcessEnv = process.env): Buffer | null {
+export function resolveConnectionEncryptionKey(
+  env: NodeJS.ProcessEnv = process.env,
+): KeyObject | null {
   const raw = trimmed(env.AMS_CONNECTION_ENCRYPTION_KEY)
   if (!raw) return null
 
   try {
-    const key = Buffer.from(raw, "base64")
-    return key.length === 32 ? key : null
+    const decoded = Buffer.from(raw, "base64")
+    if (decoded.length !== 32) return null
+    return createSecretKey(Uint8Array.from(decoded))
   } catch {
     return null
   }
@@ -113,26 +123,26 @@ function parseStored(raw: unknown): StoredConnection | null {
   return parsed.success ? parsed.data : null
 }
 
-function encryptPayload(payload: z.infer<typeof encryptedPayloadSchema>, key: Buffer) {
-  const iv = randomBytes(12)
+function encryptPayload(payload: z.infer<typeof encryptedPayloadSchema>, key: KeyObject) {
+  const iv = Uint8Array.from(randomBytes(12))
   const cipher = createCipheriv("aes-256-gcm", key, iv)
-  const plain = Buffer.from(JSON.stringify(encryptedPayloadSchema.parse(payload)), "utf8")
-  const encrypted = Buffer.concat([cipher.update(plain), cipher.final()])
+  const plain = JSON.stringify(encryptedPayloadSchema.parse(payload))
+  const cipherText = cipher.update(plain, "utf8", "hex") + cipher.final("hex")
   return {
-    cipherText: encrypted.toString("base64"),
-    iv: iv.toString("base64"),
+    cipherText,
+    iv: Buffer.from(iv).toString("base64"),
     authTag: cipher.getAuthTag().toString("base64"),
   }
 }
 
-function decryptPayload(record: StoredConnection, key: Buffer) {
-  const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(record.iv, "base64"))
-  decipher.setAuthTag(Buffer.from(record.authTag, "base64"))
-  const decrypted = Buffer.concat([
-    decipher.update(Buffer.from(record.cipherText, "base64")),
-    decipher.final(),
-  ])
-  return encryptedPayloadSchema.parse(JSON.parse(decrypted.toString("utf8")))
+function decryptPayload(record: StoredConnection, key: KeyObject) {
+  const iv = Uint8Array.from(Buffer.from(record.iv, "base64"))
+  const authTag = Uint8Array.from(Buffer.from(record.authTag, "base64"))
+  const decipher = createDecipheriv("aes-256-gcm", key, iv)
+  decipher.setAuthTag(authTag)
+  const decrypted =
+    decipher.update(record.cipherText, "hex", "utf8") + decipher.final("utf8")
+  return encryptedPayloadSchema.parse(JSON.parse(decrypted))
 }
 
 export async function saveCustomerConnection(
