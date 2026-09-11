@@ -89,7 +89,7 @@ export type OvermindTaskAuditEvent = z.infer<typeof auditEventSchema>
 
 type RedisLike = {
   get<T = unknown>(key: string): Promise<T | null>
-  set(key: string, value: string): Promise<unknown>
+  set(key: string, value: string, options?: { nx?: boolean }): Promise<unknown>
   lpush(key: string, ...values: string[]): Promise<unknown>
   ltrim(key: string, start: number, stop: number): Promise<unknown>
   lrange<T = unknown>(key: string, start: number, stop: number): Promise<T[]>
@@ -286,7 +286,20 @@ export async function createOvermindTask(
     cancellationActorHash: null,
   })
 
-  await redis.set(taskKey(task.id), JSON.stringify(task))
+  if (idempotencyKey) {
+    const claimed = await redis.set(taskKey(task.id), JSON.stringify(task), { nx: true })
+    if (claimed === null) {
+      const existing = parseTask(await redis.get<unknown>(taskKey(task.id)))
+      if (!existing) throw new Error("OVERMIND_IDEMPOTENCY_STATE_UNAVAILABLE")
+      if (existing.actionDigest !== actionDigest || existing.objective !== objective) {
+        throw new Error("OVERMIND_IDEMPOTENCY_CONFLICT")
+      }
+      return existing
+    }
+  } else {
+    await redis.set(taskKey(task.id), JSON.stringify(task))
+  }
+
   await redis.lpush(TASK_INDEX_KEY, task.id)
   await redis.ltrim(TASK_INDEX_KEY, 0, MAX_TASKS - 1)
   await recordAudit(redis, task, "task.created", actorSubject, `Created with status ${task.status}.`, options)
