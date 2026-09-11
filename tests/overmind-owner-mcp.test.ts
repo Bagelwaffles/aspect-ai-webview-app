@@ -77,6 +77,9 @@ test("owner MCP exposes task ledger controls but no execute tool", () => {
   assert.equal(OWNER_OVERMIND_TOOLS.find((tool) => tool.name === "ams_owner_list_tasks")?.requiredScope, "overmind.read")
   assert.equal(OWNER_OVERMIND_TOOLS.find((tool) => tool.name === "ams_owner_approve_task")?.requiredScope, "overmind.control")
   assert.equal(OWNER_OVERMIND_TOOLS.find((tool) => tool.name === "ams_owner_create_task")?.annotations.idempotentHint, true)
+  assert.equal(OWNER_OVERMIND_TOOLS.find((tool) => tool.name === "ams_owner_approve_task")?.annotations.idempotentHint, false)
+  assert.equal(OWNER_OVERMIND_TOOLS.find((tool) => tool.name === "ams_owner_reject_task")?.annotations.idempotentHint, true)
+  assert.equal(OWNER_OVERMIND_TOOLS.find((tool) => tool.name === "ams_owner_cancel_task")?.annotations.idempotentHint, true)
 })
 
 test("owner MCP mutations always report that no execution occurred", async () => {
