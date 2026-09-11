@@ -7,6 +7,7 @@ import {
   getOvermindTask,
   listOvermindTaskAudit,
   listOvermindTasks,
+  rejectOvermindTask,
 } from "@/lib/server/overmind-task-store"
 
 export type OwnerMcpToolDefinition = {
@@ -33,11 +34,11 @@ const READ_ONLY = {
 const WRITE_SAFE = {
   readOnlyHint: false,
   destructiveHint: false,
-  idempotentHint: false,
+  idempotentHint: true,
   openWorldHint: false,
 } as const
 
-const CANCEL = {
+const TERMINAL = {
   readOnlyHint: false,
   destructiveHint: true,
   idempotentHint: true,
@@ -60,6 +61,7 @@ const ACTION_SCHEMA = {
       additionalProperties: {
         anyOf: [{ type: "string", maxLength: 2000 }, { type: "number" }, { type: "boolean" }, { type: "null" }],
       },
+      description: "Non-secret scalar task parameters only. Secret, password, token, credential, and API-key fields are rejected server-side.",
     },
   },
 } as const
@@ -90,14 +92,15 @@ export const OWNER_OVERMIND_TOOLS: OwnerMcpToolDefinition[] = [
     name: "ams_owner_create_task",
     title: "Create Overmind task",
     description:
-      "Create a durable task record for an exact AMS agent action. This records intent only and never executes the action or contacts an external system.",
+      "Create one durable task record for an exact AMS agent action. This records intent only and never executes the action or contacts an external system. A stable idempotency key prevents retry duplicates.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
-      required: ["objective", "action"],
+      required: ["objective", "action", "idempotencyKey"],
       properties: {
         objective: { type: "string", minLength: 10, maxLength: 2000 },
         action: ACTION_SCHEMA,
+        idempotencyKey: { type: "string", minLength: 8, maxLength: 200, pattern: "^[A-Za-z0-9._:-]+$" },
       },
     },
     annotations: WRITE_SAFE,
@@ -107,7 +110,7 @@ export const OWNER_OVERMIND_TOOLS: OwnerMcpToolDefinition[] = [
     name: "ams_owner_approve_task",
     title: "Approve Overmind task",
     description:
-      "Approve one exact task action digest for a short expiry window. Approval changes only AMS task state; no executor is registered and no external action is performed.",
+      "Approve one exact task action digest for a short expiry window. Approval changes only AMS task state; no executor is registered and no external action is performed. Repeating a still-valid approval does not extend it.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -123,6 +126,23 @@ export const OWNER_OVERMIND_TOOLS: OwnerMcpToolDefinition[] = [
     requiredScope: "overmind.control",
   },
   {
+    name: "ams_owner_reject_task",
+    title: "Reject Overmind task",
+    description:
+      "Reject a task awaiting approval. Rejection is a terminal AMS ledger state, is audited, and performs no external action.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["taskId", "confirmation"],
+      properties: {
+        taskId: { type: "string", format: "uuid" },
+        confirmation: { type: "string", const: "REJECT_OVERMIND_TASK" },
+      },
+    },
+    annotations: TERMINAL,
+    requiredScope: "overmind.control",
+  },
+  {
     name: "ams_owner_cancel_task",
     title: "Cancel Overmind task",
     description: "Cancel a durable Overmind task before execution. This is idempotent and does not call any external system.",
@@ -135,7 +155,7 @@ export const OWNER_OVERMIND_TOOLS: OwnerMcpToolDefinition[] = [
         confirmation: { type: "string", const: "CANCEL_OVERMIND_TASK" },
       },
     },
-    annotations: CANCEL,
+    annotations: TERMINAL,
     requiredScope: "overmind.control",
   },
 ]
@@ -149,6 +169,9 @@ const approveSchema = z
     expiresInMinutes: z.number().int().min(1).max(30).optional(),
   })
   .strict()
+const rejectSchema = z
+  .object({ taskId: taskIdSchema, confirmation: z.literal("REJECT_OVERMIND_TASK") })
+  .strict()
 const cancelSchema = z
   .object({ taskId: taskIdSchema, confirmation: z.literal("CANCEL_OVERMIND_TASK") })
   .strict()
@@ -156,6 +179,7 @@ const createSchema = z
   .object({
     objective: z.string().trim().min(10).max(2_000),
     action: z.record(z.unknown()),
+    idempotencyKey: z.string().trim().min(8).max(200).regex(/^[A-Za-z0-9._:-]+$/),
   })
   .strict()
 
@@ -165,6 +189,7 @@ export type OwnerMcpDependencies = {
   listAudit: typeof listOvermindTaskAudit
   createTask: typeof createOvermindTask
   approveTask: typeof approveOvermindTask
+  rejectTask: typeof rejectOvermindTask
   cancelTask: typeof cancelOvermindTask
 }
 
@@ -174,6 +199,7 @@ const DEFAULT_DEPENDENCIES: OwnerMcpDependencies = {
   listAudit: listOvermindTaskAudit,
   createTask: createOvermindTask,
   approveTask: approveOvermindTask,
+  rejectTask: rejectOvermindTask,
   cancelTask: cancelOvermindTask,
 }
 
@@ -212,7 +238,10 @@ export async function handleOwnerOvermindTool(
 
     if (name === "ams_owner_create_task") {
       const input = createSchema.parse(args)
-      const task = await dependencies.createTask(input, actorSubject)
+      const task = await dependencies.createTask(
+        { objective: input.objective, action: input.action, idempotencyKey: input.idempotencyKey },
+        actorSubject,
+      )
       return { ok: true, task, executionPerformed: false }
     }
 
@@ -223,6 +252,12 @@ export async function handleOwnerOvermindTool(
         { actionDigest: input.actionDigest, expiresInMinutes: input.expiresInMinutes },
         actorSubject,
       )
+      return { ok: true, task, executionPerformed: false }
+    }
+
+    if (name === "ams_owner_reject_task") {
+      const input = rejectSchema.parse(args)
+      const task = await dependencies.rejectTask(input.taskId, actorSubject)
       return { ok: true, task, executionPerformed: false }
     }
 
