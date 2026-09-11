@@ -41,10 +41,10 @@ function cleanAndLimit(value: string, maxLength: number): string {
 export function buildProductCreatorContentBrief(
   input: ProductCreatorWorkflowInput,
 ): ProductCreatorContentBrief {
-  const concept = cleanAndLimit(input.concept, 50)
-  const outcome = cleanAndLimit(input.customerOutcome, 50)
-  const deliverables = cleanAndLimit(input.deliverables, 50)
-  const constraints = cleanAndLimit(input.constraints ?? "", 30)
+  const concept = cleanAndLimit(input.concept, 40)
+  const outcome = cleanAndLimit(input.customerOutcome, 40)
+  const deliverables = cleanAndLimit(input.deliverables, 40)
+  const constraints = cleanAndLimit(input.constraints ?? "", 20)
   const pricePositioning = cleanAndLimit(input.pricePositioning ?? "", 300)
   const physical = input.productType === "physical-product"
 
@@ -59,7 +59,7 @@ export function buildProductCreatorContentBrief(
     `Include: ${deliverables}.`,
     constraints ? `Constraints: ${constraints}.` : "",
     completionRule,
-    "Seller kit: positioning, listing copy, launch assets, QA. Human review required; no unsupported claims.",
+    "Seller kit: positioning, listing copy, launch assets, QA. Human review required. No invented claims.",
   ].filter(Boolean).join(" ")
 
   return {
