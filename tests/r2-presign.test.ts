@@ -3,17 +3,20 @@ import test from "node:test"
 
 import { isR2AssetStorageConfigured, presignR2Object } from "../lib/server/r2-presign"
 
-const env = {
+const env: NodeJS.ProcessEnv = {
+  NODE_ENV: "test",
   AMS_ASSET_R2_ACCOUNT_ID: "1234567890abcdef1234567890abcdef",
   AMS_ASSET_R2_ACCESS_KEY_ID: "TESTACCESSKEY123",
   AMS_ASSET_R2_SECRET_ACCESS_KEY: "test-secret-key-value",
   AMS_ASSET_R2_BUCKET: "ams-customer-assets",
-} as NodeJS.ProcessEnv
+}
 
 test("R2 asset storage fails closed when credentials are incomplete", () => {
-  assert.equal(isR2AssetStorageConfigured({ AMS_ASSET_R2_BUCKET: "assets" } as NodeJS.ProcessEnv), false)
+  const incomplete: NodeJS.ProcessEnv = { NODE_ENV: "test", AMS_ASSET_R2_BUCKET: "assets" }
+  const empty: NodeJS.ProcessEnv = { NODE_ENV: "test" }
+  assert.equal(isR2AssetStorageConfigured(incomplete), false)
   assert.throws(
-    () => presignR2Object("GET", "customers/abc/file.png", {}, {} as NodeJS.ProcessEnv),
+    () => presignR2Object("GET", "customers/abc/file.png", {}, empty),
     /ASSET_STORAGE_NOT_CONFIGURED/,
   )
 })
