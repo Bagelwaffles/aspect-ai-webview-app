@@ -86,20 +86,15 @@ function assetsKey(subject: string) {
   return `${WORKSPACE_PREFIX}:${customerWorkspaceSubjectHash(subject)}:assets`
 }
 
-function parseStored<T>(raw: unknown, schema: z.ZodType<T>, fallback: T): T {
-  if (raw === null || raw === undefined) return fallback
+function storedCandidate(raw: unknown): unknown {
+  if (raw === null || raw === undefined) return null
+  if (typeof raw !== "string") return raw
 
-  let candidate = raw
-  if (typeof raw === "string") {
-    try {
-      candidate = JSON.parse(raw)
-    } catch {
-      return fallback
-    }
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
   }
-
-  const parsed = schema.safeParse(candidate)
-  return parsed.success ? parsed.data : fallback
 }
 
 const assetListSchema = z.array(customerAssetSchema).max(MAX_ASSETS)
@@ -111,8 +106,10 @@ export async function getCustomerWorkspaceProfile(
   const redis = runtimeRedis(options)
   if (!redis) throw new Error("WORKSPACE_STORE_UNAVAILABLE")
 
-  const raw = await redis.get<unknown>(profileKey(subject))
-  return parseStored(raw, customerWorkspaceProfileSchema, customerWorkspaceProfileSchema.parse({}))
+  const parsed = customerWorkspaceProfileSchema.safeParse(
+    storedCandidate(await redis.get<unknown>(profileKey(subject))),
+  )
+  return parsed.success ? parsed.data : customerWorkspaceProfileSchema.parse({})
 }
 
 export async function saveCustomerWorkspaceProfile(
@@ -135,8 +132,11 @@ export async function listCustomerAssets(
   const redis = runtimeRedis(options)
   if (!redis) throw new Error("WORKSPACE_STORE_UNAVAILABLE")
 
-  const raw = await redis.get<unknown>(assetsKey(subject))
-  return parseStored(raw, assetListSchema, []).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const parsed = assetListSchema.safeParse(
+    storedCandidate(await redis.get<unknown>(assetsKey(subject))),
+  )
+  const assets = parsed.success ? parsed.data : []
+  return assets.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
 function safeFileName(fileName: string) {
