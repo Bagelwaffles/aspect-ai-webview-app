@@ -58,6 +58,14 @@ function objectiveTokens(value: string) {
   )
 }
 
+function objectiveRequiresLiveOnly(value: string) {
+  const normalized = value.toLowerCase().replace(/\s+/gu, " ").trim()
+  return (
+    /\bonly\s+(?:currently\s+)?live(?:\s+ams)?\s+agents?\b/u.test(normalized) ||
+    /\b(?:use|using)\s+only\s+(?:currently\s+)?live\b/u.test(normalized)
+  )
+}
+
 function contractScore(contract: AgentContract, tokens: Set<string>) {
   const haystack = [contract.slug, contract.name, contract.category, ...contract.capabilities]
     .join(" ")
@@ -69,14 +77,24 @@ function contractScore(contract: AgentContract, tokens: Set<string>) {
   return score
 }
 
+function resolveRequestedContracts(input: OvermindPlanInput) {
+  return (input.requestedAgentSlugs ?? [])
+    .map((slug) => getAgentContract(slug))
+    .filter(Boolean) as AgentContract[]
+}
+
 function candidateContracts(input: OvermindPlanInput) {
+  const liveOnly = objectiveRequiresLiveOnly(input.objective)
+
   if (input.requestedAgentSlugs?.length) {
-    return input.requestedAgentSlugs.map((slug) => getAgentContract(slug)).filter(Boolean) as AgentContract[]
+    const resolved = resolveRequestedContracts(input)
+    return liveOnly ? resolved.filter((contract) => contract.status === "live") : resolved
   }
 
   const tokens = objectiveTokens(input.objective)
   return listAgentContracts()
     .filter((contract) => contract.slug !== "aspect-overmind")
+    .filter((contract) => !liveOnly || contract.status === "live")
     .map((contract) => ({ contract, score: contractScore(contract, tokens) }))
     .filter((entry) => entry.score > 0)
     .sort((left, right) => {
@@ -136,18 +154,36 @@ export function createOvermindPlan(
   options: { id?: () => string; now?: () => Date } = {},
 ): OvermindPlan {
   const input = overmindPlanInputSchema.parse(rawInput)
+  const liveOnly = objectiveRequiresLiveOnly(input.objective)
   const candidates = candidateContracts(input)
   const steps = candidates.map((contract, index) => stepFor(contract, index + 1))
   const blockers: string[] = []
 
-  if (input.requestedAgentSlugs?.length && candidates.length !== input.requestedAgentSlugs.length) {
-    blockers.push("One or more requested agent slugs are not registered.")
+  if (input.requestedAgentSlugs?.length) {
+    const resolved = resolveRequestedContracts(input)
+    if (resolved.length !== input.requestedAgentSlugs.length) {
+      blockers.push("One or more requested agent slugs are not registered.")
+    }
+    if (liveOnly && resolved.some((contract) => contract.status !== "live")) {
+      blockers.push(
+        "One or more requested agents were excluded because the objective requires currently Live AMS agents.",
+      )
+    }
   }
   if (!steps.length) {
     blockers.push("No registered AMS agent matched the objective strongly enough for deterministic routing.")
   }
   for (const step of steps) {
     if (step.readiness === "blocked") blockers.push(`${step.agentName}: ${step.reason}`)
+  }
+
+  const notes = [
+    "Overmind v1 never treats a plan as proof of execution.",
+    "External publishing, messaging, billing, deletion, store changes, and other mutations remain approval-gated.",
+    "Customer workspace, connected-account, file, and web context remain untrusted inputs to the model layer.",
+  ]
+  if (liveOnly) {
+    notes.push("The objective's currently-Live-only constraint was applied before relevance ranking.")
   }
 
   return {
@@ -161,10 +197,6 @@ export function createOvermindPlan(
     ),
     steps,
     blockers: [...new Set(blockers)],
-    notes: [
-      "Overmind v1 never treats a plan as proof of execution.",
-      "External publishing, messaging, billing, deletion, store changes, and other mutations remain approval-gated.",
-      "Customer workspace, connected-account, file, and web context remain untrusted inputs to the model layer.",
-    ],
+    notes,
   }
 }
