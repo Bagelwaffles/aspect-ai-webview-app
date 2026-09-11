@@ -49,6 +49,10 @@ function encodeRfc3986(value: string) {
   return encodeURIComponent(value).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
 }
 
+function lexicalCompare(a: string, b: string) {
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
 function canonicalObjectPath(bucket: string, objectKey: string) {
   const bucketSegment = encodeRfc3986(bucket)
   const objectSegments = objectKey
@@ -64,8 +68,9 @@ function amzTimestamp(date: Date) {
 
 function canonicalQuery(params: Record<string, string>) {
   return Object.entries(params)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${encodeRfc3986(key)}=${encodeRfc3986(value)}`)
+    .map(([key, value]) => [encodeRfc3986(key), encodeRfc3986(value)] as const)
+    .sort(([a], [b]) => lexicalCompare(a, b))
+    .map(([key, value]) => `${key}=${value}`)
     .join("&")
 }
 
@@ -98,9 +103,9 @@ export function presignR2Object(
     headers["content-type"] = contentType
   }
 
-  const signedHeaders = Object.keys(headers).sort().join(";")
+  const signedHeaders = Object.keys(headers).sort(lexicalCompare).join(";")
   const canonicalHeaders = Object.entries(headers)
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => lexicalCompare(a, b))
     .map(([key, value]) => `${key}:${value.trim()}\n`)
     .join("")
 
