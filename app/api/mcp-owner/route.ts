@@ -86,7 +86,13 @@ function toolResult(value: Record<string, unknown>) {
 }
 
 function publicToolDefinitions() {
-  return OWNER_OVERMIND_TOOLS.map(({ requiredScope: _requiredScope, ...tool }) => tool)
+  return OWNER_OVERMIND_TOOLS.map((tool) => ({
+    name: tool.name,
+    title: tool.title,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+    annotations: tool.annotations,
+  }))
 }
 
 function authChallenge() {
