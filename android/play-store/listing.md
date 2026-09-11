@@ -4,23 +4,23 @@
 Aspect Marketing Solutions
 
 ## Short description
-Monitor AMS platform status and follow the verified AI agent network from Android.
+Check live AMS platform health and review verified AI agent release status on Android.
 
 ## Full description
 Aspect Marketing Solutions (AMS) is building a coordinated AI operating layer for practical business growth.
 
-The AMS Android companion gives you a clean, native view of the platform's current operating status and the verified launch state of the AMS Agent Network.
+The AMS Android companion gives you a clean, native view of live platform health and the verified release status of selected customer-facing agents included with this app version.
 
 ### What you can do in this release
 - Check live AMS platform health
 - See whether core persistence is operating normally
-- Review the current launch status of selected AMS agents
-- See which capabilities are Beta, In Development, or not yet available
+- Review verified release-time status for selected AMS agents
+- Distinguish Live and Beta capabilities without presenting unfinished work as available
 - Open the AMS privacy policy
 - Contact AMS support
 
 ### Built around honest availability
-AMS does not mark unfinished agents as live. The Android app reflects the controlled product lifecycle used across the platform so customers can distinguish working services from Beta, In Development, and Coming Soon capabilities.
+AMS does not mark unfinished agents as live. Android v2.0.0 identifies selected agents according to the production proof available when this app release was built. Platform health is refreshed live; later agent lifecycle changes are reflected in later app releases.
 
 ### Consumption-only Android release
 This version of the Android app does not sell subscriptions, accept payments, provide Stripe checkout links, or create accounts. Web purchases and account billing remain separate from this Play release.
@@ -48,7 +48,7 @@ https://www.aspectmarketingsolutions.app
 ## Release notes — 2.0.0
 - Rebuilt as a native Android companion
 - Added live AMS platform-health status
-- Added verified Agent Network lifecycle view
+- Added verified release-time Agent Network lifecycle view
 - Removed the legacy embedded WebView architecture
 - Removed in-app payment and external checkout surfaces
 - Updated to target Android API 36

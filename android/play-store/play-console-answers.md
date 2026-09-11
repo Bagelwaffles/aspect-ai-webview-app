@@ -41,7 +41,9 @@ Current source assessment:
 - No user-entered personal data collection in the Android app
 - HTTPS request to the public AMS health endpoint only
 
-Before submitting Data Safety, reconcile server-side request logging and hosting behavior with Google's current definition of collection. The dedicated draft is in `data-safety-draft.md`.
+**Do not submit a blanket `No data collected` answer yet.** Google defines collection broadly as user data transmitted off-device. The health request necessarily reaches AMS hosting with connection metadata such as IP address and the explicit `AMS-Android/2.0` user-agent. If that metadata is only processed ephemerally to serve the request, Google provides special handling; if AMS/Vercel logs or uses it beyond the real-time request, the applicable data type and purpose must be disclosed. Confirm the actual production retention/use before submitting the Data Safety form.
+
+The detailed source assessment is in `data-safety-draft.md`.
 
 ## Privacy policy
 

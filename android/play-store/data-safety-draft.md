@@ -1,6 +1,6 @@
 # Google Play Data Safety — Draft for Android v2.0.0
 
-This document is a release-preparation draft based on the current `android/play-v1` source. It must be reconciled with the exact Google Play Console questionnaire at submission time. Do not copy answers blindly if the app code or connected SDKs change.
+This document is a release-preparation draft based on the current Android source on `main`. It must be reconciled with the exact shipping AAB and Google Play Console questionnaire at submission time. Do not copy answers blindly if the app code or connected SDKs change.
 
 ## Current app architecture
 
@@ -43,7 +43,7 @@ This document is a release-preparation draft based on the current `android/play-
 - Fitness info: Not collected
 
 ### Messages
-- Emails: Not collected
+- Emails: Not collected by the app. Tapping support launches the user's external email app through an Android `mailto:` intent; AMS Mobile does not read or transmit the message itself.
 - SMS/MMS: Not collected
 - Other in-app messages: Not collected
 
@@ -73,7 +73,7 @@ This document is a release-preparation draft based on the current `android/play-
 - Other actions: Not collected by app code
 
 ### Web browsing
-- Not collected by app code
+- Not collected by app code. The Privacy Policy button opens the public AMS privacy URL in an external browser; AMS Mobile does not embed or inspect browser activity.
 
 ### App info and performance
 - Crash logs: No crash-reporting SDK in app code
@@ -85,7 +85,7 @@ This document is a release-preparation draft based on the current `android/play-
 
 ## Network / hosting note
 
-When the app calls `https://www.aspectmarketingsolutions.app/api/health`, normal internet infrastructure may process connection metadata such as IP address, timestamp, HTTP headers, and user-agent for delivery, security, and operational logging. The public AMS privacy policy discloses this. Before Play submission, confirm whether Google Play's current Data Safety definitions require any of this server-side transient/log processing to be declared as collected.
+When the app calls `https://www.aspectmarketingsolutions.app/api/health`, normal internet infrastructure may process connection metadata such as IP address, timestamp, HTTP headers, and the explicit `AMS-Android/2.0` user-agent for delivery, security, and operational logging. The public AMS privacy policy discloses server-side technical information. Before Play submission, reconcile this server-side transient/log processing with Google Play's exact current Data Safety definitions and the actual hosting configuration used by the shipping release.
 
 ## Sharing
 
