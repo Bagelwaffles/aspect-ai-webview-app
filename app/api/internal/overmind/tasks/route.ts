@@ -29,14 +29,18 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const task = await createOvermindTask(
-      { objective: body?.objective, action: body?.action },
+      { objective: body?.objective, action: body?.action, idempotencyKey: body?.idempotencyKey },
       authorization.principal.subject,
     )
     return json({ ok: true, task, executionPerformed: false }, 201)
   } catch (error) {
     if (error instanceof ZodError) return json({ ok: false, code: "INVALID_OVERMIND_TASK" }, 400)
     const code = error instanceof Error ? error.message : "OVERMIND_TASK_STORE_UNAVAILABLE"
-    const status = code === "OVERMIND_AGENT_NOT_REGISTERED" || code === "OVERMIND_PERMISSION_NOT_DECLARED" ? 409 : 503
+    const status = code === "OVERMIND_IDEMPOTENCY_CONFLICT"
+      ? 409
+      : code === "OVERMIND_AGENT_NOT_REGISTERED" || code === "OVERMIND_PERMISSION_NOT_DECLARED"
+        ? 409
+        : 503
     return json({ ok: false, code }, status)
   }
 }
