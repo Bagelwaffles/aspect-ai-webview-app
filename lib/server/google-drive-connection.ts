@@ -86,8 +86,8 @@ function oauthSigningSecret(env: NodeJS.ProcessEnv = process.env) {
   return clean(env.NEXTAUTH_SECRET) ?? clean(env.AMS_CONNECTION_ENCRYPTION_KEY)
 }
 
-function base64url(input: Buffer | string) {
-  return Buffer.from(input).toString("base64url")
+function base64url(input: string) {
+  return Buffer.from(input, "utf8").toString("base64url")
 }
 
 function signPayload(encodedPayload: string, env: NodeJS.ProcessEnv = process.env) {
@@ -137,8 +137,8 @@ export function readGoogleDriveOauthAttempt(
   if (!encoded || !signature || rest.length) throw new Error("GOOGLE_DRIVE_OAUTH_STATE_INVALID")
 
   const expectedSignature = signPayload(encoded, env)
-  const actualBytes = Buffer.from(signature)
-  const expectedBytes = Buffer.from(expectedSignature)
+  const actualBytes = Uint8Array.from(Buffer.from(signature, "utf8"))
+  const expectedBytes = Uint8Array.from(Buffer.from(expectedSignature, "utf8"))
   if (
     actualBytes.length !== expectedBytes.length ||
     !timingSafeEqual(actualBytes, expectedBytes)
