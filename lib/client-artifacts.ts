@@ -76,7 +76,7 @@ export function buildBrandedHtmlArtifact(input: BrandedArtifactInput): string {
   h2 { margin: 0 0 14px; font-size: 20px; }
   .artifact-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 1.75; }
   ul, ol { margin: 12px 0 0; padding-left: 24px; }
-  li { margin: 8px 0; line-height: 1.6; }
+  li { margin: 8px 0; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
   footer { margin-top: 42px; padding-top: 20px; border-top: 1px solid #e8e8ef; color: #777887; font-size: 12px; }
   @media (max-width: 640px) { main { width: 100%; margin: 0; border: 0; border-radius: 0; padding: 28px 20px; box-shadow: none; } }
   @media print { body { background: white; } main { width: 100%; margin: 0; border: 0; border-radius: 0; padding: 0; box-shadow: none; } }
