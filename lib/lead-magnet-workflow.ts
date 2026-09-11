@@ -32,17 +32,21 @@ function clean(value: string): string {
   return value.trim().replace(/\s+/g, " ")
 }
 
+function cleanAndLimit(value: string, maxLength: number): string {
+  return clean(value).slice(0, maxLength).trim()
+}
+
 export function buildLeadMagnetContentBrief(input: LeadMagnetWorkflowInput): ContentAgentBrief {
   const typeLabel = TYPE_LABELS[input.type]
-  const problem = clean(input.problem)
-  const outcome = clean(input.desiredOutcome)
+  const problem = cleanAndLimit(input.problem, 90)
+  const outcome = cleanAndLimit(input.desiredOutcome, 90)
   const offer = clean(input.offer ?? "")
 
   const goal = [
-    `Create a ${typeLabel}.`,
+    `Create a finished reader-facing ${typeLabel}, not an outline or description of one.`,
     `Solve: ${problem}.`,
     `Desired outcome: ${outcome}.`,
-    "Make it useful on its own with clear steps or sections. Avoid unsupported claims or guarantees.",
+    "Make the body usable on its own with concrete steps, prompts, checkboxes or sections appropriate to the format. Avoid unsupported claims or guarantees.",
   ].join(" ")
 
   return {

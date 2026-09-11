@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Copy, FileText, Loader2, Send } from "lucide-react"
+import { ArrowLeft, Copy, Download, FileText, Loader2, Printer, Send } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  artifactFilename,
+  buildBrandedHtmlArtifact,
+  downloadHtmlArtifact,
+  printHtmlArtifact,
+} from "@/lib/client-artifacts"
 import {
   buildLeadMagnetContentBrief,
   type LeadMagnetTone,
@@ -116,6 +122,31 @@ export default function LeadMagnetAgentPage() {
     setCopied(true)
   }
 
+  function leadMagnetArtifactHtml(): string | null {
+    if (!result?.output) return null
+    return buildBrandedHtmlArtifact({
+      eyebrow: "Lead Magnet",
+      title: result.output.headline,
+      subtitle: "A ready-to-review customer resource created by the AMS Lead Magnet Agent.",
+      sections: [
+        { heading: "Resource", text: result.output.body },
+        { heading: "Next Step", text: result.output.callToAction },
+      ],
+      footer: "Created with Aspect Marketing Solutions. Review for accuracy, brand fit, and any claims requiring verification before distribution.",
+    })
+  }
+
+  function downloadLeadMagnet() {
+    const html = leadMagnetArtifactHtml()
+    if (!html || !result?.output) return
+    downloadHtmlArtifact(artifactFilename(result.output.headline, "lead-magnet"), html)
+  }
+
+  function printLeadMagnet() {
+    const html = leadMagnetArtifactHtml()
+    if (html) printHtmlArtifact(html)
+  }
+
   return (
     <main className="min-h-screen bg-background px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -125,7 +156,7 @@ export default function LeadMagnetAgentPage() {
             <div>
               <h1 className="text-2xl font-bold sm:text-3xl">Lead Magnet Agent</h1>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-                Turn a business problem and desired customer outcome into a useful lead-magnet draft. This workflow is draft-only: it does not publish, email, or contact anyone.
+                Turn a business problem and customer outcome into a usable lead magnet you can download, print, or save as PDF after review. The agent creates the asset; it does not publish, email, enroll, or contact anyone for you.
               </p>
             </div>
           </div>
@@ -144,7 +175,7 @@ export default function LeadMagnetAgentPage() {
             <CardHeader>
               <CardTitle className="text-xl">Build the lead magnet</CardTitle>
               <CardDescription>
-                Tap any field to type or paste. A successful generation uses one Content Agent credit and stays inside your AMS account.
+                A successful generation uses one Content Agent credit. The finished result becomes a branded customer artifact instead of stopping at plain text.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -159,42 +190,18 @@ export default function LeadMagnetAgentPage() {
               >
                 <div className="space-y-2">
                   <Label htmlFor="lead-business">Business name</Label>
-                  <Input
-                    id="lead-business"
-                    className="h-11 text-base"
-                    name="businessName"
-                    autoComplete="organization"
-                    inputMode="text"
-                    maxLength={120}
-                    minLength={2}
-                    required
-                  />
+                  <Input id="lead-business" className="h-11 text-base" name="businessName" autoComplete="organization" inputMode="text" maxLength={120} minLength={2} required />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="lead-audience">Audience</Label>
-                  <Textarea
-                    id="lead-audience"
-                    className="min-h-24 text-base"
-                    name="audience"
-                    placeholder="Example: local service-business owners who struggle to turn website visits into inquiries"
-                    autoCapitalize="sentences"
-                    spellCheck
-                    maxLength={300}
-                    minLength={3}
-                    required
-                  />
+                  <Textarea id="lead-audience" className="min-h-24 text-base" name="audience" placeholder="Example: local service-business owners who struggle to turn website visits into inquiries" autoCapitalize="sentences" spellCheck maxLength={300} minLength={3} required />
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="lead-type">Lead magnet type</Label>
-                    <select
-                      id="lead-type"
-                      name="type"
-                      defaultValue="checklist"
-                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base"
-                    >
+                    <select id="lead-type" name="type" defaultValue="checklist" className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base">
                       <option value="checklist">Checklist</option>
                       <option value="quick-guide">Quick-start guide</option>
                       <option value="worksheet">Worksheet</option>
@@ -204,12 +211,7 @@ export default function LeadMagnetAgentPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="lead-tone">Tone</Label>
-                    <select
-                      id="lead-tone"
-                      name="tone"
-                      defaultValue="educational"
-                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base"
-                    >
+                    <select id="lead-tone" name="tone" defaultValue="educational" className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base">
                       <option value="educational">Educational</option>
                       <option value="professional">Professional</option>
                       <option value="friendly">Friendly</option>
@@ -221,52 +223,24 @@ export default function LeadMagnetAgentPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="lead-problem">Problem to solve</Label>
-                  <Textarea
-                    id="lead-problem"
-                    className="min-h-24 text-base"
-                    name="problem"
-                    placeholder="What specific problem should this free resource help the reader solve?"
-                    autoCapitalize="sentences"
-                    spellCheck
-                    maxLength={160}
-                    minLength={3}
-                    required
-                  />
+                  <Textarea id="lead-problem" className="min-h-24 text-base" name="problem" placeholder="What specific problem should this free resource help the reader solve?" autoCapitalize="sentences" spellCheck maxLength={160} minLength={3} required />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="lead-outcome">Desired reader outcome</Label>
-                  <Textarea
-                    id="lead-outcome"
-                    className="min-h-24 text-base"
-                    name="desiredOutcome"
-                    placeholder="What should the reader understand, decide, or complete after using it?"
-                    autoCapitalize="sentences"
-                    spellCheck
-                    maxLength={160}
-                    minLength={3}
-                    required
-                  />
+                  <Textarea id="lead-outcome" className="min-h-24 text-base" name="desiredOutcome" placeholder="What should the reader understand, decide, or complete after using it?" autoCapitalize="sentences" spellCheck maxLength={160} minLength={3} required />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="lead-offer">Related offer (optional)</Label>
-                  <Textarea
-                    id="lead-offer"
-                    className="min-h-20 text-base"
-                    name="offer"
-                    placeholder="A real offer the draft may mention gently at the end."
-                    autoCapitalize="sentences"
-                    spellCheck
-                    maxLength={300}
-                  />
+                  <Textarea id="lead-offer" className="min-h-20 text-base" name="offer" placeholder="A real offer the resource may mention gently at the end." autoCapitalize="sentences" spellCheck maxLength={300} />
                 </div>
 
                 {error ? <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</p> : null}
 
                 <Button className="h-11 w-full sm:w-auto" disabled={submitting} type="submit">
                   {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                  {submitting ? "Building lead magnet" : "Generate lead magnet"}
+                  {submitting ? "Building lead magnet" : "Create lead magnet"}
                 </Button>
               </form>
             </CardContent>
@@ -274,8 +248,8 @@ export default function LeadMagnetAgentPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl"><FileText className="h-5 w-5" />Lead magnet draft</CardTitle>
-              <CardDescription>Generated output remains a draft until you review and choose to use it.</CardDescription>
+              <CardTitle className="flex items-center gap-2 text-xl"><FileText className="h-5 w-5" />Lead magnet deliverable</CardTitle>
+              <CardDescription>Review the generated resource, then download it as a branded file or print/save it as PDF.</CardDescription>
             </CardHeader>
             <CardContent>
               {result?.output ? (
@@ -285,28 +259,36 @@ export default function LeadMagnetAgentPage() {
                     <h2 className="mt-1 break-words text-xl font-semibold">{result.output.headline}</h2>
                   </div>
                   <div>
-                    <p className="text-xs font-medium uppercase text-muted-foreground">Draft</p>
+                    <p className="text-xs font-medium uppercase text-muted-foreground">Resource</p>
                     <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{result.output.body}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-medium uppercase text-muted-foreground">Call to action</p>
+                    <p className="text-xs font-medium uppercase text-muted-foreground">Next step</p>
                     <p className="mt-1 break-words text-sm font-medium">{result.output.callToAction}</p>
                   </div>
                   {result.output.safetyNotes.length ? (
                     <div>
-                      <p className="text-xs font-medium uppercase text-muted-foreground">Review before using</p>
+                      <p className="text-xs font-medium uppercase text-muted-foreground">Review before distributing</p>
                       <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                         {result.output.safetyNotes.map((note) => <li key={note}>- {note}</li>)}
                       </ul>
                     </div>
                   ) : null}
-                  <Button type="button" variant="outline" className="h-11 w-full sm:w-auto" onClick={copyDraft}>
-                    <Copy className="mr-2 h-4 w-4" />{copied ? "Copied" : "Copy draft"}
-                  </Button>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Button type="button" className="h-11" onClick={downloadLeadMagnet}>
+                      <Download className="mr-2 h-4 w-4" />Download lead magnet
+                    </Button>
+                    <Button type="button" variant="outline" className="h-11" onClick={printLeadMagnet}>
+                      <Printer className="mr-2 h-4 w-4" />Print / Save PDF
+                    </Button>
+                    <Button type="button" variant="outline" className="h-11" onClick={copyDraft}>
+                      <Copy className="mr-2 h-4 w-4" />{copied ? "Copied" : "Copy text"}
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Complete the form to generate a lead magnet. Nothing is shown here until the protected Content Agent runtime succeeds and commits the run.
+                  Complete the form to create a lead magnet. Nothing appears until the protected Content Agent runtime succeeds and commits the run.
                 </p>
               )}
             </CardContent>

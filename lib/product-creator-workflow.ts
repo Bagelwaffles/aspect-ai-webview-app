@@ -25,9 +25,9 @@ export type ProductCreatorContentBrief = {
 const TYPE_LABELS: Record<ProductCreatorType, string> = {
   "digital-download": "digital download",
   "service-package": "service package",
-  course: "course",
-  membership: "membership",
-  "physical-product": "physical product concept",
+  course: "course starter product",
+  membership: "membership starter kit",
+  "physical-product": "physical product production brief",
 }
 
 function clean(value: string): string {
@@ -41,19 +41,25 @@ function cleanAndLimit(value: string, maxLength: number): string {
 export function buildProductCreatorContentBrief(
   input: ProductCreatorWorkflowInput,
 ): ProductCreatorContentBrief {
-  const concept = cleanAndLimit(input.concept, 60)
-  const outcome = cleanAndLimit(input.customerOutcome, 60)
-  const deliverables = cleanAndLimit(input.deliverables, 60)
-  const constraints = cleanAndLimit(input.constraints ?? "", 40)
+  const concept = cleanAndLimit(input.concept, 40)
+  const outcome = cleanAndLimit(input.customerOutcome, 40)
+  const deliverables = cleanAndLimit(input.deliverables, 40)
+  const constraints = cleanAndLimit(input.constraints ?? "", 20)
   const pricePositioning = cleanAndLimit(input.pricePositioning ?? "", 300)
+  const physical = input.productType === "physical-product"
+
+  const completionRule = physical
+    ? "Body headings: PRODUCTION BRIEF, then SELLER LAUNCH KIT. Specify a buildable product brief; never claim the item was manufactured."
+    : "Body headings: CUSTOMER DELIVERABLE, then SELLER LAUNCH KIT. Complete a usable first-version deliverable before sales copy."
 
   const goal = [
-    `Create a structured ${TYPE_LABELS[input.productType]} offer package.`,
+    `Create the actual ${TYPE_LABELS[input.productType]}, not only an offer idea.`,
     `Concept: ${concept}.`,
-    `Customer outcome: ${outcome}.`,
-    `Deliverables: ${deliverables}.`,
+    `Outcome: ${outcome}.`,
+    `Include: ${deliverables}.`,
     constraints ? `Constraints: ${constraints}.` : "",
-    "Include positioning, package contents, listing copy, launch assets, and QA checks. Draft only; avoid unsupported claims.",
+    completionRule,
+    "Seller kit: positioning, listing copy, launch assets, QA. Human review required. No invented claims.",
   ].filter(Boolean).join(" ")
 
   return {

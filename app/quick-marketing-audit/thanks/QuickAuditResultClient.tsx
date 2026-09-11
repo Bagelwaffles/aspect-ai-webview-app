@@ -2,10 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { CheckCircle2, Loader2, RefreshCw } from "lucide-react"
+import { CheckCircle2, Download, Loader2, Printer, RefreshCw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  artifactFilename,
+  buildBrandedHtmlArtifact,
+  downloadHtmlArtifact,
+  printHtmlArtifact,
+} from "@/lib/client-artifacts"
 import type { NativeQuickAuditResult } from "@/lib/server/quick-audit-native"
 
 type ResultState =
@@ -16,6 +22,31 @@ type ResultState =
   | { kind: "error"; message: string }
 
 const MAX_AUTOMATIC_CHECKS = 20
+
+function buildAuditArtifact(result: NativeQuickAuditResult): string {
+  return buildBrandedHtmlArtifact({
+    eyebrow: "$49 Quick Marketing Audit",
+    title: `${result.businessName} — Marketing Audit`,
+    subtitle: `${result.websiteUrl} · Generated ${new Date(result.generatedAt).toLocaleString()}`,
+    sections: [
+      ...(result.strengths.length
+        ? [{ heading: "What the Evidence Already Supports", items: result.strengths }]
+        : []),
+      {
+        heading: "5 Priority Marketing Problems and Fixes",
+        orderedItems: result.findings.map((finding) => `${finding.title}\nObservation: ${finding.observation}\nFix: ${finding.fix}`),
+      },
+      { heading: "Improved Headline", text: result.improvedHeadline },
+      { heading: "Improved Offer Direction", text: result.improvedOffer },
+      { heading: "Ready-to-Use Promotional Post", text: result.promotionalPost },
+      {
+        heading: "7-Day Action Plan",
+        orderedItems: result.sevenDayPlan.map((item) => `Day ${item.day}: ${item.action}`),
+      },
+    ],
+    footer: `Audit ID ${result.auditId}. This is an evidence-based marketing review, not a guarantee of revenue, rankings, or platform performance. Automated page checks are signals and may not detect every feature on a dynamic site.`,
+  })
+}
 
 export function QuickAuditResultClient() {
   const searchParams = useSearchParams()
@@ -112,15 +143,35 @@ export function QuickAuditResultClient() {
   }
 
   const { result } = state
+
+  function downloadAuditReport() {
+    const html = buildAuditArtifact(result)
+    downloadHtmlArtifact(artifactFilename(result.businessName, "quick-marketing-audit"), html)
+  }
+
+  function printAuditReport() {
+    printHtmlArtifact(buildAuditArtifact(result))
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
-        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-        <div>
-          <p className="font-medium">Your AMS Quick Marketing Audit is ready.</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Audit ID {result.auditId} · Generated {new Date(result.generatedAt).toLocaleString()}
-          </p>
+      <div className="flex flex-col gap-4 rounded-lg border border-primary/30 bg-primary/5 p-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+          <div>
+            <p className="font-medium">Your AMS Quick Marketing Audit is ready.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Audit ID {result.auditId} · Generated {new Date(result.generatedAt).toLocaleString()}
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Button type="button" size="sm" onClick={downloadAuditReport}>
+            <Download className="mr-2 h-4 w-4" />Download report
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={printAuditReport}>
+            <Printer className="mr-2 h-4 w-4" />Print / Save PDF
+          </Button>
         </div>
       </div>
 
