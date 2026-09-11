@@ -26,6 +26,7 @@ const scopeSchema = z.enum([
   OVERMIND_TASK_WRITE_SCOPE,
   OVERMIND_OFFLINE_SCOPE,
 ])
+type OvermindOAuthScope = z.infer<typeof scopeSchema>
 
 const clientSchema = z.object({
   clientId: z.string().min(8).max(500),
@@ -44,7 +45,7 @@ const authorizationCodeSchema = z.object({
   expiresAt: z.number().int().positive(),
 })
 
-const accessTokenSchema = z.object({
+const tokenRecordSchema = z.object({
   clientId: z.string().min(1).max(500),
   actorSubject: z.string().min(1).max(200),
   scopes: z.array(scopeSchema).min(1),
@@ -52,13 +53,8 @@ const accessTokenSchema = z.object({
   expiresAt: z.number().int().positive(),
 })
 
-const refreshTokenSchema = z.object({
-  clientId: z.string().min(1).max(500),
-  actorSubject: z.string().min(1).max(200),
-  scopes: z.array(scopeSchema).min(1),
-  resource: z.literal(OVERMIND_OWNER_RESOURCE),
-  expiresAt: z.number().int().positive(),
-})
+const accessTokenSchema = tokenRecordSchema
+const refreshTokenSchema = tokenRecordSchema
 
 type RedisLike = {
   get<T = unknown>(key: string): Promise<T | null>
@@ -118,7 +114,7 @@ function parseStored<T>(raw: unknown, schema: z.ZodType<T>): T | null {
   return parsed.success ? parsed.data : null
 }
 
-function normalizeScopes(value: string | string[] | undefined, allowOffline = true) {
+function normalizeScopes(value: string | string[] | undefined, allowOffline = true): OvermindOAuthScope[] {
   const requested = Array.isArray(value) ? value : (value ?? "").split(/\s+/)
   const unique = [...new Set(requested.map((item) => item.trim()).filter(Boolean))]
   if (!unique.length) return [OVERMIND_TASK_READ_SCOPE, OVERMIND_TASK_WRITE_SCOPE]
@@ -311,16 +307,17 @@ export async function createOvermindAuthorizationCode(
 function verifyPkce(codeVerifier: string, expectedChallenge: string) {
   const verifier = z.string().min(43).max(128).regex(/^[A-Za-z0-9._~-]+$/).parse(codeVerifier)
   const actual = createHash("sha256").update(verifier).digest("base64url")
-  const actualBytes = Buffer.from(actual)
-  const expectedBytes = Buffer.from(expectedChallenge)
-  return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes)
+  const encoder = new TextEncoder()
+  const actualBytes = encoder.encode(actual)
+  const expectedBytes = encoder.encode(expectedChallenge)
+  return actualBytes.byteLength === expectedBytes.byteLength && timingSafeEqual(actualBytes, expectedBytes)
 }
 
 async function mintTokenPair(
   input: {
     clientId: string
     actorSubject: string
-    scopes: string[]
+    scopes: OvermindOAuthScope[]
     resource: typeof OVERMIND_OWNER_RESOURCE
   },
   options: OAuthOptions,
@@ -392,7 +389,7 @@ export async function refreshOvermindAccessToken(
   if ((input.resource ?? record.resource) !== record.resource) throw new Error("OVERMIND_OAUTH_RESOURCE_INVALID")
 
   const requested = input.scope ? normalizeScopes(input.scope) : record.scopes
-  if (requested.some((scope) => !record.scopes.includes(scope as never))) {
+  if (requested.some((scope) => !record.scopes.includes(scope))) {
     throw new Error("OVERMIND_OAUTH_SCOPE_ESCALATION_REJECTED")
   }
   await redis.del(key)
