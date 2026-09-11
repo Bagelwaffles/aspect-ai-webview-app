@@ -39,10 +39,10 @@ export function buildLeadMagnetContentBrief(input: LeadMagnetWorkflowInput): Con
   const offer = clean(input.offer ?? "")
 
   const goal = [
-    `Create a ${typeLabel}.`,
+    `Create a finished reader-facing ${typeLabel}, not an outline or description of one.`,
     `Solve: ${problem}.`,
     `Desired outcome: ${outcome}.`,
-    "Make it useful on its own with clear steps or sections. Avoid unsupported claims or guarantees.",
+    "Make the body usable on its own with concrete steps, prompts, checkboxes or sections appropriate to the format. Avoid unsupported claims or guarantees.",
   ].join(" ")
 
   return {
