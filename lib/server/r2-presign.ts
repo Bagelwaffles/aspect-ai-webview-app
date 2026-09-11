@@ -1,4 +1,4 @@
-import { createHash, createHmac } from "node:crypto"
+import { createHash, createHmac, createSecretKey, type KeyObject } from "node:crypto"
 
 export type R2ObjectMethod = "GET" | "PUT" | "HEAD" | "DELETE"
 
@@ -41,8 +41,9 @@ function sha256Hex(value: string) {
   return createHash("sha256").update(value).digest("hex")
 }
 
-function hmac(key: Buffer | string, value: string) {
-  return createHmac("sha256", key).update(value).digest()
+function hmacKey(key: string | KeyObject, value: string): KeyObject {
+  const digest = createHmac("sha256", key).update(value).digest()
+  return createSecretKey(Uint8Array.from(digest))
 }
 
 function encodeRfc3986(value: string) {
@@ -134,10 +135,10 @@ export function presignR2Object(
     sha256Hex(canonicalRequest),
   ].join("\n")
 
-  const kDate = hmac(`AWS4${config.secretAccessKey}`, date)
-  const kRegion = hmac(kDate, region)
-  const kService = hmac(kRegion, service)
-  const kSigning = hmac(kService, "aws4_request")
+  const kDate = hmacKey(`AWS4${config.secretAccessKey}`, date)
+  const kRegion = hmacKey(kDate, region)
+  const kService = hmacKey(kRegion, service)
+  const kSigning = hmacKey(kService, "aws4_request")
   const signature = createHmac("sha256", kSigning).update(stringToSign).digest("hex")
 
   return {
