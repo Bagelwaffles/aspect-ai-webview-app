@@ -25,8 +25,8 @@ class FakeRedis {
   }
 }
 
-const subjectA = "cus_1234567890abcdef"
-const subjectB = "cus_abcdef1234567890"
+const subjectA = `customer:google:${"a".repeat(64)}`
+const subjectB = `customer:google:${"b".repeat(64)}`
 
 test("customer workspace profiles are isolated by stable customer subject", async () => {
   const redis = new FakeRedis()
