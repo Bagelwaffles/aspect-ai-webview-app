@@ -53,3 +53,29 @@ test("unknown requested agents produce an explicit blocker", () => {
   assert.equal(plan.steps.length, 0)
   assert.ok(plan.blockers.some((blocker) => blocker.includes("not registered")))
 })
+
+test("natural-language live-only constraint filters non-live agents before relevance ranking", () => {
+  const plan = createOvermindPlan({
+    objective: "Create a small-business marketing campaign using only currently Live AMS agents.",
+  })
+
+  assert.ok(plan.steps.length > 0)
+  assert.ok(plan.steps.every((step) => step.status === "live"))
+  assert.equal(plan.steps.some((step) => step.agentSlug === "affiliate-marketing-agent"), false)
+  assert.equal(plan.blockers.some((blocker) => blocker.includes("Affiliate Marketing Agent")), false)
+  assert.ok(plan.notes.some((note) => note.includes("currently-Live-only constraint")))
+})
+
+test("explicit non-live requested agents are excluded when the objective requires live-only routing", () => {
+  const plan = createOvermindPlan({
+    objective: "Use only currently Live AMS agents for this controlled marketing task.",
+    requestedAgentSlugs: ["content-agent", "social-publisher-agent"],
+  })
+
+  assert.deepEqual(
+    plan.steps.map((step) => step.agentSlug),
+    ["content-agent"],
+  )
+  assert.ok(plan.steps.every((step) => step.status === "live"))
+  assert.ok(plan.blockers.some((blocker) => blocker.includes("excluded")))
+})
