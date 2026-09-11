@@ -21,22 +21,20 @@ class MemoryRedis implements OvermindOAuthRedisLike {
     return (this.values.get(key) as T | undefined) ?? null
   }
 
+  async getdel<T = unknown>(key: string): Promise<T | null> {
+    const value = (this.values.get(key) as T | undefined) ?? null
+    this.values.delete(key)
+    return value
+  }
+
   async set(key: string, value: string): Promise<unknown> {
     this.values.set(key, value)
     return "OK"
   }
-
-  async del(...keys: string[]): Promise<unknown> {
-    let removed = 0
-    for (const key of keys) {
-      if (this.values.delete(key)) removed += 1
-    }
-    return removed
-  }
 }
 
 function tokens() {
-  const values = ["c", "d", "e", "f", "g", "h", "i", "j"].map((letter) => letter.repeat(43))
+  const values = ["c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n"].map((letter) => letter.repeat(43))
   return () => {
     const value = values.shift()
     if (!value) throw new Error("test token pool exhausted")
@@ -49,6 +47,19 @@ const owner = {
   email: "owner@example.com",
 }
 const redirectUri = "https://chatgpt.com/connector_platform_oauth_redirect"
+
+function authorizationInput(clientId: string, verifier: string, scope = "overmind.read overmind.control offline_access") {
+  return {
+    response_type: "code" as const,
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope,
+    state: "state-12345678",
+    code_challenge: overmindPkceS256(verifier),
+    code_challenge_method: "S256" as const,
+    resource: OVERMIND_OWNER_MCP_RESOURCE,
+  }
+}
 
 test("owner OAuth client registration is restricted to OpenAI and ChatGPT HTTPS redirects", async () => {
   assert.equal(isAllowedOvermindOAuthRedirectUri(redirectUri), true)
@@ -65,7 +76,7 @@ test("owner OAuth client registration is restricted to OpenAI and ChatGPT HTTPS 
   )
 })
 
-test("owner OAuth authorization code is PKCE-bound, one-time, and refresh rotates", async () => {
+test("owner OAuth codes are PKCE-bound and atomically one-time", async () => {
   const redis = new MemoryRedis()
   const randomToken = tokens()
   const now = () => new Date("2026-09-11T22:40:00.000Z")
@@ -83,17 +94,8 @@ test("owner OAuth authorization code is PKCE-bound, one-time, and refresh rotate
   )
 
   const verifier = "v".repeat(43)
-  const authorization = await createOvermindAuthorizationCode(
-    {
-      response_type: "code",
-      client_id: client.client_id,
-      redirect_uri: redirectUri,
-      scope: "overmind.read overmind.control offline_access",
-      state: "state-12345678",
-      code_challenge: overmindPkceS256(verifier),
-      code_challenge_method: "S256",
-      resource: OVERMIND_OWNER_MCP_RESOURCE,
-    },
+  const rejectedAuthorization = await createOvermindAuthorizationCode(
+    authorizationInput(client.client_id, verifier),
     owner,
     { redis, randomToken, now },
   )
@@ -101,7 +103,7 @@ test("owner OAuth authorization code is PKCE-bound, one-time, and refresh rotate
   await assert.rejects(
     exchangeOvermindAuthorizationCode(
       {
-        code: authorization.code,
+        code: rejectedAuthorization.code,
         clientId: client.client_id,
         redirectUri,
         codeVerifier: "x".repeat(43),
@@ -112,6 +114,25 @@ test("owner OAuth authorization code is PKCE-bound, one-time, and refresh rotate
     /OVERMIND_OAUTH_PKCE_MISMATCH/,
   )
 
+  await assert.rejects(
+    exchangeOvermindAuthorizationCode(
+      {
+        code: rejectedAuthorization.code,
+        clientId: client.client_id,
+        redirectUri,
+        codeVerifier: verifier,
+        resource: OVERMIND_OWNER_MCP_RESOURCE,
+      },
+      { redis, randomToken, now },
+    ),
+    /OVERMIND_OAUTH_CODE_INVALID/,
+  )
+
+  const authorization = await createOvermindAuthorizationCode(
+    authorizationInput(client.client_id, verifier),
+    owner,
+    { redis, randomToken, now },
+  )
   const first = await exchangeOvermindAuthorizationCode(
     {
       code: authorization.code,
@@ -178,16 +199,7 @@ test("refresh tokens cannot escalate scopes", async () => {
   )
   const verifier = "q".repeat(43)
   const authorization = await createOvermindAuthorizationCode(
-    {
-      response_type: "code",
-      client_id: client.client_id,
-      redirect_uri: redirectUri,
-      scope: "overmind.read offline_access",
-      state: "state-abcdefgh",
-      code_challenge: overmindPkceS256(verifier),
-      code_challenge_method: "S256",
-      resource: OVERMIND_OWNER_MCP_RESOURCE,
-    },
+    authorizationInput(client.client_id, verifier, "overmind.read offline_access"),
     owner,
     { redis, randomToken, now },
   )
@@ -213,5 +225,17 @@ test("refresh tokens cannot escalate scopes", async () => {
       { redis, randomToken, now },
     ),
     /OVERMIND_OAUTH_SCOPE_ESCALATION_REJECTED/,
+  )
+
+  await assert.rejects(
+    refreshOvermindAccessToken(
+      {
+        refreshToken: tokensIssued.refresh_token!,
+        clientId: client.client_id,
+        resource: OVERMIND_OWNER_MCP_RESOURCE,
+      },
+      { redis, randomToken, now },
+    ),
+    /OVERMIND_OAUTH_REFRESH_TOKEN_INVALID/,
   )
 })
