@@ -17,7 +17,8 @@ class FakeRedis {
     return (this.strings.get(key) ?? null) as T | null
   }
 
-  async set(key: string, value: string) {
+  async set(key: string, value: string, options?: { nx?: boolean }) {
+    if (options?.nx && this.strings.has(key)) return null
     this.strings.set(key, value)
     return "OK"
   }
@@ -53,20 +54,24 @@ function liveSocialContract(slug: string) {
     : contract
 }
 
-test("task creation is idempotent for retries and conflicts on changed content", async () => {
-  const redis = new FakeRedis()
-  const input = {
+function draftInput(idempotencyKey: string) {
+  return {
     objective: "Create one private AMS content draft without external publication.",
-    idempotencyKey: "owner-create-20260911-001",
+    idempotencyKey,
     action: {
       agentSlug: "content-agent",
-      mode: "draft",
+      mode: "draft" as const,
       operation: "generate-content-draft",
       target: "customer-workspace",
       summary: "Generate one private content draft.",
       parameters: { format: "social-post" },
     },
   }
+}
+
+test("task creation is idempotent for retries and conflicts on changed content", async () => {
+  const redis = new FakeRedis()
+  const input = draftInput("owner-create-20260911-001")
 
   const first = await createOvermindTask(input, actor, { redis })
   const retry = await createOvermindTask(input, actor, { redis })
@@ -80,6 +85,39 @@ test("task creation is idempotent for retries and conflicts on changed content",
     }, actor, { redis }),
     /OVERMIND_IDEMPOTENCY_CONFLICT/,
   )
+})
+
+test("concurrent retries atomically create one task and one created audit event", async () => {
+  const redis = new FakeRedis()
+  const input = draftInput("owner-create-concurrent-001")
+
+  const [first, second] = await Promise.all([
+    createOvermindTask(input, actor, { redis }),
+    createOvermindTask(input, actor, { redis }),
+  ])
+
+  assert.equal(first.id, second.id)
+  const audit = await listOvermindTaskAudit(first.id, { redis })
+  assert.equal(audit.filter((event) => event.type === "task.created").length, 1)
+})
+
+test("concurrent same-key requests with different content cannot both succeed", async () => {
+  const redis = new FakeRedis()
+  const input = draftInput("owner-create-concurrent-conflict-001")
+  const changed = {
+    ...input,
+    action: { ...input.action, summary: "Different content under the same idempotency key." },
+  }
+
+  const results = await Promise.allSettled([
+    createOvermindTask(input, actor, { redis }),
+    createOvermindTask(changed, actor, { redis }),
+  ])
+
+  assert.equal(results.filter((result) => result.status === "fulfilled").length, 1)
+  const rejected = results.find((result): result is PromiseRejectedResult => result.status === "rejected")
+  assert.ok(rejected)
+  assert.match(String(rejected.reason), /OVERMIND_IDEMPOTENCY_CONFLICT/)
 })
 
 test("owner rejection is terminal, audited, and cannot later be approved", async () => {
