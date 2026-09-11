@@ -28,9 +28,10 @@ class FakeRedis {
 }
 
 const subject = `customer:google:${"c".repeat(64)}`
-const env = {
+const env: NodeJS.ProcessEnv = {
+  NODE_ENV: "test",
   AMS_CONNECTION_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
-} as NodeJS.ProcessEnv
+}
 
 test("connection tokens are encrypted at rest and public records omit secrets", async () => {
   const redis = new FakeRedis()
