@@ -155,7 +155,7 @@ const cancelSchema = z
 const createSchema = z
   .object({
     objective: z.string().trim().min(10).max(2_000),
-    action: z.unknown(),
+    action: z.record(z.unknown()),
   })
   .strict()
 
