@@ -9,7 +9,6 @@ import {
   accessTokenHasScope,
   bearerTokenFromAuthorizationHeader,
   OVERMIND_OAUTH_PROTECTED_RESOURCE_METADATA,
-  OVERMIND_OAUTH_SCOPES,
   verifyOvermindAccessToken,
 } from "@/lib/server/overmind-oauth"
 
@@ -18,6 +17,7 @@ export const dynamic = "force-dynamic"
 
 const MODERN_PROTOCOL = "2026-07-28"
 const LEGACY_PROTOCOL = "2025-11-25"
+const RESOURCE_SCOPES = ["overmind.read", "overmind.control"] as const
 const SERVER_INFO = {
   name: "ams-overmind-owner",
   title: "Aspect Overmind Owner Control",
@@ -27,7 +27,7 @@ const SERVER_INFO = {
 } as const
 
 const INSTRUCTIONS =
-  "This owner-only AMS Overmind MCP server controls durable task records and approvals. It does not execute external actions. Creating, approving, or cancelling a task never proves that publishing, messaging, billing, deletion, or any other external mutation occurred."
+  "This owner-only AMS Overmind MCP server controls durable task records and approvals. It does not execute external actions. Creating, approving, rejecting, or cancelling a task never proves that publishing, messaging, billing, deletion, or any other external mutation occurred."
 
 type JsonRpcRequest = {
   jsonrpc?: unknown
@@ -96,7 +96,7 @@ function publicToolDefinitions() {
 }
 
 function authChallenge() {
-  return `Bearer resource_metadata="${OVERMIND_OAUTH_PROTECTED_RESOURCE_METADATA}", scope="${OVERMIND_OAUTH_SCOPES.join(" ")}"`
+  return `Bearer resource_metadata="${OVERMIND_OAUTH_PROTECTED_RESOURCE_METADATA}", scope="${RESOURCE_SCOPES.join(" ")}"`
 }
 
 async function authenticate(request: NextRequest) {
