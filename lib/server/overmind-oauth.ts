@@ -22,8 +22,8 @@ const CLIENT_TTL_SECONDS = 24 * 60 * 60
 
 export type OvermindOAuthRedisLike = {
   get<T = unknown>(key: string): Promise<T | null>
+  getdel<T = unknown>(key: string): Promise<T | null>
   set(key: string, value: string, options?: { ex?: number }): Promise<unknown>
-  del(...keys: string[]): Promise<unknown>
 }
 
 type OAuthOptions = {
@@ -53,7 +53,6 @@ const authorizationCodeSchema = z
     resource: z.literal(OVERMIND_OWNER_MCP_RESOURCE),
     codeChallenge: z.string().min(43).max(128),
     ownerSubject: z.string().refine(isStableCustomerSubject),
-    ownerEmail: z.string().email(),
     createdAt: z.string().datetime(),
     expiresAt: z.string().datetime(),
   })
@@ -67,7 +66,6 @@ const accessTokenSchema = z
     scopes: z.array(overmindScopeSchema).min(1),
     resource: z.literal(OVERMIND_OWNER_MCP_RESOURCE),
     ownerSubject: z.string().refine(isStableCustomerSubject),
-    ownerEmail: z.string().email(),
     createdAt: z.string().datetime(),
     expiresAt: z.string().datetime(),
   })
@@ -261,7 +259,7 @@ export async function createOvermindAuthorizationCode(
   options: OAuthOptions = {},
 ) {
   if (!isStableCustomerSubject(owner.subject)) throw new Error("OVERMIND_OAUTH_OWNER_SUBJECT_INVALID")
-  const ownerEmail = z.string().trim().toLowerCase().email().parse(owner.email)
+  z.string().trim().toLowerCase().email().parse(owner.email)
   const { request, client } = await validateOvermindAuthorizationRequest(rawInput, options)
   const redis = runtimeRedis(options)
   if (!redis) throw new Error("OVERMIND_OAUTH_STORE_UNAVAILABLE")
@@ -275,7 +273,6 @@ export async function createOvermindAuthorizationCode(
     resource: request.resource,
     codeChallenge: request.code_challenge,
     ownerSubject: owner.subject,
-    ownerEmail,
     createdAt: createdAt.toISOString(),
     expiresAt: new Date(createdAt.getTime() + AUTHORIZATION_CODE_TTL_SECONDS * 1_000).toISOString(),
   })
@@ -293,7 +290,6 @@ async function issueTokenPair(record: AuthorizationCodeRecord | RefreshTokenReco
     scopes: record.scopes,
     resource: record.resource,
     ownerSubject: record.ownerSubject,
-    ownerEmail: record.ownerEmail,
     createdAt: createdAt.toISOString(),
     expiresAt: new Date(createdAt.getTime() + ACCESS_TOKEN_TTL_SECONDS * 1_000).toISOString(),
   })
@@ -331,8 +327,11 @@ export async function exchangeOvermindAuthorizationCode(
   const redis = runtimeRedis(options)
   if (!redis) throw new Error("OVERMIND_OAUTH_STORE_UNAVAILABLE")
   if (input.resource !== OVERMIND_OWNER_MCP_RESOURCE) throw new Error("OVERMIND_OAUTH_RESOURCE_MISMATCH")
-  const key = authorizationCodeKey(input.code)
-  const record = parseStored(await redis.get<unknown>(key), authorizationCodeSchema)
+
+  const record = parseStored(
+    await redis.getdel<unknown>(authorizationCodeKey(input.code)),
+    authorizationCodeSchema,
+  )
   if (!record) throw new Error("OVERMIND_OAUTH_CODE_INVALID")
   if (Date.parse(record.expiresAt) <= now(options).getTime()) throw new Error("OVERMIND_OAUTH_CODE_EXPIRED")
   if (record.clientId !== input.clientId) throw new Error("OVERMIND_OAUTH_CLIENT_MISMATCH")
@@ -340,7 +339,6 @@ export async function exchangeOvermindAuthorizationCode(
   if (record.resource !== input.resource) throw new Error("OVERMIND_OAUTH_RESOURCE_MISMATCH")
   if (overmindPkceS256(input.codeVerifier) !== record.codeChallenge) throw new Error("OVERMIND_OAUTH_PKCE_MISMATCH")
 
-  await redis.del(key)
   return issueTokenPair(record, { ...options, redis })
 }
 
@@ -351,8 +349,11 @@ export async function refreshOvermindAccessToken(
   const redis = runtimeRedis(options)
   if (!redis) throw new Error("OVERMIND_OAUTH_STORE_UNAVAILABLE")
   if (input.resource !== OVERMIND_OWNER_MCP_RESOURCE) throw new Error("OVERMIND_OAUTH_RESOURCE_MISMATCH")
-  const key = refreshTokenKey(input.refreshToken)
-  const record = parseStored(await redis.get<unknown>(key), refreshTokenSchema)
+
+  const record = parseStored(
+    await redis.getdel<unknown>(refreshTokenKey(input.refreshToken)),
+    refreshTokenSchema,
+  )
   if (!record) throw new Error("OVERMIND_OAUTH_REFRESH_TOKEN_INVALID")
   if (Date.parse(record.expiresAt) <= now(options).getTime()) throw new Error("OVERMIND_OAUTH_REFRESH_TOKEN_EXPIRED")
   if (record.clientId !== input.clientId) throw new Error("OVERMIND_OAUTH_CLIENT_MISMATCH")
@@ -361,7 +362,6 @@ export async function refreshOvermindAccessToken(
   const requestedScopes = input.scope ? normalizeScopes(input.scope) : record.scopes
   if (requestedScopes.some((scope) => !record.scopes.includes(scope))) throw new Error("OVERMIND_OAUTH_SCOPE_ESCALATION_REJECTED")
 
-  await redis.del(key)
   return issueTokenPair({ ...record, scopes: requestedScopes }, { ...options, redis })
 }
 
