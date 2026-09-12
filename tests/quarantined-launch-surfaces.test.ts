@@ -35,7 +35,7 @@ test("agent deployment requires internal authentication before returning not imp
   assert.equal((await authenticated.json()).code, "NOT_IMPLEMENTED")
 })
 
-test("quarantined launch pages contain no fabricated operational claims or controls", async () => {
+test("launch pages contain no fabricated operational claims or controls", async () => {
   const [analytics, deployments, billing] = await Promise.all([
     readFile(new URL("../app/analytics/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/deployments/page.tsx", import.meta.url), "utf8"),
@@ -46,7 +46,9 @@ test("quarantined launch pages contain no fabricated operational claims or contr
     assert.equal(`${analytics}\n${deployments}`.includes(unsafeClaim), false, unsafeClaim)
   }
 
-  assert.match(analytics, /not currently have a verified analytics data source/i)
+  assert.match(analytics, /deterministic, source-backed summary/i)
+  assert.match(analytics, /Do not upload sensitive data/i)
+  assert.match(analytics, /no AI generation and no credits charged/i)
   assert.match(deployments, /deployment is not connected/i)
   assert.match(billing, /New paid AI subscriptions are paused/i)
   assert.match(billing, /No payment can be started for this plan/i)
