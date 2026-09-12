@@ -13,7 +13,7 @@ export async function GET() {
     {
       resource: OVERMIND_OWNER_MCP_RESOURCE,
       authorization_servers: [OVERMIND_OAUTH_ISSUER],
-      scopes_supported: OVERMIND_OAUTH_SCOPES,
+      scopes_supported: OVERMIND_OAUTH_SCOPES.filter((scope) => scope !== "offline_access"),
       bearer_methods_supported: ["header"],
       resource_name: "Aspect Overmind Owner Control",
     },

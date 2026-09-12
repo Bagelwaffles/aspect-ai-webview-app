@@ -28,6 +28,8 @@ const task: OvermindTask = {
   approvedAt: null,
   approvalExpiresAt: null,
   approvalActorHash: null,
+  rejectedAt: null,
+  rejectionActorHash: null,
   cancelledAt: null,
   cancellationActorHash: null,
 }
@@ -45,6 +47,13 @@ const dependencies: OwnerMcpDependencies = {
     approvalExpiresAt: "2026-09-11T22:56:00.000Z",
     approvalActorHash: "b".repeat(64),
   }),
+  rejectTask: async () => ({
+    ...task,
+    status: "rejected",
+    executionEligible: false,
+    rejectedAt: "2026-09-11T22:41:30.000Z",
+    rejectionActorHash: "e".repeat(64),
+  }),
   cancelTask: async () => ({
     ...task,
     status: "cancelled",
@@ -54,18 +63,23 @@ const dependencies: OwnerMcpDependencies = {
   }),
 }
 
-test("owner MCP exposes task control but no execute tool", () => {
+test("owner MCP exposes task ledger controls but no execute tool", () => {
   const names = OWNER_OVERMIND_TOOLS.map((tool) => tool.name)
   assert.deepEqual(names, [
     "ams_owner_list_tasks",
     "ams_owner_get_task",
     "ams_owner_create_task",
     "ams_owner_approve_task",
+    "ams_owner_reject_task",
     "ams_owner_cancel_task",
   ])
-  assert.equal(names.some((name) => /execute|publish|send|bill|delete/i.test(name)), false)
+  assert.equal(names.some((name) => /execute|publish|send|bill|delete|deploy/i.test(name)), false)
   assert.equal(OWNER_OVERMIND_TOOLS.find((tool) => tool.name === "ams_owner_list_tasks")?.requiredScope, "overmind.read")
   assert.equal(OWNER_OVERMIND_TOOLS.find((tool) => tool.name === "ams_owner_approve_task")?.requiredScope, "overmind.control")
+  assert.equal(OWNER_OVERMIND_TOOLS.find((tool) => tool.name === "ams_owner_create_task")?.annotations.idempotentHint, true)
+  assert.equal(OWNER_OVERMIND_TOOLS.find((tool) => tool.name === "ams_owner_approve_task")?.annotations.idempotentHint, false)
+  assert.equal(OWNER_OVERMIND_TOOLS.find((tool) => tool.name === "ams_owner_reject_task")?.annotations.idempotentHint, true)
+  assert.equal(OWNER_OVERMIND_TOOLS.find((tool) => tool.name === "ams_owner_cancel_task")?.annotations.idempotentHint, true)
 })
 
 test("owner MCP mutations always report that no execution occurred", async () => {
@@ -73,7 +87,7 @@ test("owner MCP mutations always report that no execution occurred", async () =>
 
   const created = await handleOwnerOvermindTool(
     "ams_owner_create_task",
-    { objective: task.objective, action: task.action },
+    { objective: task.objective, action: task.action, idempotencyKey: "owner-test-create-001" },
     actor,
     dependencies,
   )
@@ -94,6 +108,15 @@ test("owner MCP mutations always report that no execution occurred", async () =>
   assert.equal(approved.ok, true)
   assert.equal(approved.executionPerformed, false)
 
+  const rejected = await handleOwnerOvermindTool(
+    "ams_owner_reject_task",
+    { taskId: task.id, confirmation: "REJECT_OVERMIND_TASK" },
+    actor,
+    dependencies,
+  )
+  assert.equal(rejected.ok, true)
+  assert.equal(rejected.executionPerformed, false)
+
   const cancelled = await handleOwnerOvermindTool(
     "ams_owner_cancel_task",
     { taskId: task.id, confirmation: "CANCEL_OVERMIND_TASK" },
@@ -102,4 +125,26 @@ test("owner MCP mutations always report that no execution occurred", async () =>
   )
   assert.equal(cancelled.ok, true)
   assert.equal(cancelled.executionPerformed, false)
+})
+
+test("create requires an idempotency key and reject requires exact confirmation", async () => {
+  const actor = `customer:google:${"d".repeat(64)}`
+
+  const missingIdempotency = await handleOwnerOvermindTool(
+    "ams_owner_create_task",
+    { objective: task.objective, action: task.action },
+    actor,
+    dependencies,
+  )
+  assert.equal(missingIdempotency.ok, false)
+  assert.equal(missingIdempotency.error, "INVALID_OWNER_TOOL_INPUT")
+
+  const badReject = await handleOwnerOvermindTool(
+    "ams_owner_reject_task",
+    { taskId: task.id, confirmation: "YES" },
+    actor,
+    dependencies,
+  )
+  assert.equal(badReject.ok, false)
+  assert.equal(badReject.error, "INVALID_OWNER_TOOL_INPUT")
 })
