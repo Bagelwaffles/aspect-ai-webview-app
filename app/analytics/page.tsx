@@ -1,65 +1,48 @@
-import Link from "next/link"
-import { ArrowLeft, BarChart3, FileText, Sparkles } from "lucide-react"
+"use client"
 
+import Link from "next/link"
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react"
+import { AlertCircle, ArrowLeft, BarChart3, Loader2, RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
-export default function AnalyticsPage() {
-  return (
-    <main className="min-h-screen bg-background px-4 py-8 sm:px-6 sm:py-10">
-      <div className="mx-auto w-full max-w-5xl space-y-8">
-        <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0 space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <BarChart3 className="h-7 w-7 text-primary" aria-hidden="true" />
-              <h1 className="text-3xl font-bold">Analytics</h1>
-              <Badge variant="secondary">Not connected</Badge>
-            </div>
-            <p className="max-w-2xl text-muted-foreground">
-              AMS does not currently have a verified analytics data source. Reports and performance metrics will remain
-              unavailable until a real source is connected and validated.
-            </p>
-          </div>
-          <Button asChild variant="outline" className="w-full sm:w-auto">
-            <Link href="/">
-              <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
-              Back to dashboard
-            </Link>
-          </Button>
-        </header>
+const MAX_CSV_BYTES = 2 * 1024 * 1024
+type Value = string | number | boolean | null
+type EvidenceValue = { evidenceId?: string; value?: Value }
+type Profile = { format?:string; encoding?:string; metadata?:Record<string,EvidenceValue>; columns?:Array<{name?:string;metrics?:Record<string,EvidenceValue>;evidenceId?:string}> }
+type Run = { id:string; fileName?:string; createdAt?:string; status?:string; costCredits?:number; result?:Profile|null }
 
-        <section className="grid gap-4 md:grid-cols-2" aria-label="Analytics launch status">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <FileText className="h-5 w-5 text-primary" aria-hidden="true" />
-                Current status
-              </CardTitle>
-              <CardDescription>No customer analytics are being presented on this page.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>Revenue, conversion, traffic, and campaign reporting are not connected.</p>
-              <p>Export and reporting controls will be added only after persisted data is available.</p>
-            </CardContent>
-          </Card>
+const requestKey = () => typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `analytics-${Date.now()}-${Math.random().toString(36).slice(2)}`
+const errorMessage = (body:unknown, fallback:string) => body && typeof body === "object" && (typeof (body as {error?:unknown}).error === "string" || typeof (body as {message?:unknown}).message === "string") ? String((body as {error?:unknown;message?:unknown}).error ?? (body as {message?:unknown}).message) : fallback
+const oneRun = (body:unknown):Run|null => body && typeof body === "object" ? ((body as {run?:Run;result?:Run;data?:Run}).run ?? (body as {result?:Run}).result ?? (body as {data?:Run}).data ?? body as Run) : null
+const manyRuns = (body:unknown):Run[] => Array.isArray(body) ? body : body && typeof body === "object" && Array.isArray((body as {runs?:Run[]}).runs) ? (body as {runs:Run[]}).runs : []
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Sparkles className="h-5 w-5 text-primary" aria-hidden="true" />
-                Continue with AMS
-              </CardTitle>
-              <CardDescription>Review the first launch capability without implying analytics are active.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild className="w-full sm:w-auto">
-                <Link href="/content-agent">View Content Agent status</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </section>
-      </div>
-    </main>
-  )
+function Result({ run }:{run:Run}) {
+  const profile = run.result
+  const metrics = Object.entries(profile?.metadata ?? {}).map(([label,metric])=>({label,value:metric?.value,evidenceId:metric?.evidenceId}))
+  return <article className="space-y-4" aria-label={`Analytics run ${run.id}`}>
+    <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-medium">{run.fileName || "CSV analysis"}</p>{run.createdAt ? <p className="text-xs text-muted-foreground">{new Date(run.createdAt).toLocaleString()}</p>:null}</div><Badge variant="secondary">{run.status || "Completed"}</Badge></div>
+    {metrics.length ? <section><h3 className="mb-2 text-sm font-semibold">Dataset profile</h3><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{metrics.map((m)=><div className="rounded-lg border bg-muted/30 p-3" key={m.label}><p className="break-words text-xs text-muted-foreground">{m.label.replace(/([A-Z])/g," $1").trim()}</p><p className="break-words text-lg font-semibold">{String(m.value ?? "—")}</p>{m.evidenceId?<p className="mt-1 break-all text-[10px] text-muted-foreground">{m.evidenceId}</p>:null}</div>)}</div></section>:null}
+    <section><h3 className="text-sm font-semibold">Data quality</h3><p className="mt-1 text-xs text-muted-foreground">{profile?.format ? `${profile.format.toUpperCase()} · ${profile.encoding || "UTF-8"}`:"Profile unavailable"}</p><p className="mt-2 text-sm text-muted-foreground">Structural checks passed. Blank, unique, and numeric coverage are shown for each column below.</p></section>
+    {profile?.columns?.length ? <section><h3 className="mb-2 text-sm font-semibold">Column evidence</h3><div className="space-y-2">{profile.columns.map((column,i)=><div className="rounded-md border p-3 text-sm" key={`${column.name}-${i}`}><p className="font-medium">{column.name || `Column ${i+1}`}</p>{column.evidenceId ? <p className="text-xs text-muted-foreground">Evidence ID: {column.evidenceId}</p>:null}{column.metrics ? <p className="mt-1 text-xs text-muted-foreground">{Object.entries(column.metrics).map(([k,v])=>`${k.replace(/([A-Z])/g," $1").trim()}: ${String(v?.value ?? "—")} (${v?.evidenceId || "evidence unavailable"})`).join(" · ")}</p>:null}</div>)}</div></section>:null}
+  </article>
+}
+
+export default function AnalyticsPage(){
+  const [file,setFile]=useState<File|null>(null), [error,setError]=useState(""), [busy,setBusy]=useState(false), [historyBusy,setHistoryBusy]=useState(true), [result,setResult]=useState<Run|null>(null), [runs,setRuns]=useState<Run[]>([])
+  const key=useRef(requestKey())
+  const loadRuns=useCallback(async()=>{setHistoryBusy(true);try{const response=await fetch("/api/analytics/runs",{credentials:"same-origin",cache:"no-store"});const body:unknown=await response.json().catch(()=>null);if(!response.ok)throw new Error(errorMessage(body,"Recent analytics runs could not be loaded."));setRuns(manyRuns(body))}catch(e){setError(e instanceof Error?e.message:"Recent analytics runs could not be loaded.")}finally{setHistoryBusy(false)}},[])
+  useEffect(()=>{void loadRuns()},[loadRuns])
+  function changed(){key.current=requestKey();setResult(null);setError("")}
+  function choose(next:File|null){setFile(next);changed();if(next && !next.name.toLowerCase().endsWith(".csv") && next.type!=="text/csv")setError("Choose a CSV file.");else if(next && next.size>MAX_CSV_BYTES)setError("CSV files must be 2 MiB or smaller.")}
+  async function submit(event:FormEvent){event.preventDefault();if(!file)return setError("Choose one CSV file to analyze.");if(file.size>MAX_CSV_BYTES)return setError("CSV files must be 2 MiB or smaller.");if(!file.name.toLowerCase().endsWith(".csv")&&file.type!=="text/csv")return setError("Choose a CSV file.");setBusy(true);setError("");const form=new FormData();form.append("file",file);try{const response=await fetch("/api/analytics/runs",{method:"POST",body:form,credentials:"same-origin",headers:{"Idempotency-Key":key.current}});const body:unknown=await response.json().catch(()=>null);if(!response.ok)throw new Error(errorMessage(body,"The CSV could not be analyzed. You can safely retry."));const run=oneRun(body);if(!run?.id)throw new Error("The result was not readable. You can safely retry.");setResult(run);setRuns(old=>[run,...old.filter(r=>r.id!==run.id)]);key.current=requestKey()}catch(e){setError(e instanceof Error?e.message:"The CSV could not be analyzed. You can safely retry.")}finally{setBusy(false)}}
+  return <main className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-10"><div className="mx-auto max-w-5xl space-y-6">
+    <header className="flex flex-col gap-4 sm:flex-row sm:justify-between"><div><div className="flex items-center gap-3"><BarChart3 className="h-7 w-7 text-primary"/><h1 className="text-2xl font-bold sm:text-3xl">Analytics Agent</h1><Badge>Beta</Badge></div><p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">Upload one CSV for a deterministic, source-backed summary. This Beta costs 0 credits.</p></div><Button asChild variant="outline"><Link href="/agents"><ArrowLeft className="mr-2 h-4 w-4"/>Agent catalog</Link></Button></header>
+    <div className="grid gap-6 lg:grid-cols-2"><Card><CardHeader><CardTitle>Analyze a CSV</CardTitle><CardDescription>CSV only, up to 2 MiB. The durable run belongs to your signed-in account.</CardDescription></CardHeader><CardContent><form className="space-y-5" onSubmit={submit}><div className="space-y-2"><Label htmlFor="csv">CSV file</Label><Input id="csv" type="file" accept=".csv,text/csv" required onChange={e=>choose(e.target.files?.[0]??null)}/><p className="text-xs text-muted-foreground">One file only · maximum 2 MiB</p></div><div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm"><p className="font-medium">Do not upload sensitive data.</p><p className="mt-1 text-muted-foreground">No passwords, payment-card or bank details, government IDs, health records, secrets, or personal data you are not authorized to use.</p></div>{error?<div role="alert" className="flex gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"><AlertCircle className="h-4 w-4 shrink-0"/><span>{error} {file?"Retrying will not create a duplicate run.":""}</span></div>:null}<Button className="w-full" disabled={busy||!file||!!file&&file.size>MAX_CSV_BYTES}>{busy?<><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Analyzing…</>:error&&file?<><RefreshCw className="mr-2 h-4 w-4"/>Retry safely</>:"Analyze CSV — 0 credits"}</Button><p className="text-center text-xs text-muted-foreground">Deterministic Beta: no AI generation and no credits charged.</p></form></CardContent></Card>
+    <Card><CardHeader><CardTitle>{result?"Analysis complete":"Result"}</CardTitle><CardDescription>{result?"Metrics, quality checks, and evidence computed from your CSV.":"Results appear only after a successful analysis."}</CardDescription></CardHeader><CardContent>{result?<Result run={result}/>:<div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">No analysis yet.</div>}</CardContent></Card></div>
+    <Card><CardHeader className="flex-row justify-between gap-3"><div><CardTitle>Recent runs</CardTitle><CardDescription>Durable analyses saved to your account.</CardDescription></div><Button size="sm" variant="outline" onClick={()=>void loadRuns()} disabled={historyBusy}><RefreshCw className={`mr-2 h-4 w-4 ${historyBusy?"animate-spin":""}`}/>Refresh</Button></CardHeader><CardContent>{historyBusy&&!runs.length?<p className="text-sm text-muted-foreground">Loading recent runs…</p>:runs.length?<div className="divide-y">{runs.map(run=><div className="py-5 first:pt-0 last:pb-0" key={run.id}><Result run={run}/></div>)}</div>:<p className="text-sm text-muted-foreground">No saved analytics runs yet.</p>}</CardContent></Card>
+  </div></main>
 }
