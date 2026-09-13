@@ -1,27 +1,51 @@
 import Link from "next/link"
 import styles from "./marketing.module.css"
 
+const quickStarts = [
+  {
+    label: "Browse AI agents",
+    copy: "Compare all 33 agents by availability, business job, and purchase path. Seven Live agents are included in AMS plans from $29/month.",
+    href: "/agents#catalog",
+    cta: "Open the Agent Store",
+  },
+  {
+    label: "Need a fast marketing diagnosis?",
+    copy: "Get the $49 Quick Marketing Audit for a focused review, prioritized fixes, stronger messaging, and a practical 7-day action plan.",
+    href: "/quick-marketing-audit",
+    cta: "Get the $49 Audit",
+  },
+  {
+    label: "Already an AMS customer?",
+    copy: "Sign in to your dashboard to use the agents and services available with your account.",
+    href: "/login?next=/dashboard",
+    cta: "Sign in",
+  },
+]
+
 const agentCards = [
   {
     number: "01",
     status: "Live",
     title: "Content Agent",
-    copy: "Turn one clear brief into structured marketing outputs while preserving run history, execution state, and an honest boundary between planned and verified capability.",
+    copy: "Create practical marketing copy, product descriptions, email drafts, and social content from one clear brief.",
     accent: "lime",
+    href: "/agents/content-agent",
   },
   {
     number: "02",
     status: "Live",
     title: "Lead Magnet Agent",
-    copy: "Turn a defined audience problem into an offer concept, positioning angle, and conversion path that can plug into the wider AMS growth system.",
+    copy: "Turn a customer problem into a focused lead magnet concept and conversion asset for your campaign.",
     accent: "violet",
+    href: "/agents/lead-magnet-agent",
   },
   {
     number: "03",
     status: "Live",
     title: "Nurture Agent",
-    copy: "Shape follow-up sequences and customer-touch workflows designed to keep qualified leads moving without replacing judgment with generic automation.",
+    copy: "Create structured follow-up sequences that help keep qualified leads moving while preserving human review.",
     accent: "orange",
+    href: "/agents/nurture-agent",
   },
 ]
 
@@ -46,20 +70,20 @@ const principles = [
 
 const customerJourney = [
   [
-    "Define the outcome",
-    "Start with the business result: more qualified leads, faster content production, cleaner operations, better follow-up, stronger reporting, or a custom automation problem.",
+    "Choose the outcome",
+    "Start with what you need: more leads, faster content, stronger follow-up, better SEO, cleaner operations, useful analytics, or a focused marketing audit.",
   ],
   [
-    "Route to the right capability",
-    "AMS maps the request to a specialized agent, automation, service workflow, or human-reviewed build path instead of forcing every problem through one generic AI assistant.",
+    "Pick the right agent or service",
+    "The Agent Store shows exactly what each agent does, whether it is available now, and where to buy or open it.",
   ],
   [
-    "Execute with controls",
-    "The system is designed around authenticated actions, tenant-safe boundaries, credits or plan limits where required, persistent run state, and explicit handling for failures and retries.",
+    "Use it with clear controls",
+    "Available agents run through authenticated customer workflows with plan limits, saved history, and explicit handling for failures and retries.",
   ],
   [
-    "Review what actually happened",
-    "Customers should be able to see outputs, status, history, and next actions. The command-center direction is built around real operational data rather than decorative dashboard numbers.",
+    "Review the result",
+    "You stay in control of the final output and any sensitive action such as publishing, payments, account changes, or external delivery.",
   ],
 ]
 
@@ -162,44 +186,47 @@ export default function HomePage() {
         </a>
 
         <nav className={styles["desktop-nav"]} aria-label="Primary navigation">
-          <a href="#capabilities">Capabilities</a>
-          <Link href="/agents">Agent Network</Link>
+          <Link href="/agents">Agent Store</Link>
+          <Link href="/pricing">Pricing</Link>
+          <Link href="/quick-marketing-audit">$49 Audit</Link>
           <a href="#experience">How it works</a>
-          <a href="/pricing">Pricing</a>
+          <Link href="/contact">Contact</Link>
         </nav>
 
         <a className={styles["header-cta"]} href="/login?next=/dashboard">
-          Enter the system <span aria-hidden="true">↗</span>
+          Sign in <span aria-hidden="true">↗</span>
         </a>
       </header>
 
       <section className={styles.hero} id="top">
         <div className={classes("eyebrow", "reveal-one")}>
           <span className={styles.pulse} />
-          SaaS platform // controlled launch
+          AI marketing agents for small businesses
         </div>
 
         <h1 className={styles["reveal-two"]}>
-          Build demand.
+          Find the right agent.
           <br />
-          Automate the work.
+          Put it to work.
           <br />
-          <span>Own the growth.</span>
+          <span>Grow with clarity.</span>
         </h1>
 
         <div className={classes("hero-bottom", "reveal-three")}>
           <p>
-            Aspect Marketing Solutions is building a coordinated AI operating layer for business
-            growth: specialized agents for marketing, sales, content, automation, research,
-            publishing, commerce, and operations—released only as their real execution paths are
-            verified.
+            Start with seven production-verified AI agents included in AMS plans from $29/month,
+            or get the $49 Quick Marketing Audit. Every offer clearly shows what is available now,
+            what it costs, and what happens next.
           </p>
           <div className={styles["hero-actions"]}>
-            <a className={classes("button", "button-primary")} href="/quick-marketing-audit">
-              Get the $49 Marketing Audit <span aria-hidden="true">↗</span>
-            </a>
-            <Link className={styles["text-link"]} href="/agents">
-              Explore the Agent Network <span aria-hidden="true">→</span>
+            <Link className={classes("button", "button-primary")} href="/agents#catalog">
+              Browse the Agent Store <span aria-hidden="true">↗</span>
+            </Link>
+            <Link className={styles["text-link"]} href="/pricing#plans">
+              View plans from $29/month <span aria-hidden="true">→</span>
+            </Link>
+            <Link className={styles["text-link"]} href="/quick-marketing-audit">
+              Or get the $49 Marketing Audit <span aria-hidden="true">→</span>
             </Link>
           </div>
         </div>
@@ -210,28 +237,41 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className={styles["signal-bar"]} aria-label="Platform principles">
-        <span>BUILDING REAL EXECUTION</span>
+      <section className="mx-auto grid max-w-7xl gap-4 px-5 pb-12 sm:px-8 lg:grid-cols-3 lg:pb-16" aria-label="Choose where to start">
+        {quickStarts.map((item) => (
+          <article key={item.label} className="flex min-h-60 flex-col rounded-xl border border-white/10 bg-white/[0.035] p-6 shadow-lg">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#c9ff3d]">Start here</p>
+            <h2 className="mt-3 text-2xl font-bold tracking-tight text-white">{item.label}</h2>
+            <p className="mt-3 text-sm leading-6 text-white/65">{item.copy}</p>
+            <Link className="mt-auto pt-6 text-sm font-semibold text-[#c9ff3d] hover:text-white" href={item.href}>
+              {item.cta} <span aria-hidden="true">→</span>
+            </Link>
+          </article>
+        ))}
+      </section>
+
+      <section className={styles["signal-bar"]} aria-label="Current offers">
+        <span>7 LIVE AGENTS</span>
         <i>✦</i>
-        <span>HONEST METRICS</span>
+        <span>PLANS FROM $29/MO</span>
         <i>✦</i>
-        <span>TENANT-SAFE</span>
+        <span>$49 ONE-TIME AUDIT</span>
         <i>✦</i>
-        <span>BUILT TO SELL</span>
+        <span>HUMAN-CONTROLLED</span>
       </section>
 
       <section className={classes("section", "capabilities-section")} id="capabilities">
         <div className={styles["capabilities-heading"]}>
-          <p className={styles["section-kicker"]}>What AMS is built to deliver</p>
+          <p className={styles["section-kicker"]}>What AMS helps you do</p>
           <h2>
-            Strategy outside.
+            Choose the job.
             <br />
-            Automation inside.
+            Use the right tool.
           </h2>
           <p>
-            Automation is only valuable when it is attached to a real business objective. AMS is
-            designed to combine clear strategy on the customer side with structured workflows,
-            specialized agents, integrations, controls, and measurable execution underneath.
+            AMS organizes AI around practical business work: creating content, generating leads,
+            improving follow-up, strengthening search visibility, supporting commerce, and making
+            day-to-day operations easier to manage.
           </p>
         </div>
 
@@ -248,16 +288,16 @@ export default function HomePage() {
 
       <section className={classes("section", "agents-section")} id="agents">
         <div className={styles["section-intro"]}>
-          <p className={styles["section-kicker"]}>The first strike team</p>
+          <p className={styles["section-kicker"]}>Featured Live agents</p>
           <h2>
-            Agents with a job.
+            Start with work
             <br />
-            Not a gimmick.
+            you need today.
           </h2>
           <p className={styles["section-copy"]}>
-            AMS is not presenting every idea as finished software. The homepage highlights the
-            first customer-facing growth roles; the full Agent Network shows the wider catalog,
-            what each agent is intended to do, and exactly where it sits in the product lifecycle.
+            These are three of the seven production-verified agents available through AMS plans.
+            Each card opens a dedicated sales page with capabilities, pricing, availability, and a
+            sales video. The full Agent Store contains all 33 agents and their current status.
           </p>
         </div>
 
@@ -275,31 +315,39 @@ export default function HomePage() {
               </div>
               <h3>{agent.title}</h3>
               <p>{agent.copy}</p>
-              <Link href="/agents" aria-label={`View ${agent.title} in the AMS Agent Network`}>
-                View Agent Network <span aria-hidden="true">↗</span>
+              <Link href={agent.href} aria-label={`View ${agent.title} sales page`}>
+                View sales page <span aria-hidden="true">↗</span>
               </Link>
             </article>
           ))}
         </div>
 
+        <div className="mt-6 flex flex-wrap items-center gap-4">
+          <Link className={classes("button", "button-primary")} href="/agents#catalog">
+            Browse all 33 agents <span aria-hidden="true">↗</span>
+          </Link>
+          <Link className={styles["text-link"]} href="/pricing#plans">
+            Compare subscription plans <span aria-hidden="true">→</span>
+          </Link>
+        </div>
+
         <div className={styles["roadmap-panel"]}>
           <div className={styles["roadmap-proof"]}>
-            <p className={styles["section-kicker"]}>Agent network inventory</p>
+            <p className={styles["section-kicker"]}>Agent Store inventory</p>
             <strong>33</strong>
             <p>
-              The network includes customer-facing, creator, commerce, research, automation, and
-              internal platform concepts. Inventory is not the same thing as availability: every
-              agent carries an explicit lifecycle status.
+              The store includes customer-facing, creator, commerce, research, automation, and
+              platform agents. Each one is labeled Live, Beta, Setup Required, Planned, or Blocked.
             </p>
           </div>
 
           <div className={styles["roadmap-content"]}>
             <div className={styles["roadmap-header"]}>
               <div>
-                <span>Product roadmap</span>
-                <h3>A broader system, organized around business jobs instead of AI novelty.</h3>
+                <span>Organized by business job</span>
+                <h3>Find the capability you need without guessing what the product actually does.</h3>
               </div>
-              <span className={styles["status-pill"]}>Lifecycle controlled</span>
+              <span className={styles["status-pill"]}>Clear availability</span>
             </div>
 
             <div className={styles["roadmap-grid"]}>
@@ -320,25 +368,25 @@ export default function HomePage() {
 
       <section className={classes("section", "agents-section")} id="status">
         <div className={styles["section-intro"]}>
-          <p className={styles["section-kicker"]}>Availability without the nonsense</p>
+          <p className={styles["section-kicker"]}>Know what is ready before you buy</p>
           <h2>
             Five statuses.
             <br />
-            One clear promise.
+            No guesswork.
           </h2>
           <p className={styles["section-copy"]}>
-            If an agent is not ready, AMS says so. The lifecycle system makes the roadmap useful to
-            customers without turning unfinished work into fake product claims.
+            If an agent is not ready, AMS says so. Live agents can be used now. Beta and roadmap
+            agents remain visible so you can understand what is available today and what is coming next.
           </p>
         </div>
 
         <div className={styles["roadmap-panel"]}>
           <div className={styles["roadmap-proof"]}>
-            <p className={styles["section-kicker"]}>Lifecycle model</p>
+            <p className={styles["section-kicker"]}>Availability model</p>
             <strong>5</strong>
             <p>
-              Live, Beta, Setup Required, Blocked, and Planned describe how much of the real product
-              path has been proven and what still prevents customer use.
+              Live, Beta, Setup Required, Blocked, and Planned tell you how ready an agent is and
+              whether it can be purchased or used today.
             </p>
           </div>
 
@@ -346,9 +394,9 @@ export default function HomePage() {
             <div className={styles["roadmap-header"]}>
               <div>
                 <span>What the labels mean</span>
-                <h3>Customers should know what they can use today and what they are helping shape next.</h3>
+                <h3>Customers should know exactly what they can use today.</h3>
               </div>
-              <span className={styles["status-pill"]}>Truth by design</span>
+              <span className={styles["status-pill"]}>Clear by design</span>
             </div>
 
             <div className={styles["roadmap-grid"]}>
@@ -385,8 +433,8 @@ export default function HomePage() {
 
       <section className={classes("section", "method-section")} id="experience">
         <div className={styles["method-label"]}>
-          <p className={styles["section-kicker"]}>What using AMS should feel like</p>
-          <span>04 / customer flow</span>
+          <p className={styles["section-kicker"]}>How to use AMS</p>
+          <span>04 / simple customer flow</span>
         </div>
         <div className={styles["principle-list"]}>
           {customerJourney.map(([title, copy], index) => (
@@ -401,17 +449,15 @@ export default function HomePage() {
 
       <section className={classes("section", "launch-section")} id="launch">
         <div className={styles["launch-copy"]}>
-          <p className={styles["section-kicker"]}>Current mission</p>
+          <p className={styles["section-kicker"]}>Product progress</p>
           <h2>
-            From platform foundation
+            Available now.
             <br />
-            to operating system.
+            Expanding carefully.
           </h2>
           <p>
-            AMS is expanding in controlled milestones. Public marketing, service paths, account
-            systems, billing, integrations, agent execution, operational visibility, and the
-            Android experience are treated as parts of one product—not separate demos pretending
-            to be finished.
+            AMS already has production-verified customer agents and a live $49 audit. Additional
+            agents are promoted only after their real customer path, controls, and reliability are verified.
           </p>
         </div>
 
@@ -419,44 +465,49 @@ export default function HomePage() {
           <li className={styles.active}>
             <span>01</span>
             <div>
-              <strong>Public SaaS + service foundation</strong>
-              <small>Brand, offers, access paths, billing foundations, and truthful product presentation</small>
+              <strong>Public Agent Store + paid offers</strong>
+              <small>Clear catalog, dedicated sales pages, subscription access, and the $49 audit</small>
             </div>
           </li>
           <li>
             <span>02</span>
             <div>
-              <strong>Verified customer agent execution</strong>
-              <small>Authenticated runs, persistence, failure handling, plan controls, and real customer experience</small>
+              <strong>More verified customer agents</strong>
+              <small>Additional business jobs move to Live after controlled production verification</small>
             </div>
           </li>
           <li>
             <span>03</span>
             <div>
-              <strong>Network expansion + Command Center</strong>
-              <small>More verified agents, operational dashboards, integrations, analytics, and coordinated workflows</small>
+              <strong>Operational visibility + integrations</strong>
+              <small>More analytics, connected workflows, and customer-facing management tools</small>
             </div>
           </li>
           <li>
             <span>04</span>
             <div>
               <strong>Android distribution</strong>
-              <small>Package, store assets, policy readiness, device verification, and Google Play release path</small>
+              <small>Final device verification, Play Console release work, store assets, and policy completion</small>
             </div>
           </li>
         </ol>
       </section>
 
       <section className={styles.closing}>
-        <p>THE SYSTEM IS COMING ONLINE.</p>
+        <p>READY TO CHOOSE YOUR NEXT STEP?</p>
         <h2>
-          Build once.
+          Find the right agent.
           <br />
-          <span>Compound forever.</span>
+          <span>Start with confidence.</span>
         </h2>
-        <a className={classes("button", "button-primary")} href="/quick-marketing-audit">
-          Start with the $49 Audit <span aria-hidden="true">↗</span>
-        </a>
+        <div className="flex flex-wrap justify-center gap-4">
+          <Link className={classes("button", "button-primary")} href="/agents#catalog">
+            Browse the Agent Store <span aria-hidden="true">↗</span>
+          </Link>
+          <Link className={styles["text-link"]} href="/quick-marketing-audit">
+            Get the $49 Audit <span aria-hidden="true">→</span>
+          </Link>
+        </div>
       </section>
 
       <footer className={styles.footer}>
@@ -466,8 +517,14 @@ export default function HomePage() {
             ASPECT<span>/</span>AMS
           </span>
         </a>
+        <nav className="flex flex-wrap justify-center gap-4 text-xs text-white/60" aria-label="Footer navigation">
+          <Link href="/agents">Agents</Link>
+          <Link href="/pricing">Pricing</Link>
+          <Link href="/quick-marketing-audit">$49 Audit</Link>
+          <Link href="/contact">Contact</Link>
+          <Link href="/login?next=/dashboard">Sign in</Link>
+        </nav>
         <p>Aspect Marketing Solutions © 2026</p>
-        <p>Kentucky built. Global ambition.</p>
       </footer>
     </main>
   )
