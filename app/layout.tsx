@@ -1,5 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
+import { MarketingAttribution } from "@/components/marketing-attribution"
 import "./globals.css"
 
 const siteUrl = "https://www.aspectmarketingsolutions.app"
@@ -45,7 +46,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-background font-sans antialiased">{children}</body>
+      <body className="min-h-screen bg-background font-sans antialiased">
+        <MarketingAttribution />
+        {children}
+      </body>
     </html>
   )
 }
