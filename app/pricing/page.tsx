@@ -52,21 +52,21 @@ const SAAS_PLANS = [
     name: "Starter",
     price: "$29",
     credits: monthlyCreditsForPlan("starter"),
-    description: "Entry access to the verified AMS shared-credit agent suite with a monthly credit pool.",
+    fit: "Best for trying AMS or running a light monthly workload.",
   },
   {
     slug: "growth" as const,
     name: "Growth",
     price: "$79",
     credits: monthlyCreditsForPlan("growth"),
-    description: "More shared monthly generation capacity across the verified AMS agent suite.",
+    fit: "Best for an active small business using several agents each week.",
   },
   {
     slug: "pro" as const,
     name: "Pro",
     price: "$149",
     credits: monthlyCreditsForPlan("pro"),
-    description: "The largest standard shared monthly generation pool for verified AMS workflows.",
+    fit: "Best for larger workloads and frequent agent use across the month.",
   },
 ]
 
@@ -74,20 +74,17 @@ const REQUEST_OFFERS = [
   {
     id: "social-content-pack",
     name: "Social Content Pack",
-    summary: "A proposed content scope for human review before any work begins.",
-    deliverables: ["10 post ideas", "5 draft posts", "CTA set", "light brand angle"],
+    summary: "Content planning and draft support for a defined campaign.",
   },
   {
     id: "website-profile-review",
     name: "Website / Google Profile Review",
-    summary: "A proposed website and profile review scope for human review.",
-    deliverables: ["site critique", "Google profile notes", "conversion fixes", "priority checklist"],
+    summary: "A focused review of your website and public business profile.",
   },
   {
     id: "business-cleanup-plan",
     name: "Business Cleanup Plan",
-    summary: "A proposed cleanup-plan scope for human review before any work begins.",
-    deliverables: ["offer cleanup", "homepage fixes", "content priorities", "next 7-day plan"],
+    summary: "A practical cleanup plan for offers, homepage messaging, and priorities.",
   },
 ]
 
@@ -95,124 +92,99 @@ export default function PricingPage() {
   const contentAgentLive = isContentAgentLaunchEnabled()
 
   return (
-    <main className="min-h-screen bg-background px-6 py-10">
+    <main className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:py-12">
       <div className="mx-auto max-w-6xl space-y-12">
-        <div className="space-y-4">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-primary">AMS pricing</p>
-          <h1 className="max-w-3xl text-4xl font-bold sm:text-5xl">Clear offers with honest launch status.</h1>
-          <p className="max-w-2xl text-muted-foreground">
-            {contentAgentLive
-              ? `Subscribe from $29/month for shared credits across ${SUBSCRIPTION_INCLUDED_AGENT_COUNT} production-verified Live agents. Standalone rates exist for selected agents and are listed separately below.`
-              : "The $49 Quick Marketing Audit is live now. Standalone agent rates are published for transparency, while paid AI checkout remains paused until the shared production execution gate is deliberately enabled."}
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild>
-              <Link href={QUICK_MARKETING_AUDIT.landingPath}>
-                Get the $49 audit
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/agents">
-                <Bot className="mr-2 h-4 w-4" />
-                View agent status
-              </Link>
-            </Button>
-            <Button asChild variant="ghost">
+        <header className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <Link href="/" className="font-black tracking-tight">
+              ASPECT<span className="text-primary">/</span>AMS
+            </Link>
+            <nav className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground" aria-label="Pricing navigation">
+              <Link className="hover:text-foreground" href="/agents">Agent Store</Link>
+              <Link className="hover:text-foreground" href="/quick-marketing-audit">$49 Audit</Link>
+              <Link className="hover:text-foreground" href="/contact">Contact</Link>
+            </nav>
+          </div>
+
+          <div className="max-w-3xl space-y-4">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Simple pricing</p>
+            <h1 className="text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">Choose the simplest way to start.</h1>
+            <p className="text-lg leading-8 text-muted-foreground">
+              Use the AMS subscription when you want ongoing access to the {SUBSCRIPTION_INCLUDED_AGENT_COUNT} Live agents. Choose the $49 Quick Marketing Audit when you want one focused marketing review without a subscription.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="border-primary/40 bg-primary/5">
+              <CardHeader>
+                <CardDescription>Ongoing AI agent access</CardDescription>
+                <CardTitle className="text-2xl">{SUBSCRIPTION_INCLUDED_AGENT_COUNT} Live agents from $29/month</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm leading-6 text-muted-foreground">
+                  One subscription gives you a shared monthly credit pool across every currently Live AMS subscription agent.
+                </p>
+                <Button asChild>
+                  <Link href="#plans">
+                    Compare plans
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardDescription>One-time service</CardDescription>
+                <CardTitle className="text-2xl">Quick Marketing Audit — $49</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Get a focused marketing review, specific fixes, stronger copy, and a practical 7-day action plan. No subscription required.
+                </p>
+                <Button asChild variant="outline">
+                  <Link href={QUICK_MARKETING_AUDIT.landingPath}>
+                    Get the $49 Audit
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="text-muted-foreground">Already a customer?</span>
+            <Button asChild variant="ghost" size="sm">
               <Link href="/billing">
                 <CreditCard className="mr-2 h-4 w-4" />
-                Account billing
+                Open account billing
               </Link>
             </Button>
           </div>
-        </div>
+        </header>
 
         {!contentAgentLive ? (
           <Card className="border-amber-500/40 bg-amber-500/10">
             <CardHeader>
-              <CardTitle>Paid AI checkout is paused</CardTitle>
+              <CardTitle>Subscription checkout is currently paused</CardTitle>
               <CardDescription>
-                The standalone rates below are approved for the listed agents, but no standalone or subscription payment can start while the shared AI execution gate is disabled. This does not affect the live one-time Quick Marketing Audit.
+                No subscription payment can start while the shared AI execution gate is disabled. The $49 Quick Marketing Audit remains available.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild>
-                <Link href="/agents">View verified Live agents</Link>
+                <Link href={QUICK_MARKETING_AUDIT.landingPath}>Get the $49 Audit</Link>
               </Button>
             </CardContent>
           </Card>
         ) : null}
 
-        <section className="space-y-5">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Live service</p>
-            <h2 className="text-3xl font-bold">Start with a focused marketing win</h2>
-            <p className="max-w-2xl text-muted-foreground">
-              Buy the Quick Marketing Audit now through secure Stripe Checkout. This is a one-time service, not an AI subscription.
-            </p>
-          </div>
-          <Card className="border-primary/40 bg-primary/5">
-            <CardHeader>
-              <CardDescription>Available now · delivered {QUICK_MARKETING_AUDIT.deliveryWindow}</CardDescription>
-              <CardTitle className="flex flex-wrap items-end gap-3 text-2xl">
-                {QUICK_MARKETING_AUDIT.name}
-                <span className="text-4xl">{QUICK_MARKETING_AUDIT.priceLabel}</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
-              <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-                {QUICK_MARKETING_AUDIT.deliverables.map((item) => (
-                  <li key={item}>- {item}</li>
-                ))}
-              </ul>
-              <Button asChild size="lg">
-                <Link href={QUICK_MARKETING_AUDIT.landingPath}>
-                  Buy the audit — $49
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </section>
-
-        <section className="space-y-5" id="live-agent-pricing">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Selected standalone-agent pricing</p>
-            <h2 className="text-3xl font-bold">Approved standalone rates — checkout not yet available.</h2>
-            <p className="max-w-3xl text-sm text-muted-foreground">
-              These are approved rates for selected Live agents that have a standalone rate card. They are not a count of every Live subscription agent and are not an available checkout offer. Current subscription access uses shared credits.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            {LIVE_AGENT_PRICING.map((agent) => (
-              <Card key={agent.name} className="flex flex-col">
-                <CardHeader>
-                  <CardDescription>Live · approved standalone rate</CardDescription>
-                  <CardTitle className="text-xl">{agent.name}</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-1 flex-col gap-4">
-                  <div>
-                    <span className="text-3xl font-bold">{agent.price}</span>
-                    <span className="text-sm text-muted-foreground"> / completed run</span>
-                  </div>
-                  <p className="flex-1 text-sm text-muted-foreground">{agent.description}</p>
-                  <p className="text-xs text-muted-foreground">Standalone checkout unavailable. Included with subscriber shared credits.</p>
-                  <Button asChild variant="outline">
-                    <Link href={agent.href}>View agent</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-5" id="plans">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">SaaS plans</p>
-            <h2 className="text-3xl font-bold">One subscription. {SUBSCRIPTION_INCLUDED_AGENT_COUNT} Live shared-credit agents.</h2>
-            <p className="max-w-3xl text-sm text-muted-foreground">
-              Every standard plan includes {SUBSCRIPTION_INCLUDED_AGENT_NAMES}. One completed generation from any included agent uses one shared credit; subscribers do not pay a separate standalone per-run charge while using plan credits.
+        <section className="space-y-6" id="plans">
+          <div className="space-y-3">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Monthly plans</p>
+            <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Same Live agents. Choose your monthly credit pool.</h2>
+            <p className="max-w-3xl leading-7 text-muted-foreground">
+              Every plan includes {SUBSCRIPTION_INCLUDED_AGENT_NAMES}. One completed generation from any included agent uses one shared credit.
             </p>
           </div>
 
@@ -221,30 +193,33 @@ export default function PricingPage() {
               <Card key={plan.slug} className={plan.slug === "growth" ? "border-primary shadow-lg" : undefined}>
                 <CardHeader>
                   <div className="flex items-center justify-between gap-3">
-                    <CardTitle>{plan.name}</CardTitle>
-                    {plan.slug === "growth" && <Sparkles className="h-5 w-5 text-primary" />}
+                    <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                    {plan.slug === "growth" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                        <Sparkles className="h-3.5 w-3.5" /> Popular
+                      </span>
+                    ) : null}
                   </div>
-                  <CardDescription>{plan.description}</CardDescription>
+                  <CardDescription>{plan.fit}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
-                  <div className="text-4xl font-bold">
-                    {plan.price}
-                    <span className="text-base font-normal text-muted-foreground">/month</span>
+                  <div>
+                    <div className="text-4xl font-black">
+                      {plan.price}<span className="text-base font-normal text-muted-foreground">/month</span>
+                    </div>
+                    <p className="mt-2 text-sm font-medium">{plan.credits.toLocaleString()} shared credits / month</p>
                   </div>
                   <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li>- {plan.credits.toLocaleString()} shared AI generation credits per month</li>
-                    <li>- All {SUBSCRIPTION_INCLUDED_AGENT_COUNT} currently Live shared-credit agents included</li>
-                    <li>- One completed generation from any included agent uses one shared credit</li>
-                    <li>- No standalone per-run charge while using plan credits</li>
-                    <li>- Human review and each agent&apos;s delivery guardrails remain in effect</li>
-                    <li>- New agents are added only after production verification and subscription-access verification</li>
-                    <li>- Stripe billing portal for existing subscribers</li>
+                    <li>• All {SUBSCRIPTION_INCLUDED_AGENT_COUNT} Live subscription agents</li>
+                    <li>• One shared credit per completed generation</li>
+                    <li>• Human review and agent guardrails remain in effect</li>
+                    <li>• Stripe billing portal access</li>
                   </ul>
                   {contentAgentLive ? (
                     <BillingActionButton label={`Choose ${plan.name}`} endpoint="/api/billing/checkout" plan={plan.slug} />
                   ) : (
                     <div className="space-y-2">
-                      <Button type="button" disabled>Private beta — checkout paused</Button>
+                      <Button type="button" disabled>Checkout paused</Button>
                       <p className="text-xs text-muted-foreground">No payment can be started for this plan.</p>
                     </div>
                   )}
@@ -253,78 +228,108 @@ export default function PricingPage() {
             ))}
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Need more credits without changing plans?</CardTitle>
-              <CardDescription>
-                Active subscribers can buy one-time shared-credit top-ups from the web billing portal.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-3">
-                {CREDIT_TOPUP_PACKS.map((pack) => (
-                  <div key={pack.slug} className="rounded-lg border p-4">
-                    <div className="text-sm text-muted-foreground">{pack.name}</div>
-                    <div className="mt-1 text-2xl font-bold">{pack.priceLabel}</div>
-                    <div className="mt-2 text-xs text-muted-foreground">One-time purchase · subscriber-only</div>
-                  </div>
-                ))}
+          <div className="flex flex-wrap gap-3">
+            <Button asChild variant="outline">
+              <Link href="/agents">
+                <Bot className="mr-2 h-4 w-4" />
+                Browse the Agent Store
+              </Link>
+            </Button>
+            <Button asChild variant="ghost">
+              <Link href="/billing">Existing customer billing</Link>
+            </Button>
+          </div>
+        </section>
+
+        <section className="space-y-5">
+          <div className="space-y-2">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">One-time option</p>
+            <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Not ready for a subscription? Start with the $49 Audit.</h2>
+          </div>
+          <Card className="border-primary/40 bg-primary/5">
+            <CardContent className="grid gap-6 p-6 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div className="space-y-3">
+                <div className="text-3xl font-black">{QUICK_MARKETING_AUDIT.priceLabel}</div>
+                <p className="max-w-3xl leading-7 text-muted-foreground">
+                  Delivered {QUICK_MARKETING_AUDIT.deliveryWindow}. You receive {QUICK_MARKETING_AUDIT.deliverables.join(", ")}.
+                </p>
               </div>
-              <p className="max-w-3xl text-sm text-muted-foreground">
-                Purchased top-up credits remain available until consumed unless the payment is refunded or reversed. Monthly plan credits are used first. Top-up checkout is available on the web and is not offered inside the Android app while Google Play billing requirements are handled separately.
-              </p>
-              <Button asChild variant="outline">
-                <Link href="/billing">Open account billing</Link>
+              <Button asChild size="lg">
+                <Link href={QUICK_MARKETING_AUDIT.landingPath}>
+                  Buy the $49 Audit
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
               </Button>
             </CardContent>
           </Card>
         </section>
 
         <section className="space-y-5">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Request-based services</p>
-            <h2 className="text-3xl font-bold">Need a different scope?</h2>
+          <div className="space-y-2">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Need something different?</p>
+            <h2 className="text-3xl font-black tracking-tight">Request a scoped service.</h2>
             <p className="max-w-2xl text-muted-foreground">
-              These services remain request-only. Submitting a request does not charge you, start work, or guarantee availability.
+              These requests do not charge you or start work automatically. They let AMS review the scope first.
             </p>
           </div>
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3">
             {REQUEST_OFFERS.map((offer) => (
               <Card key={offer.id}>
                 <CardHeader>
-                  <CardTitle>{offer.name}</CardTitle>
-                  <CardDescription>Request-only</CardDescription>
+                  <CardTitle className="text-lg">{offer.name}</CardTitle>
+                  <CardDescription>{offer.summary}</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-lg font-semibold">No payment accepted</div>
-                  <p className="text-sm text-muted-foreground">{offer.summary}</p>
-                  <ul className="space-y-2 text-sm text-muted-foreground">
-                    {offer.deliverables.map((item) => (
-                      <li key={item}>- {item}</li>
-                    ))}
-                  </ul>
-                  <Button asChild>
+                <CardContent>
+                  <Button asChild variant="outline" className="w-full">
                     <Link href={`/ethical-agent-farm/request?offer=${offer.id}`}>Request this service</Link>
                   </Button>
                 </CardContent>
               </Card>
             ))}
           </div>
+          <Button asChild variant="ghost">
+            <Link href="/ethical-agent-farm/request?offer=monthly-marketing-support">Request ongoing monthly support</Link>
+          </Button>
         </section>
 
-        <Card className="border-primary/40 bg-primary/5">
-          <CardHeader>
-            <CardTitle>Need ongoing done-for-you support?</CardTitle>
-            <CardDescription>
-              Monthly marketing support is request-only. Submitting the form does not collect payment, start work, or guarantee availability.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link href="/ethical-agent-farm/request?offer=monthly-marketing-support">Request monthly support</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <section className="space-y-4 border-t border-border/70 pt-8">
+          <details className="rounded-xl border bg-card p-5">
+            <summary className="cursor-pointer font-semibold">Reference: standalone agent rates and credit top-ups</summary>
+            <div className="mt-5 space-y-6 text-sm text-muted-foreground">
+              <div className="space-y-3">
+                <p>
+                  Selected Live agents have approved standalone reference rates, but standalone checkout is not currently available. Subscription access uses shared credits.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                  {LIVE_AGENT_PRICING.map((agent) => (
+                    <div key={agent.name} className="rounded-lg border p-4">
+                      <div className="font-semibold text-foreground">{agent.name}</div>
+                      <div className="mt-1 text-xl font-bold text-foreground">{agent.price}</div>
+                      <div>/ completed run</div>
+                      <Link className="mt-3 inline-block text-primary hover:underline" href={agent.href}>View agent</Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="font-semibold text-foreground">Subscriber credit top-ups</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {CREDIT_TOPUP_PACKS.map((pack) => (
+                    <div key={pack.slug} className="rounded-lg border p-4">
+                      <div>{pack.name}</div>
+                      <div className="mt-1 text-xl font-bold text-foreground">{pack.priceLabel}</div>
+                      <div>One-time purchase · subscribers only</div>
+                    </div>
+                  ))}
+                </div>
+                <p>
+                  Monthly plan credits are used first. Top-ups are available from web billing and are not offered inside the Android app while Google Play billing requirements remain separate.
+                </p>
+              </div>
+            </div>
+          </details>
+        </section>
       </div>
     </main>
   )
