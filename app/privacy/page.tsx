@@ -3,7 +3,7 @@ export const metadata = {
   description: "Privacy policy for Aspect Marketing Solutions web services and the AMS Android companion app.",
 }
 
-const updated = "August 9, 2026"
+const updated = "September 12, 2026"
 
 export default function PrivacyPolicyPage() {
   return (
@@ -37,7 +37,7 @@ export default function PrivacyPolicyPage() {
             <li>Android beta tester information such as first name, Google account email used for Play testing, Android device description, referral source, optional notes, 14-day testing commitment, and private beta feedback you submit.</li>
             <li>Transaction and subscription metadata such as product, price, payment status, customer identifier, and receipt information. Payment card details are entered into and processed by Stripe; AMS does not need to store full card numbers.</li>
             <li>Operational and security information such as request logs, timestamps, service status, fraud/abuse signals, and technical diagnostics.</li>
-            <li>Content you intentionally submit to an AMS workflow or agent when that capability is available.</li>
+            <li>Content you intentionally submit to an AMS workflow or agent. When you request an AI-generated deliverable, the relevant submitted content and instructions may be sent through our AI gateway to the model provider needed to generate that requested output.</li>
           </ul>
         </section>
 
@@ -46,6 +46,7 @@ export default function PrivacyPolicyPage() {
           <ul className="list-disc space-y-2 pl-6 leading-7 text-muted-foreground">
             <li>Provide, secure, troubleshoot, and improve AMS services.</li>
             <li>Authenticate users and protect restricted areas.</li>
+            <li>Generate the drafts, reports, plans, and other deliverables you explicitly request from AMS agents.</li>
             <li>Coordinate the Android closed beta, maintain the private tester roster, review tester feedback, and document legitimate testing outcomes for Google Play production-readiness review.</li>
             <li>Fulfill service requests and maintain service history.</li>
             <li>Process payments, subscriptions, refunds, and entitlement records when a web purchase is made.</li>
@@ -58,7 +59,7 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-3">
           <h2 className="text-2xl font-bold">4. Service providers and sharing</h2>
           <p className="leading-7 text-muted-foreground">
-            AMS uses service providers to operate the platform. Depending on the feature, these may include Google for authentication and Google Play testing/distribution, Stripe for payments, Vercel for web hosting and application delivery, Upstash for Redis-based persistence, and n8n for approved automation workflows. These providers process information for the services they provide to AMS and are subject to their own contractual and privacy obligations.
+            AMS uses service providers to operate the platform. Depending on the feature, these may include Google for authentication and Google Play testing/distribution, Stripe for payments, Vercel for web hosting, application delivery, and AI-gateway routing, model providers used to generate customer-requested AI deliverables, Upstash for Redis-based persistence, and n8n for approved automation workflows when that optional integration is enabled. These providers process information for the services they provide to AMS and are subject to their own contractual and privacy obligations.
           </p>
           <p className="leading-7 text-muted-foreground">
             AMS does not sell personal or sensitive user data. We may disclose information when required by law, to protect users or AMS from fraud or security threats, or as part of a legitimate business transfer subject to applicable law.
