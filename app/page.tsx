@@ -4,21 +4,21 @@ import styles from "./marketing.module.css"
 const agentCards = [
   {
     number: "01",
-    status: "Launch focus",
+    status: "Live",
     title: "Content Agent",
     copy: "Turn one clear brief into structured marketing outputs while preserving run history, execution state, and an honest boundary between planned and verified capability.",
     accent: "lime",
   },
   {
     number: "02",
-    status: "Queued next",
+    status: "Live",
     title: "Lead Magnet Agent",
     copy: "Turn a defined audience problem into an offer concept, positioning angle, and conversion path that can plug into the wider AMS growth system.",
     accent: "violet",
   },
   {
     number: "03",
-    status: "Queued next",
+    status: "Live",
     title: "Nurture Agent",
     copy: "Shape follow-up sequences and customer-touch workflows designed to keep qualified leads moving without replacing judgment with generic automation.",
     accent: "orange",
@@ -130,11 +130,15 @@ const lifecycleGroups = [
     agents: ["Functional path exists", "Controlled testing", "Limited availability", "Still being hardened"],
   },
   {
-    label: "In development",
-    agents: ["Actively being built", "Not sold as complete", "Early-access interest", "Verification still required"],
+    label: "Setup Required",
+    agents: ["Core build exists", "Configuration still required", "Fails closed until connected", "Not sold as complete"],
   },
   {
-    label: "Coming soon",
+    label: "Blocked",
+    agents: ["Named dependency or owner action", "No fake execution", "Blocker is published", "Work resumes when cleared"],
+  },
+  {
+    label: "Planned",
     agents: ["Approved roadmap concept", "Not yet executable", "Demand can guide priority", "No fake availability"],
   },
 ]
@@ -318,7 +322,7 @@ export default function HomePage() {
         <div className={styles["section-intro"]}>
           <p className={styles["section-kicker"]}>Availability without the nonsense</p>
           <h2>
-            Four statuses.
+            Five statuses.
             <br />
             One clear promise.
           </h2>
@@ -331,10 +335,10 @@ export default function HomePage() {
         <div className={styles["roadmap-panel"]}>
           <div className={styles["roadmap-proof"]}>
             <p className={styles["section-kicker"]}>Lifecycle model</p>
-            <strong>4</strong>
+            <strong>5</strong>
             <p>
-              Live, Beta, In Development, and Coming Soon describe how much of the real product path
-              has been proven—not how exciting the idea sounds.
+              Live, Beta, Setup Required, Blocked, and Planned describe how much of the real product
+              path has been proven and what still prevents customer use.
             </p>
           </div>
 

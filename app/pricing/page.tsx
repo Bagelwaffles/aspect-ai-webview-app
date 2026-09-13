@@ -8,6 +8,10 @@ import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 import { CREDIT_TOPUP_PACKS } from "@/lib/credit-topups"
 import { QUICK_MARKETING_AUDIT } from "@/lib/quick-marketing-audit"
 import { monthlyCreditsForPlan } from "@/lib/server/entitlements"
+import {
+  SUBSCRIPTION_INCLUDED_AGENT_COUNT,
+  SUBSCRIPTION_INCLUDED_AGENT_NAMES,
+} from "@/lib/subscription-agent-catalog"
 
 const LIVE_AGENT_PRICING = [
   {
@@ -48,21 +52,21 @@ const SAAS_PLANS = [
     name: "Starter",
     price: "$29",
     credits: monthlyCreditsForPlan("starter"),
-    description: "Entry access to the verified AMS marketing-agent suite with a shared monthly credit pool.",
+    description: "Entry access to the verified AMS shared-credit agent suite with a monthly credit pool.",
   },
   {
     slug: "growth" as const,
     name: "Growth",
     price: "$79",
     credits: monthlyCreditsForPlan("growth"),
-    description: "More shared monthly generation capacity across the verified AMS marketing-agent suite.",
+    description: "More shared monthly generation capacity across the verified AMS agent suite.",
   },
   {
     slug: "pro" as const,
     name: "Pro",
     price: "$149",
     credits: monthlyCreditsForPlan("pro"),
-    description: "The largest standard shared monthly generation pool for verified AMS marketing workflows.",
+    description: "The largest standard shared monthly generation pool for verified AMS workflows.",
   },
 ]
 
@@ -98,7 +102,7 @@ export default function PricingPage() {
           <h1 className="max-w-3xl text-4xl font-bold sm:text-5xl">Clear offers with honest launch status.</h1>
           <p className="max-w-2xl text-muted-foreground">
             {contentAgentLive
-              ? "Subscribe from $29/month for shared credits across five production-verified marketing agents. Standalone rates are listed below, but standalone checkout is not yet available."
+              ? `Subscribe from $29/month for shared credits across ${SUBSCRIPTION_INCLUDED_AGENT_COUNT} production-verified Live agents. Standalone rates exist for selected agents and are listed separately below.`
               : "The $49 Quick Marketing Audit is live now. Standalone agent rates are published for transparency, while paid AI checkout remains paused until the shared production execution gate is deliberately enabled."}
           </p>
           <div className="flex flex-wrap gap-3">
@@ -128,7 +132,7 @@ export default function PricingPage() {
             <CardHeader>
               <CardTitle>Paid AI checkout is paused</CardTitle>
               <CardDescription>
-                The rates below are the approved standalone prices for the five Live agents, but no standalone or subscription payment can start while the shared AI execution gate is disabled. This does not affect the live one-time Quick Marketing Audit.
+                The standalone rates below are approved for the listed agents, but no standalone or subscription payment can start while the shared AI execution gate is disabled. This does not affect the live one-time Quick Marketing Audit.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -173,10 +177,10 @@ export default function PricingPage() {
 
         <section className="space-y-5" id="live-agent-pricing">
           <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Standalone Live-agent pricing</p>
-            <h2 className="text-3xl font-bold">Standalone rates — checkout not yet available.</h2>
+            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Selected standalone-agent pricing</p>
+            <h2 className="text-3xl font-bold">Approved standalone rates — checkout not yet available.</h2>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              These are the listed rates for a future single-run purchase option, not an available checkout offer. Current access uses shared subscription credits. Subscribers do not pay these standalone rates; each completed generation instead uses one shared plan credit.
+              These are approved rates for selected Live agents that have a standalone rate card. They are not a count of every Live subscription agent and are not an available checkout offer. Current subscription access uses shared credits.
             </p>
           </div>
 
@@ -184,7 +188,7 @@ export default function PricingPage() {
             {LIVE_AGENT_PRICING.map((agent) => (
               <Card key={agent.name} className="flex flex-col">
                 <CardHeader>
-                  <CardDescription>Live · production verified</CardDescription>
+                  <CardDescription>Live · approved standalone rate</CardDescription>
                   <CardTitle className="text-xl">{agent.name}</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col gap-4">
@@ -206,9 +210,9 @@ export default function PricingPage() {
         <section className="space-y-5" id="plans">
           <div>
             <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">SaaS plans</p>
-            <h2 className="text-3xl font-bold">One subscription. Five Live marketing agents.</h2>
+            <h2 className="text-3xl font-bold">One subscription. {SUBSCRIPTION_INCLUDED_AGENT_COUNT} Live shared-credit agents.</h2>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              Every standard plan includes Content Agent, Lead Magnet Agent, Outreach Agent, SEO Agent, and Email Campaign Agent. Subscribers do not pay the standalone per-run rate: one completed generation from any included agent uses one shared credit.
+              Every standard plan includes {SUBSCRIPTION_INCLUDED_AGENT_NAMES}. One completed generation from any included agent uses one shared credit; subscribers do not pay a separate standalone per-run charge while using plan credits.
             </p>
           </div>
 
@@ -229,11 +233,11 @@ export default function PricingPage() {
                   </div>
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     <li>- {plan.credits.toLocaleString()} shared AI generation credits per month</li>
-                    <li>- All 5 currently Live marketing agents included</li>
+                    <li>- All {SUBSCRIPTION_INCLUDED_AGENT_COUNT} currently Live shared-credit agents included</li>
                     <li>- One completed generation from any included agent uses one shared credit</li>
                     <li>- No standalone per-run charge while using plan credits</li>
                     <li>- Human review and each agent&apos;s delivery guardrails remain in effect</li>
-                    <li>- New agents are added only after production verification</li>
+                    <li>- New agents are added only after production verification and subscription-access verification</li>
                     <li>- Stripe billing portal for existing subscribers</li>
                   </ul>
                   {contentAgentLive ? (
