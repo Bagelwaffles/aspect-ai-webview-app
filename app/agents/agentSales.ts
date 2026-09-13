@@ -29,7 +29,7 @@ export function isSubscriptionAgent(agent: Agent) {
 export function getAgentSalesOffer(agent: Agent): AgentSalesOffer {
   const video = {
     videoEmbedUrl: AMS_AGENT_SALES_VIDEO_EMBED_URL,
-    videoTitle: `${agent.name} sales overview`,
+    videoTitle: `AMS sales overview on the ${agent.name} sales page`,
   }
 
   if (isSubscriptionAgent(agent)) {
@@ -79,8 +79,8 @@ export function getAgentSalesOffer(agent: Agent): AgentSalesOffer {
     label: agent.status === "blocked" ? "Blocked / roadmap" : "Roadmap agent",
     price: "Not for sale yet",
     detail: "This capability remains visible so buyers can understand the AMS roadmap without mistaking unfinished work for a working product.",
-    primaryLabel: "See available agents",
-    primaryHref: "/agents?status=live#catalog",
+    primaryLabel: "Browse the agent catalog",
+    primaryHref: "/agents#catalog",
     secondaryLabel: "Review launch status",
     secondaryHref: "/contact",
     ...video,
