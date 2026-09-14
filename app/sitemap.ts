@@ -12,6 +12,8 @@ const routes = [
   { path: "/agents/outreach-agent", changeFrequency: "weekly" as const, priority: 0.8 },
   { path: "/agents/seo-agent", changeFrequency: "weekly" as const, priority: 0.8 },
   { path: "/agents/email-campaign-agent", changeFrequency: "weekly" as const, priority: 0.8 },
+  { path: "/agents/nurture-agent", changeFrequency: "weekly" as const, priority: 0.8 },
+  { path: "/agents/product-creator-agent", changeFrequency: "weekly" as const, priority: 0.8 },
   { path: "/contact", changeFrequency: "monthly" as const, priority: 0.6 },
 ] as const
 
