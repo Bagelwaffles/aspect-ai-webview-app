@@ -63,7 +63,8 @@ export function CreatorPilotForm() {
       goals: String(formData.get("goals") ?? ""),
       biggestBottleneck: String(formData.get("biggestBottleneck") ?? ""),
       currentSetup: String(formData.get("currentSetup") ?? ""),
-      weeklyStreamHours: Number.isFinite(weeklyHours) ? weeklyHours : null,
+      weeklyStreamHours:
+        weeklyHours !== null && Number.isFinite(weeklyHours) ? weeklyHours : null,
       consentContact: formData.get("consentContact") === "yes",
       source: "ams-creators-pilot-page",
       website: String(formData.get("website") ?? ""),
