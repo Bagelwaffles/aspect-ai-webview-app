@@ -7,6 +7,7 @@ const routes = [
   { path: "/pricing", changeFrequency: "daily" as const, priority: 0.9 },
   { path: "/quick-marketing-audit", changeFrequency: "daily" as const, priority: 0.9 },
   { path: "/agents", changeFrequency: "weekly" as const, priority: 0.8 },
+  { path: "/creators", changeFrequency: "weekly" as const, priority: 0.8 },
   { path: "/agents/content-agent", changeFrequency: "weekly" as const, priority: 0.8 },
   { path: "/agents/lead-magnet-agent", changeFrequency: "weekly" as const, priority: 0.8 },
   { path: "/agents/outreach-agent", changeFrequency: "weekly" as const, priority: 0.8 },
