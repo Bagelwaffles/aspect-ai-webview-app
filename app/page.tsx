@@ -187,6 +187,7 @@ export default function HomePage() {
 
         <nav className={styles["desktop-nav"]} aria-label="Primary navigation">
           <Link href="/agents">Agent Store</Link>
+          <Link href="/creators">Creators</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/quick-marketing-audit">$49 Audit</Link>
           <a href="#experience">How it works</a>
@@ -519,6 +520,7 @@ export default function HomePage() {
         </a>
         <nav className="flex flex-wrap justify-center gap-4 text-xs text-white/60" aria-label="Footer navigation">
           <Link href="/agents">Agents</Link>
+          <Link href="/creators">Creators</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/quick-marketing-audit">$49 Audit</Link>
           <Link href="/contact">Contact</Link>
