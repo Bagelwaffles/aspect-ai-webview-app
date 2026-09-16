@@ -96,7 +96,7 @@ export function creatorPilotIdFromEmail(value: string): string {
 export function buildCreatorPilotApplication(
   input: CreatorPilotInput,
   createdAt = new Date().toISOString(),
-  applicationId = randomUUID(),
+  applicationId: string = randomUUID(),
 ): CreatorPilotApplication {
   const email = normalizeCreatorPilotEmail(input.email)
   const weeklyHours =
