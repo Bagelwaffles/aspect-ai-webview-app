@@ -231,7 +231,7 @@ export default function CreatorsPage() {
           <div className="max-w-3xl space-y-2">
             <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Creators are a new AMS lane, not a distraction from the core business.</h2>
             <p className="leading-7 text-muted-foreground">
-              The creator vertical reuses AMS's agent, analytics, content, and approval-first principles while keeping business marketing products and creator workflows clearly separated.
+              The creator vertical reuses AMS&apos;s agent, analytics, content, and approval-first principles while keeping business marketing products and creator workflows clearly separated.
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-3">
