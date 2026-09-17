@@ -28,7 +28,7 @@ function testEnv(): NodeJS.ProcessEnv {
 }
 
 test("Twitch config is fail-closed and derives production callbacks", () => {
-  assert.equal(resolveTwitchConfig({}), null)
+  assert.equal(resolveTwitchConfig({ NODE_ENV: "test" }), null)
   const config = resolveTwitchConfig(testEnv())
   assert.ok(config)
   assert.equal(config.redirectUri, "https://ams.example.test/api/internal/twitch/callback")
