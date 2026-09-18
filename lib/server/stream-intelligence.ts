@@ -370,10 +370,10 @@ export async function generateStreamIntelligencePackage(
   }
 
   if (input.phase === "post-stream") {
-    await refreshTwitchPostStreamSummary().catch(() => null)
+    await refreshTwitchPostStreamSummary({ env, redis }).catch(() => null)
   }
 
-  const status = await getTwitchPilotStatus()
+  const status = await getTwitchPilotStatus({ env, redis })
   const session = status.session as TwitchStreamSession | null
   const summary = status.summary as TwitchPilotSummary | null
 
@@ -387,7 +387,9 @@ export async function generateStreamIntelligencePackage(
   let model: string
 
   try {
-    if (!isAgentRuntimeConfigured(env)) throw new Error("AMS_AGENT_RUNTIME_UNAVAILABLE")
+    if (!options.runAgent && !isAgentRuntimeConfigured(env)) {
+      throw new Error("AMS_AGENT_RUNTIME_UNAVAILABLE")
+    }
     draft = await (options.runAgent
       ? options.runAgent(validatedInput)
       : runAiDraft(validatedInput, env))
@@ -416,7 +418,10 @@ export async function generateStreamIntelligencePackage(
 export async function regenerateLatestStreamIntelligencePackage(
   options: StreamIntelligenceOptions = {},
 ) {
-  const status = await getTwitchPilotStatus()
+  const env = options.env ?? process.env
+  const redis = runtimeRedis(options)
+  if (!redis) throw new Error("STREAM_INTELLIGENCE_STORE_UNAVAILABLE")
+  const status = await getTwitchPilotStatus({ env, redis })
   const session = status.session as TwitchStreamSession | null
   if (!session) throw new Error("STREAM_INTELLIGENCE_SESSION_NOT_FOUND")
   return generateStreamIntelligencePackage(
