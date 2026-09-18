@@ -26,11 +26,13 @@ export type TwitchMediaFactoryStatus = {
   }>
 }
 
+type Marker = { id: string; description: string; positionSeconds: number; url: string }
+
 type Summary = {
   title?: string
   categoryName?: string
   vod?: { id?: string; url?: string } | null
-  markers?: Array<{ id: string; description: string; positionSeconds: number; url: string }>
+  markers?: Marker[]
 } | null
 
 export default function TwitchMediaFactoryCard({
@@ -81,7 +83,7 @@ export default function TwitchMediaFactoryCard({
     }
   }
 
-  async function createFromMarker(marker: NonNullable<Summary>["markers"][number]) {
+  async function createFromMarker(marker: Marker) {
     if (!summary?.vod?.id) return
     if (!window.confirm("Create a real Twitch clip from this stream marker? This will add a clip to the connected Twitch channel.")) return
     const duration = Math.min(30, Math.max(5, marker.positionSeconds))
