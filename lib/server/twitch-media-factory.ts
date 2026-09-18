@@ -194,9 +194,11 @@ export async function syncLatestTwitchMediaQueue(options: Options = {}) {
 }
 
 export async function refreshLatestTwitchMediaQueue(options: Options = {}) {
-  await refreshTwitchPostStreamSummary({ env: options.env, redis: runtimeRedis(options) ?? undefined }).catch(() => null)
-  await regenerateLatestStreamIntelligencePackage({ env: options.env, redis: runtimeRedis(options) ?? undefined }).catch(() => null)
-  return syncLatestTwitchMediaQueue(options)
+  const redis = runtimeRedis(options)
+  if (!redis) throw new Error("TWITCH_MEDIA_STORE_UNAVAILABLE")
+  await refreshTwitchPostStreamSummary({ env: options.env, redis }).catch(() => null)
+  await regenerateLatestStreamIntelligencePackage({ env: options.env, redis }).catch(() => null)
+  return syncLatestTwitchMediaQueue({ ...options, redis })
 }
 
 function safeSegment(value: string) {
