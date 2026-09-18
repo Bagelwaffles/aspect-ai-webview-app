@@ -9,6 +9,7 @@ import {
   processTwitchEventSubNotification,
   readTwitchOauthAttempt,
   resolveTwitchConfig,
+  TWITCH_MEDIA_SCOPE,
   TWITCH_SCOPE,
   verifyTwitchEventSubSignature,
   type TwitchStreamSession,
@@ -57,6 +58,19 @@ test("Twitch OAuth attempt is signed, expiring, and uses only the read-only scop
     () => readTwitchOauthAttempt(attempt.cookieValue, attempt.state, env, now + 11 * 60 * 1000),
     /TWITCH_OAUTH_STATE_EXPIRED/,
   )
+})
+
+test("optional media OAuth adds only the Twitch clip-management scope", () => {
+  const env = testEnv()
+  const now = Date.parse("2026-09-18T23:30:00.000Z")
+  const attempt = createTwitchOauthAttempt(env, now, "media")
+  const parsed = readTwitchOauthAttempt(attempt.cookieValue, attempt.state, env, now + 1_000)
+  assert.equal(parsed.capability, "media")
+
+  const authUrl = buildTwitchAuthorizationUrl(attempt.state, env, true)
+  const scopes = new Set((authUrl.searchParams.get("scope") ?? "").split(" ").filter(Boolean))
+  assert.deepEqual(scopes, new Set([TWITCH_SCOPE, TWITCH_MEDIA_SCOPE]))
+  assert.equal(TWITCH_MEDIA_SCOPE, "channel:manage:clips")
 })
 
 test("EventSub signature verification rejects tampering and replay-age violations", () => {
