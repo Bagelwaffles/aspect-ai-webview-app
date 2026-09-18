@@ -4,7 +4,9 @@ import { authorizeOwnerApiRequest } from "@/lib/server/owner-api-auth"
 import {
   exchangeTwitchAuthorizationCode,
   readTwitchOauthAttempt,
+  TWITCH_MEDIA_SCOPE,
   TWITCH_OAUTH_COOKIE,
+  TWITCH_SCOPE,
 } from "@/lib/server/twitch-pilot"
 
 export const runtime = "nodejs"
@@ -38,12 +40,16 @@ export async function GET(request: NextRequest) {
   if (!code || !state) return creatorRedirect(request, "invalid-callback")
 
   try {
-    readTwitchOauthAttempt(
+    const attempt = readTwitchOauthAttempt(
       request.cookies.get(TWITCH_OAUTH_COOKIE)?.value,
       state,
     )
-    await exchangeTwitchAuthorizationCode(code)
-    return creatorRedirect(request, "connected")
+    await exchangeTwitchAuthorizationCode(
+      code,
+      {},
+      attempt.capability === "media" ? [TWITCH_SCOPE, TWITCH_MEDIA_SCOPE] : [TWITCH_SCOPE],
+    )
+    return creatorRedirect(request, attempt.capability === "media" ? "media-enabled" : "connected")
   } catch (error) {
     const codeValue = error instanceof Error ? error.message : "TWITCH_CONNECTION_FAILED"
     const stateValue =
