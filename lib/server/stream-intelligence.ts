@@ -102,6 +102,8 @@ type StreamIntelligenceOptions = {
   redis?: Redis | null
   now?: () => Date
   runAgent?: (input: StreamIntelligenceInput) => Promise<StreamIntelligenceDraft>
+  getStatus?: () => Promise<{ session: TwitchStreamSession | null; summary: TwitchPilotSummary | null }>
+  refreshSummary?: () => Promise<TwitchPilotSummary | null>
 }
 
 function clean(value: string | undefined) {
@@ -370,10 +372,14 @@ export async function generateStreamIntelligencePackage(
   }
 
   if (input.phase === "post-stream") {
-    await refreshTwitchPostStreamSummary({ env, redis }).catch(() => null)
+    await (options.refreshSummary
+      ? options.refreshSummary()
+      : refreshTwitchPostStreamSummary({ env, redis })).catch(() => null)
   }
 
-  const status = await getTwitchPilotStatus({ env, redis })
+  const status = options.getStatus
+    ? await options.getStatus()
+    : await getTwitchPilotStatus({ env, redis })
   const session = status.session as TwitchStreamSession | null
   const summary = status.summary as TwitchPilotSummary | null
 
@@ -421,7 +427,9 @@ export async function regenerateLatestStreamIntelligencePackage(
   const env = options.env ?? process.env
   const redis = runtimeRedis(options)
   if (!redis) throw new Error("STREAM_INTELLIGENCE_STORE_UNAVAILABLE")
-  const status = await getTwitchPilotStatus({ env, redis })
+  const status = options.getStatus
+    ? await options.getStatus()
+    : await getTwitchPilotStatus({ env, redis })
   const session = status.session as TwitchStreamSession | null
   if (!session) throw new Error("STREAM_INTELLIGENCE_SESSION_NOT_FOUND")
   return generateStreamIntelligencePackage(
