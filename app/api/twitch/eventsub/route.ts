@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server"
+import { after, NextRequest, NextResponse } from "next/server"
 
+import { generateStreamIntelligencePackage } from "@/lib/server/stream-intelligence"
 import {
   processTwitchEventSubNotification,
   recordTwitchSubscriptionChallenge,
@@ -52,7 +53,26 @@ export async function POST(request: NextRequest) {
 
     if (messageType === "notification") {
       if (!messageId) return noStore(400)
-      await processTwitchEventSubNotification(rawBody, messageId)
+      const result = await processTwitchEventSubNotification(rawBody, messageId)
+      if (!result.duplicate && result.streamId && (result.type === "stream.online" || result.type === "stream.offline")) {
+        const phase = result.type === "stream.offline" ? "post-stream" : "live"
+        after(async () => {
+          try {
+            if (phase === "post-stream") {
+              await new Promise((resolve) => setTimeout(resolve, 5_000))
+            }
+            await generateStreamIntelligencePackage({
+              streamId: result.streamId!,
+              phase,
+            })
+          } catch (error) {
+            console.error("STREAM_INTELLIGENCE_BACKGROUND_FAILED", {
+              phase,
+              message: error instanceof Error ? error.message : "unknown",
+            })
+          }
+        })
+      }
       return noStore(204)
     }
 

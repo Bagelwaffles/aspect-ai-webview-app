@@ -17,6 +17,7 @@ export const TWITCH_OAUTH_COOKIE = "ams_twitch_oauth"
 const CONNECTION_KEY = "ams:twitch-pilot:v1:connection"
 const SESSION_KEY = "ams:twitch-pilot:v1:session"
 const SUMMARY_KEY = "ams:twitch-pilot:v1:summary:latest"
+const SUMMARY_STREAM_PREFIX = "ams:twitch-pilot:v1:summary:"
 const EVENT_ID_PREFIX = "ams:twitch-pilot:v1:event:"
 const SUBSCRIPTION_KEY = "ams:twitch-pilot:v1:subscriptions"
 const EVENT_DEDUPE_TTL_SECONDS = 60 * 60 * 24 * 7
@@ -541,12 +542,22 @@ export function verifyTwitchEventSubSignature(
   return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes)
 }
 
-async function rememberEventId(messageId: string, redis: RedisLike) {
-  const result = await redis.set(`${EVENT_ID_PREFIX}${messageId}`, "1", {
+async function claimEventId(messageId: string, redis: RedisLike) {
+  const result = await redis.set(`${EVENT_ID_PREFIX}${messageId}`, "processing", {
     nx: true,
     ex: EVENT_DEDUPE_TTL_SECONDS,
   })
   return result === "OK"
+}
+
+async function completeEventId(messageId: string, redis: RedisLike) {
+  await redis.set(`${EVENT_ID_PREFIX}${messageId}`, "done", {
+    ex: EVENT_DEDUPE_TTL_SECONDS,
+  })
+}
+
+async function releaseEventId(messageId: string, redis: RedisLike) {
+  await redis.del(`${EVENT_ID_PREFIX}${messageId}`)
 }
 
 async function helixGet(
@@ -587,7 +598,7 @@ async function getChannelSnapshot(broadcasterId: string, options: TwitchOptions)
   }
 }
 
-async function getMarkers(options: TwitchOptions) {
+async function getMarkers(options: TwitchOptions, videoId?: string | null) {
   const env = options.env ?? process.env
   const config = resolveTwitchConfig(env)
   const connection = await loadConnection(options)
@@ -595,7 +606,11 @@ async function getMarkers(options: TwitchOptions) {
   const fetcher = options.fetcher ?? fetch
   const call = async (token: string) => {
     const url = new URL("https://api.twitch.tv/helix/streams/markers")
-    url.searchParams.set("user_id", connection.record.broadcasterId)
+    if (videoId) {
+      url.searchParams.set("video_id", videoId)
+    } else {
+      url.searchParams.set("user_id", connection.record.broadcasterId)
+    }
     url.searchParams.set("first", "100")
     return fetcher(url, {
       headers: { Authorization: `Bearer ${token}`, "Client-Id": config.clientId },
@@ -805,11 +820,12 @@ async function handleOnline(event: Record<string, unknown>, redis: RedisLike, op
     language: snapshot?.language ?? "",
     updates: [],
   }, redis)
+  return streamId
 }
 
 async function handleChannelUpdate(event: Record<string, unknown>, redis: RedisLike) {
   const session = await loadSession(redis)
-  if (!session || session.broadcasterId !== String(event.broadcaster_user_id ?? "")) return
+  if (!session || session.broadcasterId !== String(event.broadcaster_user_id ?? "")) return null
   const next = {
     ...session,
     title: String(event.title ?? session.title),
@@ -828,21 +844,52 @@ async function handleChannelUpdate(event: Record<string, unknown>, redis: RedisL
     ].slice(-50),
   }
   await saveSession(next, redis)
+  return session.streamId
 }
 
 async function handleOffline(event: Record<string, unknown>, redis: RedisLike, options: TwitchOptions) {
   const broadcasterId = String(event.broadcaster_user_id ?? "")
   const session = await loadSession(redis)
-  if (!session || session.broadcasterId !== broadcasterId) return
+  if (!session || session.broadcasterId !== broadcasterId) return null
   const endedAt = new Date().toISOString()
-  const [vod, markers, clips] = await Promise.all([
-    latestVod(session, options),
-    getMarkers(options),
+  const vod = await latestVod(session, options)
+  const [markers, clips] = await Promise.all([
+    getMarkers(options, vod?.id),
     clipsForSession(session, endedAt, options),
   ])
   const summary = buildTwitchMetadataSummary({ session, endedAt, vod, markers, clips })
-  await redis.set(SUMMARY_KEY, JSON.stringify(summary), { ex: SUMMARY_TTL_SECONDS })
+  const serialized = JSON.stringify(summary)
+  await Promise.all([
+    redis.set(SUMMARY_KEY, serialized, { ex: SUMMARY_TTL_SECONDS }),
+    redis.set(`${SUMMARY_STREAM_PREFIX}${session.streamId}`, serialized, { ex: SUMMARY_TTL_SECONDS }),
+  ])
   await saveSession({ ...session, endedAt }, redis)
+  return session.streamId
+}
+
+export async function refreshTwitchPostStreamSummary(options: TwitchOptions = {}) {
+  const redis = runtimeRedis(options)
+  if (!redis) throw new Error("TWITCH_STORE_UNAVAILABLE")
+  const session = await loadSession(redis)
+  if (!session?.endedAt) return null
+  const vod = await latestVod(session, options)
+  const [markers, clips] = await Promise.all([
+    getMarkers(options, vod?.id),
+    clipsForSession(session, session.endedAt, options),
+  ])
+  const summary = buildTwitchMetadataSummary({
+    session,
+    endedAt: session.endedAt,
+    vod,
+    markers,
+    clips,
+  })
+  const serialized = JSON.stringify(summary)
+  await Promise.all([
+    redis.set(SUMMARY_KEY, serialized, { ex: SUMMARY_TTL_SECONDS }),
+    redis.set(`${SUMMARY_STREAM_PREFIX}${session.streamId}`, serialized, { ex: SUMMARY_TTL_SECONDS }),
+  ])
+  return summary
 }
 
 export async function processTwitchEventSubNotification(
@@ -852,13 +899,33 @@ export async function processTwitchEventSubNotification(
 ) {
   const redis = runtimeRedis(options)
   if (!redis) throw new Error("TWITCH_STORE_UNAVAILABLE")
-  if (!(await rememberEventId(messageId, redis))) return { duplicate: true }
-  const parsed = eventEnvelopeSchema.parse(JSON.parse(rawBody))
-  const event = parsed.event ?? {}
-  if (parsed.subscription.type === "stream.online") await handleOnline(event, redis, options)
-  if (parsed.subscription.type === "channel.update") await handleChannelUpdate(event, redis)
-  if (parsed.subscription.type === "stream.offline") await handleOffline(event, redis, options)
-  return { duplicate: false }
+  if (!(await claimEventId(messageId, redis))) {
+    return { duplicate: true as const, type: null, streamId: null }
+  }
+
+  try {
+    const parsed = eventEnvelopeSchema.parse(JSON.parse(rawBody))
+    const event = parsed.event ?? {}
+    let streamId: string | null = null
+    if (parsed.subscription.type === "stream.online") {
+      streamId = (await handleOnline(event, redis, options)) ?? null
+    }
+    if (parsed.subscription.type === "channel.update") {
+      streamId = (await handleChannelUpdate(event, redis)) ?? null
+    }
+    if (parsed.subscription.type === "stream.offline") {
+      streamId = (await handleOffline(event, redis, options)) ?? null
+    }
+    await completeEventId(messageId, redis)
+    return {
+      duplicate: false as const,
+      type: parsed.subscription.type,
+      streamId,
+    }
+  } catch (error) {
+    await releaseEventId(messageId, redis).catch(() => undefined)
+    throw error
+  }
 }
 
 export async function recordTwitchSubscriptionChallenge(rawBody: string, options: TwitchOptions = {}) {

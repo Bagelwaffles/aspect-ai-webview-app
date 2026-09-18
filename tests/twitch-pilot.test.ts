@@ -6,6 +6,7 @@ import {
   buildTwitchAuthorizationUrl,
   buildTwitchMetadataSummary,
   createTwitchOauthAttempt,
+  processTwitchEventSubNotification,
   readTwitchOauthAttempt,
   resolveTwitchConfig,
   TWITCH_SCOPE,
@@ -128,4 +129,44 @@ test("metadata summary stays explicit about its evidence boundary", () => {
   assert.match(summary.summary, /not visual analysis/i)
   assert.equal(summary.markers.length, 1)
   assert.equal(summary.clips.length, 1)
+})
+
+
+test("failed EventSub processing releases the message claim so Twitch can retry", async () => {
+  const values = new Map<string, string>()
+  const redis = {
+    async set(key: string, value: string, options?: { nx?: boolean; ex?: number }) {
+      if (options?.nx && values.has(key)) return null
+      values.set(key, value)
+      return "OK"
+    },
+    async get(key: string) {
+      return values.get(key) ?? null
+    },
+    async del(...keys: string[]) {
+      let removed = 0
+      for (const key of keys) {
+        if (values.delete(key)) removed += 1
+      }
+      return removed
+    },
+  }
+
+  await assert.rejects(
+    processTwitchEventSubNotification("{not-json", "retry-message", { redis: redis as never }),
+  )
+
+  const valid = JSON.stringify({
+    subscription: { type: "test.noop", version: "1" },
+    event: {},
+  })
+  const processed = await processTwitchEventSubNotification(valid, "retry-message", {
+    redis: redis as never,
+  })
+  assert.equal(processed.duplicate, false)
+
+  const duplicate = await processTwitchEventSubNotification(valid, "retry-message", {
+    redis: redis as never,
+  })
+  assert.equal(duplicate.duplicate, true)
 })
