@@ -12,6 +12,7 @@ import { Redis } from "@upstash/redis"
 import { z } from "zod"
 
 export const TWITCH_SCOPE = "user:read:broadcast"
+export const TWITCH_MEDIA_SCOPE = "channel:manage:clips"
 export const TWITCH_OAUTH_COOKIE = "ams_twitch_oauth"
 
 const CONNECTION_KEY = "ams:twitch-pilot:v1:connection"
@@ -45,6 +46,7 @@ const validateResponseSchema = z.object({
 const oauthAttemptSchema = z.object({
   state: z.string().min(32).max(200),
   expiresAt: z.number().int().positive(),
+  capability: z.enum(["pilot", "media"]).default("pilot"),
 })
 
 const encryptedConnectionSchema = z.object({
@@ -118,7 +120,19 @@ export type TwitchPilotSummary = {
   categoryName: string
   vod: { id: string; title: string; url: string; duration: string; createdAt: string } | null
   markers: Array<{ id: string; description: string; positionSeconds: number; url: string }>
-  clips: Array<{ id: string; title: string; url: string; creatorName: string; viewCount: number; createdAt: string }>
+  clips: Array<{
+    id: string
+    title: string
+    url: string
+    creatorName: string
+    viewCount: number
+    createdAt: string
+    videoId?: string
+    gameId?: string
+    thumbnailUrl?: string
+    duration?: number
+    vodOffset?: number | null
+  }>
   updateCount: number
   summary: string
   generatedAt: string
@@ -217,6 +231,7 @@ function signOauthPayload(encoded: string, env: NodeJS.ProcessEnv) {
 export function createTwitchOauthAttempt(
   env: NodeJS.ProcessEnv = process.env,
   now = Date.now(),
+  capability: "pilot" | "media" = "pilot",
 ) {
   if (!isTwitchPilotConfigured(env) || !oauthSigningSecret(env)) {
     throw new Error("TWITCH_OAUTH_NOT_CONFIGURED")
@@ -224,6 +239,7 @@ export function createTwitchOauthAttempt(
   const payload = oauthAttemptSchema.parse({
     state: randomBytes(32).toString("base64url"),
     expiresAt: now + OAUTH_ATTEMPT_TTL_SECONDS * 1000,
+    capability,
   })
   const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url")
   return {
@@ -263,6 +279,7 @@ export function readTwitchOauthAttempt(
 export function buildTwitchAuthorizationUrl(
   state: string,
   env: NodeJS.ProcessEnv = process.env,
+  includeMediaScope = false,
 ) {
   const config = resolveTwitchConfig(env)
   if (!config) throw new Error("TWITCH_OAUTH_NOT_CONFIGURED")
@@ -270,7 +287,10 @@ export function buildTwitchAuthorizationUrl(
   url.searchParams.set("client_id", config.clientId)
   url.searchParams.set("redirect_uri", config.redirectUri)
   url.searchParams.set("response_type", "code")
-  url.searchParams.set("scope", TWITCH_SCOPE)
+  url.searchParams.set(
+    "scope",
+    [TWITCH_SCOPE, ...(includeMediaScope ? [TWITCH_MEDIA_SCOPE] : [])].join(" "),
+  )
   url.searchParams.set("state", state)
   return url
 }
@@ -386,6 +406,7 @@ function publicConnection(record: z.infer<typeof encryptedConnectionSchema>) {
 export async function exchangeTwitchAuthorizationCode(
   code: string,
   options: TwitchOptions = {},
+  requiredScopes: string[] = [TWITCH_SCOPE],
 ) {
   const env = options.env ?? process.env
   const config = resolveTwitchConfig(env)
@@ -411,7 +432,9 @@ export async function exchangeTwitchAuthorizationCode(
   if (!token.refresh_token) throw new Error("TWITCH_REFRESH_TOKEN_MISSING")
   const validation = await validateUserToken(token.access_token, fetcher)
   if (validation.client_id !== config.clientId) throw new Error("TWITCH_CLIENT_ID_MISMATCH")
-  if (!validation.scopes.includes(TWITCH_SCOPE)) throw new Error("TWITCH_REQUIRED_SCOPE_MISSING")
+  if (!requiredScopes.every((scope) => validation.scopes.includes(scope))) {
+    throw new Error("TWITCH_REQUIRED_SCOPE_MISSING")
+  }
 
   const now = (options.now ?? (() => new Date()))()
   const displayName =
@@ -679,6 +702,104 @@ async function refreshTwitchUserToken(options: TwitchOptions = {}) {
   return { accessToken: token.access_token, validation }
 }
 
+export function twitchMediaScopeEnabled(scopes: string[] | null | undefined) {
+  return Boolean(scopes?.includes(TWITCH_MEDIA_SCOPE))
+}
+
+async function twitchUserRequest(
+  url: URL,
+  init: RequestInit,
+  options: TwitchOptions = {},
+) {
+  const env = options.env ?? process.env
+  const config = resolveTwitchConfig(env)
+  const existing = await loadConnection(options)
+  const fetcher = options.fetcher ?? fetch
+  if (!config || !existing) throw new Error("TWITCH_CONNECTION_REQUIRED")
+  if (!twitchMediaScopeEnabled(existing.record.scopes)) {
+    throw new Error("TWITCH_MEDIA_SCOPE_REQUIRED")
+  }
+
+  const call = (token: string) => fetcher(url, {
+    ...init,
+    headers: {
+      ...(init.headers ?? {}),
+      Authorization: `Bearer ${token}`,
+      "Client-Id": config.clientId,
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
+  })
+
+  let response = await call(existing.secret.accessToken)
+  if (response.status === 401) {
+    const refreshed = await refreshTwitchUserToken(options)
+    response = await call(refreshed.accessToken)
+  }
+  return response
+}
+
+export async function getTwitchClipDownloadUrls(
+  clipIds: string[],
+  options: TwitchOptions = {},
+) {
+  const existing = await loadConnection(options)
+  if (!existing) throw new Error("TWITCH_CONNECTION_REQUIRED")
+  const ids = Array.from(new Set(clipIds.map((value) => value.trim()).filter(Boolean))).slice(0, 10)
+  if (!ids.length) return []
+  const url = new URL("https://api.twitch.tv/helix/clips/downloads")
+  url.searchParams.set("editor_id", existing.record.broadcasterId)
+  url.searchParams.set("broadcaster_id", existing.record.broadcasterId)
+  ids.forEach((id) => url.searchParams.append("clip_id", id))
+
+  const response = await twitchUserRequest(url, { method: "GET" }, options)
+  if (!response.ok) throw new Error(`TWITCH_CLIP_DOWNLOAD_FAILED:${response.status}`)
+  const body = await parseJson(response) as {
+    data?: Array<{
+      clip_id?: string
+      landscape_download_url?: string | null
+      portrait_download_url?: string | null
+    }>
+  } | null
+  return (body?.data ?? []).map((item) => ({
+    clipId: item.clip_id ?? "",
+    landscapeUrl: item.landscape_download_url ?? null,
+    portraitUrl: item.portrait_download_url ?? null,
+  })).filter((item) => item.clipId)
+}
+
+export async function createTwitchClipFromVod(
+  input: {
+    vodId: string
+    vodOffset: number
+    duration: number
+    title: string
+  },
+  options: TwitchOptions = {},
+) {
+  const existing = await loadConnection(options)
+  if (!existing) throw new Error("TWITCH_CONNECTION_REQUIRED")
+  const duration = Math.max(5, Math.min(60, Number(input.duration)))
+  const vodOffset = Math.max(Math.ceil(duration), Math.trunc(input.vodOffset))
+  const title = input.title.trim().slice(0, 100)
+  if (!input.vodId.trim() || !title) throw new Error("TWITCH_CLIP_INPUT_INVALID")
+
+  const url = new URL("https://api.twitch.tv/helix/videos/clips")
+  url.searchParams.set("editor_id", existing.record.broadcasterId)
+  url.searchParams.set("broadcaster_id", existing.record.broadcasterId)
+  url.searchParams.set("vod_id", input.vodId.trim())
+  url.searchParams.set("vod_offset", String(vodOffset))
+  url.searchParams.set("duration", String(duration))
+  url.searchParams.set("title", title)
+
+  const response = await twitchUserRequest(url, { method: "POST" }, options)
+  if (response.status !== 202) throw new Error(`TWITCH_VOD_CLIP_CREATE_FAILED:${response.status}`)
+  const body = await parseJson(response) as { data?: Array<{ id?: string; edit_url?: string }> } | null
+  const clip = body?.data?.[0]
+  if (!clip?.id) throw new Error("TWITCH_VOD_CLIP_CREATE_FAILED")
+  return { id: clip.id, editUrl: clip.edit_url ?? null }
+}
+
 export async function validateStoredTwitchConnection(options: TwitchOptions = {}) {
   const connection = await loadConnection(options)
   if (!connection) return { connected: false as const, connection: null }
@@ -734,7 +855,19 @@ async function clipsForSession(session: TwitchStreamSession, endedAt: string, op
       ended_at: endedAt,
       first: "100",
     }, options) as {
-      data?: Array<{ id?: string; title?: string; url?: string; creator_name?: string; view_count?: number; created_at?: string }>
+      data?: Array<{
+        id?: string
+        title?: string
+        url?: string
+        creator_name?: string
+        view_count?: number
+        created_at?: string
+        video_id?: string
+        game_id?: string
+        thumbnail_url?: string
+        duration?: number
+        vod_offset?: number | null
+      }>
     }
     return (body?.data ?? []).map((clip) => ({
       id: clip.id ?? "",
@@ -743,6 +876,11 @@ async function clipsForSession(session: TwitchStreamSession, endedAt: string, op
       creatorName: clip.creator_name ?? "",
       viewCount: clip.view_count ?? 0,
       createdAt: clip.created_at ?? "",
+      videoId: clip.video_id ?? "",
+      gameId: clip.game_id ?? "",
+      thumbnailUrl: clip.thumbnail_url ?? "",
+      duration: clip.duration ?? 0,
+      vodOffset: clip.vod_offset ?? null,
     })).filter((clip) => clip.id)
   } catch {
     return []
