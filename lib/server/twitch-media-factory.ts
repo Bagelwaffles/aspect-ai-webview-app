@@ -171,8 +171,12 @@ export async function syncLatestTwitchMediaQueue(options: Options = {}) {
   const redis = runtimeRedis(options)
   if (!redis) throw new Error("TWITCH_MEDIA_STORE_UNAVAILABLE")
   const status = options.getStatus ? await options.getStatus() : await getTwitchPilotStatus({ env: options.env, redis })
-  const summary = status.summary ?? null
-  const session = status.session ?? null
+  const summary = (status.summary ?? null) as TwitchPilotSummary | null
+  const session = (status.session ?? null) as {
+    streamId?: string
+    broadcasterId?: string
+    broadcasterLogin?: string
+  } | null
   if (!summary || !session?.streamId || summary.streamId !== session.streamId) {
     throw new Error("TWITCH_MEDIA_SUMMARY_REQUIRED")
   }
@@ -185,7 +189,7 @@ export async function syncLatestTwitchMediaQueue(options: Options = {}) {
     intelligence: intelligence?.streamId === summary.streamId ? intelligence : null,
     broadcasterId: session.broadcasterId ?? summary.broadcasterId,
     broadcasterLogin: session.broadcasterLogin ?? summary.broadcasterLogin,
-    scopes: status.connection?.scopes,
+    scopes: (status.connection as { scopes?: string[] } | null | undefined)?.scopes,
     previous: previous?.streamId === summary.streamId ? previous : null,
     generatedAt: (options.now ?? (() => new Date()))().toISOString(),
   })
@@ -250,7 +254,7 @@ export async function importTwitchClipMedia(clipId: string, options: Options = {
 
   const putInit: RequestInit & { duplex: "half" } = {
     method: "PUT",
-    headers: signed.requiredHeaders,
+    headers: signed.requiredHeaders as Record<string, string>,
     body: source.body,
     duplex: "half",
     signal: AbortSignal.timeout(60_000),
