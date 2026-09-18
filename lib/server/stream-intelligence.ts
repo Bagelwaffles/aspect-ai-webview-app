@@ -97,6 +97,23 @@ export type StreamIntelligenceInput = z.infer<typeof streamIntelligenceInputSche
 export type StreamIntelligenceDraft = z.infer<typeof streamIntelligenceDraftSchema>
 export type StreamIntelligencePackage = z.infer<typeof streamIntelligencePackageSchema>
 
+export function resolveStreamIntelligenceTrigger(
+  eventType: string | null,
+  streamId: string | null,
+) {
+  if (!streamId) return null
+  if (eventType === "stream.offline") {
+    return { streamId, phase: "post-stream" as const, force: false }
+  }
+  if (eventType === "stream.online") {
+    return { streamId, phase: "live" as const, force: false }
+  }
+  if (eventType === "channel.update") {
+    return { streamId, phase: "live" as const, force: true }
+  }
+  return null
+}
+
 type StreamIntelligenceOptions = {
   env?: NodeJS.ProcessEnv
   redis?: Redis | null
