@@ -4,6 +4,7 @@ import {
   generateStreamIntelligencePackage,
   resolveStreamIntelligenceTrigger,
 } from "@/lib/server/stream-intelligence"
+import { syncLatestTwitchMediaQueue } from "@/lib/server/twitch-media-factory"
 import {
   processTwitchEventSubNotification,
   recordTwitchSubscriptionChallenge,
@@ -67,6 +68,9 @@ export async function POST(request: NextRequest) {
               await new Promise((resolve) => setTimeout(resolve, 5_000))
             }
             await generateStreamIntelligencePackage(intelligenceJob)
+            if (intelligenceJob.phase === "post-stream") {
+              await syncLatestTwitchMediaQueue()
+            }
           } catch (error) {
             console.error("STREAM_INTELLIGENCE_BACKGROUND_FAILED", {
               phase: intelligenceJob.phase,
