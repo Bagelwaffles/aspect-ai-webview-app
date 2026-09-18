@@ -5,6 +5,7 @@ import {
   buildFallbackStreamIntelligenceDraft,
   buildStreamIntelligencePrompt,
   generateStreamIntelligencePackage,
+  resolveStreamIntelligenceTrigger,
   streamIntelligenceInputSchema,
   type StreamIntelligenceInput,
 } from "../lib/server/stream-intelligence"
@@ -33,6 +34,20 @@ function input(overrides: Partial<StreamIntelligenceInput> = {}): StreamIntellig
     ...overrides,
   })
 }
+
+test("EventSub trigger mapping refreshes channel metadata without mutating Twitch", () => {
+  assert.deepEqual(resolveStreamIntelligenceTrigger("stream.online", "stream-a"), {
+    streamId: "stream-a", phase: "live", force: false,
+  })
+  assert.deepEqual(resolveStreamIntelligenceTrigger("channel.update", "stream-a"), {
+    streamId: "stream-a", phase: "live", force: true,
+  })
+  assert.deepEqual(resolveStreamIntelligenceTrigger("stream.offline", "stream-a"), {
+    streamId: "stream-a", phase: "post-stream", force: false,
+  })
+  assert.equal(resolveStreamIntelligenceTrigger("channel.update", null), null)
+  assert.equal(resolveStreamIntelligenceTrigger("unknown.event", "stream-a"), null)
+})
 
 test("fallback package is stream-specific and keeps the evidence boundary explicit", () => {
   const draft = buildFallbackStreamIntelligenceDraft(input())
