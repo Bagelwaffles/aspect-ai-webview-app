@@ -598,7 +598,7 @@ async function getChannelSnapshot(broadcasterId: string, options: TwitchOptions)
   }
 }
 
-async function getMarkers(options: TwitchOptions) {
+async function getMarkers(options: TwitchOptions, videoId?: string | null) {
   const env = options.env ?? process.env
   const config = resolveTwitchConfig(env)
   const connection = await loadConnection(options)
@@ -606,7 +606,11 @@ async function getMarkers(options: TwitchOptions) {
   const fetcher = options.fetcher ?? fetch
   const call = async (token: string) => {
     const url = new URL("https://api.twitch.tv/helix/streams/markers")
-    url.searchParams.set("user_id", connection.record.broadcasterId)
+    if (videoId) {
+      url.searchParams.set("video_id", videoId)
+    } else {
+      url.searchParams.set("user_id", connection.record.broadcasterId)
+    }
     url.searchParams.set("first", "100")
     return fetcher(url, {
       headers: { Authorization: `Bearer ${token}`, "Client-Id": config.clientId },
@@ -848,9 +852,9 @@ async function handleOffline(event: Record<string, unknown>, redis: RedisLike, o
   const session = await loadSession(redis)
   if (!session || session.broadcasterId !== broadcasterId) return null
   const endedAt = new Date().toISOString()
-  const [vod, markers, clips] = await Promise.all([
-    latestVod(session, options),
-    getMarkers(options),
+  const vod = await latestVod(session, options)
+  const [markers, clips] = await Promise.all([
+    getMarkers(options, vod?.id),
     clipsForSession(session, endedAt, options),
   ])
   const summary = buildTwitchMetadataSummary({ session, endedAt, vod, markers, clips })
@@ -868,9 +872,9 @@ export async function refreshTwitchPostStreamSummary(options: TwitchOptions = {}
   if (!redis) throw new Error("TWITCH_STORE_UNAVAILABLE")
   const session = await loadSession(redis)
   if (!session?.endedAt) return null
-  const [vod, markers, clips] = await Promise.all([
-    latestVod(session, options),
-    getMarkers(options),
+  const vod = await latestVod(session, options)
+  const [markers, clips] = await Promise.all([
+    getMarkers(options, vod?.id),
     clipsForSession(session, session.endedAt, options),
   ])
   const summary = buildTwitchMetadataSummary({
