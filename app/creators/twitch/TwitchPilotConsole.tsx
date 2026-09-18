@@ -7,12 +7,13 @@ import { RefreshCcw, ShieldCheck, Twitch } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import TwitchMediaFactoryCard, { type TwitchMediaFactoryStatus } from "./TwitchMediaFactoryCard"
 
 type Summary = {
   title?: string
   categoryName?: string
   durationMinutes?: number
-  vod?: { url?: string; title?: string } | null
+  vod?: { id?: string; url?: string; title?: string } | null
   markers?: Array<{ id: string; description: string; positionSeconds: number; url: string }>
   clips?: Array<{ id: string; title: string; url: string; creatorName: string; viewCount: number }>
   summary?: string
@@ -73,6 +74,7 @@ type Status = {
   session?: unknown
   summary?: Summary | null
   streamIntelligence?: StreamIntelligence | null
+  mediaFactory?: TwitchMediaFactoryStatus | null
 }
 
 export default function TwitchPilotConsole() {
@@ -189,6 +191,7 @@ export default function TwitchPilotConsole() {
 
   const summary = status.summary
   const intelligence = status.streamIntelligence
+  const mediaFactory = status.mediaFactory ?? null
   return (
     <div className="space-y-6">
       <Card className="border-primary/25 bg-primary/5">
@@ -308,6 +311,12 @@ export default function TwitchPilotConsole() {
           )}
         </CardContent>
       </Card>
+
+      <TwitchMediaFactoryCard
+        mediaFactory={mediaFactory}
+        summary={summary ?? null}
+        onRefresh={refresh}
+      />
 
       <Card>
         <CardHeader>
