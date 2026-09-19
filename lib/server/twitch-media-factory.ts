@@ -328,7 +328,7 @@ export async function importTwitchClipMedia(clipId: string, options: Options = {
   const putInit: RequestInit = {
     method: "PUT",
     headers: signed.requiredHeaders as Record<string, string>,
-    body: Buffer.from(mediaBody),
+    body: new Blob([mediaBody], { type: contentType }),
     signal: AbortSignal.timeout(60_000),
   }
   let stored: Response
