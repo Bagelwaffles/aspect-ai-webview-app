@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { isR2AssetStorageConfigured, presignR2Object } from "../lib/server/r2-presign"
+import { isR2AssetStorageConfigured, presignR2Object, resolveR2Config } from "../lib/server/r2-presign"
 
 const env: NodeJS.ProcessEnv = {
   NODE_ENV: "test",
@@ -53,4 +53,17 @@ test("R2 GET URL never exposes secret credentials", () => {
 
   assert.doesNotMatch(signed.url, /test-secret-key-value/)
   assert.equal(new URL(signed.url).searchParams.get("X-Amz-SignedHeaders"), "host")
+})
+
+
+test("R2 config rejects malformed account IDs before network use", () => {
+  const malformed: NodeJS.ProcessEnv = {
+    NODE_ENV: "test",
+    AMS_ASSET_R2_ACCOUNT_ID: "not-an-account-id",
+    AMS_ASSET_R2_ACCESS_KEY_ID: "access-key",
+    AMS_ASSET_R2_SECRET_ACCESS_KEY: "secret-key",
+    AMS_ASSET_R2_BUCKET: "ams-creator-media",
+  }
+
+  assert.equal(resolveR2Config(malformed), null)
 })
