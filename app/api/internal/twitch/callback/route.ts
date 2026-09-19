@@ -13,7 +13,7 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 function creatorRedirect(request: NextRequest, state: string) {
-  const url = new URL("/creators", request.url)
+  const url = new URL("/creators/twitch", request.url)
   url.searchParams.set("twitch", state)
   const response = NextResponse.redirect(url)
   response.cookies.set(TWITCH_OAUTH_COOKIE, "", {
@@ -44,14 +44,19 @@ export async function GET(request: NextRequest) {
       request.cookies.get(TWITCH_OAUTH_COOKIE)?.value,
       state,
     )
-    await exchangeTwitchAuthorizationCode(
+    const result = await exchangeTwitchAuthorizationCode(
       code,
       {},
       attempt.capability === "media" ? [TWITCH_SCOPE, TWITCH_MEDIA_SCOPE] : [TWITCH_SCOPE],
     )
+    console.info("TWITCH_OAUTH_CALLBACK_SUCCESS", {
+      capability: attempt.capability,
+      scopes: result.connection.scopes,
+    })
     return creatorRedirect(request, attempt.capability === "media" ? "media-enabled" : "connected")
   } catch (error) {
     const codeValue = error instanceof Error ? error.message : "TWITCH_CONNECTION_FAILED"
+    console.warn("TWITCH_OAUTH_CALLBACK_FAILED", { code: codeValue })
     const stateValue =
       codeValue === "TWITCH_OAUTH_STATE_EXPIRED"
         ? "expired"
