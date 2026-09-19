@@ -8,7 +8,7 @@ on:
     paths:
       - ".github/workflows/configure-twitch-short-render.yml"
       - ".github/workflows/twitch-short-render-worker.yml"
-      - "scripts/enqueue_twitch_short_render.ts"
+      - "app/api/internal/twitch/media/render/acceptance/route.ts"
 
 permissions:
   contents: read
@@ -102,6 +102,13 @@ jobs:
               target: ['production'],
               comment: 'Independent secret for the controlled Twitch render worker',
             },
+            {
+              key: 'AMS_TWITCH_SHORT_ACCEPTANCE_CLIP_ID',
+              value: process.env.ACCEPTANCE_CLIP_ID,
+              type: 'plain',
+              target: ['production'],
+              comment: 'Exact owner-approved clip permitted for controlled renderer acceptance',
+            },
           ]
 
           const response = await fetch(endpoint, {
@@ -131,33 +138,30 @@ jobs:
           echo "::add-mask::$worker_key"
           echo "Renderer variables were accepted by Vercel; continuing with the masked in-job key."
 
-      - name: Install application dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Enqueue owner-approved acceptance clip
-        id: enqueue
-        shell: bash
-        run: |
-          set -euo pipefail
-          set +x
-          worker_key="$AMS_MEDIA_WORKER_KEY"
-          set -a
-          source .vercel/.env.production.local
-          set +a
-          export AMS_MEDIA_WORKER_KEY="$worker_key"
-          export AMS_TWITCH_SHORT_RENDER_ENABLED=true
-          pnpm exec tsx scripts/enqueue_twitch_short_render.ts "$ACCEPTANCE_CLIP_ID" > "$RUNNER_TEMP/enqueue.json"
-          job_id="$(jq -r '.jobId' "$RUNNER_TEMP/enqueue.json")"
-          status="$(jq -r '.status' "$RUNNER_TEMP/enqueue.json")"
-          test -n "$job_id"
-          echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
-          echo "Acceptance render queued with status: $status"
-
       - name: Redeploy production with renderer enabled
         shell: bash
         run: |
           set -euo pipefail
           npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
+
+      - name: Enqueue owner-approved acceptance clip through production
+        id: enqueue
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --arg clipId "$ACCEPTANCE_CLIP_ID" '{clipId:$clipId}' > "$RUNNER_TEMP/enqueue-request.json"
+          curl --retry 5 --retry-delay 3 --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $AMS_MEDIA_WORKER_KEY" \
+            -H "Content-Type: application/json" \
+            --data-binary @"$RUNNER_TEMP/enqueue-request.json" \
+            "$AMS_APP_URL/api/internal/twitch/media/render/acceptance" \
+            > "$RUNNER_TEMP/enqueue.json"
+          job_id="$(jq -r '.job.jobId // empty' "$RUNNER_TEMP/enqueue.json")"
+          status="$(jq -r '.job.status // empty' "$RUNNER_TEMP/enqueue.json")"
+          test -n "$job_id"
+          echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
+          echo "Acceptance render queued through production with status: $status"
 
       - name: Install FFmpeg
         shell: bash
