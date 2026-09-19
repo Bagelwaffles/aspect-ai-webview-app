@@ -57,6 +57,17 @@ export const twitchMediaQueueSchema = z.object({
 export type TwitchMediaQueue = z.infer<typeof twitchMediaQueueSchema>
 export type TwitchMediaQueueItem = z.infer<typeof itemSchema>
 
+export function reconcileTwitchMediaAuthorization(
+  queue: TwitchMediaQueue | null,
+  scopes?: string[],
+): TwitchMediaQueue | null {
+  if (!queue) return null
+  return twitchMediaQueueSchema.parse({
+    ...queue,
+    mediaAuthorized: twitchMediaScopeEnabled(scopes),
+  })
+}
+
 type Options = {
   env?: NodeJS.ProcessEnv
   redis?: Redis | null
