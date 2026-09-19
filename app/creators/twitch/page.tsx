@@ -39,7 +39,7 @@ export default function TwitchPilotPage() {
               <CardTitle>Hard boundaries</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
-              <p>No chat messages, moderation, posting, clip creation, deletion, spending, or Twitch account mutation.</p>
+              <p>No automatic chat messages, moderation, posting, clip creation, deletion, spending, or Twitch account mutation. Owner-approved clip creation is available only after optional clip-management authorization.</p>
               <p>No gameplay-analysis claim unless AMS actually receives media content later.</p>
               <p>No commercial availability until an authorized real channel completes the online → offline → summary acceptance run.</p>
             </CardContent>
