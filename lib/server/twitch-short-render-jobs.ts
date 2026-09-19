@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from "node:crypto"
 import { Redis } from "@upstash/redis"
 import { z } from "zod"
 
-import { presignR2Object } from "@/lib/server/r2-presign"
+import { isR2AssetStorageConfigured, presignR2Object } from "@/lib/server/r2-presign"
 import { getLatestTwitchMediaQueue } from "@/lib/server/twitch-media-factory"
 
 export const TWITCH_SHORT_RENDER_VERSION = "twitch-short-render-v1" as const
@@ -87,7 +87,7 @@ function workerSecret(env: NodeJS.ProcessEnv) {
 }
 
 export function isTwitchShortRenderConfigured(env: NodeJS.ProcessEnv = process.env) {
-  return renderEnabled(env) && Boolean(workerSecret(env)) && Boolean(resolveRedis(env))
+  return renderEnabled(env) && Boolean(workerSecret(env)) && Boolean(resolveRedis(env)) && isR2AssetStorageConfigured(env)
 }
 
 export function authorizeMediaWorker(
