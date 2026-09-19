@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { buildTwitchMediaQueue, reconcileTwitchMediaAuthorization } from "../lib/server/twitch-media-factory"
+import { buildTwitchMediaQueue, normalizeTwitchClipMediaContentType, reconcileTwitchMediaAuthorization } from "../lib/server/twitch-media-factory"
 import type { StreamIntelligencePackage } from "../lib/server/stream-intelligence"
 import type { TwitchPilotSummary } from "../lib/server/twitch-pilot"
 
@@ -175,4 +175,16 @@ test("status reconciliation fixes a stale media authorization flag after OAuth s
   assert.ok(reconciled)
   assert.equal(reconciled.mediaAuthorized, true)
   assert.equal(reconciled.items.length, stale.items.length)
+})
+
+
+test("Twitch clip media MIME normalization accepts video, octet-stream, and missing headers only", () => {
+  assert.equal(normalizeTwitchClipMediaContentType("video/mp4"), "video/mp4")
+  assert.equal(normalizeTwitchClipMediaContentType("video/mp4; charset=binary"), "video/mp4")
+  assert.equal(normalizeTwitchClipMediaContentType("application/octet-stream"), "video/mp4")
+  assert.equal(normalizeTwitchClipMediaContentType(null), "video/mp4")
+  assert.throws(
+    () => normalizeTwitchClipMediaContentType("text/html"),
+    /TWITCH_MEDIA_SOURCE_TYPE_INVALID/,
+  )
 })

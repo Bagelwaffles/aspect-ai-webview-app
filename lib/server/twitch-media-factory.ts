@@ -57,6 +57,13 @@ export const twitchMediaQueueSchema = z.object({
 export type TwitchMediaQueue = z.infer<typeof twitchMediaQueueSchema>
 export type TwitchMediaQueueItem = z.infer<typeof itemSchema>
 
+export function normalizeTwitchClipMediaContentType(value: string | null | undefined) {
+  const normalized = value?.split(";")[0]?.trim().toLowerCase() ?? ""
+  if (!normalized || normalized === "application/octet-stream") return "video/mp4"
+  if (normalized.startsWith("video/")) return normalized
+  throw new Error("TWITCH_MEDIA_SOURCE_TYPE_INVALID")
+}
+
 export function reconcileTwitchMediaAuthorization(
   queue: TwitchMediaQueue | null,
   scopes?: string[],
@@ -246,8 +253,7 @@ export async function importTwitchClipMedia(clipId: string, options: Options = {
   if (Number.isFinite(size) && size > CUSTOMER_ASSET_MAX_BYTES) {
     throw new Error("TWITCH_MEDIA_SOURCE_TOO_LARGE")
   }
-  const contentType = source.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() || "video/mp4"
-  if (!contentType.startsWith("video/")) throw new Error("TWITCH_MEDIA_SOURCE_TYPE_INVALID")
+  const contentType = normalizeTwitchClipMediaContentType(source.headers.get("content-type"))
 
   const objectKey = [
     "creators",
