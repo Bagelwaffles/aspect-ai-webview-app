@@ -27,7 +27,7 @@ export function resolveR2Config(env: NodeJS.ProcessEnv = process.env): R2Config 
   const bucket = trimmed(env.AMS_ASSET_R2_BUCKET)
 
   if (!accountId || !accessKeyId || !secretAccessKey || !bucket) return null
-  if (!/^[A-Za-z0-9_-]{8,}$/.test(accountId)) return null
+  if (!/^[a-f0-9]{32}$/i.test(accountId)) return null
   if (!/^[A-Za-z0-9._-]{3,63}$/.test(bucket)) return null
 
   return { accountId, accessKeyId, secretAccessKey, bucket }
