@@ -57,11 +57,37 @@ export const twitchMediaQueueSchema = z.object({
 export type TwitchMediaQueue = z.infer<typeof twitchMediaQueueSchema>
 export type TwitchMediaQueueItem = z.infer<typeof itemSchema>
 
-export function normalizeTwitchClipMediaContentType(value: string | null | undefined) {
-  const normalized = value?.split(";")[0]?.trim().toLowerCase() ?? ""
-  if (!normalized || normalized === "application/octet-stream") return "video/mp4"
-  if (normalized.startsWith("video/")) return normalized
-  throw new Error("TWITCH_MEDIA_SOURCE_TYPE_INVALID")
+export function isMp4FileSignature(bytes: Uint8Array) {
+  return bytes.length >= 12 &&
+    bytes[4] === 0x66 &&
+    bytes[5] === 0x74 &&
+    bytes[6] === 0x79 &&
+    bytes[7] === 0x70
+}
+
+async function probeMp4Stream(stream: ReadableStream<Uint8Array>) {
+  const reader = stream.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (total < 32) {
+      const { value, done } = await reader.read()
+      if (done) break
+      if (!value?.length) continue
+      chunks.push(value)
+      total += value.length
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined)
+  }
+
+  const probe = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    probe.set(chunk, offset)
+    offset += chunk.length
+  }
+  return isMp4FileSignature(probe)
 }
 
 export function reconcileTwitchMediaAuthorization(
@@ -253,7 +279,10 @@ export async function importTwitchClipMedia(clipId: string, options: Options = {
   if (Number.isFinite(size) && size > CUSTOMER_ASSET_MAX_BYTES) {
     throw new Error("TWITCH_MEDIA_SOURCE_TOO_LARGE")
   }
-  const contentType = normalizeTwitchClipMediaContentType(source.headers.get("content-type"))
+  const [probeBody, uploadBody] = source.body.tee()
+  const isMp4 = await probeMp4Stream(probeBody)
+  if (!isMp4) throw new Error("TWITCH_MEDIA_SOURCE_TYPE_INVALID")
+  const contentType = "video/mp4"
 
   const objectKey = [
     "creators",
@@ -272,7 +301,7 @@ export async function importTwitchClipMedia(clipId: string, options: Options = {
   const putInit: RequestInit & { duplex: "half" } = {
     method: "PUT",
     headers: signed.requiredHeaders as Record<string, string>,
-    body: source.body,
+    body: uploadBody,
     duplex: "half",
     signal: AbortSignal.timeout(60_000),
   }

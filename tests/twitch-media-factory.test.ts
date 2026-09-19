@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { buildTwitchMediaQueue, normalizeTwitchClipMediaContentType, reconcileTwitchMediaAuthorization } from "../lib/server/twitch-media-factory"
+import { buildTwitchMediaQueue, isMp4FileSignature, reconcileTwitchMediaAuthorization } from "../lib/server/twitch-media-factory"
 import type { StreamIntelligencePackage } from "../lib/server/stream-intelligence"
 import type { TwitchPilotSummary } from "../lib/server/twitch-pilot"
 
@@ -178,13 +178,16 @@ test("status reconciliation fixes a stale media authorization flag after OAuth s
 })
 
 
-test("Twitch clip media MIME normalization accepts video, octet-stream, and missing headers only", () => {
-  assert.equal(normalizeTwitchClipMediaContentType("video/mp4"), "video/mp4")
-  assert.equal(normalizeTwitchClipMediaContentType("video/mp4; charset=binary"), "video/mp4")
-  assert.equal(normalizeTwitchClipMediaContentType("application/octet-stream"), "video/mp4")
-  assert.equal(normalizeTwitchClipMediaContentType(null), "video/mp4")
-  assert.throws(
-    () => normalizeTwitchClipMediaContentType("text/html"),
-    /TWITCH_MEDIA_SOURCE_TYPE_INVALID/,
-  )
+test("Twitch clip import validates MP4 bytes instead of trusting CDN MIME headers", () => {
+  const mp4 = Uint8Array.from([
+    0x00, 0x00, 0x00, 0x18,
+    0x66, 0x74, 0x79, 0x70,
+    0x69, 0x73, 0x6f, 0x6d,
+  ])
+  const html = new TextEncoder().encode("<!doctype html>")
+  const short = Uint8Array.from([0x00, 0x00, 0x00, 0x18, 0x66])
+
+  assert.equal(isMp4FileSignature(mp4), true)
+  assert.equal(isMp4FileSignature(html), false)
+  assert.equal(isMp4FileSignature(short), false)
 })
