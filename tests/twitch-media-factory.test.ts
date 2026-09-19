@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { buildTwitchMediaQueue, isMp4FileSignature, reconcileTwitchMediaAuthorization } from "../lib/server/twitch-media-factory"
+import { buildTwitchMediaQueue, isMp4FileSignature, readTwitchMediaBody, reconcileTwitchMediaAuthorization } from "../lib/server/twitch-media-factory"
 import type { StreamIntelligencePackage } from "../lib/server/stream-intelligence"
 import type { TwitchPilotSummary } from "../lib/server/twitch-pilot"
 
@@ -190,4 +190,39 @@ test("Twitch clip import validates MP4 bytes instead of trusting CDN MIME header
   assert.equal(isMp4FileSignature(mp4), true)
   assert.equal(isMp4FileSignature(html), false)
   assert.equal(isMp4FileSignature(short), false)
+})
+
+
+test("Twitch media buffering enforces the byte ceiling before R2 upload", async () => {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(Uint8Array.from([1, 2, 3]))
+      controller.enqueue(Uint8Array.from([4, 5, 6]))
+      controller.close()
+    },
+  })
+
+  await assert.rejects(
+    () => readTwitchMediaBody(stream, 5),
+    /TWITCH_MEDIA_SOURCE_TOO_LARGE/,
+  )
+})
+
+test("Twitch media buffering preserves exact bytes for binary upload", async () => {
+  const expected = Uint8Array.from([
+    0x00, 0x00, 0x00, 0x18,
+    0x66, 0x74, 0x79, 0x70,
+    0x69, 0x73, 0x6f, 0x6d,
+  ])
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(expected.slice(0, 5))
+      controller.enqueue(expected.slice(5))
+      controller.close()
+    },
+  })
+
+  const actual = await readTwitchMediaBody(stream, 1024)
+  assert.deepEqual(actual, expected)
+  assert.equal(isMp4FileSignature(actual), true)
 })
