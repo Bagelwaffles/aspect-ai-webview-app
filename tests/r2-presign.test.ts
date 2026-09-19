@@ -54,3 +54,15 @@ test("R2 GET URL never exposes secret credentials", () => {
   assert.doesNotMatch(signed.url, /test-secret-key-value/)
   assert.equal(new URL(signed.url).searchParams.get("X-Amz-SignedHeaders"), "host")
 })
+
+
+test("R2 config rejects malformed account IDs before network use", () => {
+  const malformed = {
+    AMS_ASSET_R2_ACCOUNT_ID: "not-an-account-id",
+    AMS_ASSET_R2_ACCESS_KEY_ID: "access-key",
+    AMS_ASSET_R2_SECRET_ACCESS_KEY: "secret-key",
+    AMS_ASSET_R2_BUCKET: "ams-creator-media",
+  } as NodeJS.ProcessEnv
+
+  assert.equal(resolveR2Config(malformed), null)
+})
