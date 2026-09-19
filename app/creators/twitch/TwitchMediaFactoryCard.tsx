@@ -7,6 +7,16 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
+export type TwitchShortRendererStatus = {
+  configured: boolean
+  jobs: Array<{
+    jobId: string
+    clipId: string
+    status: "pending" | "rendering" | "rendered" | "failed"
+    errorCode: string | null
+  }>
+}
+
 export type TwitchMediaFactoryStatus = {
   streamId: string
   mediaAuthorized: boolean
@@ -37,10 +47,12 @@ type Summary = {
 
 export default function TwitchMediaFactoryCard({
   mediaFactory,
+  shortRenderer,
   summary,
   onRefresh,
 }: {
   mediaFactory: TwitchMediaFactoryStatus | null
+  shortRenderer: TwitchShortRendererStatus | null
   summary: Summary
   onRefresh: () => Promise<void>
 }) {
@@ -78,6 +90,26 @@ export default function TwitchMediaFactoryCard({
       } else {
         setMessage(body?.code ?? "Clip import failed.")
       }
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function queueShortRender(clipId: string) {
+    if (!window.confirm("Render an AMS 9:16 Short from this imported clip? This stores a rendered draft but does not publish it.")) return
+    setBusy(`render:${clipId}`)
+    setMessage(null)
+    try {
+      const response = await fetch("/api/internal/twitch/media/render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clipId, approved: true }),
+      })
+      const body = await response.json().catch(() => null) as { code?: string; job?: { status?: string } } | null
+      setMessage(response.ok
+        ? `Short render queued (${body?.job?.status ?? "pending"}). It remains a private draft until you approve publishing separately.`
+        : body?.code ?? "Short render queue failed.")
+      if (response.ok) await onRefresh()
     } finally {
       setBusy(null)
     }
@@ -146,6 +178,10 @@ export default function TwitchMediaFactoryCard({
           <span>No automatic posting, messaging, moderation, or spending is enabled.</span>
         </div>
 
+        <div className="rounded-lg border p-3 text-xs">
+          9:16 renderer: {shortRenderer?.configured ? "configured" : "setup required"} · rendered Shorts stay private until a separate publish approval.
+        </div>
+
         {message ? <div className="rounded-lg border p-3 text-foreground">{message}</div> : null}
 
         {summary?.vod?.id && (summary.markers?.length ?? 0) > 0 ? (
@@ -205,6 +241,23 @@ export default function TwitchMediaFactoryCard({
                     <Download className="mr-2 h-4 w-4" />
                     {busy === item.clipId ? "Importing…" : item.status === "discovered" ? "Import media" : "Re-import media"}
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={
+                      !shortRenderer?.configured ||
+                      item.status === "discovered" ||
+                      busy === `render:${item.clipId}`
+                    }
+                    onClick={() => void queueShortRender(item.clipId)}
+                  >
+                    <Film className="mr-2 h-4 w-4" />
+                    {busy === `render:${item.clipId}` ? "Queuing…" : "Render 9:16 Short"}
+                  </Button>
+                  {(() => {
+                    const job = shortRenderer?.jobs.find((candidate) => candidate.clipId === item.clipId)
+                    return job ? <Badge variant="outline">Render: {job.status}</Badge> : null
+                  })()}
                 </div>
               </div>
             ))}
