@@ -291,6 +291,7 @@ export function buildTwitchAuthorizationUrl(
     "scope",
     [TWITCH_SCOPE, ...(includeMediaScope ? [TWITCH_MEDIA_SCOPE] : [])].join(" "),
   )
+  if (includeMediaScope) url.searchParams.set("force_verify", "true")
   url.searchParams.set("state", state)
   return url
 }

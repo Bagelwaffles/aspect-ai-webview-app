@@ -70,6 +70,7 @@ test("optional media OAuth adds only the Twitch clip-management scope", () => {
   const authUrl = buildTwitchAuthorizationUrl(attempt.state, env, true)
   const scopes = new Set((authUrl.searchParams.get("scope") ?? "").split(" ").filter(Boolean))
   assert.deepEqual(scopes, new Set([TWITCH_SCOPE, TWITCH_MEDIA_SCOPE]))
+  assert.equal(authUrl.searchParams.get("force_verify"), "true")
   assert.equal(TWITCH_MEDIA_SCOPE, "channel:manage:clips")
 })
 
