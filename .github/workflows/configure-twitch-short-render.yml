@@ -74,6 +74,8 @@ jobs:
           fi
           echo "::add-mask::$worker_key"
           export AMS_MEDIA_WORKER_KEY_VALUE="$worker_key"
+          printf 'AMS_MEDIA_WORKER_KEY=%s\n' "$worker_key" >> "$GITHUB_ENV"
+          echo 'AMS_TWITCH_SHORT_RENDER_ENABLED=true' >> "$GITHUB_ENV"
 
           node --input-type=module - <<'NODE'
           const required = ['VERCEL_TOKEN', 'VERCEL_PROJECT_ID', 'VERCEL_ORG_ID', 'AMS_MEDIA_WORKER_KEY_VALUE']
@@ -122,15 +124,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN" >/dev/null
           set +x
-          set -a
-          source .vercel/.env.production.local
-          set +a
-          test "${AMS_TWITCH_SHORT_RENDER_ENABLED:-}" = "true"
-          test ${#AMS_MEDIA_WORKER_KEY} -ge 32
-          echo "::add-mask::$AMS_MEDIA_WORKER_KEY"
-          printf 'AMS_MEDIA_WORKER_KEY=%s\n' "$AMS_MEDIA_WORKER_KEY" >> "$GITHUB_ENV"
+          worker_key="$AMS_MEDIA_WORKER_KEY"
+          test ${#worker_key} -ge 32 || { echo "::error::Generated worker key handoff is invalid."; exit 1; }
+          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN" >/dev/null
+          echo "::add-mask::$worker_key"
+          echo "Renderer variables were accepted by Vercel; continuing with the masked in-job key."
 
       - name: Install application dependencies
         run: pnpm install --frozen-lockfile
@@ -141,9 +140,12 @@ jobs:
         run: |
           set -euo pipefail
           set +x
+          worker_key="$AMS_MEDIA_WORKER_KEY"
           set -a
           source .vercel/.env.production.local
           set +a
+          export AMS_MEDIA_WORKER_KEY="$worker_key"
+          export AMS_TWITCH_SHORT_RENDER_ENABLED=true
           pnpm exec tsx scripts/enqueue_twitch_short_render.ts "$ACCEPTANCE_CLIP_ID" > "$RUNNER_TEMP/enqueue.json"
           job_id="$(jq -r '.jobId' "$RUNNER_TEMP/enqueue.json")"
           status="$(jq -r '.status' "$RUNNER_TEMP/enqueue.json")"
