@@ -97,8 +97,8 @@ export function authorizeMediaWorker(
   const secret = workerSecret(env)
   if (!secret || !authorization?.startsWith("Bearer ")) return false
   const supplied = authorization.slice("Bearer ".length).trim()
-  const left = Buffer.from(createHash("sha256").update(supplied).digest())
-  const right = Buffer.from(createHash("sha256").update(secret).digest())
+  const left = Uint8Array.from(createHash("sha256").update(supplied).digest())
+  const right = Uint8Array.from(createHash("sha256").update(secret).digest())
   return timingSafeEqual(left, right)
 }
 
