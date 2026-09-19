@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { authorizeOwnerApiRequest } from "@/lib/server/owner-api-auth"
 import { getLatestStreamIntelligencePackage } from "@/lib/server/stream-intelligence"
-import { getLatestTwitchMediaQueue } from "@/lib/server/twitch-media-factory"
+import { getLatestTwitchMediaQueue, reconcileTwitchMediaAuthorization } from "@/lib/server/twitch-media-factory"
 import {
   isTwitchShortRenderConfigured,
   listLatestTwitchShortRenderJobs,
@@ -30,11 +30,15 @@ export async function GET(request: NextRequest) {
       getLatestTwitchMediaQueue(),
       listLatestTwitchShortRenderJobs(),
     ])
+    const currentMediaFactory = reconcileTwitchMediaAuthorization(
+      mediaFactory,
+      twitch.connection?.scopes,
+    )
     return json({
       ok: true,
       ...twitch,
       streamIntelligence,
-      mediaFactory,
+      mediaFactory: currentMediaFactory,
       shortRenderer: {
         configured: isTwitchShortRenderConfigured(),
         jobs: shortRenderJobs,

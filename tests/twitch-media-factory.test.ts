@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { buildTwitchMediaQueue } from "../lib/server/twitch-media-factory"
+import { buildTwitchMediaQueue, reconcileTwitchMediaAuthorization } from "../lib/server/twitch-media-factory"
 import type { StreamIntelligencePackage } from "../lib/server/stream-intelligence"
 import type { TwitchPilotSummary } from "../lib/server/twitch-pilot"
 
@@ -153,4 +153,26 @@ test("media queue recognizes clip permission and preserves prior imported media 
   assert.equal(refreshed.items[0].status, "short-ready")
   assert.equal(refreshed.items[0].orientation, "portrait")
   assert.match(refreshed.items[0].objectKey ?? "", /portrait\.mp4$/)
+})
+
+
+test("status reconciliation fixes a stale media authorization flag after OAuth scope upgrade", () => {
+  const stale = buildTwitchMediaQueue({
+    summary: summary(),
+    intelligence,
+    broadcasterId: "155477801",
+    broadcasterLogin: "smokybanana03",
+    scopes: ["user:read:broadcast"],
+    generatedAt: "2026-09-19T01:39:00.000Z",
+  })
+  assert.equal(stale.mediaAuthorized, false)
+
+  const reconciled = reconcileTwitchMediaAuthorization(stale, [
+    "user:read:broadcast",
+    "channel:manage:clips",
+  ])
+
+  assert.ok(reconciled)
+  assert.equal(reconciled.mediaAuthorized, true)
+  assert.equal(reconciled.items.length, stale.items.length)
 })
