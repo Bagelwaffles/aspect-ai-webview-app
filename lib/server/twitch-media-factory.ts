@@ -269,11 +269,16 @@ export async function importTwitchClipMedia(clipId: string, options: Options = {
   const orientation = download?.portraitUrl ? "portrait" : download?.landscapeUrl ? "landscape" : null
   if (!sourceUrl || !orientation) throw new Error("TWITCH_MEDIA_DOWNLOAD_UNAVAILABLE")
 
-  const source = await fetcher(sourceUrl, {
-    method: "GET",
-    cache: "no-store",
-    signal: AbortSignal.timeout(30_000),
-  })
+  let source: Response
+  try {
+    source = await fetcher(sourceUrl, {
+      method: "GET",
+      cache: "no-store",
+      signal: AbortSignal.timeout(30_000),
+    })
+  } catch {
+    throw new Error("TWITCH_MEDIA_SOURCE_NETWORK_FAILED")
+  }
   if (!source.ok || !source.body) throw new Error("TWITCH_MEDIA_SOURCE_FETCH_FAILED")
   const size = Number(source.headers.get("content-length") ?? "")
   if (Number.isFinite(size) && size > CUSTOMER_ASSET_MAX_BYTES) {
@@ -305,8 +310,13 @@ export async function importTwitchClipMedia(clipId: string, options: Options = {
     duplex: "half",
     signal: AbortSignal.timeout(60_000),
   }
-  const stored = await fetcher(signed.url, putInit)
-  if (!stored.ok) throw new Error("TWITCH_MEDIA_STORE_WRITE_FAILED")
+  let stored: Response
+  try {
+    stored = await fetcher(signed.url, putInit)
+  } catch {
+    throw new Error("TWITCH_MEDIA_STORE_NETWORK_FAILED")
+  }
+  if (!stored.ok) throw new Error(`TWITCH_MEDIA_STORE_WRITE_FAILED:${stored.status}`)
 
   const now = (options.now ?? (() => new Date()))().toISOString()
   const next: TwitchMediaQueue = twitchMediaQueueSchema.parse({
