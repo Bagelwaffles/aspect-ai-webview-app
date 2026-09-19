@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { isR2AssetStorageConfigured, presignR2Object } from "../lib/server/r2-presign"
+import { isR2AssetStorageConfigured, presignR2Object, resolveR2Config } from "../lib/server/r2-presign"
 
 const env: NodeJS.ProcessEnv = {
   NODE_ENV: "test",
