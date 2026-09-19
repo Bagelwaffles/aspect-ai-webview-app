@@ -7,7 +7,10 @@ import { RefreshCcw, ShieldCheck, Twitch } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import TwitchMediaFactoryCard, { type TwitchMediaFactoryStatus } from "./TwitchMediaFactoryCard"
+import TwitchMediaFactoryCard, {
+  type TwitchMediaFactoryStatus,
+  type TwitchShortRendererStatus,
+} from "./TwitchMediaFactoryCard"
 
 type Summary = {
   title?: string
@@ -75,6 +78,7 @@ type Status = {
   summary?: Summary | null
   streamIntelligence?: StreamIntelligence | null
   mediaFactory?: TwitchMediaFactoryStatus | null
+  shortRenderer?: TwitchShortRendererStatus | null
 }
 
 export default function TwitchPilotConsole() {
@@ -192,6 +196,7 @@ export default function TwitchPilotConsole() {
   const summary = status.summary
   const intelligence = status.streamIntelligence
   const mediaFactory = status.mediaFactory ?? null
+  const shortRenderer = status.shortRenderer ?? null
   return (
     <div className="space-y-6">
       <Card className="border-primary/25 bg-primary/5">
@@ -314,6 +319,7 @@ export default function TwitchPilotConsole() {
 
       <TwitchMediaFactoryCard
         mediaFactory={mediaFactory}
+        shortRenderer={shortRenderer}
         summary={summary ?? null}
         onRefresh={refresh}
       />
