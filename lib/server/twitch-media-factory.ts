@@ -65,29 +65,52 @@ export function isMp4FileSignature(bytes: Uint8Array) {
     bytes[7] === 0x70
 }
 
-async function probeMp4Stream(stream: ReadableStream<Uint8Array>) {
+export async function readTwitchMediaBody(
+  stream: ReadableStream<Uint8Array>,
+  maxBytes = CUSTOMER_ASSET_MAX_BYTES,
+) {
   const reader = stream.getReader()
   const chunks: Uint8Array[] = []
   let total = 0
+
   try {
-    while (total < 32) {
+    while (true) {
       const { value, done } = await reader.read()
       if (done) break
       if (!value?.length) continue
-      chunks.push(value)
       total += value.length
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => undefined)
+        throw new Error("TWITCH_MEDIA_SOURCE_TOO_LARGE")
+      }
+      chunks.push(value)
     }
   } finally {
-    await reader.cancel().catch(() => undefined)
+    reader.releaseLock()
   }
 
-  const probe = new Uint8Array(total)
+  const body = new Uint8Array(total)
   let offset = 0
   for (const chunk of chunks) {
-    probe.set(chunk, offset)
+    body.set(chunk, offset)
     offset += chunk.length
   }
-  return isMp4FileSignature(probe)
+  return body
+}
+
+function safeNetworkFailureCode(error: unknown) {
+  const cause = error instanceof Error
+    ? (error.cause as { code?: unknown } | undefined)
+    : undefined
+  const code = typeof cause?.code === "string" ? cause.code : ""
+
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") return "DNS"
+  if (code === "UND_ERR_CONNECT_TIMEOUT" || code === "ETIMEDOUT") return "TIMEOUT"
+  if (code === "ECONNRESET" || code === "EPIPE") return "RESET"
+  if (code.startsWith("ERR_TLS") || code.startsWith("CERT_")) return "TLS"
+  if (error instanceof DOMException && error.name === "TimeoutError") return "TIMEOUT"
+  if (error instanceof DOMException && error.name === "AbortError") return "ABORTED"
+  return "UNKNOWN"
 }
 
 export function reconcileTwitchMediaAuthorization(
@@ -276,17 +299,16 @@ export async function importTwitchClipMedia(clipId: string, options: Options = {
       cache: "no-store",
       signal: AbortSignal.timeout(30_000),
     })
-  } catch {
-    throw new Error("TWITCH_MEDIA_SOURCE_NETWORK_FAILED")
+  } catch (error) {
+    throw new Error(`TWITCH_MEDIA_SOURCE_NETWORK_FAILED:${safeNetworkFailureCode(error)}`)
   }
   if (!source.ok || !source.body) throw new Error("TWITCH_MEDIA_SOURCE_FETCH_FAILED")
   const size = Number(source.headers.get("content-length") ?? "")
   if (Number.isFinite(size) && size > CUSTOMER_ASSET_MAX_BYTES) {
     throw new Error("TWITCH_MEDIA_SOURCE_TOO_LARGE")
   }
-  const [probeBody, uploadBody] = source.body.tee()
-  const isMp4 = await probeMp4Stream(probeBody)
-  if (!isMp4) throw new Error("TWITCH_MEDIA_SOURCE_TYPE_INVALID")
+  const mediaBody = await readTwitchMediaBody(source.body)
+  if (!isMp4FileSignature(mediaBody)) throw new Error("TWITCH_MEDIA_SOURCE_TYPE_INVALID")
   const contentType = "video/mp4"
 
   const objectKey = [
@@ -303,18 +325,17 @@ export async function importTwitchClipMedia(clipId: string, options: Options = {
     expiresInSeconds: 300,
   }, env)
 
-  const putInit: RequestInit & { duplex: "half" } = {
+  const putInit: RequestInit = {
     method: "PUT",
     headers: signed.requiredHeaders as Record<string, string>,
-    body: uploadBody,
-    duplex: "half",
+    body: new Blob([mediaBody], { type: contentType }),
     signal: AbortSignal.timeout(60_000),
   }
   let stored: Response
   try {
     stored = await fetcher(signed.url, putInit)
-  } catch {
-    throw new Error("TWITCH_MEDIA_STORE_NETWORK_FAILED")
+  } catch (error) {
+    throw new Error(`TWITCH_MEDIA_STORE_NETWORK_FAILED:${safeNetworkFailureCode(error)}`)
   }
   if (!stored.ok) throw new Error(`TWITCH_MEDIA_STORE_WRITE_FAILED:${stored.status}`)
 
