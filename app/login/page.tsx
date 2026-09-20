@@ -30,7 +30,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <>
       <AmsPublicHeader />
-      <main className="ams-public-page flex min-h-screen items-center justify-center bg-background px-6 py-12">
+      <main className="ams-public-page ams-public-page flex min-h-screen items-center justify-center bg-background px-6 py-12">
       <Card className="w-full max-w-md border-border/70 bg-card/90 shadow-2xl">
         <CardHeader>
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
