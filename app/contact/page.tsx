@@ -1,3 +1,5 @@
+import { AmsPublicHeader } from "@/components/ams-public-header"
+import { AmsPublicFooter } from "@/components/ams-public-footer"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowRight, Bot, ClipboardCheck, Sparkles } from "lucide-react"
@@ -14,7 +16,9 @@ export const metadata: Metadata = {
 
 export default function ContactPage() {
   return (
-    <main className="min-h-screen bg-background px-5 py-12 sm:px-8 lg:py-20">
+    <>
+      <AmsPublicHeader />
+      <main className="ams-public-page min-h-screen bg-background px-5 py-12 sm:px-8 lg:py-20">
       <div className="mx-auto max-w-5xl space-y-8">
         <div className="max-w-3xl space-y-4">
           <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
@@ -108,5 +112,7 @@ export default function ContactPage() {
         </div>
       </div>
     </main>
+      <AmsPublicFooter />
+    </>
   )
 }
