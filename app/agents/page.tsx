@@ -1,6 +1,8 @@
 "use client"
 
 import Link from "next/link"
+import { AmsPublicHeader } from "@/components/ams-public-header"
+import { AmsPublicFooter } from "@/components/ams-public-footer"
 import { useMemo, useState } from "react"
 
 import styles from "./agents.module.css"
@@ -50,20 +52,9 @@ export default function AgentsPage() {
   const counts = agentStatusCounts
 
   return (
-    <main className={styles.network}>
-      <header className={styles.header}>
-        <Link className={styles.brand} href="/" aria-label="Aspect Marketing Solutions home">
-          <span className={styles.brandMark}>A</span>
-          <span className={styles.brandText}>ASPECT<span>/</span>AMS</span>
-        </Link>
-        <nav className={styles.nav} aria-label="Agent sales catalog navigation">
-          <Link href="/">Home</Link>
-          <a href="#catalog">Catalog</a>
-          <a href="#lifecycle">Availability</a>
-          <Link href="/pricing">Pricing</Link>
-        </nav>
-        <Link className={styles.enter} href="/pricing#plans">Choose a plan ↗</Link>
-      </header>
+    <main className={`${styles.network} ams-public-page`}>
+      <AmsPublicHeader />
+      
 
       <section className={styles.hero}>
         <p className={styles.kicker}><span className={styles.kickerDot} />Aspect Agent Store // buy what is verified</p>
@@ -248,11 +239,8 @@ export default function AgentsPage() {
         </div>
       </section>
 
-      <footer className={styles.footer}>
-        <Link className={styles.brand} href="/"><span className={styles.brandMark}>A</span><span className={styles.brandText}>ASPECT<span>/</span>AMS</span></Link>
-        <span>Agent Store // verified offers only</span>
-        <div className={styles.footerLinks}><Link href="/pricing">Pricing</Link><Link href="/contact">Contact</Link><Link href="/">Home</Link></div>
-      </footer>
-    </main>
+      
+          <AmsPublicFooter />
+</main>
   )
 }
