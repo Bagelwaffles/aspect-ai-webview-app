@@ -1,3 +1,5 @@
+import { AmsPublicHeader } from "@/components/ams-public-header"
+import { AmsPublicFooter } from "@/components/ams-public-footer"
 import { Suspense } from "react"
 import Link from "next/link"
 import { CheckCircle2, Clock3, ShieldCheck } from "lucide-react"
@@ -15,7 +17,9 @@ export const metadata = {
 
 export default function QuickMarketingAuditThanksPage() {
   return (
-    <main className="min-h-screen bg-background px-4 py-12 sm:px-6">
+    <>
+      <AmsPublicHeader />
+      <main className="ams-public-page min-h-screen bg-background px-4 py-12 sm:px-6">
       <div className="mx-auto max-w-4xl space-y-8">
         <Card className="border-primary/30">
           <CardHeader className="space-y-4">
@@ -63,5 +67,7 @@ export default function QuickMarketingAuditThanksPage() {
         </Card>
       </div>
     </main>
+      <AmsPublicFooter />
+    </>
   )
 }
