@@ -18,7 +18,7 @@ export default function ContactPage() {
   return (
     <>
       <AmsPublicHeader />
-      <main className="ams-public-page min-h-screen bg-background px-5 py-12 sm:px-8 lg:py-20">
+      <main className="ams-public-page ams-public-page min-h-screen bg-background px-5 py-12 sm:px-8 lg:py-20">
       <div className="mx-auto max-w-5xl space-y-8">
         <div className="max-w-3xl space-y-4">
           <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
