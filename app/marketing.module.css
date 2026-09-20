@@ -486,6 +486,17 @@
   border-left: 1px solid var(--line);
 }
 
+.lifecycleNote {
+  position: relative;
+  z-index: 1;
+  width: min(1180px, calc(100% - 40px));
+  margin: 14px auto 0;
+  color: var(--subtle);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
 .section {
   position: relative;
   z-index: 1;
