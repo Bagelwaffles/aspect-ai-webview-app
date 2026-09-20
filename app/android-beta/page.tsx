@@ -31,7 +31,7 @@ export default function AndroidBetaPage() {
   return (
     <>
       <AmsPublicHeader />
-      <main className="ams-public-page min-h-screen bg-background px-5 py-10 sm:px-8 lg:py-16">
+      <main className="ams-public-page ams-public-page min-h-screen bg-background px-5 py-10 sm:px-8 lg:py-16">
       <div className="mx-auto max-w-6xl space-y-12">
         <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div className="space-y-5">
