@@ -112,7 +112,8 @@ export default function HomePage() {
           </h1>
 
           <p className={styles.heroText}>
-            Aspect Marketing Solutions gives small businesses focused AI agents for content,
+            Start with seven production-verified AI agents from $29/month, or choose the
+            $49 Quick Marketing Audit for a focused one-time review. AMS also supports content,
             lead generation, follow-up, visibility, creator workflows, and day-to-day operations —
             with human control where it matters.
           </p>
@@ -223,6 +224,9 @@ export default function HomePage() {
         <span>Production-verified agents</span>
         <span>Clear pricing</span>
       </section>
+      <p className={styles.lifecycleNote}>
+        Five statuses. Live, Beta, Setup Required, Blocked, and Planned.
+      </p>
 
       <section className={styles.section}>
         <div className={styles.sectionHeading}>
@@ -276,7 +280,7 @@ export default function HomePage() {
               <h3>{agent.title}</h3>
               <p>{agent.copy}</p>
               <Link href={agent.href}>
-                View agent <span aria-hidden="true">→</span>
+                View sales page <span aria-hidden="true">→</span>
               </Link>
             </article>
           ))}
