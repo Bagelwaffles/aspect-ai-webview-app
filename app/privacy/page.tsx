@@ -1,3 +1,5 @@
+import { AmsPublicHeader } from "@/components/ams-public-header"
+import { AmsPublicFooter } from "@/components/ams-public-footer"
 export const metadata = {
   title: "Privacy Policy | Aspect Marketing Solutions",
   description: "Privacy policy for Aspect Marketing Solutions web services and the AMS Android companion app.",
@@ -7,7 +9,9 @@ const updated = "September 12, 2026"
 
 export default function PrivacyPolicyPage() {
   return (
-    <main className="min-h-screen bg-background px-5 py-12 sm:px-8 lg:py-16">
+    <>
+      <AmsPublicHeader />
+      <main className="ams-public-page ams-public-page min-h-screen bg-background px-5 py-12 sm:px-8 lg:py-16">
       <article className="mx-auto max-w-4xl space-y-8 text-foreground">
         <header className="space-y-3 border-b border-border pb-8">
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-primary">Aspect Marketing Solutions</p>
@@ -106,5 +110,7 @@ export default function PrivacyPolicyPage() {
         </section>
       </article>
     </main>
+      <AmsPublicFooter />
+    </>
   )
 }

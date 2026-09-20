@@ -1,3 +1,5 @@
+import { AmsPublicHeader } from "@/components/ams-public-header"
+import { AmsPublicFooter } from "@/components/ams-public-footer"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
@@ -76,20 +78,10 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
   const heroTail = offer.mode === "roadmap" || offer.mode === "beta" ? "" : "to work."
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border/70 bg-background/95 px-5 py-4 backdrop-blur sm:px-8">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-3 font-black tracking-tight">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/40 bg-primary/10 text-primary">A</span>
-            <span>ASPECT<span className="text-primary">/</span>AMS</span>
-          </Link>
-          <nav className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-            <Link className="hover:text-foreground" href="/agents">Agent store</Link>
-            <Link className="hover:text-foreground" href="/pricing">Pricing</Link>
-            <Link className="hover:text-foreground" href="/contact">Contact</Link>
-          </nav>
-        </div>
-      </header>
+    <>
+      <AmsPublicHeader />
+      <main className="ams-public-page ams-public-page min-h-screen bg-background text-foreground">
+      
 
       <section className="border-b border-border/70 px-5 py-14 sm:px-8 lg:py-20">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
@@ -293,5 +285,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
         </div>
       </section>
     </main>
+      <AmsPublicFooter />
+    </>
   )
 }

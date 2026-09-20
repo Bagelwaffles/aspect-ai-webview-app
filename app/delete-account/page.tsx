@@ -1,3 +1,5 @@
+import { AmsPublicHeader } from "@/components/ams-public-header"
+import { AmsPublicFooter } from "@/components/ams-public-footer"
 import Link from "next/link"
 import { ArrowLeft, CheckCircle2, ShieldCheck } from "lucide-react"
 
@@ -7,7 +9,9 @@ import { Badge } from "@/components/ui/badge"
 
 export default function DeleteAccountPage() {
   return (
-    <main className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8">
+    <>
+      <AmsPublicHeader />
+      <main className="ams-public-page min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
@@ -82,5 +86,7 @@ export default function DeleteAccountPage() {
         </Card>
       </div>
     </main>
+      <AmsPublicFooter />
+    </>
   )
 }

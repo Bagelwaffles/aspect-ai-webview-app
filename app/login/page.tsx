@@ -1,3 +1,5 @@
+import { AmsPublicHeader } from "@/components/ams-public-header"
+import { AmsPublicFooter } from "@/components/ams-public-footer"
 import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
 import { ShieldCheck } from "lucide-react"
@@ -26,7 +28,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const configured = isCustomerAuthConfigured()
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
+    <>
+      <AmsPublicHeader />
+      <main className="ams-public-page ams-public-page flex min-h-screen items-center justify-center bg-background px-6 py-12">
       <Card className="w-full max-w-md border-border/70 bg-card/90 shadow-2xl">
         <CardHeader>
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
@@ -54,5 +58,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </CardContent>
       </Card>
     </main>
+      <AmsPublicFooter />
+    </>
   )
 }

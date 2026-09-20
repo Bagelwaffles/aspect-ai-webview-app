@@ -1,3 +1,5 @@
+import { AmsPublicHeader } from "@/components/ams-public-header"
+import { AmsPublicFooter } from "@/components/ams-public-footer"
 import Link from "next/link"
 import { ArrowRight, Bot, CreditCard, Sparkles } from "lucide-react"
 
@@ -92,20 +94,11 @@ export default function PricingPage() {
   const contentAgentLive = isContentAgentLaunchEnabled()
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:py-12">
+    <>
+      <AmsPublicHeader />
+      <main className="ams-public-page ams-public-page min-h-screen bg-background px-4 py-8 sm:px-6 lg:py-12">
       <div className="mx-auto max-w-6xl space-y-12">
         <header className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <Link href="/" className="font-black tracking-tight">
-              ASPECT<span className="text-primary">/</span>AMS
-            </Link>
-            <nav className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground" aria-label="Pricing navigation">
-              <Link className="hover:text-foreground" href="/agents">Agent Store</Link>
-              <Link className="hover:text-foreground" href="/quick-marketing-audit">$49 Audit</Link>
-              <Link className="hover:text-foreground" href="/contact">Contact</Link>
-            </nav>
-          </div>
-
           <div className="max-w-3xl space-y-4">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Simple pricing</p>
             <h1 className="text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">Choose the simplest way to start.</h1>
@@ -332,5 +325,7 @@ export default function PricingPage() {
         </section>
       </div>
     </main>
+      <AmsPublicFooter />
+    </>
   )
 }

@@ -1,5 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { AmsPublicHeader } from "@/components/ams-public-header"
+import { AmsPublicFooter } from "@/components/ams-public-footer"
 import { agents, agentStatusCounts, statusMeta, type AgentCategory } from "../agents/agentCatalog"
 import CollaborationBriefBuilder from "./CollaborationBriefBuilder"
 import CollaborationFilm from "./CollaborationFilm"
@@ -141,24 +143,11 @@ export default function CollaboratePage() {
   ].join("\n")
 
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ams-public-page`}>
+      <AmsPublicHeader />
       <div className={styles.gridGlow} aria-hidden="true" />
 
-      <header className={styles.header}>
-        <Link className={styles.brand} href="/">
-          <span className={styles.brandMark}>A</span>
-          <span>ASPECT / AMS</span>
-        </Link>
-        <nav className={styles.nav} aria-label="Collaboration page navigation">
-          <a href="#company">Company</a>
-          <a href="#models">Ways to collaborate</a>
-          <a href="#agents">Agent network</a>
-          <a href="#brief">Build a brief</a>
-        </nav>
-        <a className={styles.topCta} href="mailto:kimberleyaversbiz@gmail.com?subject=AMS%20Collaboration">
-          Start a conversation
-        </a>
-      </header>
+      
 
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
@@ -405,18 +394,8 @@ export default function CollaboratePage() {
         <code>GET /api/collaboration-profile</code>
       </section>
 
-      <footer className={styles.footer}>
-        <div>
-          <strong>ASPECT MARKETING SOLUTIONS</strong>
-          <p>Build something useful. Prove it. Then decide what comes next.</p>
-        </div>
-        <div className={styles.footerLinks}>
-          <Link href="/">Home</Link>
-          <Link href="/agents">Agent Network</Link>
-          <Link href="/quick-marketing-audit">Quick Marketing Audit</Link>
-          <a href="mailto:kimberleyaversbiz@gmail.com?subject=AMS%20Collaboration">Email AMS</a>
-        </div>
-      </footer>
-    </main>
+      
+          <AmsPublicFooter />
+</main>
   )
 }

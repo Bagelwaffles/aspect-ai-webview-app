@@ -1,3 +1,5 @@
+import { AmsPublicHeader } from "@/components/ams-public-header"
+import { AmsPublicFooter } from "@/components/ams-public-footer"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowLeft, CheckCircle2, ShieldCheck } from "lucide-react"
@@ -29,16 +31,10 @@ const boundaries = [
 
 export default function CreatorPilotPage() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border/70 px-5 py-4 sm:px-8">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-          <Link href="/creators" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" />
-            AMS Creators
-          </Link>
-          <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">Controlled pilot</Badge>
-        </div>
-      </header>
+    <>
+      <AmsPublicHeader />
+      <main className="ams-public-page ams-public-page min-h-screen bg-background text-foreground">
+      
 
       <section className="border-b border-border/70 px-5 py-14 sm:px-8 lg:py-20">
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
@@ -80,5 +76,7 @@ export default function CreatorPilotPage() {
         </div>
       </section>
     </main>
+      <AmsPublicFooter />
+    </>
   )
 }

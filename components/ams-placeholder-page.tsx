@@ -1,6 +1,8 @@
 "use client"
 
 import Link from "next/link"
+import { AmsPublicHeader } from "@/components/ams-public-header"
+import { AmsPublicFooter } from "@/components/ams-public-footer"
 import { ArrowLeft, CircleAlert, Clock3 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -29,7 +31,9 @@ export function PlaceholderPage({
   secondaryActionHref,
 }: PlaceholderPageProps) {
   return (
-    <main className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8">
+    <>
+      <AmsPublicHeader />
+      <main className="ams-public-page min-h-screen bg-background px-4 py-10 sm:px-6 sm:py-12">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
@@ -86,6 +90,8 @@ export function PlaceholderPage({
           </CardContent>
         </Card>
       </div>
-    </main>
+      </main>
+      <AmsPublicFooter />
+    </>
   )
 }
