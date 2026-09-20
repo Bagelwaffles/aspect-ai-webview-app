@@ -712,3 +712,23 @@
   .footer { flex-direction: column; }
   .footerLinks { justify-content: flex-start; }
 }
+
+
+/* AMS public refresh overrides */
+.page {
+  --ink: #060a12;
+  --panel: rgba(14,21,34,.82);
+  --line: rgba(255,255,255,.10);
+  --paper: #f6f8fb;
+  --muted: #a9b2c3;
+  --lime: #c9ff3d;
+  --blue: #63dcff;
+  --violet: #8f7cff;
+  background:
+    radial-gradient(circle at 12% 0%,rgba(99,220,255,.10),transparent 30rem),
+    radial-gradient(circle at 88% 10%,rgba(143,124,255,.09),transparent 34rem),
+    linear-gradient(180deg,#070b13 0%,#060a12 58%,#080d16 100%);
+}
+.page section { max-width: 1180px; }
+.page article { border-radius: 22px; }
+.page button,.page a[class*="button"] { border-radius: 14px; }
