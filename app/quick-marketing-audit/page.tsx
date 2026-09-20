@@ -1,3 +1,5 @@
+import { AmsPublicHeader } from "@/components/ams-public-header"
+import { AmsPublicFooter } from "@/components/ams-public-footer"
 import Link from "next/link"
 import { ArrowRight, CheckCircle2, Clock3, ShieldCheck, Sparkles } from "lucide-react"
 
@@ -25,7 +27,9 @@ export default async function QuickMarketingAuditPage() {
   const checkoutReady = await isQuickAuditRuntimeLaunchEnabled()
 
   return (
-    <main className="min-h-screen bg-background px-4 py-10 sm:px-6 lg:py-16">
+    <>
+      <AmsPublicHeader />
+      <main className="ams-public-page min-h-screen bg-background px-4 py-10 sm:px-6 lg:py-16">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
         <section className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
           <div className="space-y-6">
@@ -154,5 +158,7 @@ export default async function QuickMarketingAuditPage() {
         </section>
       </div>
     </main>
+      <AmsPublicFooter />
+    </>
   )
 }
