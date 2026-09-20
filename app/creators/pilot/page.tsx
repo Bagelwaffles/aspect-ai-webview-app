@@ -33,7 +33,7 @@ export default function CreatorPilotPage() {
   return (
     <>
       <AmsPublicHeader />
-      <main className="ams-public-page min-h-screen bg-background text-foreground">
+      <main className="ams-public-page ams-public-page min-h-screen bg-background text-foreground">
       
 
       <section className="border-b border-border/70 px-5 py-14 sm:px-8 lg:py-20">
