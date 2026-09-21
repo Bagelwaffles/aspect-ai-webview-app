@@ -10,6 +10,12 @@
       "dest": "/$1"
     }
   ],
+  "crons": [
+    {
+      "path": "/api/internal/monitoring/run",
+      "schedule": "17 13 * * *"
+    }
+  ],
   "env": {
     "NEXT_PUBLIC_APP_NAME": "Aspect Marketing Solutions",
     "NEXT_PUBLIC_APP_URL": "https://www.aspectmarketingsolutions.app"

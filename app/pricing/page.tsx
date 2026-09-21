@@ -46,6 +46,18 @@ const LIVE_AGENT_PRICING = [
     href: "/email-campaign-agent",
     description: "Build a human-reviewed 3, 5, or 7-email campaign sequence from your supplied inputs.",
   },
+  {
+    name: "Nurture Agent",
+    price: "$15",
+    href: "/nurture-agent",
+    description: "Build structured human-reviewed nurture sequences for leads and customers.",
+  },
+  {
+    name: "Product Creator Agent",
+    price: "$15",
+    href: "/product-creator-agent",
+    description: "Turn a product concept into a structured, human-reviewed offer package and launch draft.",
+  },
 ] as const
 
 const SAAS_PLANS = [
@@ -293,7 +305,7 @@ export default function PricingPage() {
                 <p>
                   Selected Live agents have approved standalone reference rates, but standalone checkout is not currently available. Subscription access uses shared credits.
                 </p>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
                   {LIVE_AGENT_PRICING.map((agent) => (
                     <div key={agent.name} className="rounded-lg border p-4">
                       <div className="font-semibold text-foreground">{agent.name}</div>
