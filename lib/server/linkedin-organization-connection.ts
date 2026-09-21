@@ -12,7 +12,7 @@ import { Redis } from "@upstash/redis"
 import { z } from "zod"
 
 export const LINKEDIN_ORGANIZATION_SCOPES = [
-  "r_organization_admin",
+  "rw_organization_admin",
   "w_organization_social",
 ] as const
 export const LINKEDIN_OAUTH_COOKIE = "ams_linkedin_org_oauth"
