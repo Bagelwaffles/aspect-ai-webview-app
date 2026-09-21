@@ -1,0 +1,65 @@
+name: Deploy LinkedIn diagnostics main to production
+
+on:
+  push:
+    branches:
+      - "ops/deploy-linkedin-diagnostics-main"
+    paths:
+      - ".github/workflows/deploy-linkedin-diagnostics-main.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_TEAM_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
+      VERCEL_PROJECT_ID: prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ
+    steps:
+      - name: Create exact main production deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          body='{"name":"aspect-ai-overlord","project":"aspect-ai-overlord","target":"production","gitSource":{"type":"github","repo":"aspect-ai-webview-app","ref":"main","org":"Bagelwaffles"}}'
+          response="$(curl --silent --show-error --fail-with-body \
+            -X POST \
+            "https://api.vercel.com/v13/deployments?teamId=$VERCEL_TEAM_ID" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$body")"
+          id="$(printf '%s' "$response" | jq -r '.id // empty')"
+          status="$(printf '%s' "$response" | jq -r '.status // .readyState // empty')"
+          if [ -z "$id" ]; then
+            echo "::error::Vercel did not return a deployment id."
+            exit 1
+          fi
+          echo "DEPLOYMENT_ID=$id" >> "$GITHUB_ENV"
+          echo "Created production deployment: $id"
+          echo "Initial status: ${status:-unknown}"
+
+      - name: Wait for Vercel readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 90); do
+            response="$(curl --silent --show-error --fail-with-body \
+              "https://api.vercel.com/v13/deployments/$DEPLOYMENT_ID?teamId=$VERCEL_TEAM_ID" \
+              -H "Authorization: Bearer $VERCEL_TOKEN")"
+            state="$(printf '%s' "$response" | jq -r '.readyState // .state // .status // empty')"
+            sha="$(printf '%s' "$response" | jq -r '.meta.githubCommitSha // empty')"
+            echo "Vercel state: ${state:-unknown}; commit: ${sha:-unknown}"
+            if [ "$state" = "READY" ]; then
+              test "$sha" = "528f8bdd057b0fa7ada3718d4969c7a7d6757ce9"
+              exit 0
+            fi
+            if [ "$state" = "ERROR" ] || [ "$state" = "CANCELED" ]; then
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "::error::Timed out waiting for deployment readiness."
+          exit 1
