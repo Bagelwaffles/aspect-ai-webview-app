@@ -13,7 +13,7 @@
   "crons": [
     {
       "path": "/api/internal/monitoring/run",
-      "schedule": "17 * * * *"
+      "schedule": "17 13 * * *"
     }
   ],
   "env": {
