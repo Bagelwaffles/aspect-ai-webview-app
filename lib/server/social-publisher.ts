@@ -3,6 +3,7 @@ import type {
   SocialChannelDeliveryStatus,
 } from "@/lib/server/social-campaign-store"
 import type { SocialChannel, SocialDraft } from "@/lib/server/social-campaign-agent"
+import { getStoredLinkedInOrganizationAccessToken } from "@/lib/server/linkedin-organization-connection"
 
 export type SocialPublisherResult = {
   channel: SocialChannel
@@ -53,14 +54,24 @@ function linkedinConfig(env: NodeJS.ProcessEnv = process.env) {
   const token = normalized(env.AMS_LINKEDIN_ACCESS_TOKEN)
   const author = normalized(env.AMS_LINKEDIN_AUTHOR_URN)
   const version = normalized(env.AMS_LINKEDIN_API_VERSION)
+  const generation = normalized(env.AMS_LINKEDIN_CONNECTION_GENERATION)
+  const authorReady = hasConfiguredIdentifier(
+    author,
+    /^urn:li:organization:[A-Za-z0-9_-]+$/u,
+  )
+  const versionReady = /^20\d{4}$/u.test(version)
   return {
     token,
     author,
     version,
+    generation,
+    authorReady,
+    versionReady,
     configured:
       hasBearerToken(token) &&
-      hasConfiguredIdentifier(author, /^urn:li:(?:person|organization):[A-Za-z0-9_-]+$/u) &&
-      /^20\d{4}$/u.test(version),
+      authorReady &&
+      versionReady &&
+      generation === "ams-linkedin-org-2026-09",
   }
 }
 
@@ -201,7 +212,20 @@ async function publishLinkedIn(
   dependencies: Required<PublisherDependencies>,
 ): Promise<SocialPublisherResult> {
   const config = linkedinConfig(dependencies.env)
-  if (!config.configured) {
+  let accessToken = config.configured ? config.token : null
+
+  try {
+    const stored = await getStoredLinkedInOrganizationAccessToken({
+      env: dependencies.env,
+    })
+    if (stored && stored.organizationUrn === config.author) {
+      accessToken = stored.accessToken
+    }
+  } catch {
+    // Keep LinkedIn fail-closed if the encrypted connection vault is unavailable.
+  }
+
+  if (!accessToken || !config.authorReady || !config.versionReady) {
     return {
       channel: "linkedin",
       status: "not_configured",
@@ -217,7 +241,7 @@ async function publishLinkedIn(
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${config.token}`,
+          Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
           "Linkedin-Version": config.version,
           "X-Restli-Protocol-Version": "2.0.0",
