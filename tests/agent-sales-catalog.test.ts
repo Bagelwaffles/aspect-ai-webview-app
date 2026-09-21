@@ -1,4 +1,6 @@
 import assert from "node:assert/strict"
+import { existsSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 import test from "node:test"
 
 import { agents } from "../app/agents/agentCatalog"
@@ -31,6 +33,25 @@ test("the seven verified shared-credit agents sell only through existing subscri
     assert.equal(offer.primaryHref, "/pricing#plans")
     assert.equal(offer.secondaryHref, included.href)
   }
+})
+
+test("the seven verified Live agents use matching accessible WebP artwork", () => {
+  for (const included of SUBSCRIPTION_INCLUDED_AGENTS) {
+    const agent = agents.find((candidate) => candidate.slug === included.slug)
+    assert.ok(agent, `${included.slug} must remain in the agent catalog`)
+    assert.equal(agent.status, "live")
+    assert.equal(agent.image?.src, `/agent-assets/${included.slug}.webp`)
+    assert.match(agent.image?.alt ?? "", new RegExp(agent.name.replace(" Agent", ""), "i"))
+  }
+})
+
+test("the Agent Store prominently presents the seven-agent Live showcase", () => {
+  const showcasePath = join(process.cwd(), "public/agent-assets/live-agent-showcase.webp")
+  const agentStoreSource = readFileSync(join(process.cwd(), "app/agents/page.tsx"), "utf8")
+
+  assert.equal(existsSync(showcasePath), true)
+  assert.match(agentStoreSource, /live-agent-showcase\.webp/)
+  assert.match(agentStoreSource, /Meet the Live AMS team\./)
 })
 
 test("Marketing Audit preserves the existing $49 one-time purchase route", () => {
