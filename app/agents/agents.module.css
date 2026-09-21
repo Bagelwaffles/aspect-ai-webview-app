@@ -124,6 +124,8 @@
 .glyph i:nth-child(1) { inset: 0; }
 .glyph i:nth-child(2) { inset: 16px; }
 .glyph i:nth-child(3) { inset: 31px; background: currentColor; }
+.cardArtwork { position: relative; width: 100%; aspect-ratio: 4 / 5; margin: 22px 0; overflow: hidden; border: 1px solid rgba(99,220,255,.18); border-radius: 18px; background: #050a12; }
+.cardArtwork img { object-fit: cover; }
 .card[data-status="beta"] .glyph { color: var(--blue); }
 .card[data-status="development"] .glyph { color: var(--violet); }
 .card[data-status="soon"] .glyph { color: var(--orange); }\n.card[data-status="blocked"] .glyph { color: #ff6b6b; }

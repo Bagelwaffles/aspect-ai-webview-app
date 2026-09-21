@@ -33,6 +33,16 @@ test("the seven verified shared-credit agents sell only through existing subscri
   }
 })
 
+test("the seven verified Live agents use matching accessible WebP artwork", () => {
+  for (const included of SUBSCRIPTION_INCLUDED_AGENTS) {
+    const agent = agents.find((candidate) => candidate.slug === included.slug)
+    assert.ok(agent, `${included.slug} must remain in the agent catalog`)
+    assert.equal(agent.status, "live")
+    assert.equal(agent.image?.src, `/agent-assets/${included.slug}.webp`)
+    assert.match(agent.image?.alt ?? "", new RegExp(agent.name.replace(" Agent", ""), "i"))
+  }
+})
+
 test("Marketing Audit preserves the existing $49 one-time purchase route", () => {
   const audit = agents.find((agent) => agent.slug === "marketing-audit-agent")
   assert.ok(audit)

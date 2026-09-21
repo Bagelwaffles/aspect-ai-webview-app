@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { AmsPublicHeader } from "@/components/ams-public-header"
 import { AmsPublicFooter } from "@/components/ams-public-footer"
 import { useMemo, useState } from "react"
@@ -142,7 +143,18 @@ export default function AgentsPage() {
                     </div>
                   </div>
 
-                  <div className={styles.glyph} aria-hidden="true"><i /><i /><i /></div>
+                  {agent.image ? (
+                    <div className={styles.cardArtwork}>
+                      <Image
+                        src={agent.image.src}
+                        alt={agent.image.alt}
+                        fill
+                        sizes="(max-width: 720px) calc(100vw - 86px), (max-width: 1050px) 42vw, 340px"
+                      />
+                    </div>
+                  ) : (
+                    <div className={styles.glyph} aria-hidden="true"><i /><i /><i /></div>
+                  )}
                   <p className={styles.category}>{agent.category}</p>
                   <h3>{agent.name}</h3>
                   <p className={styles.description}>{agent.description}</p>

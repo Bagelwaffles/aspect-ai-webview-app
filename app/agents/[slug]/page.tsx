@@ -2,6 +2,7 @@ import { AmsPublicHeader } from "@/components/ams-public-header"
 import { AmsPublicFooter } from "@/components/ams-public-footer"
 import type { Metadata } from "next"
 import Link from "next/link"
+import Image from "next/image"
 import { notFound } from "next/navigation"
 import { ArrowRight, Check, PlayCircle, ShieldCheck, Sparkles } from "lucide-react"
 
@@ -116,6 +117,19 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
             </div>
           </div>
 
+          <div className="space-y-5">
+          {agent.image ? (
+            <div className="relative mx-auto aspect-[4/5] w-full max-w-[30rem] overflow-hidden rounded-3xl border border-cyan-300/20 bg-slate-950 shadow-[0_24px_80px_rgba(34,211,238,0.12)]">
+              <Image
+                src={agent.image.src}
+                alt={agent.image.alt}
+                fill
+                priority
+                sizes="(max-width: 1023px) min(100vw - 40px, 480px), 38vw"
+                className="object-cover"
+              />
+            </div>
+          ) : null}
           <Card className="border-primary/25 bg-primary/5 shadow-xl">
             <CardHeader>
               <CardDescription>{offer.label}</CardDescription>
@@ -135,6 +149,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
       </section>
 
