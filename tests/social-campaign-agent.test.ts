@@ -128,8 +128,9 @@ test("social publishers fail closed when credentials are absent", () => {
 test("social publisher configuration rejects placeholder identifiers and keeps YouTube closed", () => {
   const env = testEnv({
     AMS_LINKEDIN_ACCESS_TOKEN: "token_1234567890123456789012345",
-    AMS_LINKEDIN_AUTHOR_URN: "urn:li:person:realperson123",
+    AMS_LINKEDIN_AUTHOR_URN: "urn:li:organization:145213077",
     AMS_LINKEDIN_API_VERSION: "202608",
+    AMS_LINKEDIN_CONNECTION_GENERATION: "ams-linkedin-org-2026-09",
     AMS_META_ACCESS_TOKEN: "meta_1234567890123456789012345",
     AMS_META_GRAPH_API_VERSION: "v24.0",
     AMS_FACEBOOK_PAGE_ID: "replace-with-facebook-page-id",

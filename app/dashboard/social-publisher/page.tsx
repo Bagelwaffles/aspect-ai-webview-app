@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 
 import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie"
 import { getLinkedInOrganizationCutoverStatus } from "@/lib/server/linkedin-organization-cutover"
+import { getLinkedInOrganizationConnectionStatus } from "@/lib/server/linkedin-organization-connection"
 import { isSocialCampaignAgentConfigured } from "@/lib/server/social-campaign-agent"
 import {
   isSocialCampaignStoreConfigured,
@@ -50,8 +51,16 @@ export default async function SocialPublisherStatusPage() {
   const agentConfigured = isSocialCampaignAgentConfigured()
   const storeConfigured = isSocialCampaignStoreConfigured()
   const linkedinCutover = getLinkedInOrganizationCutoverStatus()
+  const linkedinConnection = await getLinkedInOrganizationConnectionStatus().catch(() => ({
+    oauthConfigured: false,
+    connected: false,
+    connection: null,
+  }))
   const rawPublishers = getSocialPublisherConfiguration()
-  const publishers = { ...rawPublishers, linkedin: linkedinCutover.configured }
+  const publishers = {
+    ...rawPublishers,
+    linkedin: linkedinConnection.connected || linkedinCutover.configured,
+  }
   let campaigns: SocialCampaignRecord[] = []
   let storeReadError = false
 
@@ -101,10 +110,42 @@ export default async function SocialPublisherStatusPage() {
           <section className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5">
             <p className="font-bold text-amber-200">LinkedIn legacy identity quarantined</p>
             <p className="mt-2 text-sm leading-6 text-slate-300">
-              AMS detected an older LinkedIn credential but will not use it. LinkedIn publishing stays blocked until a fresh organization-only connection is authorized for the Aspect Marketing Solutions Page and the new connection generation is installed.
+              AMS detected an older LinkedIn credential but will not use it. LinkedIn publishing stays blocked until a fresh organization-only connection is authorized for the Aspect Marketing Solutions Page.
             </p>
           </section>
         ) : null}
+
+        <section className="rounded-2xl border border-sky-400/20 bg-sky-400/5 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-2xl">
+              <p className="font-bold text-sky-200">LinkedIn organization OAuth</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Target organization: <span className="font-mono">urn:li:organization:145213077</span>.
+                Fresh OAuth credentials are encrypted before Redis storage. No token value is rendered here.
+              </p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Callback: https://www.aspectmarketingsolutions.app/api/internal/linkedin/callback
+              </p>
+            </div>
+            <div className="flex flex-col items-start gap-2">
+              <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.14em] ${linkedinConnection.connected ? "border-emerald-400/30 text-emerald-200" : "border-slate-700 text-slate-300"}`}>
+                {linkedinConnection.connected
+                  ? "Connected"
+                  : linkedinConnection.oauthConfigured
+                    ? "Ready to authorize"
+                    : "Developer app setup required"}
+              </span>
+              {linkedinConnection.oauthConfigured ? (
+                <Link
+                  href="/api/internal/linkedin/start"
+                  className="rounded-lg border border-sky-400/30 px-4 py-2 text-sm font-bold text-sky-200 hover:bg-sky-400/10"
+                >
+                  {linkedinConnection.connected ? "Reauthorize LinkedIn" : "Connect LinkedIn organization"}
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        </section>
 
         <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
