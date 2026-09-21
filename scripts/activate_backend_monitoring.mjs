@@ -147,7 +147,8 @@ const alertTransport = alertUrl && alertSecret
 mask(cron.value)
 mask(nextAuth.value)
 console.log("CRON_SECRET production presence before activation: " + (cronExisted ? "yes" : "no"))
-console.log("CRON_SECRET created during activation: " + (cronCreated ? "yes" : "no"))\nconsole.log("CRON_SECRET rotated to complete activation: " + (cronRotatedForActivation ? "yes" : "no"))
+console.log("CRON_SECRET created during activation: " + (cronCreated ? "yes" : "no"))
+console.log("CRON_SECRET rotated to complete activation: " + (cronRotatedForActivation ? "yes" : "no"))
 console.log("Optional alert transport state: " + alertTransport)
 
 let productionRedeployed = false
@@ -176,9 +177,9 @@ function redeployCurrentProduction() {
   productionRedeployed = true
 }
 
-if (cronCreated) {
+if (cronCreated || cronRotatedForActivation) {
   redeployCurrentProduction()
-  console.log("Production redeployed because CRON_SECRET was newly created.")
+  console.log("Production redeployed because CRON_SECRET changed during activation.")
 }
 
 async function executeMonitoring() {
@@ -318,7 +319,8 @@ console.log("Unauthenticated cron endpoint: HTTP 401")
 const result = {
   cronSecretConfigured: true,
   cronSecretExisted,
-  cronSecretCreated: cronCreated,\n  cronSecretRotatedForActivation,
+  cronSecretCreated: cronCreated,
+  cronSecretRotatedForActivation: cronRotatedForActivation,
   productionRedeployed,
   monitoringRunExecuted: true,
   redisSnapshotVerified: true,
