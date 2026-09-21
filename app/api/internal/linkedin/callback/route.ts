@@ -29,7 +29,15 @@ export async function GET(request: NextRequest) {
   const auth = await authorizeOwnerApiRequest(request)
   if (!auth.ok) return dashboardRedirect(request, "owner-session-required")
 
-  if (request.nextUrl.searchParams.get("error")) {
+  const providerError = request.nextUrl.searchParams.get("error")
+  if (providerError) {
+    const description = request.nextUrl.searchParams
+      .get("error_description")
+      ?.slice(0, 300) ?? null
+    console.warn("LINKEDIN_ORGANIZATION_OAUTH_PROVIDER_DENIED", {
+      error: providerError.slice(0, 120),
+      description,
+    })
     return dashboardRedirect(request, "denied")
   }
 
