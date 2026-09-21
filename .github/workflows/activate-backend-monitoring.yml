@@ -1,0 +1,67 @@
+name: Activate AMS backend monitoring
+
+on:
+  push:
+    branches:
+      - "ops/activate-backend-monitoring"
+    paths:
+      - ".github/workflows/activate-backend-monitoring.yml"
+      - "scripts/activate_backend_monitoring.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: activate-ams-backend-monitoring
+  cancel-in-progress: false
+
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    env:
+      VERCEL_ORG_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
+      VERCEL_PROJECT_ID: prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      AMS_APP_URL: https://www.aspectmarketingsolutions.app
+      CURRENT_PRODUCTION_DEPLOYMENT_ID: dpl_D6eGuEerdLce1i9wrDquex1gvY3u
+
+    steps:
+      - name: Checkout exact monitoring commit
+        uses: actions/checkout@v4
+        with:
+          ref: b70858c70b9d067d96d5d342cbd03a0fcf0efa34
+
+      - name: Restore branch-only activation script
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api             -H "Accept: application/vnd.github.raw+json"             "/repos/${{ github.repository }}/contents/scripts/activate_backend_monitoring.mjs?ref=ops/activate-backend-monitoring"             > scripts/activate_backend_monitoring.mjs
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.28.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Activate and verify monitoring
+        run: node scripts/activate_backend_monitoring.mjs
+
+      - name: Show safe acceptance result
+        if: always()
+        shell: bash
+        run: |
+          if [ -f monitoring-activation-result.json ]; then
+            cat monitoring-activation-result.json
+          fi
