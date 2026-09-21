@@ -140,7 +140,7 @@ function redeployCurrentProduction() {
       "vercel@latest",
       "redeploy",
       deploymentId,
-      "--yes",
+      "--non-interactive",
       "--token",
       vercelToken,
     ],
