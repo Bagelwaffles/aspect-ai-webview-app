@@ -36,12 +36,12 @@ test("stale task detection honors the requested age", () => {
 })
 
 test("cron authorization fails closed and accepts only the configured secret", () => {
-  const env = { CRON_SECRET: "this-is-a-long-monitoring-secret" } as NodeJS.ProcessEnv
+  const env = { CRON_SECRET: "this-is-a-long-monitoring-secret", NODE_ENV: "test" } as NodeJS.ProcessEnv
   assert.equal(authorizeMonitoringCron(null, env), false)
   assert.equal(authorizeMonitoringCron("Bearer wrong-secret", env), false)
   assert.equal(
     authorizeMonitoringCron("Bearer this-is-a-long-monitoring-secret", env),
     true,
   )
-  assert.equal(authorizeMonitoringCron("Bearer anything", {} as NodeJS.ProcessEnv), false)
+  assert.equal(authorizeMonitoringCron("Bearer anything", { NODE_ENV: "test" } as NodeJS.ProcessEnv), false)
 })
