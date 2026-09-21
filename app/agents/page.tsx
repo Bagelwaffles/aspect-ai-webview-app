@@ -83,6 +83,33 @@ export default function AgentsPage() {
         <div className={styles.signalItem} data-status="blocked"><span className={styles.signalLabel}>Blocked</span><strong className={styles.signalValue}>{counts.blocked}</strong></div>
       </section>
 
+      <section className={`${styles.section} ${styles.showcaseSection}`} aria-labelledby="live-agent-showcase-title">
+        <div className={styles.showcaseCopy}>
+          <div>
+            <p className={styles.kicker}>Seven agents // available now</p>
+            <h2 id="live-agent-showcase-title">Meet the Live AMS team.</h2>
+          </div>
+          <div>
+            <p>
+              Content, lead magnets, email campaigns, nurture, outreach, SEO, and product creation are already included in AMS subscriptions.
+              Explore every Live agent below or compare plans to put the full team to work.
+            </p>
+            <div className={styles.heroActions}>
+              <a className={styles.primary} href="#catalog">Explore all 33 agents <span>↓</span></a>
+              <Link className={styles.secondary} href="/pricing#plans">Get 7 Live agents <span>↗</span></Link>
+            </div>
+          </div>
+        </div>
+        <div className={styles.showcaseArtwork}>
+          <Image
+            src="/agent-assets/live-agent-showcase.webp"
+            alt="The seven Live AMS agents: Content, Lead Magnet, Email Campaign, Nurture, Outreach, SEO, and Product Creator"
+            fill
+            sizes="(max-width: 720px) calc(100vw - 40px), (max-width: 1220px) calc(100vw - 80px), 1180px"
+          />
+        </div>
+      </section>
+
       <section className={`${styles.section} ${styles.catalogSection}`} id="catalog">
         <div className={styles.filters}>
           <div className={styles.filterGroup}>
