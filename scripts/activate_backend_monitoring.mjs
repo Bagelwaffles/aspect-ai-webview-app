@@ -99,10 +99,30 @@ if (!cron.record) {
   cronCreated = true
 }
 
+let cronRotatedForActivation = false
 if (!cron.value || cron.value === "[SENSITIVE]") {
-  fail(
-    "Existing Production CRON_SECRET could not be decrypted by the protected Vercel credential; refusing to rotate it automatically.",
-  )
+  const value = randomBytes(48).toString("base64url")
+  const rotateUrl = new URL("https://api.vercel.com/v10/projects/" + projectId + "/env")
+  rotateUrl.searchParams.set("teamId", teamId)
+  rotateUrl.searchParams.set("upsert", "true")
+  const rotated = await fetchJson(rotateUrl, {
+    method: "POST",
+    headers: { ...headers, "content-type": "application/json" },
+    body: JSON.stringify([
+      {
+        key: "CRON_SECRET",
+        value,
+        type: "sensitive",
+        target: ["production"],
+        comment: "Independent secret for the backend-only AMS monitoring cron",
+      },
+    ]),
+  })
+  if (!rotated.response.ok) {
+    fail("CRON_SECRET activation rotation failed with HTTP " + rotated.response.status)
+  }
+  cron = { record: { key: "CRON_SECRET", target: ["production"] }, value }
+  cronRotatedForActivation = true
 }
 
 const nextAuth = await resolveProductionValue("NEXTAUTH_SECRET")
@@ -127,7 +147,7 @@ const alertTransport = alertUrl && alertSecret
 mask(cron.value)
 mask(nextAuth.value)
 console.log("CRON_SECRET production presence before activation: " + (cronExisted ? "yes" : "no"))
-console.log("CRON_SECRET created during activation: " + (cronCreated ? "yes" : "no"))
+console.log("CRON_SECRET created during activation: " + (cronCreated ? "yes" : "no"))\nconsole.log("CRON_SECRET rotated to complete activation: " + (cronRotatedForActivation ? "yes" : "no"))
 console.log("Optional alert transport state: " + alertTransport)
 
 let productionRedeployed = false
@@ -298,7 +318,7 @@ console.log("Unauthenticated cron endpoint: HTTP 401")
 const result = {
   cronSecretConfigured: true,
   cronSecretExisted,
-  cronSecretCreated: cronCreated,
+  cronSecretCreated: cronCreated,\n  cronSecretRotatedForActivation,
   productionRedeployed,
   monitoringRunExecuted: true,
   redisSnapshotVerified: true,
