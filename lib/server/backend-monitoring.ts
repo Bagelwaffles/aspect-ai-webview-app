@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto"
+import { createHash, createHmac, timingSafeEqual } from "node:crypto"
 
 import { Redis } from "@upstash/redis"
 import Stripe from "stripe"
@@ -548,7 +548,7 @@ async function monitorFiverr(context: MonitorContext) {
     return remaining >= 0 && remaining <= 24 * 60 * 60 * 1000
   })
   const actionable = operations.filter((operation) =>
-    ["new_order", "requirements_received", "buyer_message", "revision_request", "deadline_warning"].includes(
+    ["new_order", "requirements_received", "buyer_message", "revision_requested", "deadline_warning"].includes(
       operation.event_type,
     ),
   )
@@ -836,7 +836,7 @@ async function dispatchAlertWebhook(
     createdAt: new Date().toISOString(),
     events,
   })
-  const signature = createHash("sha256").update(`${secret}:${body}`).digest("hex")
+  const signature = createHmac("sha256", secret).update(body).digest("hex")
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
 
