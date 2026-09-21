@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto"
 import { writeFileSync } from "node:fs"
 import { execFileSync } from "node:child_process"
-import { encode } from "next-auth/jwt"
+import { decode, encode } from "next-auth/jwt"
 
 const required = [
   "VERCEL_TOKEN",
@@ -227,6 +227,7 @@ console.log(
 )
 
 const ownerEmail = owner.value.trim().toLowerCase()
+const sessionCookieName = "__Secure-next-auth.session-token"
 const ownerSession = await encode({
   token: {
     sub: "ams-monitoring-activation-acceptance",
@@ -234,18 +235,24 @@ const ownerSession = await encode({
     name: "AMS Monitoring Acceptance",
   },
   secret: nextAuth.value,
+  salt: sessionCookieName,
   maxAge: 5 * 60,
 })
 mask(ownerSession)
 
+const roundTrip = await decode({
+  token: ownerSession,
+  secret: nextAuth.value,
+  salt: sessionCookieName,
+})
+if (roundTrip?.email !== ownerEmail || !roundTrip?.sub) {
+  fail("Synthetic owner session failed local NextAuth round-trip validation.")
+}
+
 const ownerResponse = await fetch(appUrl + "/api/internal/monitoring", {
   method: "GET",
   headers: {
-    cookie:
-      "__Secure-next-auth.session-token=" +
-      ownerSession +
-      "; next-auth.session-token=" +
-      ownerSession,
+    cookie: sessionCookieName + "=" + ownerSession,
   },
   cache: "no-store",
 })
