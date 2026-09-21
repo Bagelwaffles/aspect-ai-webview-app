@@ -16,6 +16,7 @@ import {
   type SocialPublisherResult,
 } from "@/lib/server/social-publisher"
 import { getLinkedInOrganizationCutoverStatus } from "@/lib/server/linkedin-organization-cutover"
+import { getLinkedInOrganizationConnectionStatus } from "@/lib/server/linkedin-organization-connection"
 import {
   isInternalApiAuthorized,
   unauthorizedInternalApiResponse,
@@ -57,11 +58,20 @@ function campaignError(error: unknown) {
   return errorJson(503, "SOCIAL_CAMPAIGN_STORE_UNAVAILABLE", "Social campaign storage is unavailable")
 }
 
-function effectivePublisherConfiguration() {
+async function effectivePublisherConfiguration() {
   const publishers = getSocialPublisherConfiguration()
+  const [linkedinConnection] = await Promise.all([
+    getLinkedInOrganizationConnectionStatus().catch(() => ({
+      oauthConfigured: false,
+      connected: false,
+      connection: null,
+    })),
+  ])
   return {
     ...publishers,
-    linkedin: getLinkedInOrganizationCutoverStatus().configured,
+    linkedin:
+      linkedinConnection.connected ||
+      getLinkedInOrganizationCutoverStatus().configured,
   }
 }
 
@@ -76,7 +86,7 @@ export async function GET(request: NextRequest) {
       return noStoreJson({
         ok: true,
         campaign,
-        publishers: effectivePublisherConfiguration(),
+        publishers: await effectivePublisherConfiguration(),
       })
     }
 
@@ -84,7 +94,7 @@ export async function GET(request: NextRequest) {
     return noStoreJson({
       ok: true,
       campaigns,
-      publishers: effectivePublisherConfiguration(),
+      publishers: await effectivePublisherConfiguration(),
     })
   } catch {
     return errorJson(503, "SOCIAL_CAMPAIGN_STORE_UNAVAILABLE", "Social campaign storage is unavailable")
@@ -139,13 +149,20 @@ export async function POST(request: NextRequest) {
       continue
     }
 
-    if (channel === "linkedin" && !getLinkedInOrganizationCutoverStatus().configured) {
-      const result: SocialPublisherResult = {
-        channel,
-        status: "not_configured",
-        externalId: null,
-        errorCode: "LINKEDIN_ORGANIZATION_REAUTH_REQUIRED",
-      }
+    if (channel === "linkedin") {
+      const linkedinConnection = await getLinkedInOrganizationConnectionStatus().catch(() => ({
+        oauthConfigured: false,
+        connected: false,
+        connection: null,
+      }))
+      const legacyCutoverReady = getLinkedInOrganizationCutoverStatus().configured
+      if (!linkedinConnection.connected && !legacyCutoverReady) {
+        const result: SocialPublisherResult = {
+          channel,
+          status: "not_configured",
+          externalId: null,
+          errorCode: "LINKEDIN_ORGANIZATION_REAUTH_REQUIRED",
+        }
       try {
         campaign = await updateSocialCampaignDelivery({
           id: campaign.id,
@@ -157,8 +174,9 @@ export async function POST(request: NextRequest) {
       } catch {
         // Keep the external provider fail-closed even if state persistence is temporarily unavailable.
       }
-      results.push(result)
-      continue
+        results.push(result)
+        continue
+      }
     }
 
     let claimToken: string | null = null
