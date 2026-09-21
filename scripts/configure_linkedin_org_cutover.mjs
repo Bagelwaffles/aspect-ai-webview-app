@@ -15,7 +15,7 @@ const headers={authorization:"Bearer "+token}
 const desired={
   AMS_LINKEDIN_AUTHOR_URN:"urn:li:organization:145213077",
   AMS_LINKEDIN_API_VERSION:"202608",
-  AMS_LINKEDIN_CONNECTION_GENERATION:"ams-linkedin-org-2026-09",
+  AMS_LINKEDIN_CONNECTION_GENERATION:"ams-linkedin-org-pending-oauth-2026-09",
 }
 
 function isProduction(record){
@@ -44,7 +44,7 @@ async function upsert(key,value){
       value,
       type:"plain",
       target:["production"],
-      comment:"AMS LinkedIn organization-only cutover for organization 145213077",
+      comment:"AMS LinkedIn organization-only cutover; publishing stays fail-closed pending fresh OAuth",
     }]),
   })
   if(!r.ok) throw new Error(key+" upsert failed with HTTP "+r.status)
