@@ -1,0 +1,51 @@
+name: Configure AMS LinkedIn organization cutover
+
+on:
+  push:
+    branches:
+      - "ops/linkedin-organization-cutover-145213077"
+    paths:
+      - ".github/workflows/configure-linkedin-org-cutover.yml"
+      - "scripts/configure_linkedin_org_cutover.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: configure-ams-linkedin-org-cutover
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      VERCEL_ORG_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
+      VERCEL_PROJECT_ID: prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      CURRENT_PRODUCTION_DEPLOYMENT_ID: dpl_FabEoeKUTjVGzyBdh3QDJD7jvnBn
+    steps:
+      - name: Checkout exact production commit
+        uses: actions/checkout@v4
+        with:
+          ref: b70858c70b9d067d96d5d342cbd03a0fcf0efa34
+
+      - name: Restore branch-only cutover script
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api             -H "Accept: application/vnd.github.raw+json"             "/repos/${{ github.repository }}/contents/scripts/configure_linkedin_org_cutover.mjs?ref=ops/linkedin-organization-cutover-145213077"             > scripts/configure_linkedin_org_cutover.mjs
+
+      - name: Configure LinkedIn organization cutover
+        run: node scripts/configure_linkedin_org_cutover.mjs
+
+      - name: Show safe cutover result
+        if: always()
+        run: |
+          if [ -f linkedin-cutover-result.json ]; then
+            cat linkedin-cutover-result.json
+          fi
