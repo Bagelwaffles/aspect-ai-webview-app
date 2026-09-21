@@ -15,3 +15,6 @@ const keys=envs
 console.log(JSON.stringify({linkedinEnvKeys:keys},null,2))
 
 // rerun marker 2026-09-21T19:17
+
+const safeValues = Object.fromEntries(envs.filter((e)=>["AMS_LINKEDIN_AUTHOR_URN","AMS_LINKEDIN_API_VERSION","AMS_LINKEDIN_CONNECTION_GENERATION"].includes(e?.key)).map((e)=>[e.key,e.value]))
+console.log(JSON.stringify({safeLinkedInValues:safeValues},null,2))
