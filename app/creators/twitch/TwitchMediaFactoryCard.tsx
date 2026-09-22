@@ -95,6 +95,23 @@ export default function TwitchMediaFactoryCard({
     }
   }
 
+  async function openRenderedShort(jobId: string) {
+    setBusy(`preview:${jobId}`)
+    setMessage(null)
+    try {
+      const response = await fetch(`/api/internal/twitch/media/render/preview?jobId=${encodeURIComponent(jobId)}`, { cache: "no-store" })
+      const body = await response.json().catch(() => null) as { previewUrl?: string; code?: string } | null
+      if (!response.ok || !body?.previewUrl) {
+        setMessage(body?.code ?? "Rendered Short preview is unavailable.")
+        return
+      }
+      const opened = window.open(body.previewUrl, "_blank", "noopener,noreferrer")
+      if (!opened) setMessage("Your browser blocked the video tab. Allow pop-ups for AMS and try again.")
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function queueShortRender(clipId: string) {
     if (!window.confirm("Render an AMS 9:16 Short from this imported clip? This stores a rendered draft but does not publish it.")) return
     setBusy(`render:${clipId}`)
@@ -256,7 +273,22 @@ export default function TwitchMediaFactoryCard({
                   </Button>
                   {(() => {
                     const job = shortRenderer?.jobs.find((candidate) => candidate.clipId === item.clipId)
-                    return job ? <Badge variant="outline">Render: {job.status}</Badge> : null
+                    return job ? (
+                      <>
+                        <Badge variant="outline">Render: {job.status}</Badge>
+                        {job.status === "rendered" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busy === `preview:${job.jobId}`}
+                            onClick={() => void openRenderedShort(job.jobId)}
+                          >
+                            <Film className="mr-2 h-4 w-4" />
+                            {busy === `preview:${job.jobId}` ? "Opening…" : "Open rendered Short"}
+                          </Button>
+                        ) : null}
+                      </>
+                    ) : null
                   })()}
                 </div>
               </div>
