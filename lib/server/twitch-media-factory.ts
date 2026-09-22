@@ -11,6 +11,7 @@ import {
 import {
   getTwitchClipDownloadUrls,
   getTwitchPilotStatus,
+  getTwitchRecentArchive,
   refreshTwitchPostStreamSummary,
   twitchMediaScopeEnabled,
   type TwitchPilotSummary,
@@ -401,6 +402,39 @@ export async function syncTwitchDailyMediaQueue(input: {
   })
   await saveQueue(queue, redis)
   return queue
+}
+
+export async function refreshTwitchDailyMediaQueue(options: Options = {}) {
+  const redis = runtimeRedis(options)
+  if (!redis) throw new Error("TWITCH_MEDIA_STORE_UNAVAILABLE")
+
+  const status = options.getStatus
+    ? await options.getStatus()
+    : await getTwitchPilotStatus({ env: options.env, redis })
+  const connection = status.connection as {
+    broadcasterId?: string
+    login?: string
+    scopes?: string[]
+  } | null | undefined
+  if (!connection?.broadcasterId || !connection.login) {
+    throw new Error("TWITCH_CONNECTION_REQUIRED")
+  }
+
+  const archive = await getTwitchRecentArchive(24, { env: options.env, redis })
+  const vodIds = new Set(archive.vods.map((vod) => vod.id))
+  const clips = archive.clips
+    .filter((clip) => clip.videoId && vodIds.has(clip.videoId))
+    .sort((left, right) => Date.parse(right.createdAt || "0") - Date.parse(left.createdAt || "0"))
+    .slice(0, 15)
+
+  return syncTwitchDailyMediaQueue({
+    dayKey: `day-${archive.endedAt.slice(0, 10)}`,
+    broadcasterId: connection.broadcasterId,
+    broadcasterLogin: connection.login,
+    scopes: connection.scopes,
+    clips,
+    generatedAt: archive.endedAt,
+  }, { ...options, redis })
 }
 
 export async function refreshLatestTwitchMediaQueue(options: Options = {}) {
