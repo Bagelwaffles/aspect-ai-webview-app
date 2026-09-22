@@ -221,7 +221,7 @@ export default function TwitchMediaFactoryCard({
           <div>
             <CardTitle>Clip & Shorts Factory</CardTitle>
             <CardDescription>
-              Approval-first Twitch clip creation, official media import, and per-clip Shorts metadata.
+              Rolling 24-hour Twitch review across every completed stream, with video analysis, private Shorts, and publish-ready metadata.
             </CardDescription>
           </div>
           <Badge variant="outline">{authorized ? "Media authorized" : "Media scope required"}</Badge>
@@ -242,7 +242,7 @@ export default function TwitchMediaFactoryCard({
 
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" disabled={busy === "refresh"} onClick={() => void refreshQueue()}>
-            <RefreshCcw className="mr-2 h-4 w-4" />{busy === "refresh" ? "Refreshing…" : "Refresh clips"}
+            <RefreshCcw className="mr-2 h-4 w-4" />{busy === "refresh" ? "Refreshing…" : "Refresh last 24 hours"}
           </Button>
           <span>No automatic posting, messaging, moderation, or spending is enabled.</span>
         </div>
@@ -276,8 +276,7 @@ export default function TwitchMediaFactoryCard({
 
         {(mediaFactory?.items.length ?? 0) === 0 ? (
           <p>
-            No clip candidates are archived for the latest completed stream yet. After stream.offline,
-            AMS discovers Twitch clips and creates one independent Shorts package per clip.
+            No clip candidates are archived in the current 24-hour sweep yet. AMS checks every completed VOD in the window, includes existing Twitch clips, and can generate bounded candidate clips for streams that have none.
           </p>
         ) : (
           <div className="space-y-3">

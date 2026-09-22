@@ -11,9 +11,11 @@ import {
 import {
   getTwitchClipDownloadUrls,
   getTwitchPilotStatus,
+  getTwitchRecentArchive,
   refreshTwitchPostStreamSummary,
   twitchMediaScopeEnabled,
   type TwitchPilotSummary,
+  type TwitchRecentClip,
 } from "@/lib/server/twitch-pilot"
 
 export const TWITCH_MEDIA_FACTORY_VERSION = "twitch-media-factory-v1" as const
@@ -355,6 +357,84 @@ export async function syncLatestTwitchMediaQueue(options: Options = {}) {
   })
   await saveQueue(queue, redis)
   return queue
+}
+
+export async function syncTwitchDailyMediaQueue(input: {
+  dayKey: string
+  broadcasterId: string
+  broadcasterLogin: string
+  scopes?: string[]
+  clips: TwitchRecentClip[]
+  generatedAt?: string
+}, options: Options = {}) {
+  const redis = runtimeRedis(options)
+  if (!redis) throw new Error("TWITCH_MEDIA_STORE_UNAVAILABLE")
+
+  const previous = await getLatestTwitchMediaQueue({ ...options, redis })
+  const generatedAt = input.generatedAt ?? (options.now ?? (() => new Date()))().toISOString()
+  const summary: TwitchPilotSummary = {
+    broadcasterId: input.broadcasterId,
+    broadcasterLogin: input.broadcasterLogin,
+    broadcasterName: input.broadcasterLogin,
+    streamId: input.dayKey,
+    startedAt: generatedAt,
+    endedAt: generatedAt,
+    durationMinutes: 0,
+    title: "Daily Twitch archive",
+    categoryName: "Gaming",
+    vod: null,
+    markers: [],
+    clips: input.clips,
+    updateCount: 0,
+    summary: `Daily Twitch media queue containing ${input.clips.length} clip candidate${input.clips.length === 1 ? "" : "s"} across the rolling archive window.`,
+    generatedAt,
+    sourceModel: "twitch-metadata",
+  }
+
+  const queue = buildTwitchMediaQueue({
+    summary,
+    intelligence: null,
+    broadcasterId: input.broadcasterId,
+    broadcasterLogin: input.broadcasterLogin,
+    scopes: input.scopes,
+    previous: previous?.streamId === input.dayKey ? previous : null,
+    generatedAt,
+  })
+  await saveQueue(queue, redis)
+  return queue
+}
+
+export async function refreshTwitchDailyMediaQueue(options: Options = {}) {
+  const redis = runtimeRedis(options)
+  if (!redis) throw new Error("TWITCH_MEDIA_STORE_UNAVAILABLE")
+
+  const status = options.getStatus
+    ? await options.getStatus()
+    : await getTwitchPilotStatus({ env: options.env, redis })
+  const connection = status.connection as {
+    broadcasterId?: string
+    login?: string
+    scopes?: string[]
+  } | null | undefined
+  if (!connection?.broadcasterId || !connection.login) {
+    throw new Error("TWITCH_CONNECTION_REQUIRED")
+  }
+
+  const archive = await getTwitchRecentArchive(24, { env: options.env, redis })
+  const vodIds = new Set(archive.vods.map((vod) => vod.id))
+  const clips = archive.clips
+    .filter((clip) => clip.videoId && vodIds.has(clip.videoId))
+    .sort((left, right) => Date.parse(right.createdAt || "0") - Date.parse(left.createdAt || "0"))
+    .slice(0, 15)
+
+  return syncTwitchDailyMediaQueue({
+    dayKey: `day-${archive.endedAt.slice(0, 10)}`,
+    broadcasterId: connection.broadcasterId,
+    broadcasterLogin: connection.login,
+    scopes: connection.scopes,
+    clips,
+    generatedAt: archive.endedAt,
+  }, { ...options, redis })
 }
 
 export async function refreshLatestTwitchMediaQueue(options: Options = {}) {

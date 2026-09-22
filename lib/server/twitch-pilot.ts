@@ -801,6 +801,124 @@ export async function createTwitchClipFromVod(
   return { id: clip.id, editUrl: clip.edit_url ?? null }
 }
 
+
+export type TwitchRecentVod = {
+  id: string
+  streamId: string
+  title: string
+  url: string
+  createdAt: string
+  duration: string
+  durationSeconds: number
+}
+
+export type TwitchRecentClip = TwitchPilotSummary["clips"][number]
+
+export type TwitchRecentArchive = {
+  startedAt: string
+  endedAt: string
+  vods: TwitchRecentVod[]
+  clips: TwitchRecentClip[]
+}
+
+export function twitchDurationToSeconds(value: string) {
+  const text = value.trim().toLowerCase()
+  if (!text) return 0
+  const hours = Number(text.match(/(\d+)h/)?.[1] ?? 0)
+  const minutes = Number(text.match(/(\d+)m/)?.[1] ?? 0)
+  const seconds = Number(text.match(/(\d+)s/)?.[1] ?? 0)
+  return Math.max(0, hours * 3600 + minutes * 60 + seconds)
+}
+
+export async function getTwitchRecentArchive(
+  hours = 24,
+  options: TwitchOptions = {},
+): Promise<TwitchRecentArchive> {
+  const existing = await loadConnection(options)
+  if (!existing) throw new Error("TWITCH_CONNECTION_REQUIRED")
+  const boundedHours = Math.max(1, Math.min(48, Math.trunc(hours)))
+  const now = (options.now ?? (() => new Date()))()
+  const endedAt = now.toISOString()
+  const startedAt = new Date(now.getTime() - boundedHours * 60 * 60 * 1000).toISOString()
+
+  const [videosBody, clipsBody] = await Promise.all([
+    helixGet("videos", {
+      user_id: existing.record.broadcasterId,
+      type: "archive",
+      first: "100",
+    }, options),
+    helixGet("clips", {
+      broadcaster_id: existing.record.broadcasterId,
+      started_at: startedAt,
+      ended_at: endedAt,
+      first: "100",
+    }, options),
+  ])
+
+  const rawVideos = (videosBody as {
+    data?: Array<{
+      id?: string
+      stream_id?: string
+      title?: string
+      url?: string
+      created_at?: string
+      duration?: string
+    }>
+  } | null)?.data ?? []
+
+  const vods = rawVideos
+    .map((video) => {
+      const createdAt = video.created_at ?? ""
+      const duration = video.duration ?? ""
+      return {
+        id: video.id ?? "",
+        streamId: video.stream_id ?? "",
+        title: video.title ?? "",
+        url: video.url ?? (video.id ? `https://www.twitch.tv/videos/${video.id}` : ""),
+        createdAt,
+        duration,
+        durationSeconds: twitchDurationToSeconds(duration),
+      }
+    })
+    .filter((video) =>
+      Boolean(video.id) &&
+      Boolean(video.createdAt) &&
+      Date.parse(video.createdAt) >= Date.parse(startedAt),
+    )
+
+  const rawClips = (clipsBody as {
+    data?: Array<{
+      id?: string
+      title?: string
+      url?: string
+      creator_name?: string
+      view_count?: number
+      created_at?: string
+      video_id?: string
+      game_id?: string
+      thumbnail_url?: string
+      duration?: number
+      vod_offset?: number | null
+    }>
+  } | null)?.data ?? []
+
+  const clips = rawClips.map((clip) => ({
+    id: clip.id ?? "",
+    title: clip.title ?? "",
+    url: clip.url ?? "",
+    creatorName: clip.creator_name ?? "",
+    viewCount: clip.view_count ?? 0,
+    createdAt: clip.created_at ?? "",
+    videoId: clip.video_id ?? "",
+    gameId: clip.game_id ?? "",
+    thumbnailUrl: clip.thumbnail_url ?? "",
+    duration: clip.duration ?? 0,
+    vodOffset: clip.vod_offset ?? null,
+  })).filter((clip) => clip.id)
+
+  return { startedAt, endedAt, vods, clips }
+}
+
 export async function validateStoredTwitchConnection(options: TwitchOptions = {}) {
   const connection = await loadConnection(options)
   if (!connection) return { connected: false as const, connection: null }
