@@ -74,7 +74,7 @@ jobs:
             -X POST \
             -H "Authorization: Bearer $AMS_MEDIA_WORKER_KEY" \
             "$AMS_APP_URL/api/internal/twitch/media/auto" \
-            | jq '{ok, skipped, streamId, created, analyzed, queued, failureCount:(.failures | length)}'
+            | jq '{ok, skipped, windowHours, vodCount, clipCount, created, analyzed, queued, failureCount:(.failures | length)}'
 
       - name: Claim render job
         if: steps.config.outputs.ready == 'true'
