@@ -58,9 +58,27 @@ test("automatic Twitch VOD candidates avoid existing clip offsets", () => {
   assert.deepEqual(candidates.map((item) => item.id), ["m2", "m3"])
 })
 
-test("automatic Twitch VOD candidates require a VOD and valid marker offset", () => {
+test("automatic Twitch VOD candidates require a VOD", () => {
   assert.equal(selectAutomaticVodClipCandidates(summary({ vod: null })).length, 0)
-  assert.equal(selectAutomaticVodClipCandidates(summary({
-    markers: [{ id: "too-early", description: "Early", positionSeconds: 4, url: "https://twitch.tv/early" }],
-  })).length, 0)
+})
+
+test("automatic Twitch VOD candidates fall back to sampled VOD positions when clips and markers are absent", () => {
+  const candidates = selectAutomaticVodClipCandidates(summary({
+    durationMinutes: 3,
+    markers: [],
+    clips: [],
+  }))
+  assert.equal(candidates.length, 3)
+  assert.deepEqual(candidates.map((item) => item.source), ["sample", "sample", "sample"])
+  assert.deepEqual(candidates.map((item) => item.positionSeconds), [45, 90, 135])
+})
+
+test("automatic Twitch VOD sampling stays bounded for short completed streams", () => {
+  const candidates = selectAutomaticVodClipCandidates(summary({
+    durationMinutes: 1,
+    markers: [],
+    clips: [],
+  }))
+  assert.equal(candidates.length, 3)
+  assert.ok(candidates.every((item) => item.positionSeconds >= 10 && item.positionSeconds <= 55))
 })
