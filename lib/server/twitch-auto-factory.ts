@@ -13,8 +13,13 @@ import {
   enqueueTwitchShortRender,
   isTwitchShortRenderConfigured,
 } from "@/lib/server/twitch-short-render-jobs"
+import {
+  analyzeTwitchClipVideo,
+  isTwitchVideoAnalysisRenderEligible,
+} from "@/lib/server/twitch-video-analysis"
 
 export const TWITCH_AUTO_FACTORY_MAX_CLIPS = 3
+export const TWITCH_AUTO_FACTORY_MAX_ANALYSES = 5
 
 type MarkerCandidate = TwitchPilotSummary["markers"][number]
 
@@ -88,20 +93,36 @@ export async function runTwitchAutomaticPrivateShorts() {
     return null
   })
 
-  let queued = 0
-  for (const item of (queue?.items ?? []).slice(0, TWITCH_AUTO_FACTORY_MAX_CLIPS)) {
+  const analyzed: Array<{ clipId: string; score: number }> = []
+  for (const item of (queue?.items ?? []).slice(0, TWITCH_AUTO_FACTORY_MAX_ANALYSES)) {
     try {
       let current = item
       if (current.status === "discovered") {
         const imported = await importTwitchClipMedia(current.clipId)
         current = imported.item
       }
-      if (current.status !== "discovered") {
-        await enqueueTwitchShortRender(current.clipId)
-        queued += 1
-      }
+      if (current.status === "discovered") continue
+
+      const analysis = await analyzeTwitchClipVideo(current.clipId)
+      analyzed.push({ clipId: current.clipId, score: analysis.score })
     } catch (error) {
-      failures.push(`${item.clipId}:${safeError(error)}`)
+      failures.push(`${item.clipId}:analysis:${safeError(error)}`)
+    }
+  }
+
+  const ranked = [...analyzed]
+    .sort((left, right) => right.score - left.score)
+    .slice(0, TWITCH_AUTO_FACTORY_MAX_CLIPS)
+
+  let queued = 0
+  for (const candidate of ranked) {
+    try {
+      const analysis = await analyzeTwitchClipVideo(candidate.clipId)
+      if (!isTwitchVideoAnalysisRenderEligible(analysis)) continue
+      await enqueueTwitchShortRender(candidate.clipId)
+      queued += 1
+    } catch (error) {
+      failures.push(`${candidate.clipId}:render:${safeError(error)}`)
     }
   }
 
@@ -110,6 +131,7 @@ export async function runTwitchAutomaticPrivateShorts() {
     skipped: null,
     streamId: summary.streamId,
     created,
+    analyzed: analyzed.length,
     queued,
     failures,
   }

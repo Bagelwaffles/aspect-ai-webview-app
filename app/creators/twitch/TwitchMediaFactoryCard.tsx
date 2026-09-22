@@ -27,6 +27,20 @@ export type TwitchMediaFactoryStatus = {
     twitchUrl: string
     status: "discovered" | "short-ready" | "landscape-ready"
     orientation: "portrait" | "landscape" | null
+    videoAnalysis?: {
+      version: "twitch-video-analysis-v1"
+      analyzedAt: string
+      model: string
+      score: number
+      recommendation: "render" | "skip"
+      reason: string
+      observedMoments: string[]
+      bestStartSeconds: number | null
+      bestEndSeconds: number | null
+      hook: string
+      caption: string
+      evidenceBoundary: string
+    } | null
     shortDraft: {
       title: string
       hook: string
@@ -113,10 +127,30 @@ export default function TwitchMediaFactoryCard({
   }
 
   async function queueShortRender(clipId: string) {
-    if (!window.confirm("Render an AMS 9:16 Short from this imported clip? This stores a rendered draft but does not publish it.")) return
+    if (!window.confirm("Analyze the actual video first, then render it only if AMS scores it strong enough for a Short? Nothing will be published.")) return
     setBusy(`render:${clipId}`)
     setMessage(null)
     try {
+      const analysisResponse = await fetch("/api/internal/twitch/media/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clipId }),
+      })
+      const analysisBody = await analysisResponse.json().catch(() => null) as {
+        code?: string
+        renderEligible?: boolean
+        analysis?: { score?: number; reason?: string }
+      } | null
+      if (!analysisResponse.ok) {
+        setMessage(analysisBody?.code ?? "Video analysis failed.")
+        return
+      }
+      if (!analysisBody?.renderEligible) {
+        setMessage(`Video analyzed and skipped (${analysisBody?.analysis?.score ?? 0}/100). ${analysisBody?.analysis?.reason ?? "It did not meet the Short quality threshold."}`)
+        await onRefresh()
+        return
+      }
+
       const response = await fetch("/api/internal/twitch/media/render", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -124,7 +158,7 @@ export default function TwitchMediaFactoryCard({
       })
       const body = await response.json().catch(() => null) as { code?: string; job?: { status?: string } } | null
       setMessage(response.ok
-        ? `Short render queued (${body?.job?.status ?? "pending"}). It remains a private draft until you approve publishing separately.`
+        ? `Video scored ${analysisBody.analysis?.score ?? "approved"}/100. Short render queued (${body?.job?.status ?? "pending"}); it remains private until separate publishing approval.`
         : body?.code ?? "Short render queue failed.")
       if (response.ok) await onRefresh()
     } finally {
@@ -240,6 +274,21 @@ export default function TwitchMediaFactoryCard({
                     {item.status === "short-ready" ? "Short-ready" : item.status === "landscape-ready" ? "Landscape imported" : "Discovered"}
                   </Badge>
                 </div>
+                {item.videoAnalysis ? (
+                  <div className="mt-3 rounded-lg border p-3 text-xs">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">Video analysis: {item.videoAnalysis.score}/100</Badge>
+                      <Badge variant="outline">{item.videoAnalysis.recommendation === "render" ? "Selected" : "Skipped"}</Badge>
+                    </div>
+                    <div className="mt-2 text-foreground">{item.videoAnalysis.reason}</div>
+                    {item.videoAnalysis.observedMoments.length > 0 ? (
+                      <div className="mt-2">Observed: {item.videoAnalysis.observedMoments.join(" · ")}</div>
+                    ) : null}
+                    {item.videoAnalysis.bestStartSeconds !== null && item.videoAnalysis.bestEndSeconds !== null ? (
+                      <div className="mt-1">Best window: {item.videoAnalysis.bestStartSeconds.toFixed(1)}s–{item.videoAnalysis.bestEndSeconds.toFixed(1)}s</div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="mt-3 space-y-2">
                   <div><span className="font-medium text-foreground">Hook:</span> {item.shortDraft.hook}</div>
                   <div><span className="font-medium text-foreground">Caption:</span> {item.shortDraft.caption}</div>
@@ -269,7 +318,7 @@ export default function TwitchMediaFactoryCard({
                     onClick={() => void queueShortRender(item.clipId)}
                   >
                     <Film className="mr-2 h-4 w-4" />
-                    {busy === `render:${item.clipId}` ? "Queuing…" : "Render 9:16 Short"}
+                    {busy === `render:${item.clipId}` ? "Analyzing…" : item.videoAnalysis ? "Render analyzed Short" : "Analyze & render Short"}
                   </Button>
                   {(() => {
                     const job = shortRenderer?.jobs.find((candidate) => candidate.clipId === item.clipId)

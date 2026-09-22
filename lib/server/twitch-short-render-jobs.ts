@@ -36,6 +36,16 @@ export const twitchShortRenderJobSchema = z.object({
   completedAt: z.string().datetime().nullable(),
   errorCode: z.string().max(200).nullable(),
   shortDraft: shortDraftSchema,
+  videoAnalysis: z.object({
+    version: z.literal("twitch-video-analysis-v1"),
+    analyzedAt: z.string().datetime(),
+    model: z.string().min(1).max(200),
+    score: z.number().int().min(0).max(100),
+    recommendation: z.literal("render"),
+    reason: z.string().min(1).max(600),
+    bestStartSeconds: z.number().min(0).max(120).nullable(),
+    bestEndSeconds: z.number().min(0).max(120).nullable(),
+  }).optional(),
 }).strict()
 
 export type TwitchShortRenderJob = z.infer<typeof twitchShortRenderJobSchema>
@@ -169,6 +179,13 @@ export async function enqueueTwitchShortRender(
   const existing = await getTwitchShortRenderJob(id, { ...options, redis })
   if (existing && existing.status !== "failed") return existing
 
+  if (!item.videoAnalysis) {
+    throw new Error("TWITCH_VIDEO_ANALYSIS_REQUIRED")
+  }
+  if (item.videoAnalysis.recommendation !== "render" || item.videoAnalysis.score < 65) {
+    throw new Error("TWITCH_VIDEO_ANALYSIS_REJECTED")
+  }
+
   const timestamp = nowIso(options)
   const outputObjectKey = [
     "creators",
@@ -195,6 +212,16 @@ export async function enqueueTwitchShortRender(
     completedAt: null,
     errorCode: null,
     shortDraft: item.shortDraft,
+    videoAnalysis: {
+      version: item.videoAnalysis.version,
+      analyzedAt: item.videoAnalysis.analyzedAt,
+      model: item.videoAnalysis.model,
+      score: item.videoAnalysis.score,
+      recommendation: "render",
+      reason: item.videoAnalysis.reason,
+      bestStartSeconds: item.videoAnalysis.bestStartSeconds,
+      bestEndSeconds: item.videoAnalysis.bestEndSeconds,
+    },
   })
   const index = await loadIndex(redis)
   await Promise.all([

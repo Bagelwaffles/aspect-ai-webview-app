@@ -74,7 +74,7 @@ jobs:
             -X POST \
             -H "Authorization: Bearer $AMS_MEDIA_WORKER_KEY" \
             "$AMS_APP_URL/api/internal/twitch/media/auto" \
-            | jq '{ok, skipped, streamId, created, queued, failureCount:(.failures | length)}'
+            | jq '{ok, skipped, streamId, created, analyzed, queued, failureCount:(.failures | length)}'
 
       - name: Claim render job
         if: steps.config.outputs.ready == 'true'
@@ -102,7 +102,12 @@ jobs:
         run: |
           set -euo pipefail
           source_url="$(jq -r '.source.url' "$RUNNER_TEMP/claim.json")"
-          jq '.job.shortDraft | {hook, caption}' "$RUNNER_TEMP/claim.json" > "$RUNNER_TEMP/metadata.json"
+          jq '{
+            hook:.job.shortDraft.hook,
+            caption:.job.shortDraft.caption,
+            bestStartSeconds:(.job.videoAnalysis.bestStartSeconds // null),
+            bestEndSeconds:(.job.videoAnalysis.bestEndSeconds // null)
+          }' "$RUNNER_TEMP/claim.json" > "$RUNNER_TEMP/metadata.json"
           curl --fail-with-body --silent --show-error "$source_url" -o "$RUNNER_TEMP/source.mp4"
 
       - name: Render 9x16 Short
