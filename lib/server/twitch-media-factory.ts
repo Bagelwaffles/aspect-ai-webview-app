@@ -22,6 +22,24 @@ const QUEUE_KEY_PREFIX = "ams:twitch-media:v1:queue:"
 const LATEST_QUEUE_KEY = "ams:twitch-media:v1:latest"
 const QUEUE_TTL_SECONDS = 60 * 60 * 24 * 180
 
+export const twitchVideoAnalysisRecordSchema = z.object({
+  version: z.literal("twitch-video-analysis-v1"),
+  clipId: z.string().min(1).max(160),
+  analyzedAt: z.string().datetime(),
+  model: z.string().min(1).max(200),
+  score: z.number().int().min(0).max(100),
+  recommendation: z.enum(["render", "skip"]),
+  reason: z.string().min(1).max(600),
+  observedMoments: z.array(z.string().min(1).max(240)).max(6),
+  bestStartSeconds: z.number().min(0).max(120).nullable(),
+  bestEndSeconds: z.number().min(0).max(120).nullable(),
+  hook: z.string().min(1).max(180),
+  caption: z.string().min(1).max(1000),
+  evidenceBoundary: z.string().min(1).max(500),
+}).strict()
+
+export type TwitchVideoAnalysisRecord = z.infer<typeof twitchVideoAnalysisRecordSchema>
+
 const itemSchema = z.object({
   clipId: z.string().min(1).max(160),
   title: z.string().max(500),
@@ -36,6 +54,7 @@ const itemSchema = z.object({
   orientation: z.enum(["portrait", "landscape"]).nullable(),
   objectKey: z.string().max(1000).nullable(),
   importedAt: z.string().datetime().nullable(),
+  videoAnalysis: twitchVideoAnalysisRecordSchema.nullable().optional(),
   shortDraft: z.object({
     title: z.string().min(1).max(140),
     hook: z.string().min(1).max(180),
@@ -214,7 +233,14 @@ export function buildTwitchMediaQueue(input: {
         orientation: previous?.orientation ?? null,
         objectKey: previous?.objectKey ?? null,
         importedAt: previous?.importedAt ?? null,
-        shortDraft: itemDraft(index, clip, input.intelligence),
+        videoAnalysis: previous?.videoAnalysis ?? null,
+        shortDraft: previous?.videoAnalysis?.recommendation === "render"
+          ? {
+              ...itemDraft(index, clip, input.intelligence),
+              hook: previous.videoAnalysis.hook,
+              caption: previous.videoAnalysis.caption,
+            }
+          : itemDraft(index, clip, input.intelligence),
       }
     }),
   })
@@ -232,6 +258,43 @@ export async function getLatestTwitchMediaQueue(options: Options = {}) {
   const redis = runtimeRedis(options)
   if (!redis) return null
   return parseQueue(await redis.get<unknown>(LATEST_QUEUE_KEY))
+}
+
+export async function saveTwitchMediaVideoAnalysis(
+  clipId: string,
+  analysis: TwitchVideoAnalysisRecord,
+  options: Options = {},
+) {
+  const redis = runtimeRedis(options)
+  if (!redis) throw new Error("TWITCH_MEDIA_STORE_UNAVAILABLE")
+  const queue = await getLatestTwitchMediaQueue({ ...options, redis })
+  if (!queue) throw new Error("TWITCH_MEDIA_QUEUE_NOT_FOUND")
+  const existing = queue.items.find((candidate) => candidate.clipId === clipId)
+  if (!existing) throw new Error("TWITCH_MEDIA_CLIP_NOT_FOUND")
+
+  const parsedAnalysis = twitchVideoAnalysisRecordSchema.parse(analysis)
+  if (parsedAnalysis.clipId !== clipId) throw new Error("TWITCH_VIDEO_ANALYSIS_CLIP_MISMATCH")
+
+  const next = twitchMediaQueueSchema.parse({
+    ...queue,
+    generatedAt: (options.now ?? (() => new Date()))().toISOString(),
+    items: queue.items.map((candidate) => candidate.clipId === clipId
+      ? {
+          ...candidate,
+          videoAnalysis: parsedAnalysis,
+          shortDraft: parsedAnalysis.recommendation === "render"
+            ? {
+                ...candidate.shortDraft,
+                hook: parsedAnalysis.hook,
+                caption: parsedAnalysis.caption,
+              }
+            : candidate.shortDraft,
+        }
+      : candidate),
+  })
+
+  await saveQueue(next, redis)
+  return next.items.find((candidate) => candidate.clipId === clipId)!
 }
 
 export async function syncLatestTwitchMediaQueue(options: Options = {}) {
