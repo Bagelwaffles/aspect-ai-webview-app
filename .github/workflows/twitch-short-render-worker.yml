@@ -103,6 +103,17 @@ jobs:
           set -euo pipefail
           source_url="$(jq -r '.source.url' "$RUNNER_TEMP/claim.json")"
           jq '{
+            title:(.job.publishMetadata.title // .job.shortDraft.title),
+            description:(.job.publishMetadata.description // .job.shortDraft.caption),
+            tags:(.job.publishMetadata.tags // []),
+            hashtags:(.job.publishMetadata.hashtags // .job.shortDraft.hashtags),
+            keywords:(.job.publishMetadata.keywords // []),
+            categoryLabel:(.job.publishMetadata.categoryLabel // "Gaming"),
+            twitchClipTitle:(.job.publishMetadata.twitchClipTitle // .job.shortDraft.title),
+            youtube:(.job.publishMetadata.youtube // null),
+            tiktok:(.job.publishMetadata.tiktok // null),
+            instagram:(.job.publishMetadata.instagram // null),
+            x:(.job.publishMetadata.x // null),
             hook:.job.shortDraft.hook,
             caption:.job.shortDraft.caption,
             bestStartSeconds:(.job.videoAnalysis.bestStartSeconds // null),
