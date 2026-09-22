@@ -21,12 +21,17 @@ import {
 export const TWITCH_AUTO_FACTORY_MAX_CLIPS = 3
 export const TWITCH_AUTO_FACTORY_MAX_ANALYSES = 5
 
-type MarkerCandidate = TwitchPilotSummary["markers"][number]
+type AutomaticVodClipCandidate = {
+  id: string
+  description: string
+  positionSeconds: number
+  source: "marker" | "sample"
+}
 
 export function selectAutomaticVodClipCandidates(
   summary: TwitchPilotSummary,
   maxClips = TWITCH_AUTO_FACTORY_MAX_CLIPS,
-): MarkerCandidate[] {
+): AutomaticVodClipCandidate[] {
   const limit = Math.max(0, Math.min(TWITCH_AUTO_FACTORY_MAX_CLIPS, Math.trunc(maxClips)))
   if (!summary.vod?.id || limit === 0) return []
 
@@ -37,12 +42,44 @@ export function selectAutomaticVodClipCandidates(
   const remaining = Math.max(0, limit - Math.min(summary.clips.length, limit))
   if (!remaining) return []
 
-  return summary.markers
+  const markerCandidates = summary.markers
     .filter((marker) =>
       marker.positionSeconds >= 5 &&
       !existingOffsets.some((offset) => Math.abs(offset - marker.positionSeconds) <= 3),
     )
+    .map((marker) => ({
+      id: marker.id,
+      description: marker.description || "Creator marker",
+      positionSeconds: marker.positionSeconds,
+      source: "marker" as const,
+    }))
     .slice(0, remaining)
+
+  if (markerCandidates.length >= remaining) return markerCandidates
+
+  const durationSeconds = Math.max(0, Math.round(summary.durationMinutes * 60))
+  if (durationSeconds < 20) return markerCandidates
+
+  const needed = remaining - markerCandidates.length
+  const fractions = needed === 1 ? [0.5] : needed === 2 ? [1 / 3, 2 / 3] : [0.25, 0.5, 0.75]
+  const sampled = fractions
+    .map((fraction, index) => {
+      const positionSeconds = Math.max(10, Math.min(durationSeconds - 5, Math.round(durationSeconds * fraction)))
+      return {
+        id: `sample-${index + 1}-${positionSeconds}`,
+        description: `${summary.categoryName || "Gaming"} sampled moment ${index + 1}`,
+        positionSeconds,
+        source: "sample" as const,
+      }
+    })
+    .filter((candidate, index, all) =>
+      all.findIndex((item) => item.positionSeconds === candidate.positionSeconds) === index &&
+      !existingOffsets.some((offset) => Math.abs(offset - candidate.positionSeconds) <= 5) &&
+      !markerCandidates.some((marker) => Math.abs(marker.positionSeconds - candidate.positionSeconds) <= 5),
+    )
+    .slice(0, needed)
+
+  return [...markerCandidates, ...sampled]
 }
 
 function safeError(error: unknown) {
@@ -70,13 +107,13 @@ export async function runTwitchAutomaticPrivateShorts() {
   const candidates = selectAutomaticVodClipCandidates(summary)
 
   for (let index = 0; index < candidates.length; index += 1) {
-    const marker = candidates[index]
-    const duration = Math.min(30, Math.max(5, marker.positionSeconds))
-    const title = (marker.description || `${summary.categoryName || "Gaming"} highlight ${index + 1}`).slice(0, 100)
+    const candidate = candidates[index]
+    const duration = Math.min(30, Math.max(15, Math.round(Math.min(30, summary.durationMinutes * 60 / 6))))
+    const title = (candidate.description || `${summary.categoryName || "Gaming"} candidate ${index + 1}`).slice(0, 100)
     try {
       await createTwitchClipFromVod({
         vodId: summary.vod.id,
-        vodOffset: marker.positionSeconds,
+        vodOffset: candidate.positionSeconds,
         duration,
         title,
       })
