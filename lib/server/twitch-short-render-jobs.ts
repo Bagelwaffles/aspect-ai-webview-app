@@ -37,7 +37,7 @@ export const twitchShortRenderJobSchema = z.object({
   errorCode: z.string().max(200).nullable(),
   shortDraft: shortDraftSchema,
   videoAnalysis: z.object({
-    version: z.literal("twitch-video-analysis-v1"),
+    version: z.enum(["twitch-video-analysis-v1", "twitch-video-analysis-v2"]),
     analyzedAt: z.string().datetime(),
     model: z.string().min(1).max(200),
     score: z.number().int().min(0).max(100),
@@ -46,6 +46,32 @@ export const twitchShortRenderJobSchema = z.object({
     bestStartSeconds: z.number().min(0).max(120).nullable(),
     bestEndSeconds: z.number().min(0).max(120).nullable(),
   }).optional(),
+  publishMetadata: z.object({
+    title: z.string().min(1).max(140),
+    description: z.string().min(1).max(5000),
+    tags: z.array(z.string().min(1).max(80)).min(3).max(20),
+    hashtags: z.array(z.string().min(1).max(80)).min(3).max(12),
+    keywords: z.array(z.string().min(1).max(80)).min(3).max(15),
+    categoryLabel: z.string().min(1).max(120),
+    twitchClipTitle: z.string().min(1).max(100),
+    youtube: z.object({
+      title: z.string().min(1).max(100),
+      description: z.string().min(1).max(5000),
+      tags: z.array(z.string().min(1).max(80)).min(3).max(20),
+      hashtags: z.array(z.string().min(1).max(80)).min(3).max(12),
+    }).strict(),
+    tiktok: z.object({
+      caption: z.string().min(1).max(2200),
+      hashtags: z.array(z.string().min(1).max(80)).min(3).max(12),
+    }).strict(),
+    instagram: z.object({
+      caption: z.string().min(1).max(2200),
+      hashtags: z.array(z.string().min(1).max(80)).min(3).max(12),
+    }).strict(),
+    x: z.object({
+      post: z.string().min(1).max(280),
+    }).strict(),
+  }).strict().optional(),
 }).strict()
 
 export type TwitchShortRenderJob = z.infer<typeof twitchShortRenderJobSchema>
@@ -185,6 +211,9 @@ export async function enqueueTwitchShortRender(
   if (item.videoAnalysis.recommendation !== "render" || item.videoAnalysis.score < 65) {
     throw new Error("TWITCH_VIDEO_ANALYSIS_REJECTED")
   }
+  if (!item.videoAnalysis.publishMetadata) {
+    throw new Error("TWITCH_VIDEO_METADATA_REQUIRED")
+  }
 
   const timestamp = nowIso(options)
   const outputObjectKey = [
@@ -222,6 +251,7 @@ export async function enqueueTwitchShortRender(
       bestStartSeconds: item.videoAnalysis.bestStartSeconds,
       bestEndSeconds: item.videoAnalysis.bestEndSeconds,
     },
+    publishMetadata: item.videoAnalysis.publishMetadata,
   })
   const index = await loadIndex(redis)
   await Promise.all([

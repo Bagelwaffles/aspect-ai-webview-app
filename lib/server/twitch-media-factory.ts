@@ -23,7 +23,7 @@ const LATEST_QUEUE_KEY = "ams:twitch-media:v1:latest"
 const QUEUE_TTL_SECONDS = 60 * 60 * 24 * 180
 
 export const twitchVideoAnalysisRecordSchema = z.object({
-  version: z.literal("twitch-video-analysis-v1"),
+  version: z.enum(["twitch-video-analysis-v1", "twitch-video-analysis-v2"]),
   clipId: z.string().min(1).max(160),
   analyzedAt: z.string().datetime(),
   model: z.string().min(1).max(200),
@@ -35,6 +35,32 @@ export const twitchVideoAnalysisRecordSchema = z.object({
   bestEndSeconds: z.number().min(0).max(120).nullable(),
   hook: z.string().min(1).max(180),
   caption: z.string().min(1).max(1000),
+  publishMetadata: z.object({
+    title: z.string().min(1).max(140),
+    description: z.string().min(1).max(5000),
+    tags: z.array(z.string().min(1).max(80)).min(3).max(20),
+    hashtags: z.array(z.string().min(1).max(80)).min(3).max(12),
+    keywords: z.array(z.string().min(1).max(80)).min(3).max(15),
+    categoryLabel: z.string().min(1).max(120),
+    twitchClipTitle: z.string().min(1).max(100),
+    youtube: z.object({
+      title: z.string().min(1).max(100),
+      description: z.string().min(1).max(5000),
+      tags: z.array(z.string().min(1).max(80)).min(3).max(20),
+      hashtags: z.array(z.string().min(1).max(80)).min(3).max(12),
+    }).strict(),
+    tiktok: z.object({
+      caption: z.string().min(1).max(2200),
+      hashtags: z.array(z.string().min(1).max(80)).min(3).max(12),
+    }).strict(),
+    instagram: z.object({
+      caption: z.string().min(1).max(2200),
+      hashtags: z.array(z.string().min(1).max(80)).min(3).max(12),
+    }).strict(),
+    x: z.object({
+      post: z.string().min(1).max(280),
+    }).strict(),
+  }).strict().optional(),
   evidenceBoundary: z.string().min(1).max(500),
 }).strict()
 
@@ -234,11 +260,13 @@ export function buildTwitchMediaQueue(input: {
         objectKey: previous?.objectKey ?? null,
         importedAt: previous?.importedAt ?? null,
         videoAnalysis: previous?.videoAnalysis ?? null,
-        shortDraft: previous?.videoAnalysis?.recommendation === "render"
+        shortDraft: previous?.videoAnalysis?.recommendation === "render" && previous.videoAnalysis.publishMetadata
           ? {
               ...itemDraft(index, clip, input.intelligence),
+              title: previous.videoAnalysis.publishMetadata.title,
               hook: previous.videoAnalysis.hook,
               caption: previous.videoAnalysis.caption,
+              hashtags: previous.videoAnalysis.publishMetadata.hashtags,
             }
           : itemDraft(index, clip, input.intelligence),
       }
@@ -282,11 +310,13 @@ export async function saveTwitchMediaVideoAnalysis(
       ? {
           ...candidate,
           videoAnalysis: parsedAnalysis,
-          shortDraft: parsedAnalysis.recommendation === "render"
+          shortDraft: parsedAnalysis.recommendation === "render" && parsedAnalysis.publishMetadata
             ? {
                 ...candidate.shortDraft,
+                title: parsedAnalysis.publishMetadata.title,
                 hook: parsedAnalysis.hook,
                 caption: parsedAnalysis.caption,
+                hashtags: parsedAnalysis.publishMetadata.hashtags,
               }
             : candidate.shortDraft,
         }

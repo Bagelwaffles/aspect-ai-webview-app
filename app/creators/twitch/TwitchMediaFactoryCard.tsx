@@ -28,7 +28,7 @@ export type TwitchMediaFactoryStatus = {
     status: "discovered" | "short-ready" | "landscape-ready"
     orientation: "portrait" | "landscape" | null
     videoAnalysis?: {
-      version: "twitch-video-analysis-v1"
+      version: "twitch-video-analysis-v1" | "twitch-video-analysis-v2"
       analyzedAt: string
       model: string
       score: number
@@ -39,6 +39,24 @@ export type TwitchMediaFactoryStatus = {
       bestEndSeconds: number | null
       hook: string
       caption: string
+      publishMetadata?: {
+        title: string
+        description: string
+        tags: string[]
+        hashtags: string[]
+        keywords: string[]
+        categoryLabel: string
+        twitchClipTitle: string
+        youtube: {
+          title: string
+          description: string
+          tags: string[]
+          hashtags: string[]
+        }
+        tiktok: { caption: string; hashtags: string[] }
+        instagram: { caption: string; hashtags: string[] }
+        x: { post: string }
+      }
       evidenceBoundary: string
     } | null
     shortDraft: {
@@ -287,6 +305,22 @@ export default function TwitchMediaFactoryCard({
                     {item.videoAnalysis.bestStartSeconds !== null && item.videoAnalysis.bestEndSeconds !== null ? (
                       <div className="mt-1">Best window: {item.videoAnalysis.bestStartSeconds.toFixed(1)}s–{item.videoAnalysis.bestEndSeconds.toFixed(1)}s</div>
                     ) : null}
+                    {item.videoAnalysis.publishMetadata ? (
+                      <div className="mt-3 space-y-2 rounded-lg border p-3">
+                        <div className="font-semibold text-foreground">Publish metadata</div>
+                        <div><span className="font-medium text-foreground">Title:</span> {item.videoAnalysis.publishMetadata.title}</div>
+                        <div><span className="font-medium text-foreground">Description:</span> {item.videoAnalysis.publishMetadata.description}</div>
+                        <div><span className="font-medium text-foreground">Category:</span> {item.videoAnalysis.publishMetadata.categoryLabel}</div>
+                        <div><span className="font-medium text-foreground">Tags:</span> {item.videoAnalysis.publishMetadata.tags.join(", ")}</div>
+                        <div><span className="font-medium text-foreground">Hashtags:</span> {item.videoAnalysis.publishMetadata.hashtags.join(" ")}</div>
+                        <div><span className="font-medium text-foreground">YouTube title:</span> {item.videoAnalysis.publishMetadata.youtube.title}</div>
+                        <div><span className="font-medium text-foreground">TikTok:</span> {item.videoAnalysis.publishMetadata.tiktok.caption}</div>
+                        <div><span className="font-medium text-foreground">Instagram:</span> {item.videoAnalysis.publishMetadata.instagram.caption}</div>
+                        <div><span className="font-medium text-foreground">X:</span> {item.videoAnalysis.publishMetadata.x.post}</div>
+                      </div>
+                    ) : (
+                      <div className="mt-2">Legacy analysis detected. Re-analyze this clip to generate the complete title and publish metadata package.</div>
+                    )}
                   </div>
                 ) : null}
                 <div className="mt-3 space-y-2">
