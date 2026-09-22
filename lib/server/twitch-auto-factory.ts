@@ -20,7 +20,7 @@ import {
   isTwitchVideoAnalysisRenderEligible,
 } from "@/lib/server/twitch-video-analysis"
 
-export const TWITCH_AUTO_FACTORY_MAX_CLIPS_PER_VOD_PER_VOD = 3
+export const TWITCH_AUTO_FACTORY_MAX_CLIPS_PER_VOD = 3
 export const TWITCH_AUTO_FACTORY_MAX_DAY_CLIPS = 15
 export const TWITCH_AUTO_FACTORY_MAX_ANALYSES = 15
 export const TWITCH_AUTO_FACTORY_MAX_RENDERS = 6
