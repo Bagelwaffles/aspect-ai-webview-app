@@ -13,7 +13,7 @@ function json(body: Record<string, unknown>, status = 200) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!authorizeMediaWorker(request.headers.get("authorization"))) {
+  if (!(await authorizeMediaWorker(request.headers.get("authorization")))) {
     return json({ ok: false, code: "MEDIA_WORKER_UNAUTHORIZED" }, 401)
   }
 
