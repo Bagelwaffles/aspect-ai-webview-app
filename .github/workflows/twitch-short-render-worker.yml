@@ -65,6 +65,17 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
 
+      - name: Reconcile automatic private Shorts
+        if: steps.config.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $AMS_MEDIA_WORKER_KEY" \
+            "$AMS_APP_URL/api/internal/twitch/media/auto" \
+            | jq '{ok, skipped, streamId, created, queued, failureCount:(.failures | length)}'
+
       - name: Claim render job
         if: steps.config.outputs.ready == 'true'
         id: claim
