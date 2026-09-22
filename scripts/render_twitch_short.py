@@ -49,6 +49,17 @@ def main() -> int:
     metadata = json.loads(Path(args.metadata).read_text(encoding="utf-8"))
     hook = str(metadata.get("hook") or "Gaming highlight")
     caption = str(metadata.get("caption") or "")
+    start = metadata.get("bestStartSeconds")
+    end = metadata.get("bestEndSeconds")
+    try:
+        start = max(0.0, float(start)) if start is not None else None
+        end = max(0.0, float(end)) if end is not None else None
+    except (TypeError, ValueError):
+        start = None
+        end = None
+    if start is not None and end is not None and end - start < 3:
+        start = None
+        end = None
 
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -67,8 +78,10 @@ def main() -> int:
             f"ass={ass.as_posix()}:fontsdir=/usr/share/fonts/truetype/dejavu,"
             "format=yuv420p[v]"
         )
-        run([
-            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        input_args = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
+        if start is not None and end is not None:
+            input_args.extend(["-ss", f"{start:.3f}", "-to", f"{end:.3f}"])
+        input_args.extend([
             "-i", args.input,
             "-filter_complex", vf,
             "-map", "[v]", "-map", "0:a?",
@@ -78,6 +91,7 @@ def main() -> int:
             "-shortest",
             str(output),
         ])
+        run(input_args)
     return 0
 
 if __name__ == "__main__":
