@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
       code === "TWITCH_SHORT_RENDER_NOT_CONFIGURED" ||
       code === "TWITCH_MEDIA_IMPORT_REQUIRED" ||
       code === "TWITCH_VIDEO_ANALYSIS_REQUIRED" ||
-      code === "TWITCH_VIDEO_ANALYSIS_REJECTED" ? 409 :
+      code === "TWITCH_VIDEO_ANALYSIS_REJECTED" ||
+      code === "TWITCH_VIDEO_METADATA_REQUIRED" ? 409 :
       code === "TWITCH_MEDIA_QUEUE_NOT_FOUND" || code === "TWITCH_MEDIA_CLIP_NOT_FOUND" ? 404 : 503
     return json({ ok: false, code }, status)
   }
