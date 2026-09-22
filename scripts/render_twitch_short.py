@@ -49,6 +49,12 @@ def main() -> int:
     metadata = json.loads(Path(args.metadata).read_text(encoding="utf-8"))
     hook = str(metadata.get("hook") or "Gaming highlight")
     caption = str(metadata.get("caption") or "")
+    title = str(metadata.get("title") or "Gaming highlight")[:140]
+    description = str(metadata.get("description") or caption)[:5000]
+    tags = metadata.get("tags") or []
+    hashtags = metadata.get("hashtags") or []
+    keywords = metadata.get("keywords") or []
+    keyword_string = ", ".join(str(value)[:80] for value in [*tags, *hashtags, *keywords][:40])
     start = metadata.get("bestStartSeconds")
     end = metadata.get("bestEndSeconds")
     try:
@@ -87,6 +93,10 @@ def main() -> int:
             "-map", "[v]", "-map", "0:a?",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
             "-c:a", "aac", "-b:a", "160k",
+            "-metadata", f"title={title}",
+            "-metadata", f"description={description}",
+            "-metadata", f"comment={description}",
+            "-metadata", f"keywords={keyword_string}",
             "-movflags", "+faststart",
             "-shortest",
             str(output),
