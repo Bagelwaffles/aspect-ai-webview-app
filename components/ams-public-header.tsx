@@ -15,7 +15,10 @@ export function AmsPublicHeader() {
           <Link href="/quick-marketing-audit">Marketing Audit</Link>
           <Link href="/contact">Contact</Link>
         </nav>
-        <Link href="/login?next=/dashboard" className="ams-public-signin">Sign in</Link>
+        <div className="ams-public-header__actions">
+          <Link href="/login?next=/dashboard" className="ams-public-signin">Sign in</Link>
+          <Link href="/pricing#plans" className="ams-public-start">Get started</Link>
+        </div>
       </div>
     </header>
   )
