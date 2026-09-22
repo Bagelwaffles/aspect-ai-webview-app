@@ -14,6 +14,7 @@ import {
   refreshTwitchPostStreamSummary,
   twitchMediaScopeEnabled,
   type TwitchPilotSummary,
+  type TwitchRecentClip,
 } from "@/lib/server/twitch-pilot"
 
 export const TWITCH_MEDIA_FACTORY_VERSION = "twitch-media-factory-v1" as const
@@ -352,6 +353,51 @@ export async function syncLatestTwitchMediaQueue(options: Options = {}) {
     scopes: (status.connection as { scopes?: string[] } | null | undefined)?.scopes,
     previous: previous?.streamId === summary.streamId ? previous : null,
     generatedAt: (options.now ?? (() => new Date()))().toISOString(),
+  })
+  await saveQueue(queue, redis)
+  return queue
+}
+
+export async function syncTwitchDailyMediaQueue(input: {
+  dayKey: string
+  broadcasterId: string
+  broadcasterLogin: string
+  scopes?: string[]
+  clips: TwitchRecentClip[]
+  generatedAt?: string
+}, options: Options = {}) {
+  const redis = runtimeRedis(options)
+  if (!redis) throw new Error("TWITCH_MEDIA_STORE_UNAVAILABLE")
+
+  const previous = await getLatestTwitchMediaQueue({ ...options, redis })
+  const generatedAt = input.generatedAt ?? (options.now ?? (() => new Date()))().toISOString()
+  const summary: TwitchPilotSummary = {
+    broadcasterId: input.broadcasterId,
+    broadcasterLogin: input.broadcasterLogin,
+    broadcasterName: input.broadcasterLogin,
+    streamId: input.dayKey,
+    startedAt: generatedAt,
+    endedAt: generatedAt,
+    durationMinutes: 0,
+    title: "Daily Twitch archive",
+    categoryName: "Gaming",
+    vod: null,
+    markers: [],
+    clips: input.clips,
+    updateCount: 0,
+    summary: `Daily Twitch media queue containing ${input.clips.length} clip candidate${input.clips.length === 1 ? "" : "s"} across the rolling archive window.`,
+    generatedAt,
+    sourceModel: "twitch-metadata",
+  }
+
+  const queue = buildTwitchMediaQueue({
+    summary,
+    intelligence: null,
+    broadcasterId: input.broadcasterId,
+    broadcasterLogin: input.broadcasterLogin,
+    scopes: input.scopes,
+    previous: previous?.streamId === input.dayKey ? previous : null,
+    generatedAt,
   })
   await saveQueue(queue, redis)
   return queue
