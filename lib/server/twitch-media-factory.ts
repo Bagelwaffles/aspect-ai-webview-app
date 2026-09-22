@@ -35,6 +35,32 @@ export const twitchVideoAnalysisRecordSchema = z.object({
   bestEndSeconds: z.number().min(0).max(120).nullable(),
   hook: z.string().min(1).max(180),
   caption: z.string().min(1).max(1000),
+  publishMetadata: z.object({
+    title: z.string().min(1).max(140),
+    description: z.string().min(1).max(5000),
+    tags: z.array(z.string().min(1).max(80)).min(3).max(20),
+    hashtags: z.array(z.string().min(1).max(80)).min(3).max(12),
+    keywords: z.array(z.string().min(1).max(80)).min(3).max(15),
+    categoryLabel: z.string().min(1).max(120),
+    twitchClipTitle: z.string().min(1).max(100),
+    youtube: z.object({
+      title: z.string().min(1).max(100),
+      description: z.string().min(1).max(5000),
+      tags: z.array(z.string().min(1).max(80)).min(3).max(20),
+      hashtags: z.array(z.string().min(1).max(80)).min(3).max(12),
+    }).strict(),
+    tiktok: z.object({
+      caption: z.string().min(1).max(2200),
+      hashtags: z.array(z.string().min(1).max(80)).min(3).max(12),
+    }).strict(),
+    instagram: z.object({
+      caption: z.string().min(1).max(2200),
+      hashtags: z.array(z.string().min(1).max(80)).min(3).max(12),
+    }).strict(),
+    x: z.object({
+      post: z.string().min(1).max(280),
+    }).strict(),
+  }).strict(),
   evidenceBoundary: z.string().min(1).max(500),
 }).strict()
 
@@ -237,8 +263,10 @@ export function buildTwitchMediaQueue(input: {
         shortDraft: previous?.videoAnalysis?.recommendation === "render"
           ? {
               ...itemDraft(index, clip, input.intelligence),
+              title: previous.videoAnalysis.publishMetadata.title,
               hook: previous.videoAnalysis.hook,
               caption: previous.videoAnalysis.caption,
+              hashtags: previous.videoAnalysis.publishMetadata.hashtags,
             }
           : itemDraft(index, clip, input.intelligence),
       }
@@ -285,8 +313,10 @@ export async function saveTwitchMediaVideoAnalysis(
           shortDraft: parsedAnalysis.recommendation === "render"
             ? {
                 ...candidate.shortDraft,
+                title: parsedAnalysis.publishMetadata.title,
                 hook: parsedAnalysis.hook,
                 caption: parsedAnalysis.caption,
+                hashtags: parsedAnalysis.publishMetadata.hashtags,
               }
             : candidate.shortDraft,
         }
