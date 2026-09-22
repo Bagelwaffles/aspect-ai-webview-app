@@ -10,7 +10,7 @@ import {
 } from "@/lib/server/twitch-media-factory"
 import { presignR2Object } from "@/lib/server/r2-presign"
 
-export const TWITCH_VIDEO_ANALYSIS_VERSION = "twitch-video-analysis-v1" as const
+export const TWITCH_VIDEO_ANALYSIS_VERSION = "twitch-video-analysis-v2" as const
 export const DEFAULT_TWITCH_VIDEO_ANALYSIS_MODEL = "google/gemini-2.5-flash" as const
 export const TWITCH_VIDEO_RENDER_SCORE_MIN = 65
 
