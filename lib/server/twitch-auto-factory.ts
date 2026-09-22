@@ -98,8 +98,10 @@ export function selectDailyVodSampleCandidates(
   const remaining = Math.max(0, limit - Math.min(existing.length, limit))
   if (!remaining) return []
 
-  const fractions = remaining === 1 ? [0.5] : remaining === 2 ? [1 / 3, 2 / 3] : [0.25, 0.5, 0.75]
-  return fractions.map((fraction, index) => {
+  const preferred = remaining === 1 ? [0.5] : remaining === 2 ? [1 / 3, 2 / 3] : [0.25, 0.5, 0.75]
+  const fallbackFractions = [...preferred, 0.2, 0.4, 0.6, 0.8, 0.125, 0.875]
+
+  return fallbackFractions.map((fraction, index) => {
     const offset = Math.max(10, Math.min(vod.durationSeconds - 5, Math.round(vod.durationSeconds * fraction)))
     return {
       id: `vod-${vod.id}-sample-${index + 1}-${offset}`,
@@ -110,7 +112,7 @@ export function selectDailyVodSampleCandidates(
   }).filter((candidate, index, all) =>
     all.findIndex((item) => item.positionSeconds === candidate.positionSeconds) === index &&
     !existing.some((clip) => typeof clip.vodOffset === "number" && Math.abs(clip.vodOffset - candidate.positionSeconds) <= 5),
-  )
+  ).slice(0, remaining)
 }
 
 function dailyQueueKey(now = new Date()) {
