@@ -234,13 +234,13 @@ async function verifyGitHubActionsWorkerToken(token: string, fetcher: typeof fet
   )
   if (!jwk) return false
 
-  const key = createPublicKey({ key: jwk, format: "jwk" })
-  return verifySignature(
-    "RSA-SHA256",
-    Buffer.from(`${parts[0]}.${parts[1]}`, "utf8"),
-    key,
-    Buffer.from(parts[2], "base64url"),
-  )
+  const key = createPublicKey({
+    key: jwk as unknown as Record<string, string>,
+    format: "jwk",
+  })
+  const signingInput = new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
+  const signature = Uint8Array.from(Buffer.from(parts[2], "base64url"))
+  return verifySignature("RSA-SHA256", signingInput, key, signature)
 }
 
 export async function authorizeMediaWorker(
