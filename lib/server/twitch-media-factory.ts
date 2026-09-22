@@ -23,7 +23,7 @@ const LATEST_QUEUE_KEY = "ams:twitch-media:v1:latest"
 const QUEUE_TTL_SECONDS = 60 * 60 * 24 * 180
 
 export const twitchVideoAnalysisRecordSchema = z.object({
-  version: z.literal("twitch-video-analysis-v1"),
+  version: z.enum(["twitch-video-analysis-v1", "twitch-video-analysis-v2"]),
   clipId: z.string().min(1).max(160),
   analyzedAt: z.string().datetime(),
   model: z.string().min(1).max(200),
@@ -60,7 +60,7 @@ export const twitchVideoAnalysisRecordSchema = z.object({
     x: z.object({
       post: z.string().min(1).max(280),
     }).strict(),
-  }).strict(),
+  }).strict().optional(),
   evidenceBoundary: z.string().min(1).max(500),
 }).strict()
 
@@ -260,7 +260,7 @@ export function buildTwitchMediaQueue(input: {
         objectKey: previous?.objectKey ?? null,
         importedAt: previous?.importedAt ?? null,
         videoAnalysis: previous?.videoAnalysis ?? null,
-        shortDraft: previous?.videoAnalysis?.recommendation === "render"
+        shortDraft: previous?.videoAnalysis?.recommendation === "render" && previous.videoAnalysis.publishMetadata
           ? {
               ...itemDraft(index, clip, input.intelligence),
               title: previous.videoAnalysis.publishMetadata.title,
@@ -310,7 +310,7 @@ export async function saveTwitchMediaVideoAnalysis(
       ? {
           ...candidate,
           videoAnalysis: parsedAnalysis,
-          shortDraft: parsedAnalysis.recommendation === "render"
+          shortDraft: parsedAnalysis.recommendation === "render" && parsedAnalysis.publishMetadata
             ? {
                 ...candidate.shortDraft,
                 title: parsedAnalysis.publishMetadata.title,
