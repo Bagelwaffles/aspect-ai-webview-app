@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto"
+import { createHash, createPublicKey, timingSafeEqual, verify as verifySignature } from "node:crypto"
 
 import { Redis } from "@upstash/redis"
 import { z } from "zod"
@@ -126,16 +126,144 @@ export function isTwitchShortRenderConfigured(env: NodeJS.ProcessEnv = process.e
   return renderEnabled(env) && Boolean(workerSecret(env)) && Boolean(resolveRedis(env)) && isR2AssetStorageConfigured(env)
 }
 
-export function authorizeMediaWorker(
+const GITHUB_ACTIONS_OIDC_ISSUER = "https://token.actions.githubusercontent.com"
+const GITHUB_ACTIONS_OIDC_JWKS = "https://token.actions.githubusercontent.com/.well-known/jwks"
+const GITHUB_ACTIONS_WORKER_AUDIENCE = "ams-twitch-worker"
+const GITHUB_ACTIONS_WORKER_REPOSITORY = "Bagelwaffles/aspect-ai-webview-app"
+const GITHUB_ACTIONS_WORKER_REPOSITORY_ID = "1026496028"
+const GITHUB_ACTIONS_WORKER_WORKFLOW = "Twitch Short Render Worker"
+const GITHUB_ACTIONS_WORKER_WORKFLOW_REF =
+  "Bagelwaffles/aspect-ai-webview-app/.github/workflows/twitch-short-render-worker.yml@refs/heads/main"
+
+type GitHubActionsWorkerClaims = {
+  iss?: unknown
+  aud?: unknown
+  sub?: unknown
+  exp?: unknown
+  nbf?: unknown
+  iat?: unknown
+  repository?: unknown
+  repository_id?: unknown
+  ref?: unknown
+  workflow?: unknown
+  workflow_ref?: unknown
+  event_name?: unknown
+  environment?: unknown
+  runner_environment?: unknown
+}
+
+type JsonWebKeySet = {
+  keys?: Array<JsonWebKey & { kid?: string; alg?: string }>
+}
+
+let cachedGitHubJwks: { expiresAt: number; value: JsonWebKeySet } | null = null
+
+function audienceIncludes(value: unknown, expected: string) {
+  if (typeof value === "string") return value === expected
+  return Array.isArray(value) && value.some((item) => item === expected)
+}
+
+export function validateGitHubActionsWorkerClaims(
+  claims: GitHubActionsWorkerClaims,
+  nowMs = Date.now(),
+) {
+  const now = Math.floor(nowMs / 1000)
+  const exp = typeof claims.exp === "number" ? claims.exp : 0
+  const nbf = typeof claims.nbf === "number" ? claims.nbf : 0
+  const iat = typeof claims.iat === "number" ? claims.iat : 0
+
+  if (claims.iss !== GITHUB_ACTIONS_OIDC_ISSUER) return false
+  if (!audienceIncludes(claims.aud, GITHUB_ACTIONS_WORKER_AUDIENCE)) return false
+  if (claims.sub !== `repo:${GITHUB_ACTIONS_WORKER_REPOSITORY}:environment:production`) return false
+  if (claims.repository !== GITHUB_ACTIONS_WORKER_REPOSITORY) return false
+  if (claims.repository_id !== GITHUB_ACTIONS_WORKER_REPOSITORY_ID) return false
+  if (claims.ref !== "refs/heads/main") return false
+  if (claims.workflow !== GITHUB_ACTIONS_WORKER_WORKFLOW) return false
+  if (claims.workflow_ref !== GITHUB_ACTIONS_WORKER_WORKFLOW_REF) return false
+  if (!["schedule", "workflow_dispatch", "push"].includes(String(claims.event_name ?? ""))) return false
+  if (claims.environment !== "production") return false
+  if (claims.runner_environment !== undefined && claims.runner_environment !== "github-hosted") return false
+  if (!exp || exp < now - 30) return false
+  if (nbf && nbf > now + 30) return false
+  if (!iat || iat > now + 30 || iat < now - 15 * 60) return false
+  return true
+}
+
+function decodeJwtJson<T>(part: string): T | null {
+  try {
+    return JSON.parse(Buffer.from(part, "base64url").toString("utf8")) as T
+  } catch {
+    return null
+  }
+}
+
+async function githubActionsJwks(fetcher: typeof fetch) {
+  const now = Date.now()
+  if (cachedGitHubJwks && cachedGitHubJwks.expiresAt > now) return cachedGitHubJwks.value
+
+  const response = await fetcher(GITHUB_ACTIONS_OIDC_JWKS, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(5_000),
+  })
+  if (!response.ok) throw new Error("MEDIA_WORKER_OIDC_JWKS_UNAVAILABLE")
+  const parsed = await response.json() as JsonWebKeySet
+  if (!Array.isArray(parsed.keys) || !parsed.keys.length) {
+    throw new Error("MEDIA_WORKER_OIDC_JWKS_INVALID")
+  }
+  cachedGitHubJwks = { value: parsed, expiresAt: now + 5 * 60 * 1000 }
+  return parsed
+}
+
+async function verifyGitHubActionsWorkerToken(token: string, fetcher: typeof fetch) {
+  if (!token || token.length > 20_000) return false
+  const parts = token.split(".")
+  if (parts.length !== 3) return false
+
+  const header = decodeJwtJson<{ alg?: unknown; kid?: unknown; typ?: unknown }>(parts[0])
+  const claims = decodeJwtJson<GitHubActionsWorkerClaims>(parts[1])
+  if (!header || !claims) return false
+  if (header.alg !== "RS256" || typeof header.kid !== "string") return false
+  if (header.typ !== undefined && header.typ !== "JWT") return false
+  if (!validateGitHubActionsWorkerClaims(claims)) return false
+
+  const jwks = await githubActionsJwks(fetcher)
+  const jwk = jwks.keys?.find((candidate) =>
+    candidate.kid === header.kid &&
+    candidate.kty === "RSA" &&
+    (candidate.alg === undefined || candidate.alg === "RS256"),
+  )
+  if (!jwk) return false
+
+  const key = createPublicKey({
+    key: jwk as unknown as Record<string, string>,
+    format: "jwk",
+  })
+  const signingInput = new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
+  const signature = Uint8Array.from(Buffer.from(parts[2], "base64url"))
+  return verifySignature("RSA-SHA256", signingInput, key, signature)
+}
+
+export async function authorizeMediaWorker(
   authorization: string | null,
   env: NodeJS.ProcessEnv = process.env,
+  fetcher: typeof fetch = fetch,
 ) {
-  const secret = workerSecret(env)
-  if (!secret || !authorization?.startsWith("Bearer ")) return false
+  if (!authorization?.startsWith("Bearer ")) return false
   const supplied = authorization.slice("Bearer ".length).trim()
-  const left = Uint8Array.from(createHash("sha256").update(supplied).digest())
-  const right = Uint8Array.from(createHash("sha256").update(secret).digest())
-  return timingSafeEqual(left, right)
+  if (!supplied) return false
+
+  const secret = workerSecret(env)
+  if (secret) {
+    const left = Uint8Array.from(createHash("sha256").update(supplied).digest())
+    const right = Uint8Array.from(createHash("sha256").update(secret).digest())
+    if (timingSafeEqual(left, right)) return true
+  }
+
+  try {
+    return await verifyGitHubActionsWorkerToken(supplied, fetcher)
+  } catch {
+    return false
+  }
 }
 
 function safeSegment(value: string) {

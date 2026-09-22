@@ -7,7 +7,7 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function POST(request: NextRequest) {
-  if (!authorizeMediaWorker(request.headers.get("authorization"))) {
+  if (!(await authorizeMediaWorker(request.headers.get("authorization")))) {
     return NextResponse.json(
       { ok: false, code: "MEDIA_WORKER_UNAUTHORIZED" },
       { status: 401, headers: { "Cache-Control": "no-store" } },
