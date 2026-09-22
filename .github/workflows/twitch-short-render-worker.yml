@@ -2,11 +2,16 @@ name: Twitch Short Render Worker
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/twitch-short-render-worker.yml"
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "17,47 * * * *"
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: twitch-short-render-worker
@@ -15,76 +20,61 @@ concurrency:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     environment: production
     env:
-      VERCEL_ORG_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
-      VERCEL_PROJECT_ID: prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       AMS_APP_URL: https://www.aspectmarketingsolutions.app
+      AMS_WORKER_AUDIENCE: ams-twitch-worker
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Load renderer configuration
-        id: config
-        shell: bash
-        run: |
-          set -euo pipefail
-          set +x
-          if [ -z "${VERCEL_TOKEN:-}" ]; then
-            echo "::error::VERCEL_TOKEN is not configured."
-            exit 1
-          fi
-          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN" >/dev/null
-          set -a
-          source .vercel/.env.production.local
-          set +a
-          if [ "${AMS_TWITCH_SHORT_RENDER_ENABLED:-}" != "true" ]; then
-            echo "Renderer disabled; exiting safely."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [ ${#AMS_MEDIA_WORKER_KEY} -lt 32 ]; then
-            echo "::error::AMS_MEDIA_WORKER_KEY is missing or invalid."
-            exit 1
-          fi
-          echo "::add-mask::$AMS_MEDIA_WORKER_KEY"
-          printf 'AMS_MEDIA_WORKER_KEY=%s\n' "$AMS_MEDIA_WORKER_KEY" >> "$GITHUB_ENV"
-          echo "ready=true" >> "$GITHUB_OUTPUT"
-
-      - name: Install FFmpeg
-        if: steps.config.outputs.ready == 'true'
-        shell: bash
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg
-
       - name: Reconcile automatic private Shorts
-        if: steps.config.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail-with-body --silent --show-error \
+          token_response="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AMS_WORKER_AUDIENCE")"
+          worker_token="$(printf '%s' "$token_response" | jq -r '.value // empty')"
+          if [ -z "$worker_token" ]; then
+            echo "::error::GitHub OIDC worker token was not issued."
+            exit 1
+          fi
+          echo "::add-mask::$worker_token"
+
+          set +e
+          response="$(curl --fail-with-body --silent --show-error \
             -X POST \
-            -H "Authorization: Bearer $AMS_MEDIA_WORKER_KEY" \
-            "$AMS_APP_URL/api/internal/twitch/media/auto" \
-            | jq '{ok, skipped, windowHours, vodCount, clipCount, created, analyzed, queued, failureCount:(.failures | length)}'
+            -H "Authorization: Bearer $worker_token" \
+            "$AMS_APP_URL/api/internal/twitch/media/auto")"
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::warning::Twitch automatic reconciliation returned an error: $response"
+          else
+            printf '%s' "$response" \
+              | jq '{ok, skipped, windowHours, vodCount, clipCount, created, analyzed, queued, failureCount:(.failures | length)}'
+          fi
 
       - name: Claim render job
-        if: steps.config.outputs.ready == 'true'
         id: claim
         shell: bash
         run: |
           set -euo pipefail
+          token_response="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AMS_WORKER_AUDIENCE")"
+          worker_token="$(printf '%s' "$token_response" | jq -r '.value // empty')"
+          if [ -z "$worker_token" ]; then
+            echo "::error::GitHub OIDC worker token was not issued."
+            exit 1
+          fi
+          echo "::add-mask::$worker_token"
+
           response="$(curl --fail-with-body --silent --show-error \
             -X POST \
-            -H "Authorization: Bearer $AMS_MEDIA_WORKER_KEY" \
+            -H "Authorization: Bearer $worker_token" \
             "$AMS_APP_URL/api/internal/twitch/media/render/next")"
           job_id="$(printf '%s' "$response" | jq -r '.job.jobId // empty')"
           if [ -z "$job_id" ]; then
@@ -95,6 +85,13 @@ jobs:
           printf '%s' "$response" > "$RUNNER_TEMP/claim.json"
           echo "has_job=true" >> "$GITHUB_OUTPUT"
           echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
+
+      - name: Install FFmpeg
+        if: steps.claim.outputs.has_job == 'true'
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
 
       - name: Download source and prepare metadata
         if: steps.claim.outputs.has_job == 'true'
@@ -152,11 +149,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          token_response="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AMS_WORKER_AUDIENCE")"
+          worker_token="$(printf '%s' "$token_response" | jq -r '.value // empty')"
+          if [ -z "$worker_token" ]; then
+            echo "::error::GitHub OIDC worker token was not issued."
+            exit 1
+          fi
+          echo "::add-mask::$worker_token"
+
           jq -n --arg jobId "${{ steps.claim.outputs.job_id }}" \
             '{jobId:$jobId,ok:true}' > "$RUNNER_TEMP/result.json"
           curl --fail-with-body --silent --show-error \
             -X POST \
-            -H "Authorization: Bearer $AMS_MEDIA_WORKER_KEY" \
+            -H "Authorization: Bearer $worker_token" \
             -H "Content-Type: application/json" \
             --data-binary @"$RUNNER_TEMP/result.json" \
             "$AMS_APP_URL/api/internal/twitch/media/render/complete"
@@ -165,11 +172,19 @@ jobs:
         if: failure() && steps.claim.outputs.has_job == 'true'
         shell: bash
         run: |
+          set +e
+          token_response="$(curl --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AMS_WORKER_AUDIENCE")"
+          worker_token="$(printf '%s' "$token_response" | jq -r '.value // empty')"
+          [ -n "$worker_token" ] || exit 0
+          echo "::add-mask::$worker_token"
+
           jq -n --arg jobId "${{ steps.claim.outputs.job_id }}" \
             '{jobId:$jobId,ok:false,errorCode:"GITHUB_ACTIONS_RENDER_FAILED"}' > "$RUNNER_TEMP/failure.json"
           curl --silent --show-error \
             -X POST \
-            -H "Authorization: Bearer $AMS_MEDIA_WORKER_KEY" \
+            -H "Authorization: Bearer $worker_token" \
             -H "Content-Type: application/json" \
             --data-binary @"$RUNNER_TEMP/failure.json" \
             "$AMS_APP_URL/api/internal/twitch/media/render/complete" || true
