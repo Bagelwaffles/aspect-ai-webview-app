@@ -288,13 +288,22 @@ function installDependencies(dependencies: Record<string, unknown>) {
   routeTestGlobals.__amsContentAgentTestDependencies = dependencies
 }
 
-function postRequest(body: unknown = validInput, idempotencyKey = "content-operation-1234") {
+function postRequest(
+  body: unknown = validInput,
+  idempotencyKey = "content-operation-1234",
+  externalProcessingConsent: string | null = "granted",
+) {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    "idempotency-key": idempotencyKey,
+  }
+  if (externalProcessingConsent) {
+    headers["x-ams-external-processing-consent"] = externalProcessingConsent
+  }
+
   return new NextRequest("http://127.0.0.1:3000/api/content-agent/runs", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "idempotency-key": idempotencyKey,
-    },
+    headers,
     body: JSON.stringify(body),
   })
 }
@@ -340,6 +349,22 @@ test("Content Agent rejects unsupported client-controlled fields and invalid bri
   assert.equal(response.status, 400)
   assert.equal(body.code, "INVALID_CONTENT_INPUT")
   assert.deepEqual(events, [])
+})
+
+test("Content Agent requires explicit external processing consent before run work", async () => {
+  const events: string[] = []
+  const { store } = createStore()
+  installDependencies(baseDependencies(store, events))
+
+  const response = await contentRunsPost(
+    postRequest(validInput, "content-consent-operation-1234", null),
+  )
+  const body = await response.json()
+
+  assert.equal(response.status, 428)
+  assert.equal(body.code, "EXTERNAL_PROCESSING_CONSENT_REQUIRED")
+  assert.deepEqual(events, [])
+  assert.deepEqual(await store.listForOwner(customer.subject), [])
 })
 
 test("Content Agent enforces entitlement before claiming or reserving a run", async () => {
@@ -615,12 +640,25 @@ test("successful Content Agent output is committed, persisted, and returned in t
   assert.equal(response.status, 200)
   assert.equal(body.ok, true)
   assert.deepEqual(body.run.output, validOutput)
+  assert.equal(body.run.provenance.aiGenerated, true)
+  assert.equal(body.run.provenance.automaticallyVerified, true)
+  assert.equal(body.run.provenance.humanReviewed, false)
+  assert.deepEqual(body.run.provenance.externalProviders, ["OpenAI via Vercel AI Gateway"])
+  assert.equal(body.run.provenance.customerConsent.externalProvider, "granted")
+  assert.ok(body.run.provenance.customerConsent.recordedAt)
+  assert.deepEqual(body.run.provenance.labels, [
+    "AI_GENERATED",
+    "AUTOMATICALLY_VERIFIED",
+    "EXTERNAL_PROVIDER",
+    "CUSTOMER_APPROVED",
+  ])
   assert.deepEqual(events, ["reserve", "provider", "commit"])
   assert.equal(historyResponse.status, 200)
   assert.equal(history.runs.length, 1)
   assert.equal(history.runs[0].status, "succeeded")
   assert.equal(history.runs[0].creditState, "committed")
   assert.deepEqual(history.runs[0].output, validOutput)
+  assert.deepEqual(history.runs[0].provenance, body.run.provenance)
   assert.equal(JSON.stringify(history).includes(customer.subject), false)
   assert.equal(JSON.stringify(history).includes("content-operation-1234"), false)
 })
