@@ -11,6 +11,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  ExecutionProvenancePanel,
+  ExternalAiProcessingConsent,
+  type ExecutionProvenance,
+} from "@/components/execution-transparency"
+import {
   buildOutreachContentBrief,
   type OutreachChannel,
   type OutreachObjective,
@@ -29,6 +34,7 @@ type ContentRun = {
     callToAction: string
     safetyNotes: string[]
   } | null
+  provenance: ExecutionProvenance | null
 }
 
 type RunsResponse = {
@@ -63,10 +69,15 @@ export default function OutreachAgentPage() {
   const [result, setResult] = useState<ContentRun | null>(null)
   const [error, setError] = useState("")
   const [copied, setCopied] = useState(false)
+  const [externalProcessingConsent, setExternalProcessingConsent] = useState(false)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (submitting) return
+    if (!externalProcessingConsent) {
+      setError("EXTERNAL_PROCESSING_CONSENT_REQUIRED: Approve external AI processing before generating.")
+      return
+    }
 
     const form = new FormData(event.currentTarget)
     const brief = buildOutreachContentBrief({
@@ -95,6 +106,7 @@ export default function OutreachAgentPage() {
         headers: {
           "Content-Type": "application/json",
           "Idempotency-Key": operationKey,
+          "X-AMS-External-Processing-Consent": "granted",
         },
         body: JSON.stringify(brief),
       })
@@ -108,6 +120,7 @@ export default function OutreachAgentPage() {
 
       setResult(body.run)
       setRequestKey(null)
+      setExternalProcessingConsent(false)
     } catch {
       setError("NETWORK_ERROR: Retry to safely reuse the same generation request.")
     } finally {
@@ -244,9 +257,17 @@ export default function OutreachAgentPage() {
                   </div>
                 </div>
 
+                <ExternalAiProcessingConsent
+                  checked={externalProcessingConsent}
+                  onCheckedChange={(checked) => {
+                    setExternalProcessingConsent(checked)
+                    setError("")
+                  }}
+                />
+
                 {error ? <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</p> : null}
 
-                <Button className="h-11 w-full sm:w-auto" disabled={submitting} type="submit">
+                <Button className="h-11 w-full sm:w-auto" disabled={submitting || !externalProcessingConsent} type="submit">
                   {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                   {submitting ? "Building outreach draft" : "Generate outreach draft"}
                 </Button>
@@ -256,12 +277,13 @@ export default function OutreachAgentPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl"><MessageSquareText className="h-5 w-5" />Human-reviewed outreach draft</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-xl"><MessageSquareText className="h-5 w-5" />Review-ready outreach draft</CardTitle>
               <CardDescription>Nothing is sent. Copy the draft only after reviewing it for accuracy, relevance, consent, and platform rules.</CardDescription>
             </CardHeader>
             <CardContent>
               {result?.output ? (
                 <div className="space-y-5">
+                  <ExecutionProvenancePanel provenance={result.provenance} />
                   <div>
                     <p className="text-xs font-medium uppercase text-muted-foreground">Subject / opener</p>
                     <h2 className="mt-1 break-words text-xl font-semibold">{result.output.headline}</h2>
