@@ -85,6 +85,20 @@ export function getContentAgentModel(): string {
   return process.env.AMS_CONTENT_AGENT_MODEL?.trim() || DEFAULT_CONTENT_AGENT_MODEL
 }
 
+export function getContentAgentProviderDisclosure(): string {
+  const model = getContentAgentModel()
+  const providerKey = model.split("/")[0]?.trim().toLowerCase() ?? ""
+  const providerNames: Record<string, string> = {
+    openai: "OpenAI",
+    anthropic: "Anthropic",
+    google: "Google",
+    xai: "xAI",
+    meta: "Meta",
+  }
+  const provider = providerNames[providerKey] ?? (providerKey || "Configured model provider")
+  return `${provider} via Vercel AI Gateway`
+}
+
 export function isContentAgentGatewayAuthAvailable(): boolean {
   return isVercelAiGatewayAuthAvailable()
 }
