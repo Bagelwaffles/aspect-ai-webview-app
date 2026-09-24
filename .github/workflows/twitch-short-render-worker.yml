@@ -56,7 +56,7 @@ jobs:
             echo "needs_verify=false" >> "$GITHUB_OUTPUT"
           else
             printf '%s' "$response" \
-              | jq '{ok, skipped, windowHours, vodCount, clipCount, created, verified, pending, expired, analyzed, queued, failureCount:(.failures | length)}'
+              | jq '{ok, skipped, windowHours, vodCount, clipCount, created, verified, pending, expired, analyzed, queued, failureCount:(.failures | length), failures:(.failures // [])}'
             needs_verify="$(printf '%s' "$response" | jq -r 'if ((.created // 0) > 0 or (.pending // 0) > 0) then "true" else "false" end')"
             echo "needs_verify=$needs_verify" >> "$GITHUB_OUTPUT"
           fi
@@ -82,7 +82,7 @@ jobs:
             -H "Authorization: Bearer $worker_token" \
             "$AMS_APP_URL/api/internal/twitch/media/auto")"
           printf '%s' "$response" \
-            | jq '{ok, skipped, windowHours, vodCount, clipCount, created, verified, pending, expired, analyzed, queued, failureCount:(.failures | length)}'
+            | jq '{ok, skipped, windowHours, vodCount, clipCount, created, verified, pending, expired, analyzed, queued, failureCount:(.failures | length), failures:(.failures // [])}'
 
       - name: Claim render job
         id: claim

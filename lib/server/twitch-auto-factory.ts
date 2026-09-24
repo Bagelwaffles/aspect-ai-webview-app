@@ -125,7 +125,13 @@ function dailyQueueKey(now = new Date()) {
 }
 
 function safeError(error: unknown) {
-  return error instanceof Error ? error.message.slice(0, 200) : "UNKNOWN"
+  if (!(error instanceof Error)) return "UNKNOWN"
+  const message = error.message.slice(0, 300)
+  const knownCode = message.match(/\b(?:TWITCH|AMS|AI|R2|MEDIA|GATEWAY|MODEL)_[A-Z0-9_:-]{2,160}\b/)?.[0]
+  if (knownCode) return knownCode
+  const httpCode = message.match(/\b(?:HTTP|STATUS)[: _-]?(\d{3})\b/i)?.[1]
+  if (httpCode) return `HTTP_${httpCode}`
+  return error.name.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80) || "ERROR"
 }
 
 export async function runTwitchAutomaticPrivateShorts() {
