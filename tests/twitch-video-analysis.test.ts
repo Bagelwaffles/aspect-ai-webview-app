@@ -3,6 +3,7 @@ import test from "node:test"
 
 import {
   isTwitchVideoAnalysisRenderEligible,
+  recoverTwitchVideoAnalysisOutput,
   TWITCH_VIDEO_RENDER_SCORE_MIN,
 } from "../lib/server/twitch-video-analysis"
 import { twitchVideoAnalysisRecordSchema } from "../lib/server/twitch-media-factory"
@@ -61,4 +62,59 @@ test("Twitch video analysis v2 carries complete publish metadata", () => {
   assert.equal(parsed.publishMetadata?.title, "Fast Call of Duty Turnaround")
   assert.equal(parsed.publishMetadata?.youtube.title, "Fast Call of Duty Turnaround")
   assert.equal(parsed.publishMetadata?.tags.length, 3)
+})
+
+
+test("Twitch video analysis recovers schema-valid JSON from fenced model output", () => {
+  const raw = `Here is the analysis:
+\`\`\`json
+{
+  "score": 82,
+  "recommendation": "render",
+  "reason": "Clear visible action with a defined payoff.",
+  "observedMoments": ["Visible gameplay action"],
+  "bestStartSeconds": 3,
+  "bestEndSeconds": 18,
+  "hook": "Watch this turn.",
+  "caption": "A short gameplay moment.",
+  "publishMetadata": {
+    "title": "Gameplay Turnaround",
+    "description": "A concise description grounded in the clip.",
+    "tags": ["gaming", "Twitch", "gameplay"],
+    "hashtags": ["#Gaming", "#Twitch", "#Shorts"],
+    "keywords": ["gaming clip", "Twitch gameplay", "short video"],
+    "categoryLabel": "Gaming",
+    "twitchClipTitle": "Gameplay Turnaround",
+    "youtube": {
+      "title": "Gameplay Turnaround",
+      "description": "A concise gameplay Short.",
+      "tags": ["gaming", "Twitch", "shorts"],
+      "hashtags": ["#Gaming", "#Twitch", "#Shorts"]
+    },
+    "tiktok": {
+      "caption": "A quick gameplay moment.",
+      "hashtags": ["#Gaming", "#Twitch", "#Gameplay"]
+    },
+    "instagram": {
+      "caption": "A quick gameplay moment.",
+      "hashtags": ["#Gaming", "#Twitch", "#Reels"]
+    },
+    "x": {
+      "post": "A quick gameplay moment from the stream."
+    }
+  },
+  "evidenceBoundary": "Claims are limited to visible and audible events in the clip."
+}
+\`\`\`
+`
+
+  const recovered = recoverTwitchVideoAnalysisOutput(raw)
+  assert.ok(recovered)
+  assert.equal(recovered.score, 82)
+  assert.equal(recovered.publishMetadata.title, "Gameplay Turnaround")
+})
+
+test("Twitch video analysis refuses recovered JSON that violates the schema", () => {
+  const recovered = recoverTwitchVideoAnalysisOutput('{"score":82,"recommendation":"render"}')
+  assert.equal(recovered, null)
 })

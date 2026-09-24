@@ -52,6 +52,45 @@ const modelOutputSchema = z.object({
   evidenceBoundary: z.string().trim().min(1).max(500),
 }).strict()
 
+type TwitchVideoModelOutput = z.infer<typeof modelOutputSchema>
+
+function jsonCandidates(text: string) {
+  const trimmed = text.trim()
+  if (!trimmed) return []
+
+  const withoutFence = trimmed
+    .replace(/^\`\`\`(?:json)?\s*/i, "")
+    .replace(/\s*\`\`\`$/i, "")
+    .trim()
+
+  const firstBrace = withoutFence.indexOf("{")
+  const lastBrace = withoutFence.lastIndexOf("}")
+  const extracted = firstBrace >= 0 && lastBrace > firstBrace
+    ? withoutFence.slice(firstBrace, lastBrace + 1)
+    : ""
+
+  return Array.from(new Set([trimmed, withoutFence, extracted].filter(Boolean)))
+}
+
+export function recoverTwitchVideoAnalysisOutput(text: string): TwitchVideoModelOutput | null {
+  for (const candidate of jsonCandidates(text)) {
+    try {
+      const parsedJson = JSON.parse(candidate)
+      const parsed = modelOutputSchema.safeParse(parsedJson)
+      if (parsed.success) return parsed.data
+    } catch {
+      // Try the next bounded candidate.
+    }
+  }
+  return null
+}
+
+function structuredOutputErrorText(error: unknown) {
+  if (!error || typeof error !== "object" || !("text" in error)) return null
+  const text = (error as { text?: unknown }).text
+  return typeof text === "string" ? text : null
+}
+
 type Options = {
   env?: NodeJS.ProcessEnv
   now?: () => Date
@@ -101,9 +140,11 @@ export async function analyzeTwitchClipVideo(
   const duration = Math.max(5, Math.min(120, item.duration ?? 60))
   const model = getTwitchVideoAnalysisModel(env)
 
-  const result = await generateText({
-    model,
-    output: Output.object({ schema: modelOutputSchema }),
+  let raw: TwitchVideoModelOutput
+  try {
+    const result = await generateText({
+      model,
+      output: Output.object({ schema: modelOutputSchema }),
     system: [
       "You are the Aspect Marketing Solutions Twitch Video Analyst.",
       "You are reviewing actual creator gameplay footage before AMS is allowed to render a Short.",
@@ -111,6 +152,7 @@ export async function analyzeTwitchClipVideo(
       "Do not invent kills, wins, reactions, dialogue, game events, people, or outcomes.",
       "Prefer moments with clear action, tension, humor, surprise, skill, payoff, or a strong reaction.",
       "Create a complete publish-ready metadata package from the actual footage: title, description, tags, hashtags, keywords, category label, Twitch clip title, YouTube metadata, TikTok caption, Instagram caption, and X copy.",
+      "Keep every field concise: descriptions under 500 characters, captions under 300 characters, and use 3-6 high-signal tags/hashtags/keywords.",
       "Titles and descriptions must describe only what is actually visible or audible. Do not use fake hype, unsupported outcomes, or invented game events.",
       "Penalize loading screens, menus, dead air, repetitive traversal, unclear context, and weak visual payoff.",
       "A score below 65 must be recommendation=skip.",
@@ -142,11 +184,16 @@ export async function analyzeTwitchClipVideo(
         },
       ],
     }],
-    temperature: 0.2,
-    maxOutputTokens: 1_000,
-  })
+      temperature: 0.2,
+      maxOutputTokens: 2_000,
+    })
+    raw = modelOutputSchema.parse(result.output)
+  } catch (error) {
+    const recovered = recoverTwitchVideoAnalysisOutput(structuredOutputErrorText(error) ?? "")
+    if (!recovered) throw error
+    raw = recovered
+  }
 
-  const raw = modelOutputSchema.parse(result.output)
   const score = Math.max(0, Math.min(100, Math.round(raw.score)))
   const recommendation =
     raw.recommendation === "render" && score >= TWITCH_VIDEO_RENDER_SCORE_MIN
