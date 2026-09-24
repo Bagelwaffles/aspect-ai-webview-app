@@ -107,6 +107,7 @@ test("zero-cost launch rejects Content Agent execution before entitlement or cre
       headers: {
         "content-type": "application/json",
         "idempotency-key": "zero-cost-content-0001",
+        "x-ams-external-processing-consent": "granted",
       },
       body: JSON.stringify({
         businessName: "Aspect Marketing Solutions",
