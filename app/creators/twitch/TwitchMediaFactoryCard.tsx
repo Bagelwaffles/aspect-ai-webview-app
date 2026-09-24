@@ -28,7 +28,7 @@ export type TwitchMediaFactoryStatus = {
     status: "discovered" | "short-ready" | "landscape-ready"
     orientation: "portrait" | "landscape" | null
     videoAnalysis?: {
-      version: "twitch-video-analysis-v1" | "twitch-video-analysis-v2"
+      version: "twitch-video-analysis-v1" | "twitch-video-analysis-v2" | "twitch-video-analysis-v3"
       analyzedAt: string
       model: string
       score: number
