@@ -21,6 +21,10 @@ const SUMMARY_KEY = "ams:twitch-pilot:v1:summary:latest"
 const SUMMARY_STREAM_PREFIX = "ams:twitch-pilot:v1:summary:"
 const EVENT_ID_PREFIX = "ams:twitch-pilot:v1:event:"
 const SUBSCRIPTION_KEY = "ams:twitch-pilot:v1:subscriptions"
+const VOD_CLIP_PENDING_KEY = "ams:twitch-pilot:v1:vod-clips:pending"
+const VOD_CLIP_PENDING_TTL_SECONDS = 60 * 60 * 24 * 2
+const VOD_CLIP_VERIFY_AFTER_MS = 60_000
+const MAX_PENDING_VOD_CLIPS = 100
 const EVENT_DEDUPE_TTL_SECONDS = 60 * 60 * 24 * 7
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30
 const SUMMARY_TTL_SECONDS = 60 * 60 * 24 * 180
@@ -85,6 +89,17 @@ const eventEnvelopeSchema = z.object({
   event: z.record(z.unknown()).optional(),
   challenge: z.string().optional(),
 })
+
+const pendingVodClipSchema = z.object({
+  id: z.string().min(1).max(160),
+  vodId: z.string().min(1).max(160),
+  vodOffset: z.number().int().nonnegative(),
+  duration: z.number().min(5).max(60),
+  title: z.string().min(1).max(100),
+  requestedAt: z.string().datetime(),
+})
+
+export type PendingTwitchVodClip = z.infer<typeof pendingVodClipSchema>
 
 const streamSessionSchema = z.object({
   broadcasterId: z.string().min(1),
@@ -769,6 +784,134 @@ export async function getTwitchClipDownloadUrls(
   })).filter((item) => item.clipId)
 }
 
+function parsePendingVodClips(raw: unknown): PendingTwitchVodClip[] {
+  if (!raw) return []
+  try {
+    const value = typeof raw === "string" ? JSON.parse(raw) : raw
+    const parsed = z.array(pendingVodClipSchema).safeParse(value)
+    return parsed.success ? parsed.data.slice(0, MAX_PENDING_VOD_CLIPS) : []
+  } catch {
+    return []
+  }
+}
+
+async function loadPendingVodClips(options: TwitchOptions = {}) {
+  const redis = runtimeRedis(options)
+  if (!redis) return [] as PendingTwitchVodClip[]
+  return parsePendingVodClips(await redis.get<unknown>(VOD_CLIP_PENDING_KEY))
+}
+
+async function savePendingVodClips(
+  pending: PendingTwitchVodClip[],
+  options: TwitchOptions = {},
+) {
+  const redis = runtimeRedis(options)
+  if (!redis) return false
+  const normalized = pending
+    .map((item) => pendingVodClipSchema.parse(item))
+    .slice(0, MAX_PENDING_VOD_CLIPS)
+  await redis.set(VOD_CLIP_PENDING_KEY, JSON.stringify(normalized), {
+    ex: VOD_CLIP_PENDING_TTL_SECONDS,
+  })
+  return true
+}
+
+export async function listPendingTwitchVodClips(options: TwitchOptions = {}) {
+  return loadPendingVodClips(options)
+}
+
+async function rememberPendingTwitchVodClip(
+  pending: PendingTwitchVodClip,
+  options: TwitchOptions = {},
+) {
+  const existing = await loadPendingVodClips(options)
+  const next = [
+    pendingVodClipSchema.parse(pending),
+    ...existing.filter((item) => item.id !== pending.id),
+  ].slice(0, MAX_PENDING_VOD_CLIPS)
+  return savePendingVodClips(next, options)
+}
+
+export async function getTwitchClipsByIds(
+  ids: string[],
+  options: TwitchOptions = {},
+): Promise<TwitchRecentClip[]> {
+  const uniqueIds = [...new Set(ids.map((id) => id.trim()).filter(Boolean))].slice(0, 100)
+  if (!uniqueIds.length) return []
+
+  const config = resolveTwitchConfig(options.env ?? process.env)
+  if (!config) throw new Error("TWITCH_NOT_CONFIGURED")
+  const token = await appAccessToken(options)
+  const url = new URL("https://api.twitch.tv/helix/clips")
+  uniqueIds.forEach((id) => url.searchParams.append("id", id))
+
+  const response = await (options.fetcher ?? fetch)(url, {
+    headers: { Authorization: `Bearer ${token}`, "Client-Id": config.clientId },
+    cache: "no-store",
+    signal: AbortSignal.timeout(12_000),
+  })
+  if (!response.ok) throw new Error(`TWITCH_HELIX_FAILED:clips:${response.status}`)
+
+  const body = await parseJson(response) as {
+    data?: Array<{
+      id?: string
+      title?: string
+      url?: string
+      creator_name?: string
+      view_count?: number
+      created_at?: string
+      video_id?: string
+      game_id?: string
+      thumbnail_url?: string
+      duration?: number
+      vod_offset?: number | null
+    }>
+  } | null
+
+  return (body?.data ?? []).map((clip) => ({
+    id: clip.id ?? "",
+    title: clip.title ?? "",
+    url: clip.url ?? "",
+    creatorName: clip.creator_name ?? "",
+    viewCount: clip.view_count ?? 0,
+    createdAt: clip.created_at ?? "",
+    videoId: clip.video_id ?? "",
+    gameId: clip.game_id ?? "",
+    thumbnailUrl: clip.thumbnail_url ?? "",
+    duration: clip.duration ?? 0,
+    vodOffset: clip.vod_offset ?? null,
+  })).filter((clip) => clip.id)
+}
+
+export async function reconcilePendingTwitchVodClips(
+  options: TwitchOptions = {},
+) {
+  const pending = await loadPendingVodClips(options)
+  if (!pending.length) {
+    return {
+      materialized: [] as TwitchRecentClip[],
+      failed: [] as PendingTwitchVodClip[],
+      pending: [] as PendingTwitchVodClip[],
+    }
+  }
+
+  const materialized = await getTwitchClipsByIds(pending.map((item) => item.id), options)
+  const materializedIds = new Set(materialized.map((clip) => clip.id))
+  const nowMs = (options.now ?? (() => new Date()))().getTime()
+  const failed: PendingTwitchVodClip[] = []
+  const stillPending: PendingTwitchVodClip[] = []
+
+  for (const item of pending) {
+    if (materializedIds.has(item.id)) continue
+    const ageMs = Math.max(0, nowMs - Date.parse(item.requestedAt))
+    if (ageMs >= VOD_CLIP_VERIFY_AFTER_MS) failed.push(item)
+    else stillPending.push(item)
+  }
+
+  await savePendingVodClips(stillPending, options)
+  return { materialized, failed, pending: stillPending }
+}
+
 export async function createTwitchClipFromVod(
   input: {
     vodId: string
@@ -798,7 +941,22 @@ export async function createTwitchClipFromVod(
   const body = await parseJson(response) as { data?: Array<{ id?: string; edit_url?: string }> } | null
   const clip = body?.data?.[0]
   if (!clip?.id) throw new Error("TWITCH_VOD_CLIP_CREATE_FAILED")
-  return { id: clip.id, editUrl: clip.edit_url ?? null }
+
+  let tracked = false
+  try {
+    tracked = await rememberPendingTwitchVodClip({
+      id: clip.id,
+      vodId: input.vodId.trim(),
+      vodOffset,
+      duration,
+      title,
+      requestedAt: (options.now ?? (() => new Date()))().toISOString(),
+    }, options)
+  } catch {
+    tracked = false
+  }
+
+  return { id: clip.id, editUrl: clip.edit_url ?? null, tracked }
 }
 
 
