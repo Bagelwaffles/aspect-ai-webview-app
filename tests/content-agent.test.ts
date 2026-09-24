@@ -802,7 +802,10 @@ test("Content Agent requires an explicit bounded idempotency key", async () => {
   installDependencies(baseDependencies(store, events))
   const request = new NextRequest("http://127.0.0.1:3000/api/content-agent/runs", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-ams-external-processing-consent": "granted",
+    },
     body: JSON.stringify(validInput),
   })
 
