@@ -151,3 +151,24 @@ test("daily Twitch sweep does not let clips from another VOD consume this VOD's 
   }]
   assert.equal(selectDailyVodSampleCandidates(vod, clips).length, 3)
 })
+
+
+test("daily Twitch sweep reserves pending VOD offsets so async clip requests are not duplicated", () => {
+  const vod: TwitchRecentVod = {
+    id: "vod-day-pending",
+    streamId: "stream-day-pending",
+    title: "Pending stream",
+    url: "https://www.twitch.tv/videos/pending",
+    createdAt: "2026-09-24T20:00:00.000Z",
+    duration: "1h",
+    durationSeconds: 3600,
+  }
+  const reserved = [
+    { vodId: vod.id, vodOffset: 900 },
+    { vodId: vod.id, vodOffset: 1800 },
+  ]
+  const candidates = selectDailyVodSampleCandidates(vod, [], 3, reserved)
+  assert.equal(candidates.length, 1)
+  assert.ok(candidates.every((item) => Math.abs(item.positionSeconds - 900) > 5))
+  assert.ok(candidates.every((item) => Math.abs(item.positionSeconds - 1800) > 5))
+})
