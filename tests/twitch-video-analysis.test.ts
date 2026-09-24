@@ -67,21 +67,22 @@ test("Twitch video analysis v2 carries complete publish metadata", () => {
 
 
 test("Twitch video evidence parser accepts fenced JSON and ignores surrounding text", () => {
-  const parsed = parseTwitchVideoEvidenceText(`
-```json
-{
-  "score": 82,
-  "recommendation": "render",
-  "reason": "Visible action has a clear payoff.",
-  "observedMoments": ["Player lands a visible shot and immediately changes position."],
-  "bestStartSeconds": 4,
-  "bestEndSeconds": 16,
-  "hook": "Quick shot, instant reposition.",
-  "caption": "A fast gameplay moment with a visible shot and immediate reposition.",
-  "evidenceBoundary": "Claims are limited to visible and audible events in this clip."
-}
-```
-`)
+  const fenced = [
+    "```json",
+    "{",
+    '  "score": 82,',
+    '  "recommendation": "render",',
+    '  "reason": "Visible action has a clear payoff.",',
+    '  "observedMoments": ["Player lands a visible shot and immediately changes position."],',
+    '  "bestStartSeconds": 4,',
+    '  "bestEndSeconds": 16,',
+    '  "hook": "Quick shot, instant reposition.",',
+    '  "caption": "A fast gameplay moment with a visible shot and immediate reposition.",',
+    '  "evidenceBoundary": "Claims are limited to visible and audible events in this clip."',
+    "}",
+    "```",
+  ].join("\n")
+  const parsed = parseTwitchVideoEvidenceText(fenced)
   assert.equal(parsed.score, 82)
   assert.equal(parsed.recommendation, "render")
   assert.equal(parsed.bestStartSeconds, 4)
