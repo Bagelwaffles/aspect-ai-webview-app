@@ -4,6 +4,7 @@ import {
   contentAgentIdempotencyKeySchema,
   contentAgentInputSchema,
   contentAgentOutputSchema,
+  getContentAgentProviderDisclosure,
   isContentAgentProviderConfigured,
   runContentAgentProvider,
   type ContentAgentOutput,
@@ -26,6 +27,10 @@ import {
   snapshotHasAgentAccess,
 } from "@/lib/server/entitlements"
 import { consumeDistributedAiRateLimit } from "@/lib/server/rate-limit"
+import {
+  buildExecutionProvenance,
+  hasExplicitExternalProcessingConsent,
+} from "@/lib/execution-transparency"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -569,6 +574,28 @@ async function handlePost(request: NextRequest, dependencies: ContentAgentRouteD
     )
   }
 
+  if (
+    !hasExplicitExternalProcessingConsent(
+      request.headers.get("x-ams-external-processing-consent"),
+    )
+  ) {
+    return safeError(
+      "EXTERNAL_PROCESSING_CONSENT_REQUIRED",
+      "Explicit consent is required before AMS sends this brief or relevant workspace context to an external AI processing provider",
+      428,
+    )
+  }
+
+  const provenance = buildExecutionProvenance({
+    aiGenerated: true,
+    automaticallyVerified: true,
+    humanReviewed: false,
+    externalProviders: [getContentAgentProviderDisclosure()],
+    humanReviewConsent: "not-required",
+    externalProviderConsent: "granted",
+    consentRecordedAt: new Date().toISOString(),
+  })
+
   const idempotencyKey = resolveIdempotencyKey(request)
   if (idempotencyKey instanceof NextResponse) return idempotencyKey
 
@@ -645,6 +672,7 @@ async function handlePost(request: NextRequest, dependencies: ContentAgentRouteD
       ownerSubject: principal.subject,
       idempotencyKey,
       content: parsedInput.data,
+      provenance,
     })
   } catch (error) {
     return runStoreErrorResponse(error)
