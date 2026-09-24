@@ -1,4 +1,9 @@
 import type { AgentCategory, AgentStatus } from "@/app/agents/agentCatalog"
+import {
+  DEFAULT_EXECUTION_TRANSPARENCY_POLICY,
+  executionTransparencyPolicySchema,
+  type ExecutionTransparencyPolicy,
+} from "@/lib/execution-transparency"
 
 export const AGENT_TEMPLATE_VERSION = 1 as const
 
@@ -58,6 +63,7 @@ export type AgentContract = {
   failClosed: true
   treatsExternalContextAsUntrusted: true
   recordsAuditState: true
+  executionTransparency: ExecutionTransparencyPolicy
   controlLimits: AgentControlLimits
   liveProof: {
     verified: boolean
@@ -90,6 +96,7 @@ export function assertAgentContract(contract: AgentContract): AgentContract {
   if (contract.status === "live" && !contract.liveProof.evidence.trim()) {
     throw new Error("LIVE_AGENT_EVIDENCE_REQUIRED")
   }
+  executionTransparencyPolicySchema.parse(contract.executionTransparency)
 
   for (const permission of contract.permissions) {
     if (["write", "publish", "billing"].includes(permission.mode) && permission.approval === "none") {
@@ -118,6 +125,7 @@ export function defineAgentContract(
     | "failClosed"
     | "treatsExternalContextAsUntrusted"
     | "recordsAuditState"
+    | "executionTransparency"
     | "controlLimits"
   > & { controlLimits?: Partial<AgentControlLimits> },
 ): AgentContract {
@@ -128,6 +136,7 @@ export function defineAgentContract(
     failClosed: true,
     treatsExternalContextAsUntrusted: true,
     recordsAuditState: true,
+    executionTransparency: { ...DEFAULT_EXECUTION_TRANSPARENCY_POLICY },
     controlLimits: { ...DEFAULT_AGENT_CONTROL_LIMITS, ...(input.controlLimits ?? {}) },
   })
 }
