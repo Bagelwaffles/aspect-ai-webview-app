@@ -4,6 +4,7 @@ import { Redis } from "@upstash/redis"
 import Stripe from "stripe"
 
 import { agents } from "@/app/agents/agentCatalog"
+import { listAgentContracts } from "@/lib/agent-contract-registry"
 import { listOvermindTasks } from "@/lib/server/overmind-task-store"
 import { listRecentFiverrOperations } from "@/lib/server/fiverr-operations"
 import { listSocialCampaignRecords } from "@/lib/server/social-campaign-store"
@@ -678,6 +679,44 @@ async function monitorVisibility(context: MonitorContext) {
   )
 }
 
+async function monitorExecutionTransparency(context: MonitorContext) {
+  const checkedAt = context.now.toISOString()
+  const contracts = listAgentContracts()
+  const violations = contracts.filter((contract) => {
+    const policy = contract.executionTransparency
+    return (
+      !contract.failClosed ||
+      !contract.recordsAuditState ||
+      !policy.discloseAiGeneration ||
+      !policy.discloseAutomaticVerification ||
+      !policy.discloseHumanReview ||
+      !policy.discloseExternalProviders ||
+      !policy.requireExplicitHumanConsent ||
+      !policy.requireExplicitExternalProviderConsent ||
+      !policy.persistConsentDecision
+    )
+  })
+
+  return result(
+    "execution-transparency",
+    "Trust & Execution Transparency",
+    violations.length ? "critical" : "ok",
+    violations.length
+      ? `${violations.length} agent contract(s) violate the AMS execution-transparency rule.`
+      : `All ${contracts.length} registered agent contracts require execution disclosure, explicit human/third-party consent, and audit persistence.`,
+    checkedAt,
+    violations.map(
+      (contract) =>
+        `${contract.name}: execution-transparency controls are incomplete or not fail-closed.`,
+    ),
+    {
+      registeredAgents: contracts.length,
+      governedAgents: contracts.length - violations.length,
+      violations: violations.length,
+    },
+  )
+}
+
 async function monitorAgentLifecycle(context: MonitorContext) {
   const checkedAt = context.now.toISOString()
   const counts = agents.reduce(
@@ -883,6 +922,7 @@ export async function runBackendMonitoring(
     runMonitorSafely("fiverr-operations", "Fiverr Operations", checkedAt, () => monitorFiverr(context)),
     runMonitorSafely("android-play", "Google Play Release", checkedAt, () => monitorAndroidPlay(context)),
     runMonitorSafely("visibility-catalog", "Visibility & Catalog Truth", checkedAt, () => monitorVisibility(context)),
+    runMonitorSafely("execution-transparency", "Trust & Execution Transparency", checkedAt, () => monitorExecutionTransparency(context)),
     runMonitorSafely("agent-lifecycle", "Agent Lifecycle", checkedAt, () => monitorAgentLifecycle(context)),
   ])
 
