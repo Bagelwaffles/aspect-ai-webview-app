@@ -5,6 +5,10 @@ import { z } from "zod"
 
 import { isStableCustomerSubject } from "@/lib/auth"
 import {
+  executionProvenanceSchema,
+  type ExecutionProvenance,
+} from "@/lib/execution-transparency"
+import {
   CONTENT_AGENT_VERSION,
   contentAgentIdempotencyKeySchema,
   contentAgentInputSchema,
@@ -61,6 +65,7 @@ const runRecordSchema = z
     inputFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
     agentVersion: z.literal(CONTENT_AGENT_VERSION),
     input: contentAgentInputSchema,
+    provenance: executionProvenanceSchema.nullable().default(null),
     status: contentAgentRunStatusSchema,
     creditState: creditStateSchema,
     pendingOutput: contentAgentOutputSchema.nullable(),
@@ -136,6 +141,7 @@ export function hasUnresolvedContentAgentFinancialState(
 export type PublicContentAgentRun = {
   id: string
   input: ContentAgentInput
+  provenance: ExecutionProvenance | null
   status: ContentAgentRunStatus
   creditState: ContentAgentCreditState
   output: ContentAgentOutput | null
@@ -480,6 +486,7 @@ export function toPublicContentAgentRun(record: ContentAgentRunRecord): PublicCo
   return {
     id: record.id,
     input: record.input,
+    provenance: record.provenance,
     status: record.status,
     creditState: record.creditState,
     output: record.status === "succeeded" ? record.output : null,
@@ -508,6 +515,7 @@ export class ContentAgentRunStore {
     ownerSubject: string
     idempotencyKey: string
     content: ContentAgentInput
+    provenance?: ExecutionProvenance | null
   }): Promise<{ created: boolean; record: ContentAgentRunRecord }> {
     validateOwner(input.ownerSubject)
     const idempotency = contentAgentIdempotencyKeySchema.safeParse(input.idempotencyKey)
@@ -527,6 +535,7 @@ export class ContentAgentRunStore {
       inputFingerprint: digest(JSON.stringify(content)),
       agentVersion: CONTENT_AGENT_VERSION,
       input: content,
+      provenance: input.provenance ?? null,
       status: "queued",
       creditState: "not_reserved",
       pendingOutput: null,
