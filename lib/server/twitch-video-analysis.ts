@@ -152,6 +152,7 @@ export async function analyzeTwitchClipVideo(
       "Do not invent kills, wins, reactions, dialogue, game events, people, or outcomes.",
       "Prefer moments with clear action, tension, humor, surprise, skill, payoff, or a strong reaction.",
       "Create a complete publish-ready metadata package from the actual footage: title, description, tags, hashtags, keywords, category label, Twitch clip title, YouTube metadata, TikTok caption, Instagram caption, and X copy.",
+      "Keep every field concise: descriptions under 500 characters, captions under 300 characters, and use 3-6 high-signal tags/hashtags/keywords.",
       "Titles and descriptions must describe only what is actually visible or audible. Do not use fake hype, unsupported outcomes, or invented game events.",
       "Penalize loading screens, menus, dead air, repetitive traversal, unclear context, and weak visual payoff.",
       "A score below 65 must be recommendation=skip.",
@@ -184,7 +185,7 @@ export async function analyzeTwitchClipVideo(
       ],
     }],
       temperature: 0.2,
-      maxOutputTokens: 1_000,
+      maxOutputTokens: 2_000,
     })
     raw = modelOutputSchema.parse(result.output)
   } catch (error) {
