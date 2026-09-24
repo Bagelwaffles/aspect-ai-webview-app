@@ -37,7 +37,7 @@ export const twitchShortRenderJobSchema = z.object({
   errorCode: z.string().max(200).nullable(),
   shortDraft: shortDraftSchema,
   videoAnalysis: z.object({
-    version: z.enum(["twitch-video-analysis-v1", "twitch-video-analysis-v2"]),
+    version: z.enum(["twitch-video-analysis-v1", "twitch-video-analysis-v2", "twitch-video-analysis-v3"]),
     analyzedAt: z.string().datetime(),
     model: z.string().min(1).max(200),
     score: z.number().int().min(0).max(100),
