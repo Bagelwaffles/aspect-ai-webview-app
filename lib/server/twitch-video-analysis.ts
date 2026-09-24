@@ -1,4 +1,4 @@
-import { generateText, Output } from "ai"
+import { generateText } from "ai"
 import { z } from "zod"
 
 import { isAgentRuntimeConfigured } from "@/lib/server/agent-runtime"
@@ -10,47 +10,23 @@ import {
 } from "@/lib/server/twitch-media-factory"
 import { presignR2Object } from "@/lib/server/r2-presign"
 
-export const TWITCH_VIDEO_ANALYSIS_VERSION = "twitch-video-analysis-v2" as const
+export const TWITCH_VIDEO_ANALYSIS_VERSION = "twitch-video-analysis-v3" as const
 export const DEFAULT_TWITCH_VIDEO_ANALYSIS_MODEL = "google/gemini-2.5-flash" as const
 export const TWITCH_VIDEO_RENDER_SCORE_MIN = 65
 
-const modelOutputSchema = z.object({
-  score: z.number().int().min(0).max(100),
+const videoEvidenceSchema = z.object({
+  score: z.coerce.number().int().min(0).max(100),
   recommendation: z.enum(["render", "skip"]),
   reason: z.string().trim().min(1).max(600),
-  observedMoments: z.array(z.string().trim().min(1).max(240)).max(6),
-  bestStartSeconds: z.number().min(0).max(120).nullable(),
-  bestEndSeconds: z.number().min(0).max(120).nullable(),
+  observedMoments: z.array(z.string().trim().min(1).max(240)).min(1).max(6),
+  bestStartSeconds: z.coerce.number().min(0).max(120).nullable().optional().default(null),
+  bestEndSeconds: z.coerce.number().min(0).max(120).nullable().optional().default(null),
   hook: z.string().trim().min(1).max(180),
   caption: z.string().trim().min(1).max(1000),
-  publishMetadata: z.object({
-    title: z.string().trim().min(1).max(140),
-    description: z.string().trim().min(1).max(5000),
-    tags: z.array(z.string().trim().min(1).max(80)).min(3).max(20),
-    hashtags: z.array(z.string().trim().min(1).max(80)).min(3).max(12),
-    keywords: z.array(z.string().trim().min(1).max(80)).min(3).max(15),
-    categoryLabel: z.string().trim().min(1).max(120),
-    twitchClipTitle: z.string().trim().min(1).max(100),
-    youtube: z.object({
-      title: z.string().trim().min(1).max(100),
-      description: z.string().trim().min(1).max(5000),
-      tags: z.array(z.string().trim().min(1).max(80)).min(3).max(20),
-      hashtags: z.array(z.string().trim().min(1).max(80)).min(3).max(12),
-    }).strict(),
-    tiktok: z.object({
-      caption: z.string().trim().min(1).max(2200),
-      hashtags: z.array(z.string().trim().min(1).max(80)).min(3).max(12),
-    }).strict(),
-    instagram: z.object({
-      caption: z.string().trim().min(1).max(2200),
-      hashtags: z.array(z.string().trim().min(1).max(80)).min(3).max(12),
-    }).strict(),
-    x: z.object({
-      post: z.string().trim().min(1).max(280),
-    }).strict(),
-  }).strict(),
   evidenceBoundary: z.string().trim().min(1).max(500),
-}).strict()
+}).passthrough()
+
+export type TwitchVideoEvidence = z.infer<typeof videoEvidenceSchema>
 
 type Options = {
   env?: NodeJS.ProcessEnv
@@ -78,6 +54,203 @@ function clampMoment(value: number | null, duration: number) {
   return Math.max(0, Math.min(duration, value))
 }
 
+function compactWhitespace(value: string) {
+  return value.replace(/\s+/g, " ").trim()
+}
+
+function truncate(value: string, max: number) {
+  const cleanValue = compactWhitespace(value)
+  if (cleanValue.length <= max) return cleanValue
+  return cleanValue.slice(0, Math.max(1, max - 1)).trimEnd() + "…"
+}
+
+function uniqueStrings(values: string[], max: number) {
+  return Array.from(new Set(values.map((value) => compactWhitespace(value)).filter(Boolean))).slice(0, max)
+}
+
+function keywordTokens(...values: string[]) {
+  const stop = new Set([
+    "about", "after", "again", "also", "because", "before", "being", "from", "have",
+    "into", "just", "more", "that", "the", "their", "then", "there", "these", "they",
+    "this", "through", "very", "what", "when", "where", "which", "while", "with", "your",
+  ])
+  return uniqueStrings(
+    values
+      .flatMap((value) => value.split(/[^A-Za-z0-9'+-]+/))
+      .map((word) => word.trim())
+      .filter((word) => word.length >= 3 && !stop.has(word.toLowerCase())),
+    20,
+  )
+}
+
+function hashtag(value: string) {
+  const normalized = value.replace(/[^A-Za-z0-9]/g, "")
+  return normalized ? `#${normalized.slice(0, 60)}` : null
+}
+
+export function parseTwitchVideoEvidenceText(text: string): TwitchVideoEvidence {
+  const trimmed = text.trim()
+  const unfenced = trimmed
+    .replace(/^\s*```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/i, "")
+    .trim()
+  const first = unfenced.indexOf("{")
+  const last = unfenced.lastIndexOf("}")
+  if (first < 0 || last <= first) throw new Error("TWITCH_VIDEO_ANALYSIS_JSON_INVALID")
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(unfenced.slice(first, last + 1))
+  } catch {
+    throw new Error("TWITCH_VIDEO_ANALYSIS_JSON_INVALID")
+  }
+  const result = videoEvidenceSchema.safeParse(parsed)
+  if (!result.success) throw new Error("TWITCH_VIDEO_ANALYSIS_JSON_INVALID")
+  return result.data
+}
+
+export function buildTwitchPublishMetadata(input: {
+  creatorName: string
+  sourceTitle: string
+  evidence: TwitchVideoEvidence
+}) {
+  const creator = truncate(input.creatorName || "Creator", 80)
+  const evidence = input.evidence
+  const observedLead = evidence.observedMoments[0] || evidence.hook
+  const titleBase = truncate(observedLead || evidence.hook || "Gameplay highlight", 105)
+  const canonicalTitle = truncate(titleBase, 140)
+  const youtubeTitle = truncate(canonicalTitle, 100)
+  const description = truncate(
+    `${evidence.caption}\n\nActual Twitch footage from ${creator}. ${evidence.evidenceBoundary}`,
+    5000,
+  )
+
+  const tokens = keywordTokens(
+    canonicalTitle,
+    evidence.caption,
+    evidence.observedMoments.join(" "),
+    input.sourceTitle,
+    creator,
+  )
+  const tags = uniqueStrings([
+    ...tokens.slice(0, 10),
+    creator,
+    "gaming",
+    "Twitch",
+    "gaming highlights",
+    "short-form video",
+  ], 20).map((value) => truncate(value, 80))
+
+  while (tags.length < 3) tags.push(["gaming", "Twitch", "shorts"][tags.length])
+
+  const hashCandidates = uniqueStrings([
+    creator,
+    ...tokens.slice(0, 5),
+    "Gaming",
+    "Twitch",
+    "Shorts",
+  ], 12)
+    .map(hashtag)
+    .filter((value): value is string => Boolean(value))
+  const hashtags = uniqueStrings(hashCandidates, 12)
+  while (hashtags.length < 3) hashtags.push(["#Gaming", "#Twitch", "#Shorts"][hashtags.length])
+
+  const keywords = uniqueStrings([
+    ...tokens,
+    `${creator} Twitch`,
+    "gaming highlight",
+    "Twitch clip",
+  ], 15).map((value) => truncate(value, 80))
+  while (keywords.length < 3) keywords.push(["gaming", "Twitch clip", "gameplay"][keywords.length])
+
+  const socialSuffix = hashtags.slice(0, 5).join(" ")
+  const socialCaption = truncate(`${evidence.caption} ${socialSuffix}`, 2200)
+
+  return {
+    title: canonicalTitle,
+    description,
+    tags,
+    hashtags,
+    keywords,
+    categoryLabel: "Gaming",
+    twitchClipTitle: truncate(canonicalTitle, 100),
+    youtube: {
+      title: youtubeTitle,
+      description,
+      tags,
+      hashtags,
+    },
+    tiktok: {
+      caption: socialCaption,
+      hashtags,
+    },
+    instagram: {
+      caption: socialCaption,
+      hashtags,
+    },
+    x: {
+      post: truncate(evidence.caption, 280),
+    },
+  }
+}
+
+async function requestVideoEvidence(input: {
+  model: string
+  signedUrl: string
+  clipId: string
+  title: string
+  duration: number
+  retry: boolean
+}) {
+  const prompt = [
+    "Analyze this actual Twitch gameplay video for short-form repurposing.",
+    `Clip ID: ${input.clipId}`,
+    `Twitch title/context: ${input.title || "(untitled)"}`,
+    `Clip duration: approximately ${input.duration} seconds.`,
+    "Return one VALID JSON object only. No markdown, no code fence, no commentary.",
+    "Use exactly these keys:",
+    '{"score":0,"recommendation":"skip","reason":"...","observedMoments":["..."],"bestStartSeconds":null,"bestEndSeconds":null,"hook":"...","caption":"...","evidenceBoundary":"..."}',
+    "score must be an integer 0-100.",
+    "recommendation must be render or skip. Scores below 65 must be skip.",
+    "observedMoments must contain 1-6 short statements describing only visible or audible evidence.",
+    "bestStartSeconds/bestEndSeconds should identify the strongest window when useful, otherwise null.",
+    "hook and caption must stay factual and grounded in the footage.",
+    input.retry
+      ? "Previous structured parsing failed. Keep this response especially short and syntactically valid JSON."
+      : "Do not add any fields beyond those shown.",
+  ].join("\n")
+
+  const result = await generateText({
+    model: input.model,
+    system: [
+      "You are the Aspect Marketing Solutions Twitch Video Analyst.",
+      "Review the supplied actual creator gameplay footage before AMS is allowed to render a Short.",
+      "Base every claim only on what is visible or audible in the supplied video.",
+      "Do not invent kills, wins, reactions, dialogue, game events, people, or outcomes.",
+      "Prefer clear action, tension, humor, surprise, skill, payoff, or a strong reaction.",
+      "Penalize loading screens, menus, dead air, repetitive traversal, unclear context, and weak visual payoff.",
+      "If evidence is ambiguous, choose skip rather than guessing.",
+      "Do not publish, message, moderate, spend money, or mutate external accounts.",
+      "Output only valid JSON matching the requested compact shape.",
+    ].join("\n"),
+    messages: [{
+      role: "user",
+      content: [
+        { type: "text", text: prompt },
+        {
+          type: "file",
+          data: new URL(input.signedUrl),
+          mediaType: "video/mp4",
+          filename: `${input.clipId}.mp4`,
+        },
+      ],
+    }],
+    temperature: input.retry ? 0 : 0.15,
+    maxOutputTokens: 900,
+  })
+
+  return result.text
+}
+
 export async function analyzeTwitchClipVideo(
   clipId: string,
   options: Options = {},
@@ -101,52 +274,24 @@ export async function analyzeTwitchClipVideo(
   const duration = Math.max(5, Math.min(120, item.duration ?? 60))
   const model = getTwitchVideoAnalysisModel(env)
 
-  const result = await generateText({
-    model,
-    output: Output.object({ schema: modelOutputSchema }),
-    system: [
-      "You are the Aspect Marketing Solutions Twitch Video Analyst.",
-      "You are reviewing actual creator gameplay footage before AMS is allowed to render a Short.",
-      "Base every claim only on what is visible or audible in the supplied video.",
-      "Do not invent kills, wins, reactions, dialogue, game events, people, or outcomes.",
-      "Prefer moments with clear action, tension, humor, surprise, skill, payoff, or a strong reaction.",
-      "Create a complete publish-ready metadata package from the actual footage: title, description, tags, hashtags, keywords, category label, Twitch clip title, YouTube metadata, TikTok caption, Instagram caption, and X copy.",
-      "Titles and descriptions must describe only what is actually visible or audible. Do not use fake hype, unsupported outcomes, or invented game events.",
-      "Penalize loading screens, menus, dead air, repetitive traversal, unclear context, and weak visual payoff.",
-      "A score below 65 must be recommendation=skip.",
-      "If evidence is ambiguous, skip rather than guessing.",
-      "Do not publish, message, moderate, spend money, or mutate external accounts.",
-      "Return only the structured analysis object.",
-    ].join("\n"),
-    messages: [{
-      role: "user",
-      content: [
-        {
-          type: "text",
-          text: [
-            `Analyze this Twitch gameplay clip for Short-form repurposing.`,
-            `Clip ID: ${item.clipId}`,
-            `Twitch title: ${item.title || "(untitled)"}`,
-            `Clip duration: approximately ${duration} seconds.`,
-            `Score 0-100 for whether this actual footage deserves a private 9:16 Short.`,
-            `Identify only observed moments. Give the strongest approximate start/end window within the clip when possible.`,
-            `Write the hook, caption, and complete publish metadata from the actual footage, not metadata-only assumptions.`,
-            `Make the main title strong enough to be the canonical AMS Short title. Produce platform-specific variants where useful.`,
-          ].join("\n"),
-        },
-        {
-          type: "file",
-          data: new URL(signed.url),
-          mediaType: "video/mp4",
-          filename: `${item.clipId}.mp4`,
-        },
-      ],
-    }],
-    temperature: 0.2,
-    maxOutputTokens: 1_000,
-  })
+  let raw: TwitchVideoEvidence | null = null
+  for (let attempt = 0; attempt < 2 && !raw; attempt += 1) {
+    const text = await requestVideoEvidence({
+      model,
+      signedUrl: signed.url,
+      clipId: item.clipId,
+      title: item.title,
+      duration,
+      retry: attempt > 0,
+    })
+    try {
+      raw = parseTwitchVideoEvidenceText(text)
+    } catch {
+      if (attempt === 1) throw new Error("TWITCH_VIDEO_ANALYSIS_JSON_INVALID")
+    }
+  }
+  if (!raw) throw new Error("TWITCH_VIDEO_ANALYSIS_JSON_INVALID")
 
-  const raw = modelOutputSchema.parse(result.output)
   const score = Math.max(0, Math.min(100, Math.round(raw.score)))
   const recommendation =
     raw.recommendation === "render" && score >= TWITCH_VIDEO_RENDER_SCORE_MIN
@@ -164,6 +309,19 @@ export async function analyzeTwitchClipVideo(
     bestEndSeconds = null
   }
 
+  const normalizedEvidence: TwitchVideoEvidence = {
+    ...raw,
+    score,
+    recommendation,
+    bestStartSeconds,
+    bestEndSeconds,
+  }
+  const publishMetadata = buildTwitchPublishMetadata({
+    creatorName: item.creatorName || queue.broadcasterLogin,
+    sourceTitle: item.title,
+    evidence: normalizedEvidence,
+  })
+
   const record = twitchVideoAnalysisRecordSchema.parse({
     version: TWITCH_VIDEO_ANALYSIS_VERSION,
     clipId: item.clipId,
@@ -177,7 +335,7 @@ export async function analyzeTwitchClipVideo(
     bestEndSeconds,
     hook: raw.hook,
     caption: raw.caption,
-    publishMetadata: raw.publishMetadata,
+    publishMetadata,
     evidenceBoundary: raw.evidenceBoundary,
   })
 

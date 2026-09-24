@@ -2,7 +2,9 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import {
+  buildTwitchPublishMetadata,
   isTwitchVideoAnalysisRenderEligible,
+  parseTwitchVideoEvidenceText,
   TWITCH_VIDEO_RENDER_SCORE_MIN,
 } from "../lib/server/twitch-video-analysis"
 import { twitchVideoAnalysisRecordSchema } from "../lib/server/twitch-media-factory"
@@ -61,4 +63,52 @@ test("Twitch video analysis v2 carries complete publish metadata", () => {
   assert.equal(parsed.publishMetadata?.title, "Fast Call of Duty Turnaround")
   assert.equal(parsed.publishMetadata?.youtube.title, "Fast Call of Duty Turnaround")
   assert.equal(parsed.publishMetadata?.tags.length, 3)
+})
+
+
+test("Twitch video evidence parser accepts fenced JSON and ignores surrounding text", () => {
+  const fenced = [
+    "```json",
+    "{",
+    '  "score": 82,',
+    '  "recommendation": "render",',
+    '  "reason": "Visible action has a clear payoff.",',
+    '  "observedMoments": ["Player lands a visible shot and immediately changes position."],',
+    '  "bestStartSeconds": 4,',
+    '  "bestEndSeconds": 16,',
+    '  "hook": "Quick shot, instant reposition.",',
+    '  "caption": "A fast gameplay moment with a visible shot and immediate reposition.",',
+    '  "evidenceBoundary": "Claims are limited to visible and audible events in this clip."',
+    "}",
+    "```",
+  ].join("\n")
+  const parsed = parseTwitchVideoEvidenceText(fenced)
+  assert.equal(parsed.score, 82)
+  assert.equal(parsed.recommendation, "render")
+  assert.equal(parsed.bestStartSeconds, 4)
+})
+
+test("Twitch publish metadata is built from verified video evidence without another model call", () => {
+  const evidence = parseTwitchVideoEvidenceText(JSON.stringify({
+    score: 88,
+    recommendation: "render",
+    reason: "Clear action and payoff.",
+    observedMoments: ["Player escapes pressure and reaches cover."],
+    bestStartSeconds: 3,
+    bestEndSeconds: 17,
+    hook: "A clean escape under pressure.",
+    caption: "The player escapes pressure and reaches cover in this gameplay clip.",
+    evidenceBoundary: "Only visible and audible events are described.",
+  }))
+  const metadata = buildTwitchPublishMetadata({
+    creatorName: "SmokyBanana03",
+    sourceTitle: "Evening stream",
+    evidence,
+  })
+
+  assert.match(metadata.title, /escapes pressure/i)
+  assert.equal(metadata.youtube.title.length <= 100, true)
+  assert.equal(metadata.tags.length >= 3, true)
+  assert.equal(metadata.hashtags.length >= 3, true)
+  assert.match(metadata.description, /SmokyBanana03/)
 })

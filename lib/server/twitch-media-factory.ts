@@ -25,7 +25,7 @@ const LATEST_QUEUE_KEY = "ams:twitch-media:v1:latest"
 const QUEUE_TTL_SECONDS = 60 * 60 * 24 * 180
 
 export const twitchVideoAnalysisRecordSchema = z.object({
-  version: z.enum(["twitch-video-analysis-v1", "twitch-video-analysis-v2"]),
+  version: z.enum(["twitch-video-analysis-v1", "twitch-video-analysis-v2", "twitch-video-analysis-v3"]),
   clipId: z.string().min(1).max(160),
   analyzedAt: z.string().datetime(),
   model: z.string().min(1).max(200),
