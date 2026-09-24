@@ -7,7 +7,9 @@ const quickAuditSource = readFileSync(new URL("../components/quick-audit-checkou
 
 test("content brief fields remain editable when execution is unavailable", () => {
   assert.doesNotMatch(contentAgentSource, /<fieldset[^>]*disabled=\{!launchEnabled/)
-  assert.match(contentAgentSource, /<Button type="submit" disabled=\{!launchEnabled \|\| isSubmitting\}/)
+  assert.match(contentAgentSource, /<Button type="submit" disabled=\{!launchEnabled \|\| isSubmitting \|\| !externalProcessingConsent\}/)
+  assert.match(contentAgentSource, /type="checkbox"[\s\S]*?checked=\{externalProcessingConsent\}/)
+  assert.match(contentAgentSource, /X-AMS-External-Processing-Consent": "granted"/)
 })
 
 test("content brief uses mobile-friendly text controls", () => {
