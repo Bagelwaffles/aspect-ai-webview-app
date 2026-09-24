@@ -1,4 +1,4 @@
-import { generateText } from "ai"
+import { generateText, Output } from "ai"
 import { z } from "zod"
 
 import { isAgentRuntimeConfigured } from "@/lib/server/agent-runtime"
@@ -13,6 +13,8 @@ import { presignR2Object } from "@/lib/server/r2-presign"
 export const TWITCH_VIDEO_ANALYSIS_VERSION = "twitch-video-analysis-v3" as const
 export const DEFAULT_TWITCH_VIDEO_ANALYSIS_MODEL = "google/gemini-2.5-flash" as const
 export const TWITCH_VIDEO_RENDER_SCORE_MIN = 65
+
+const VIDEO_EVIDENCE_REPAIR_MODEL = "google/gemini-2.5-flash-lite" as const
 
 const videoEvidenceSchema = z.object({
   score: z.coerce.number().int().min(0).max(100),
@@ -193,6 +195,34 @@ export function buildTwitchPublishMetadata(input: {
   }
 }
 
+async function repairVideoEvidenceText(text: string): Promise<TwitchVideoEvidence | null> {
+  const raw = text.trim()
+  if (!raw) return null
+  try {
+    const result = await generateText({
+      model: VIDEO_EVIDENCE_REPAIR_MODEL,
+      output: Output.object({ schema: videoEvidenceSchema }),
+      system: [
+        "You normalize an existing video analyst response into the required object.",
+        "Use only information already present in the supplied response.",
+        "Do not add gameplay events, outcomes, people, dialogue, or actions that are not stated.",
+        "If the response is uncertain or lacks a strong highlight, recommendation must be skip.",
+        "A score below 65 must use recommendation=skip.",
+      ].join("\n"),
+      prompt: [
+        "Normalize this Twitch video-analysis response into the required schema.",
+        "Preserve uncertainty and factual boundaries.",
+        raw.slice(0, 8_000),
+      ].join("\n\n"),
+      temperature: 0,
+      maxOutputTokens: 900,
+    })
+    return videoEvidenceSchema.parse(result.output)
+  } catch {
+    return null
+  }
+}
+
 async function requestVideoEvidence(input: {
   model: string
   signedUrl: string
@@ -287,10 +317,10 @@ export async function analyzeTwitchClipVideo(
     try {
       raw = parseTwitchVideoEvidenceText(text)
     } catch {
-      if (attempt === 1) throw new Error("TWITCH_VIDEO_ANALYSIS_JSON_INVALID")
+      raw = await repairVideoEvidenceText(text)
     }
   }
-  if (!raw) throw new Error("TWITCH_VIDEO_ANALYSIS_JSON_INVALID")
+  if (!raw) throw new Error("TWITCH_VIDEO_ANALYSIS_EVIDENCE_INVALID")
 
   const score = Math.max(0, Math.min(100, Math.round(raw.score)))
   const recommendation =
