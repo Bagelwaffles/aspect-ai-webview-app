@@ -10,8 +10,10 @@ import {
   type TwitchRecentVod,
 } from "@/lib/server/twitch-pilot"
 import {
+  getLatestTwitchMediaQueue,
   importTwitchClipMedia,
   syncTwitchDailyMediaQueue,
+  type TwitchVideoAnalysisRecord,
 } from "@/lib/server/twitch-media-factory"
 import {
   enqueueTwitchShortRender,
@@ -249,20 +251,40 @@ export async function runTwitchAutomaticPrivateShorts() {
     return null
   })
 
-  const analyzed: Array<{ clipId: string; score: number }> = []
-  for (const item of (queue?.items ?? []).slice(0, TWITCH_AUTO_FACTORY_MAX_ANALYSES)) {
+  const clipIds = (queue?.items ?? [])
+    .slice(0, TWITCH_AUTO_FACTORY_MAX_ANALYSES)
+    .map((item) => item.clipId)
+  const analyzed: Array<{ clipId: string; score: number; analysis: TwitchVideoAnalysisRecord }> = []
+
+  for (const clipId of clipIds) {
     try {
-      let current = item
-      if (current.status === "discovered") {
-        const imported = await importTwitchClipMedia(current.clipId)
+      let latest = await getLatestTwitchMediaQueue()
+      let current = latest?.items.find((item) => item.clipId === clipId) ?? null
+
+      if (!current) {
+        latest = await syncTwitchDailyMediaQueue({
+          dayKey: dailyQueueKey(),
+          broadcasterId: status.connection.broadcasterId,
+          broadcasterLogin: status.connection.login,
+          scopes,
+          clips: dayClips,
+        })
+        current = latest.items.find((item) => item.clipId === clipId) ?? null
+      }
+      if (!current) throw new Error("TWITCH_MEDIA_CLIP_NOT_FOUND")
+
+      if (current.status === "discovered" || !current.objectKey || !current.importedAt) {
+        const imported = await importTwitchClipMedia(clipId)
         current = imported.item
       }
-      if (current.status === "discovered") continue
+      if (current.status === "discovered" || !current.objectKey || !current.importedAt) {
+        throw new Error("TWITCH_MEDIA_IMPORT_REQUIRED")
+      }
 
-      const analysis = await analyzeTwitchClipVideo(current.clipId)
-      analyzed.push({ clipId: current.clipId, score: analysis.score })
+      const analysis = await analyzeTwitchClipVideo(clipId)
+      analyzed.push({ clipId, score: analysis.score, analysis })
     } catch (error) {
-      failures.push(`${item.clipId}:analysis:${safeError(error)}`)
+      failures.push(`${clipId}:analysis:${safeError(error)}`)
     }
   }
 
@@ -273,8 +295,7 @@ export async function runTwitchAutomaticPrivateShorts() {
   let queued = 0
   for (const candidate of ranked) {
     try {
-      const analysis = await analyzeTwitchClipVideo(candidate.clipId)
-      if (!isTwitchVideoAnalysisRenderEligible(analysis)) continue
+      if (!isTwitchVideoAnalysisRenderEligible(candidate.analysis)) continue
       await enqueueTwitchShortRender(candidate.clipId)
       queued += 1
     } catch (error) {
