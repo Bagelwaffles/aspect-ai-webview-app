@@ -32,6 +32,19 @@ type ContentRun = {
     callToAction: string
     safetyNotes: string[]
   } | null
+  provenance: {
+    version: string
+    aiGenerated: boolean
+    automaticallyVerified: boolean
+    humanReviewed: boolean
+    externalProviders: string[]
+    customerConsent: {
+      humanReview: "not-required" | "granted" | "not-granted"
+      externalProvider: "not-required" | "granted" | "not-granted"
+      recordedAt: string | null
+    }
+    labels: string[]
+  } | null
   errorCode: string | null
   createdAt: string
   updatedAt: string
@@ -105,6 +118,7 @@ export default function ContentAgentPage() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [requestKey, setRequestKey] = useState<string | null>(null)
+  const [externalProcessingConsent, setExternalProcessingConsent] = useState(false)
 
   function updateBrief(patch: Partial<ContentRun["input"]>) {
     setBrief((current) => ({ ...current, ...patch }))
@@ -143,6 +157,12 @@ export default function ContentAgentPage() {
       return
     }
     if (isSubmitting) return
+    if (!externalProcessingConsent) {
+      setSubmitError(
+        "EXTERNAL_PROCESSING_CONSENT_REQUIRED: Approve external AI processing before generating.",
+      )
+      return
+    }
 
     setIsSubmitting(true)
     setSubmitError(null)
@@ -155,6 +175,7 @@ export default function ContentAgentPage() {
         headers: {
           "Content-Type": "application/json",
           "Idempotency-Key": operationKey,
+          "X-AMS-External-Processing-Consent": "granted",
         },
         body: JSON.stringify({
           ...brief,
@@ -170,6 +191,7 @@ export default function ContentAgentPage() {
       }
       setResult(body.run)
       setRequestKey(null)
+      setExternalProcessingConsent(false)
       await loadRuns()
     } catch {
       setSubmitError("NETWORK_ERROR: Retry to safely reuse the same content run idempotency key.")
@@ -336,13 +358,33 @@ export default function ContentAgentPage() {
                   </div>
                 </fieldset>
 
+                <div className="rounded-lg border border-border bg-muted/30 p-4">
+                  <label className="flex cursor-pointer items-start gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={externalProcessingConsent}
+                      onChange={(event) => {
+                        setExternalProcessingConsent(event.target.checked)
+                        setSubmitError(null)
+                      }}
+                      className="mt-1 h-4 w-4"
+                    />
+                    <span>
+                      I approve sending this brief and relevant saved workspace context to the disclosed external AI processing provider for this generation.
+                    </span>
+                  </label>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                    This generation is AI-produced and automatically checked for required structure and safe persistence. It is not human-reviewed. Any future human review requires separate explicit consent and must be recorded in the run audit trail.
+                  </p>
+                </div>
+
                 {submitError ? (
                   <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                     {submitError}
                   </div>
                 ) : null}
 
-                <Button type="submit" disabled={!launchEnabled || isSubmitting} className="h-11 w-full sm:w-auto">
+                <Button type="submit" disabled={!launchEnabled || isSubmitting || !externalProcessingConsent} className="h-11 w-full sm:w-auto">
                   {isSubmitting ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating</>
                   ) : launchEnabled ? (
@@ -364,6 +406,35 @@ export default function ContentAgentPage() {
               <CardContent>
                 {result?.output ? (
                   <div className="space-y-5">
+                    <div className="rounded-lg border border-primary/25 bg-primary/5 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Execution transparency</p>
+                      {result.provenance ? (
+                        <div className="mt-3 space-y-2 text-sm">
+                          <div className="flex flex-wrap gap-2">
+                            {result.provenance.aiGenerated ? <Badge variant="outline">AI-generated</Badge> : null}
+                            {result.provenance.automaticallyVerified ? <Badge variant="outline">Automatically verified</Badge> : null}
+                            <Badge variant="outline">
+                              {result.provenance.humanReviewed ? "Human-reviewed" : "No human review"}
+                            </Badge>
+                            {result.provenance.externalProviders.length ? <Badge variant="outline">External provider</Badge> : null}
+                          </div>
+                          {result.provenance.externalProviders.length ? (
+                            <p className="text-xs text-muted-foreground">
+                              Processing provider: {result.provenance.externalProviders.join(", ")}. Customer consent was recorded for this run.
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">No external provider was recorded for this run.</p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            “Automatically verified” means AMS validated the required output structure and protected persistence path; it does not mean every factual claim was independently fact-checked.
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Execution details are unavailable for this legacy run.
+                        </p>
+                      )}
+                    </div>
                     <div>
                       <p className="text-xs font-medium uppercase text-muted-foreground">Headline</p>
                       <h2 className="mt-1 break-words text-lg font-semibold">{result.output.headline}</h2>
@@ -425,6 +496,18 @@ export default function ContentAgentPage() {
                         </div>
                         <h3 className="mt-2 break-words text-sm font-semibold">{run.output?.headline ?? run.input.businessName}</h3>
                         <p className="mt-1 line-clamp-2 break-words text-sm text-muted-foreground">{run.input.goal}</p>
+                        {run.status === "succeeded" && run.provenance ? (
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            {run.provenance.aiGenerated ? <span>AI-generated</span> : null}
+                            {run.provenance.automaticallyVerified ? <span>• Automatically verified</span> : null}
+                            <span>• {run.provenance.humanReviewed ? "Human-reviewed" : "No human review"}</span>
+                            {run.provenance.externalProviders.length ? (
+                              <span>• Provider: {run.provenance.externalProviders.join(", ")}</span>
+                            ) : null}
+                          </div>
+                        ) : run.status === "succeeded" ? (
+                          <p className="mt-2 text-xs text-muted-foreground">Execution provenance unavailable for this legacy run.</p>
+                        ) : null}
                         {run.errorCode ? <p className="mt-2 text-xs text-muted-foreground">Status: {run.errorCode}</p> : null}
                       </article>
                     ))}

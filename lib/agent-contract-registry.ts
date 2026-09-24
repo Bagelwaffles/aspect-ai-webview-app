@@ -167,6 +167,7 @@ export function listAgentContracts(): AgentContract[] {
     contextSources: [...contract.contextSources],
     permissions: contract.permissions.map((permission) => ({ ...permission })),
     requiredConnections: [...contract.requiredConnections],
+    executionTransparency: { ...contract.executionTransparency },
     controlLimits: { ...contract.controlLimits },
     liveProof: { ...contract.liveProof },
   }))

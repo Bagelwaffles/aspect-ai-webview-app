@@ -5,7 +5,7 @@ export const metadata = {
   description: "Privacy policy for Aspect Marketing Solutions web services and the AMS Android companion app.",
 }
 
-const updated = "September 12, 2026"
+const updated = "September 24, 2026"
 
 export default function PrivacyPolicyPage() {
   return (
@@ -71,14 +71,24 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-2xl font-bold">5. Security</h2>
+          <h2 className="text-2xl font-bold">5. AI execution transparency and consent</h2>
+          <p className="leading-7 text-muted-foreground">
+            AMS distinguishes AI-generated work, automatic validation, human review, and external-provider processing. The protected generation workflows require affirmative customer consent before customer-provided content or relevant saved workspace context is sent to an external AI model provider.
+          </p>
+          <p className="leading-7 text-muted-foreground">
+            Successful protected generation runs record execution provenance, including whether the result was AI-generated, whether required output structure and persistence were automatically validated, whether a human reviewed the work, which external processing provider was used, and the recorded consent state. A human review or other new external handoff requires the applicable consent before that handling occurs.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-2xl font-bold">6. Security</h2>
           <p className="leading-7 text-muted-foreground">
             We use HTTPS in transit, server-side secret storage, authenticated access controls, and operational safeguards designed to limit unauthorized access. The Android tester roster is available only on an internal operator surface. No internet service can guarantee absolute security, so AMS also uses monitoring, rate limits, and incident-response practices where appropriate.
           </p>
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-2xl font-bold">6. Retention and deletion</h2>
+          <h2 className="text-2xl font-bold">7. Retention and deletion</h2>
           <p className="leading-7 text-muted-foreground">
             AMS keeps information only as long as reasonably needed for the purpose it was collected, to operate and secure the service, and to meet legal, tax, accounting, dispute, or fraud-prevention requirements. The current Android beta roster and private feedback records are configured with a maximum 120-day application retention window unless a shorter deletion request or longer lawful retention requirement applies.
           </p>
@@ -88,21 +98,21 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-2xl font-bold">7. Children</h2>
+          <h2 className="text-2xl font-bold">8. Children</h2>
           <p className="leading-7 text-muted-foreground">
             AMS business software and services are not directed to children under 13. We do not knowingly design the Android companion or beta recruitment program to collect personal information from children.
           </p>
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-2xl font-bold">8. Changes to this policy</h2>
+          <h2 className="text-2xl font-bold">9. Changes to this policy</h2>
           <p className="leading-7 text-muted-foreground">
             We may update this policy as AMS features, providers, or legal requirements change. We will update the date at the top of this page when the policy changes materially.
           </p>
         </section>
 
         <section className="space-y-3 rounded-xl border border-border bg-card p-6">
-          <h2 className="text-2xl font-bold">9. Privacy contact</h2>
+          <h2 className="text-2xl font-bold">10. Privacy contact</h2>
           <p className="leading-7 text-muted-foreground">
             Aspect Marketing Solutions<br />
             Privacy and support contact: <a className="text-primary underline underline-offset-4" href="mailto:kimberleyaversbiz@gmail.com">kimberleyaversbiz@gmail.com</a>
