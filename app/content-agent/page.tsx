@@ -191,6 +191,7 @@ export default function ContentAgentPage() {
       }
       setResult(body.run)
       setRequestKey(null)
+      setExternalProcessingConsent(false)
       await loadRuns()
     } catch {
       setSubmitError("NETWORK_ERROR: Retry to safely reuse the same content run idempotency key.")
@@ -495,7 +496,7 @@ export default function ContentAgentPage() {
                         </div>
                         <h3 className="mt-2 break-words text-sm font-semibold">{run.output?.headline ?? run.input.businessName}</h3>
                         <p className="mt-1 line-clamp-2 break-words text-sm text-muted-foreground">{run.input.goal}</p>
-                        {run.provenance ? (
+                        {run.status === "succeeded" && run.provenance ? (
                           <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                             {run.provenance.aiGenerated ? <span>AI-generated</span> : null}
                             {run.provenance.automaticallyVerified ? <span>• Automatically verified</span> : null}
