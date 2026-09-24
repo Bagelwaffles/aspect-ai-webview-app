@@ -2,7 +2,9 @@ import {
   createTwitchClipFromVod,
   getTwitchPilotStatus,
   getTwitchRecentArchive,
+  reconcilePendingTwitchVodClips,
   TWITCH_MEDIA_SCOPE,
+  type PendingTwitchVodClip,
   type TwitchPilotSummary,
   type TwitchRecentClip,
   type TwitchRecentVod,
@@ -90,12 +92,14 @@ export function selectDailyVodSampleCandidates(
   vod: TwitchRecentVod,
   clips: TwitchRecentClip[],
   maxClips = TWITCH_AUTO_FACTORY_MAX_CLIPS_PER_VOD,
+  reserved: Array<Pick<PendingTwitchVodClip, "vodId" | "vodOffset">> = [],
 ) {
   const limit = Math.max(0, Math.min(TWITCH_AUTO_FACTORY_MAX_CLIPS_PER_VOD, Math.trunc(maxClips)))
   if (!vod.id || vod.durationSeconds < 20 || limit === 0) return []
 
   const existing = clips.filter((clip) => clip.videoId === vod.id)
-  const remaining = Math.max(0, limit - Math.min(existing.length, limit))
+  const reservedForVod = reserved.filter((item) => item.vodId === vod.id)
+  const remaining = Math.max(0, limit - Math.min(existing.length + reservedForVod.length, limit))
   if (!remaining) return []
 
   const preferred = remaining === 1 ? [0.5] : remaining === 2 ? [1 / 3, 2 / 3] : [0.25, 0.5, 0.75]
@@ -111,7 +115,8 @@ export function selectDailyVodSampleCandidates(
     }
   }).filter((candidate, index, all) =>
     all.findIndex((item) => item.positionSeconds === candidate.positionSeconds) === index &&
-    !existing.some((clip) => typeof clip.vodOffset === "number" && Math.abs(clip.vodOffset - candidate.positionSeconds) <= 5),
+    !existing.some((clip) => typeof clip.vodOffset === "number" && Math.abs(clip.vodOffset - candidate.positionSeconds) <= 5) &&
+    !reservedForVod.some((item) => Math.abs(item.vodOffset - candidate.positionSeconds) <= 5),
   ).slice(0, remaining)
 }
 
@@ -149,36 +154,80 @@ export async function runTwitchAutomaticPrivateShorts() {
   }
 
   const failures: string[] = []
+  const reconciliation = await reconcilePendingTwitchVodClips().catch((error) => {
+    failures.push(`pending-reconcile:${safeError(error)}`)
+    return {
+      materialized: [] as TwitchRecentClip[],
+      failed: [] as PendingTwitchVodClip[],
+      pending: [] as PendingTwitchVodClip[],
+    }
+  })
+
+  const knownClips = [...archive.clips]
+  const knownClipIds = new Set(knownClips.map((clip) => clip.id))
+  for (const clip of reconciliation.materialized) {
+    if (!knownClipIds.has(clip.id)) {
+      knownClips.push(clip)
+      knownClipIds.add(clip.id)
+    }
+  }
+
+  const reservations = [...reconciliation.pending, ...reconciliation.failed]
   let created = 0
+  let trackedCreated = 0
 
   for (const vod of archive.vods) {
-    const candidates = selectDailyVodSampleCandidates(vod, archive.clips)
+    const candidates = selectDailyVodSampleCandidates(
+      vod,
+      knownClips,
+      TWITCH_AUTO_FACTORY_MAX_CLIPS_PER_VOD,
+      reservations,
+    )
     for (let index = 0; index < candidates.length; index += 1) {
       const candidate = candidates[index]
       const duration = Math.min(30, Math.max(15, Math.round(Math.min(30, vod.durationSeconds / 6))))
       try {
-        await createTwitchClipFromVod({
+        const clip = await createTwitchClipFromVod({
           vodId: vod.id,
           vodOffset: candidate.positionSeconds,
           duration,
           title: candidate.description.slice(0, 100),
         })
         created += 1
+        if (clip.tracked) {
+          trackedCreated += 1
+          reservations.push({
+            id: clip.id,
+            vodId: vod.id,
+            vodOffset: candidate.positionSeconds,
+            duration,
+            title: candidate.description.slice(0, 100),
+            requestedAt: new Date().toISOString(),
+          })
+        } else {
+          failures.push(`${vod.id}:track:TWITCH_VOD_CLIP_PENDING_STORE_UNAVAILABLE`)
+        }
       } catch (error) {
         failures.push(`${vod.id}:create:${safeError(error)}`)
       }
     }
   }
 
-  // Twitch clip creation is asynchronous. Existing/manual clips plus any newly
-  // materialized clips are processed now; newly created clips can join on a later
-  // scheduled pass without duplicating VOD sampling once their offsets are visible.
   const refreshedArchive = await getTwitchRecentArchive(24).catch((error) => {
     failures.push(`archive-refresh:${safeError(error)}`)
     return archive
   })
 
-  const dayClips = refreshedArchive.clips
+  const combinedClips = [...refreshedArchive.clips]
+  const combinedClipIds = new Set(combinedClips.map((clip) => clip.id))
+  for (const clip of reconciliation.materialized) {
+    if (!combinedClipIds.has(clip.id)) {
+      combinedClips.push(clip)
+      combinedClipIds.add(clip.id)
+    }
+  }
+
+  const dayClips = combinedClips
     .filter((clip) => refreshedArchive.vods.some((vod) => vod.id === clip.videoId))
     .sort((left, right) => Date.parse(right.createdAt || "0") - Date.parse(left.createdAt || "0"))
     .slice(0, TWITCH_AUTO_FACTORY_MAX_DAY_CLIPS)
@@ -234,6 +283,9 @@ export async function runTwitchAutomaticPrivateShorts() {
     vodCount: refreshedArchive.vods.length,
     clipCount: dayClips.length,
     created,
+    verified: reconciliation.materialized.length,
+    pending: reconciliation.pending.length + trackedCreated,
+    expired: reconciliation.failed.length,
     analyzed: analyzed.length,
     queued,
     failures,

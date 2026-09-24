@@ -8,6 +8,7 @@ import {
   createTwitchOauthAttempt,
   processTwitchEventSubNotification,
   readTwitchOauthAttempt,
+  reconcilePendingTwitchVodClips,
   resolveTwitchConfig,
   TWITCH_MEDIA_SCOPE,
   TWITCH_SCOPE,
@@ -184,4 +185,72 @@ test("failed EventSub processing releases the message claim so Twitch can retry"
     redis: redis as never,
   })
   assert.equal(duplicate.duplicate, true)
+})
+
+
+test("pending Twitch VOD clips are verified by returned clip ID and removed from the ledger", async () => {
+  const values = new Map<string, string>()
+  values.set("ams:twitch-pilot:v1:vod-clips:pending", JSON.stringify([{
+    id: "clip-materialized-1",
+    vodId: "vod-123",
+    vodOffset: 900,
+    duration: 30,
+    title: "Sample",
+    requestedAt: "2026-09-24T20:00:00.000Z",
+  }]))
+
+  const redis = {
+    async set(key: string, value: string) {
+      values.set(key, value)
+      return "OK"
+    },
+    async get(key: string) {
+      return values.get(key) ?? null
+    },
+    async del(...keys: string[]) {
+      let removed = 0
+      for (const key of keys) if (values.delete(key)) removed += 1
+      return removed
+    },
+  }
+
+  const fetcher = async (input: string | URL) => {
+    const url = String(input)
+    if (url.startsWith("https://id.twitch.tv/oauth2/token")) {
+      return new Response(JSON.stringify({
+        access_token: "app-token",
+        expires_in: 3600,
+        token_type: "bearer",
+      }), { status: 200, headers: { "Content-Type": "application/json" } })
+    }
+    assert.match(url, /helix\/clips\?id=clip-materialized-1/)
+    return new Response(JSON.stringify({
+      data: [{
+        id: "clip-materialized-1",
+        title: "Sample",
+        url: "https://clips.twitch.tv/clip-materialized-1",
+        creator_name: "SmokyBanana03",
+        view_count: 0,
+        created_at: "2026-09-24T20:00:30.000Z",
+        video_id: "vod-123",
+        game_id: "game-1",
+        thumbnail_url: "https://example.test/thumb.jpg",
+        duration: 30,
+        vod_offset: 870,
+      }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } })
+  }
+
+  const result = await reconcilePendingTwitchVodClips({
+    env: testEnv(),
+    redis: redis as never,
+    fetcher: fetcher as typeof fetch,
+    now: () => new Date("2026-09-24T20:01:05.000Z"),
+  })
+
+  assert.equal(result.materialized.length, 1)
+  assert.equal(result.failed.length, 0)
+  assert.equal(result.pending.length, 0)
+  assert.equal(result.materialized[0].videoId, "vod-123")
+  assert.deepEqual(JSON.parse(values.get("ams:twitch-pilot:v1:vod-clips:pending") ?? "[]"), [])
 })
