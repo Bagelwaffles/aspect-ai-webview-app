@@ -266,7 +266,7 @@ export async function uploadPrivateVideoToLockedSmokyChannel(
       "Content-Type": contentType,
       "Content-Length": String(sourceBuffer.byteLength),
     },
-    body: Buffer.from(sourceBuffer),
+    body: new Uint8Array(sourceBuffer),
     cache: "no-store",
     signal: AbortSignal.timeout(120_000),
   })
