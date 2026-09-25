@@ -15,7 +15,7 @@
     "test:credit-ledger:redis": "node --import tsx --test tests/credit-ledger.redis.test.ts"
   },
   "dependencies": {
-    "@ai-sdk/xai": "latest",
+    "@ai-sdk/xai": "4.0.57",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -45,7 +45,7 @@
     "@radix-ui/react-toggle-group": "1.1.1",
     "@radix-ui/react-tooltip": "1.1.6",
     "@upstash/redis": "1.36.0",
-    "ai": "latest",
+    "ai": "7.0.97",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
