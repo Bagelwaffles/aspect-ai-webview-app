@@ -19,6 +19,7 @@ import { isR2AssetStorageConfigured } from "@/lib/server/r2-presign"
 import { checkRedisReadiness } from "@/lib/server/redis-readiness"
 import { isInternalApiConfigured } from "@/lib/server/internal-api-auth"
 import { getSmokyYouTubeConfiguration } from "@/lib/server/smoky-youtube-uploader"
+import { getSmokyYouTubeVodUploadConfiguration } from "@/lib/server/smoky-youtube-vod-jobs"
 
 export type BackendMonitorStatus =
   | "ok"
@@ -205,6 +206,7 @@ async function monitorCoreHealth(context: MonitorContext) {
   const r2Configured = isR2AssetStorageConfigured(context.env)
   const twitchRenderConfigured = isTwitchShortRenderConfigured(context.env)
   const smokyYouTube = getSmokyYouTubeConfiguration(context.env)
+  const smokyYouTubeVod = getSmokyYouTubeVodUploadConfiguration(context.env)
 
   const critical: string[] = []
   const warnings: string[] = []
@@ -222,6 +224,9 @@ async function monitorCoreHealth(context: MonitorContext) {
   }
   if (smokyYouTube.enabled && !smokyYouTube.configured) {
     warnings.push("SmokyBanana03 YouTube auto-upload is enabled but the locked channel OAuth configuration is incomplete.")
+  }
+  if (smokyYouTubeVod.enabled && !smokyYouTubeVod.configured) {
+    warnings.push("SmokyBanana03 full-length VOD upload is enabled but its worker, storage, encryption, or locked YouTube configuration is incomplete.")
   }
 
   const status: BackendMonitorStatus = critical.length
@@ -249,6 +254,8 @@ async function monitorCoreHealth(context: MonitorContext) {
       twitchRenderConfigured,
       smokyYouTubeAutoUploadEnabled: smokyYouTube.enabled,
       smokyYouTubeAutoUploadConfigured: smokyYouTube.configured,
+      smokyYouTubeVodUploadEnabled: smokyYouTubeVod.enabled,
+      smokyYouTubeVodUploadConfigured: smokyYouTubeVod.configured,
     },
   )
 }
