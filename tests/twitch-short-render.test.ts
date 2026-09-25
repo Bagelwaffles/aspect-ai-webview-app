@@ -37,7 +37,7 @@ test("media worker keeps the exact bearer secret as a fallback", async () => {
   assert.equal(await authorizeMediaWorker(workerSecret, configuredEnv), false)
 })
 
-test("GitHub Actions worker claims are pinned to the production Twitch workflow", () => {
+test("GitHub Actions worker claims are pinned to approved production Twitch workflows", () => {
   const now = Date.parse("2026-09-22T02:30:00.000Z")
   const valid = {
     iss: "https://token.actions.githubusercontent.com",
@@ -56,6 +56,19 @@ test("GitHub Actions worker claims are pinned to the production Twitch workflow"
     runner_environment: "github-hosted",
   }
   assert.equal(validateGitHubActionsWorkerClaims(valid, now), true)
+  assert.equal(validateGitHubActionsWorkerClaims({
+    ...valid,
+    workflow: "Twitch Latest Render Artifact Export",
+    workflow_ref: "Bagelwaffles/aspect-ai-webview-app/.github/workflows/twitch-short-export-latest.yml@refs/heads/main",
+    event_name: "push",
+  }, now), true)
+  assert.equal(validateGitHubActionsWorkerClaims({
+    ...valid,
+    workflow: "Twitch Latest Render Artifact Export",
+    workflow_ref: "Bagelwaffles/aspect-ai-webview-app/.github/workflows/twitch-short-render-worker.yml@refs/heads/main",
+    event_name: "push",
+  }, now), false)
+  assert.equal(validateGitHubActionsWorkerClaims({ ...valid, workflow: "Unapproved Workflow" }, now), false)
   assert.equal(validateGitHubActionsWorkerClaims({ ...valid, repository: "other/repo" }, now), false)
   assert.equal(validateGitHubActionsWorkerClaims({ ...valid, ref: "refs/heads/feature" }, now), false)
   assert.equal(validateGitHubActionsWorkerClaims({ ...valid, event_name: "pull_request" }, now), false)
