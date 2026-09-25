@@ -63,7 +63,9 @@ test("VOD worker implements ranged source reads and resumable YouTube status che
   assert.match(worker, /Content-Range.*bytes \*\/\{total_bytes\}/u)
   assert.match(worker, /status == 308/u)
   assert.match(worker, /YOUTUBE_UPLOAD_FINAL_STATE_UNCERTAIN/u)
-  assert.match(worker, /privacy/u, "worker should be paired with private-only server session policy")
+  const server = readFileSync("lib/server/smoky-youtube-vod-jobs.ts", "utf8")
+  assert.match(server, /privacyStatus:\s*"private"/u)
+  assert.match(server, /notifySubscribers.*false/u)
 })
 
 test("VOD GitHub worker is OIDC-scoped and never receives permanent Google secrets", () => {
