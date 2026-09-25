@@ -133,9 +133,16 @@ const GITHUB_ACTIONS_OIDC_JWKS = "https://token.actions.githubusercontent.com/.w
 const GITHUB_ACTIONS_WORKER_AUDIENCE = "ams-twitch-worker"
 const GITHUB_ACTIONS_WORKER_REPOSITORY = "Bagelwaffles/aspect-ai-webview-app"
 const GITHUB_ACTIONS_WORKER_REPOSITORY_ID = "1026496028"
-const GITHUB_ACTIONS_WORKER_WORKFLOW = "Twitch Short Render Worker"
-const GITHUB_ACTIONS_WORKER_WORKFLOW_REF =
-  "Bagelwaffles/aspect-ai-webview-app/.github/workflows/twitch-short-render-worker.yml@refs/heads/main"
+const GITHUB_ACTIONS_ALLOWED_WORKFLOWS = new Map([
+  [
+    "Twitch Short Render Worker",
+    "Bagelwaffles/aspect-ai-webview-app/.github/workflows/twitch-short-render-worker.yml@refs/heads/main",
+  ],
+  [
+    "Twitch Latest Render Artifact Export",
+    "Bagelwaffles/aspect-ai-webview-app/.github/workflows/twitch-short-export-latest.yml@refs/heads/main",
+  ],
+] as const)
 
 type GitHubActionsWorkerClaims = {
   iss?: unknown
@@ -180,8 +187,8 @@ export function validateGitHubActionsWorkerClaims(
   if (claims.repository !== GITHUB_ACTIONS_WORKER_REPOSITORY) return false
   if (claims.repository_id !== GITHUB_ACTIONS_WORKER_REPOSITORY_ID) return false
   if (claims.ref !== "refs/heads/main") return false
-  if (claims.workflow !== GITHUB_ACTIONS_WORKER_WORKFLOW) return false
-  if (claims.workflow_ref !== GITHUB_ACTIONS_WORKER_WORKFLOW_REF) return false
+  if (typeof claims.workflow !== "string" || typeof claims.workflow_ref !== "string") return false
+  if (GITHUB_ACTIONS_ALLOWED_WORKFLOWS.get(claims.workflow) !== claims.workflow_ref) return false
   if (!["schedule", "workflow_dispatch", "push"].includes(String(claims.event_name ?? ""))) return false
   if (claims.environment !== "production") return false
   if (claims.runner_environment !== undefined && claims.runner_environment !== "github-hosted") return false
