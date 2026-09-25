@@ -1,0 +1,85 @@
+name: Twitch Latest Render Artifact Export
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/twitch-short-export-latest.yml"
+      - "app/api/internal/twitch/media/render/export/route.ts"
+      - "lib/server/twitch-short-render-jobs.ts"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: twitch-short-export-latest
+  cancel-in-progress: true
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      AMS_APP_URL: https://www.aspectmarketingsolutions.app
+      AMS_WORKER_AUDIENCE: ams-twitch-worker
+    steps:
+      - name: Export latest rendered Short
+        id: export
+        shell: bash
+        run: |
+          set -euo pipefail
+          token_response="$(curl --fail-with-body --silent --show-error \
+            -H \"Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN\" \
+            \"$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AMS_WORKER_AUDIENCE\")"
+          worker_token="$(printf '%s' "$token_response" | jq -r '.value // empty')"
+          if [ -z "$worker_token" ]; then
+            echo "::error::GitHub OIDC worker token was not issued."
+            exit 1
+          fi
+          echo "::add-mask::$worker_token"
+
+          response=""
+          for attempt in $(seq 1 18); do
+            set +e
+            response="$(curl --fail-with-body --silent --show-error \
+              -H \"Authorization: Bearer $worker_token\" \
+              \"$AMS_APP_URL/api/internal/twitch/media/render/export\")"
+            status=$?
+            set -e
+            if [ "$status" -eq 0 ]; then
+              break
+            fi
+            sleep 10
+          done
+
+          if [ -z "$response" ]; then
+            echo "::error::Rendered Short export endpoint did not become available."
+            exit 1
+          fi
+
+          preview_url="$(printf '%s' "$response" | jq -r '.previewUrl // empty')"
+          job_id="$(printf '%s' "$response" | jq -r '.job.jobId // empty')"
+          clip_id="$(printf '%s' "$response" | jq -r '.job.clipId // empty')"
+          hook="$(printf '%s' "$response" | jq -r '.job.shortDraft.hook // empty')"
+          if [ -z "$preview_url" ] || [ -z "$job_id" ]; then
+            echo "::error::Rendered Short export response was incomplete."
+            exit 1
+          fi
+
+          echo "::add-mask::$preview_url"
+          printf '%s' "$response" | jq '{jobId:.job.jobId,clipId:.job.clipId,outputObjectKey:.job.outputObjectKey,hook:.job.shortDraft.hook}'
+          curl --fail-with-body --silent --show-error "$preview_url" -o "$RUNNER_TEMP/corrected-short.mp4"
+          test -s "$RUNNER_TEMP/corrected-short.mp4"
+          echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
+          echo "clip_id=$clip_id" >> "$GITHUB_OUTPUT"
+          echo "hook=$hook" >> "$GITHUB_OUTPUT"
+
+      - name: Upload corrected Short artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: twitch-render-${{ steps.export.outputs.job_id }}
+          path: ${{ runner.temp }}/corrected-short.mp4
+          if-no-files-found: error
+          retention-days: 1

@@ -620,3 +620,14 @@ export async function getRenderedShortPreview(
   const signed = presignR2Object("GET", job.outputObjectKey, { expiresInSeconds: 600 }, env)
   return { job, previewUrl: signed.url }
 }
+
+export async function getLatestRenderedShortPreview(
+  options: Options = {},
+) {
+  const env = options.env ?? process.env
+  const jobs = await listLatestTwitchShortRenderJobs(options)
+  const job = jobs.find((candidate) => candidate.status === "rendered") ?? null
+  if (!job) return null
+  const signed = presignR2Object("GET", job.outputObjectKey, { expiresInSeconds: 600 }, env)
+  return { job, previewUrl: signed.url }
+}
