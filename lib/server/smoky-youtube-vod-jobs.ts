@@ -404,7 +404,7 @@ export async function claimNextSmokyYouTubeVodUpload(
     if (!job || job.status === "uploaded" || job.status === "uncertain") continue
     if (job.attempts >= MAX_ATTEMPTS) continue
     if (job.status === "uploading" && leaseActive(job, at)) continue
-    if (!["pending", "failed", "uploading"].includes(job.status)) continue
+    if (!["pending", "uploading"].includes(job.status)) continue
 
     const claimToken = randomUUID()
     const locked = await redis.set(claimLockKey(job.jobId), claimToken, {
