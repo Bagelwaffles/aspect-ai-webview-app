@@ -272,6 +272,62 @@ function safeSegment(value: string) {
   return value.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 180)
 }
 
+function personalizePublishMetadata(
+  metadata: NonNullable<TwitchShortRenderJob["publishMetadata"]>,
+  creatorName: string,
+) {
+  return {
+    ...metadata,
+    title: personalizeTwitchCreatorCopy(metadata.title, creatorName),
+    description: personalizeTwitchCreatorCopy(metadata.description, creatorName),
+    tags: metadata.tags.map((value) => personalizeTwitchCreatorCopy(value, creatorName)),
+    keywords: metadata.keywords.map((value) => personalizeTwitchCreatorCopy(value, creatorName)),
+    twitchClipTitle: personalizeTwitchCreatorCopy(metadata.twitchClipTitle, creatorName),
+    youtube: {
+      ...metadata.youtube,
+      title: personalizeTwitchCreatorCopy(metadata.youtube.title, creatorName),
+      description: personalizeTwitchCreatorCopy(metadata.youtube.description, creatorName),
+      tags: metadata.youtube.tags.map((value) => personalizeTwitchCreatorCopy(value, creatorName)),
+    },
+    tiktok: {
+      ...metadata.tiktok,
+      caption: personalizeTwitchCreatorCopy(metadata.tiktok.caption, creatorName),
+    },
+    instagram: {
+      ...metadata.instagram,
+      caption: personalizeTwitchCreatorCopy(metadata.instagram.caption, creatorName),
+    },
+    x: {
+      ...metadata.x,
+      post: personalizeTwitchCreatorCopy(metadata.x.post, creatorName),
+    },
+  }
+}
+
+function hasGenericStreamerCopy(job: TwitchShortRenderJob) {
+  const values = [
+    job.shortDraft.title,
+    job.shortDraft.hook,
+    job.shortDraft.caption,
+    job.publishMetadata?.title,
+    job.publishMetadata?.description,
+    job.publishMetadata?.youtube.title,
+    job.publishMetadata?.youtube.description,
+  ].filter((value): value is string => Boolean(value))
+  return values.some((value) => /\bstreamer(?:'s|’s)?\b/i.test(value))
+}
+
+function creatorNameForLegacyJob(job: TwitchShortRenderJob, fallback: string) {
+  const descriptionMatch = job.publishMetadata?.description.match(/Actual Twitch footage from ([A-Za-z0-9_]+)/i)?.[1]
+  if (descriptionMatch) return descriptionMatch
+
+  const reserved = new Set(["gaming", "twitch", "shorts"])
+  const hashtagName = job.publishMetadata?.hashtags
+    .map((value) => value.replace(/^#/, ""))
+    .find((value) => value && !reserved.has(value.toLowerCase()))
+  return hashtagName || fallback
+}
+
 function jobId(streamId: string, clipId: string) {
   return createHash("sha256")
     .update(`${streamId}:${clipId}:short-v1:${TWITCH_SHORT_RENDER_LAYOUT_VERSION}`)
@@ -350,33 +406,10 @@ export async function enqueueTwitchShortRender(
 
   const timestamp = nowIso(options)
   const creatorName = item.creatorName || queue.broadcasterLogin
-  const publishMetadata = item.videoAnalysis.publishMetadata
-  const personalizedPublishMetadata = {
-    ...publishMetadata,
-    title: personalizeTwitchCreatorCopy(publishMetadata.title, creatorName),
-    description: personalizeTwitchCreatorCopy(publishMetadata.description, creatorName),
-    tags: publishMetadata.tags.map((value) => personalizeTwitchCreatorCopy(value, creatorName)),
-    keywords: publishMetadata.keywords.map((value) => personalizeTwitchCreatorCopy(value, creatorName)),
-    twitchClipTitle: personalizeTwitchCreatorCopy(publishMetadata.twitchClipTitle, creatorName),
-    youtube: {
-      ...publishMetadata.youtube,
-      title: personalizeTwitchCreatorCopy(publishMetadata.youtube.title, creatorName),
-      description: personalizeTwitchCreatorCopy(publishMetadata.youtube.description, creatorName),
-      tags: publishMetadata.youtube.tags.map((value) => personalizeTwitchCreatorCopy(value, creatorName)),
-    },
-    tiktok: {
-      ...publishMetadata.tiktok,
-      caption: personalizeTwitchCreatorCopy(publishMetadata.tiktok.caption, creatorName),
-    },
-    instagram: {
-      ...publishMetadata.instagram,
-      caption: personalizeTwitchCreatorCopy(publishMetadata.instagram.caption, creatorName),
-    },
-    x: {
-      ...publishMetadata.x,
-      post: personalizeTwitchCreatorCopy(publishMetadata.x.post, creatorName),
-    },
-  }
+  const personalizedPublishMetadata = personalizePublishMetadata(
+    item.videoAnalysis.publishMetadata,
+    creatorName,
+  )
   const outputObjectKey = [
     "creators",
     "twitch",
@@ -425,6 +458,76 @@ export async function enqueueTwitchShortRender(
     saveIndex([job.jobId, ...index.filter((value) => value !== job.jobId)], redis),
   ])
   return job
+}
+
+export async function requeueGenericCreatorTwitchShortRenders(
+  options: Options = {},
+) {
+  const env = options.env ?? process.env
+  const redis = runtimeRedis(options)
+  if (!redis) throw new Error("TWITCH_SHORT_RENDER_STORE_UNAVAILABLE")
+  if (!isTwitchShortRenderConfigured(env)) throw new Error("TWITCH_SHORT_RENDER_NOT_CONFIGURED")
+
+  const queue = await getLatestTwitchMediaQueue({ env, redis })
+  const fallbackCreatorName = queue?.broadcasterLogin || "Creator"
+  const jobs = await listLatestTwitchShortRenderJobs({ ...options, redis })
+  let index = await loadIndex(redis)
+  let requeued = 0
+
+  for (const legacy of jobs) {
+    if (requeued >= 3) break
+    if (legacy.status !== "rendered") continue
+    if (legacy.outputObjectKey.endsWith(`-${TWITCH_SHORT_RENDER_LAYOUT_VERSION}.mp4`)) continue
+    if (!legacy.publishMetadata || !hasGenericStreamerCopy(legacy)) continue
+
+    const id = jobId(legacy.streamId, legacy.clipId)
+    const existing = await getTwitchShortRenderJob(id, { ...options, redis })
+    if (existing && existing.status !== "failed") continue
+
+    const creatorName = creatorNameForLegacyJob(legacy, fallbackCreatorName)
+    const timestamp = nowIso(options)
+    const outputObjectKey = [
+      "creators",
+      "twitch",
+      safeSegment(legacy.broadcasterId),
+      safeSegment(legacy.streamId),
+      "shorts",
+      `${safeSegment(legacy.clipId)}-${TWITCH_SHORT_RENDER_LAYOUT_VERSION}.mp4`,
+    ].join("/")
+
+    const next = twitchShortRenderJobSchema.parse({
+      ...legacy,
+      jobId: id,
+      outputObjectKey,
+      status: "pending",
+      attempts: existing?.attempts ?? 0,
+      createdAt: existing?.createdAt ?? timestamp,
+      updatedAt: timestamp,
+      claimedAt: null,
+      completedAt: null,
+      errorCode: null,
+      shortDraft: {
+        ...legacy.shortDraft,
+        title: personalizeTwitchCreatorCopy(legacy.shortDraft.title, creatorName),
+        hook: personalizeTwitchCreatorCopy(legacy.shortDraft.hook, creatorName),
+        caption: personalizeTwitchCreatorCopy(legacy.shortDraft.caption, creatorName),
+      },
+      videoAnalysis: legacy.videoAnalysis
+        ? {
+            ...legacy.videoAnalysis,
+            reason: personalizeTwitchCreatorCopy(legacy.videoAnalysis.reason, creatorName),
+          }
+        : undefined,
+      publishMetadata: personalizePublishMetadata(legacy.publishMetadata, creatorName),
+    })
+
+    await saveJob(next, redis)
+    index = [next.jobId, ...index.filter((value) => value !== next.jobId)]
+    requeued += 1
+  }
+
+  if (requeued) await saveIndex(index, redis)
+  return requeued
 }
 
 export async function claimNextTwitchShortRenderJob(options: Options = {}) {
