@@ -5,9 +5,10 @@ import { z } from "zod"
 
 import { isR2AssetStorageConfigured, presignR2Object } from "@/lib/server/r2-presign"
 import { getLatestTwitchMediaQueue } from "@/lib/server/twitch-media-factory"
+import { personalizeTwitchCreatorCopy } from "@/lib/server/twitch-video-analysis"
 
 export const TWITCH_SHORT_RENDER_VERSION = "twitch-short-render-v1" as const
-const TWITCH_SHORT_RENDER_LAYOUT_VERSION = "safe-text-v2" as const
+const TWITCH_SHORT_RENDER_LAYOUT_VERSION = "safe-text-v3" as const
 
 const JOB_KEY_PREFIX = "ams:twitch-short-render:v1:job:"
 const JOB_INDEX_KEY = "ams:twitch-short-render:v1:index"
@@ -372,7 +373,11 @@ export async function enqueueTwitchShortRender(
     claimedAt: null,
     completedAt: null,
     errorCode: null,
-    shortDraft: item.shortDraft,
+    shortDraft: {
+      ...item.shortDraft,
+      hook: personalizeTwitchCreatorCopy(item.shortDraft.hook, item.creatorName || queue.broadcasterLogin),
+      caption: personalizeTwitchCreatorCopy(item.shortDraft.caption, item.creatorName || queue.broadcasterLogin),
+    },
     videoAnalysis: {
       version: item.videoAnalysis.version,
       analyzedAt: item.videoAnalysis.analyzedAt,
