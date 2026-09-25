@@ -5,7 +5,7 @@ import { z } from "zod"
 
 import { isR2AssetStorageConfigured, presignR2Object } from "@/lib/server/r2-presign"
 import { getLatestTwitchMediaQueue } from "@/lib/server/twitch-media-factory"
-import { personalizeTwitchCreatorCopy } from "@/lib/server/twitch-video-analysis"
+import { personalizeTwitchCreatorCopy } from "@/lib/server/twitch-creator-copy"
 
 export const TWITCH_SHORT_RENDER_VERSION = "twitch-short-render-v1" as const
 const TWITCH_SHORT_RENDER_LAYOUT_VERSION = "safe-text-v3" as const
