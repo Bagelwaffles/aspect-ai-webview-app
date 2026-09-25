@@ -18,6 +18,7 @@ import {
 import { isR2AssetStorageConfigured } from "@/lib/server/r2-presign"
 import { checkRedisReadiness } from "@/lib/server/redis-readiness"
 import { isInternalApiConfigured } from "@/lib/server/internal-api-auth"
+import { getCloudBrowserConfiguration } from "@/lib/server/cloud-browser-dispatch"
 
 export type BackendMonitorStatus =
   | "ok"
@@ -203,6 +204,7 @@ async function monitorCoreHealth(context: MonitorContext) {
   )
   const r2Configured = isR2AssetStorageConfigured(context.env)
   const twitchRenderConfigured = isTwitchShortRenderConfigured(context.env)
+  const cloudBrowser = getCloudBrowserConfiguration(context.env)
 
   const critical: string[] = []
   const warnings: string[] = []
@@ -217,6 +219,9 @@ async function monitorCoreHealth(context: MonitorContext) {
     !twitchRenderConfigured
   ) {
     warnings.push("Twitch short rendering is enabled but its worker/storage configuration is incomplete.")
+  }
+  if (cloudBrowser.enabled && !cloudBrowser.configured) {
+    warnings.push("Vercel Cloud Browser Worker is enabled but its URL or dispatch key is incomplete.")
   }
 
   const status: BackendMonitorStatus = critical.length
@@ -242,6 +247,8 @@ async function monitorCoreHealth(context: MonitorContext) {
       stripeConfigured,
       r2Configured,
       twitchRenderConfigured,
+      cloudBrowserEnabled: cloudBrowser.enabled,
+      cloudBrowserConfigured: cloudBrowser.configured,
     },
   )
 }
