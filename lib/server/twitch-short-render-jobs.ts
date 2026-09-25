@@ -5,9 +5,10 @@ import { z } from "zod"
 
 import { isR2AssetStorageConfigured, presignR2Object } from "@/lib/server/r2-presign"
 import { getLatestTwitchMediaQueue } from "@/lib/server/twitch-media-factory"
+import { personalizeTwitchCreatorCopy } from "@/lib/server/twitch-creator-copy"
 
 export const TWITCH_SHORT_RENDER_VERSION = "twitch-short-render-v1" as const
-const TWITCH_SHORT_RENDER_LAYOUT_VERSION = "safe-text-v2" as const
+const TWITCH_SHORT_RENDER_LAYOUT_VERSION = "safe-text-v3" as const
 
 const JOB_KEY_PREFIX = "ams:twitch-short-render:v1:job:"
 const JOB_INDEX_KEY = "ams:twitch-short-render:v1:index"
@@ -348,6 +349,34 @@ export async function enqueueTwitchShortRender(
   }
 
   const timestamp = nowIso(options)
+  const creatorName = item.creatorName || queue.broadcasterLogin
+  const publishMetadata = item.videoAnalysis.publishMetadata
+  const personalizedPublishMetadata = {
+    ...publishMetadata,
+    title: personalizeTwitchCreatorCopy(publishMetadata.title, creatorName),
+    description: personalizeTwitchCreatorCopy(publishMetadata.description, creatorName),
+    tags: publishMetadata.tags.map((value) => personalizeTwitchCreatorCopy(value, creatorName)),
+    keywords: publishMetadata.keywords.map((value) => personalizeTwitchCreatorCopy(value, creatorName)),
+    twitchClipTitle: personalizeTwitchCreatorCopy(publishMetadata.twitchClipTitle, creatorName),
+    youtube: {
+      ...publishMetadata.youtube,
+      title: personalizeTwitchCreatorCopy(publishMetadata.youtube.title, creatorName),
+      description: personalizeTwitchCreatorCopy(publishMetadata.youtube.description, creatorName),
+      tags: publishMetadata.youtube.tags.map((value) => personalizeTwitchCreatorCopy(value, creatorName)),
+    },
+    tiktok: {
+      ...publishMetadata.tiktok,
+      caption: personalizeTwitchCreatorCopy(publishMetadata.tiktok.caption, creatorName),
+    },
+    instagram: {
+      ...publishMetadata.instagram,
+      caption: personalizeTwitchCreatorCopy(publishMetadata.instagram.caption, creatorName),
+    },
+    x: {
+      ...publishMetadata.x,
+      post: personalizeTwitchCreatorCopy(publishMetadata.x.post, creatorName),
+    },
+  }
   const outputObjectKey = [
     "creators",
     "twitch",
@@ -372,18 +401,23 @@ export async function enqueueTwitchShortRender(
     claimedAt: null,
     completedAt: null,
     errorCode: null,
-    shortDraft: item.shortDraft,
+    shortDraft: {
+      ...item.shortDraft,
+      title: personalizeTwitchCreatorCopy(item.shortDraft.title, creatorName),
+      hook: personalizeTwitchCreatorCopy(item.shortDraft.hook, creatorName),
+      caption: personalizeTwitchCreatorCopy(item.shortDraft.caption, creatorName),
+    },
     videoAnalysis: {
       version: item.videoAnalysis.version,
       analyzedAt: item.videoAnalysis.analyzedAt,
       model: item.videoAnalysis.model,
       score: item.videoAnalysis.score,
       recommendation: "render",
-      reason: item.videoAnalysis.reason,
+      reason: personalizeTwitchCreatorCopy(item.videoAnalysis.reason, creatorName),
       bestStartSeconds: item.videoAnalysis.bestStartSeconds,
       bestEndSeconds: item.videoAnalysis.bestEndSeconds,
     },
-    publishMetadata: item.videoAnalysis.publishMetadata,
+    publishMetadata: personalizedPublishMetadata,
   })
   const index = await loadIndex(redis)
   await Promise.all([

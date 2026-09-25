@@ -8,6 +8,7 @@ import {
   TWITCH_VIDEO_RENDER_SCORE_MIN,
 } from "../lib/server/twitch-video-analysis"
 import { twitchVideoAnalysisRecordSchema } from "../lib/server/twitch-media-factory"
+import { personalizeTwitchCreatorCopy } from "../lib/server/twitch-creator-copy"
 
 test("Twitch video analysis requires both a render recommendation and the score threshold", () => {
   assert.equal(TWITCH_VIDEO_RENDER_SCORE_MIN, 65)
@@ -111,4 +112,22 @@ test("Twitch publish metadata is built from verified video evidence without anot
   assert.equal(metadata.tags.length >= 3, true)
   assert.equal(metadata.hashtags.length >= 3, true)
   assert.match(metadata.description, /SmokyBanana03/)
+})
+
+
+test("Twitch creator copy replaces generic streamer wording with the channel name", () => {
+  assert.equal(
+    personalizeTwitchCreatorCopy(
+      "Streamer's hilarious reaction to rapid eliminations!",
+      "SmokyBanana03",
+    ),
+    "SmokyBanana03’s hilarious reaction to rapid eliminations!",
+  )
+  assert.equal(
+    personalizeTwitchCreatorCopy(
+      "Watch this streamer's epic reaction after securing multiple eliminations.",
+      "SmokyBanana03",
+    ),
+    "Watch SmokyBanana03’s epic reaction after securing multiple eliminations.",
+  )
 })
