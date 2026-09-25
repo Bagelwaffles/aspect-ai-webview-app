@@ -5,6 +5,7 @@ import argparse
 import json
 import subprocess
 import tempfile
+import textwrap
 from pathlib import Path
 
 def run(args: list[str]) -> None:
@@ -18,9 +19,23 @@ def escape_ass(text: str) -> str:
         .replace("\n", r"\N")
     )
 
+def wrap_overlay_text(text: str, *, width: int, max_lines: int) -> str:
+    normalized = " ".join(text.split())
+    lines = textwrap.wrap(
+        normalized,
+        width=width,
+        break_long_words=False,
+        break_on_hyphens=False,
+    )
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = textwrap.shorten(lines[-1], width=width, placeholder="…")
+    return r"\N".join(escape_ass(line) for line in lines)
+
+
 def write_ass(path: Path, hook: str, caption: str) -> None:
-    hook = escape_ass(hook[:180])
-    caption = escape_ass(caption[:500])
+    hook = wrap_overlay_text(hook[:180], width=28, max_lines=3)
+    caption = wrap_overlay_text(caption[:500], width=42, max_lines=3)
     content = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -29,8 +44,8 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Hook,DejaVu Sans,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H90000000,-1,0,0,0,100,100,0,0,1,5,0,8,70,70,150,1
-Style: Caption,DejaVu Sans,46,&H00FFFFFF,&H00FFFFFF,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,1,4,0,2,80,80,170,1
+Style: Hook,DejaVu Sans,62,&H00FFFFFF,&H00FFFFFF,&H00000000,&H90000000,-1,0,0,0,100,100,0,0,3,4,0,8,96,96,190,1
+Style: Caption,DejaVu Sans,38,&H00FFFFFF,&H00FFFFFF,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,3,3,0,2,96,96,220,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
