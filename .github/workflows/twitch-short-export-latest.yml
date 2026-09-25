@@ -31,8 +31,8 @@ jobs:
         run: |
           set -euo pipefail
           token_response="$(curl --fail-with-body --silent --show-error \
-            -H \"Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN\" \
-            \"$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AMS_WORKER_AUDIENCE\")"
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AMS_WORKER_AUDIENCE")"
           worker_token="$(printf '%s' "$token_response" | jq -r '.value // empty')"
           if [ -z "$worker_token" ]; then
             echo "::error::GitHub OIDC worker token was not issued."
@@ -44,8 +44,8 @@ jobs:
           for attempt in $(seq 1 18); do
             set +e
             response="$(curl --fail-with-body --silent --show-error \
-              -H \"Authorization: Bearer $worker_token\" \
-              \"$AMS_APP_URL/api/internal/twitch/media/render/export\")"
+              -H "Authorization: Bearer $worker_token" \
+              "$AMS_APP_URL/api/internal/twitch/media/render/export")"
             status=$?
             set -e
             if [ "$status" -eq 0 ]; then
