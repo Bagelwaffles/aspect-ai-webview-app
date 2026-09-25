@@ -1,0 +1,82 @@
+name: Smoky YouTube VOD Upload Worker
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/smoky-youtube-vod-upload-worker.yml"
+      - "lib/server/smoky-youtube-vod-jobs.ts"
+      - "lib/server/smoky-youtube-uploader.ts"
+      - "scripts/upload_smoky_youtube_vod.py"
+  schedule:
+    - cron: "27 * * * *"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: smoky-youtube-vod-upload-worker
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    environment: production
+    env:
+      AMS_APP_URL: https://www.aspectmarketingsolutions.app
+      AMS_WORKER_AUDIENCE: ams-twitch-worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Claim VOD upload job
+        id: claim
+        shell: bash
+        run: |
+          set -euo pipefail
+          token_response="$(curl --fail-with-body --silent --show-error             -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN"             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AMS_WORKER_AUDIENCE")"
+          worker_token="$(printf '%s' "$token_response" | jq -r '.value // empty')"
+          if [ -z "$worker_token" ]; then
+            echo "::error::GitHub OIDC worker token was not issued."
+            exit 1
+          fi
+          echo "::add-mask::$worker_token"
+
+          response="$(curl --fail-with-body --silent --show-error             -X POST             -H "Authorization: Bearer $worker_token"             "$AMS_APP_URL/api/internal/twitch/vod/upload/next")"
+
+          job_id="$(printf '%s' "$response" | jq -r '.job.jobId // empty')"
+          if [ -z "$job_id" ]; then
+            echo "No pending full-length VOD upload."
+            echo "has_job=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          printf '%s' "$response" > "$RUNNER_TEMP/vod-claim.json"
+          for value in             "$(printf '%s' "$response" | jq -r '.leaseToken // empty')"             "$(printf '%s' "$response" | jq -r '.accessToken // empty')"             "$(printf '%s' "$response" | jq -r '.resumableUrl // empty')"             "$(printf '%s' "$response" | jq -r '.source.url // empty')"; do
+            [ -z "$value" ] || echo "::add-mask::$value"
+          done
+
+          echo "has_job=true" >> "$GITHUB_OUTPUT"
+          echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
+
+      - name: Upload VOD resumably
+        if: steps.claim.outputs.has_job == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/upload_smoky_youtube_vod.py "$RUNNER_TEMP/vod-claim.json"
+
+      - name: Return interrupted job to queue
+        if: failure() && steps.claim.outputs.has_job == 'true'
+        shell: bash
+        run: |
+          set +e
+          job_id="$(jq -r '.job.jobId // empty' "$RUNNER_TEMP/vod-claim.json")"
+          lease_token="$(jq -r '.leaseToken // empty' "$RUNNER_TEMP/vod-claim.json")"
+          [ -n "$job_id" ] && [ -n "$lease_token" ] || exit 0
+          echo "::add-mask::$lease_token"
+          jq -n --arg jobId "$job_id"             '{jobId:$jobId,ok:false,errorCode:"GITHUB_ACTIONS_VOD_WORKER_INTERRUPTED",retriable:true}'             > "$RUNNER_TEMP/vod-failure.json"
+          curl --silent --show-error             -X POST             -H "Authorization: Bearer $lease_token"             -H "Content-Type: application/json"             --data-binary @"$RUNNER_TEMP/vod-failure.json"             "$AMS_APP_URL/api/internal/twitch/vod/upload/complete" || true

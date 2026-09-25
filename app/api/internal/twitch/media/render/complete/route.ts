@@ -5,6 +5,7 @@ import {
   authorizeMediaWorker,
   completeTwitchShortRenderJob,
 } from "@/lib/server/twitch-short-render-jobs"
+import { autoUploadRenderedTwitchShort } from "@/lib/server/smoky-youtube-uploader"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -28,7 +29,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const job = await completeTwitchShortRenderJob(parsed.data)
-    return json({ ok: true, job })
+    const youtubeUpload = job.status === "rendered"
+      ? await autoUploadRenderedTwitchShort(job)
+      : null
+    return json({ ok: true, job, youtubeUpload })
   } catch (error) {
     const code = error instanceof Error ? error.message : "TWITCH_SHORT_RENDER_COMPLETE_FAILED"
     const status = code === "TWITCH_SHORT_RENDER_JOB_NOT_FOUND" ? 404 : 409
