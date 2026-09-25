@@ -33,7 +33,7 @@ jobs:
       AMS_WORKER_AUDIENCE: ams-twitch-worker
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Reconcile automatic private Shorts
         id: reconcile
