@@ -46,10 +46,15 @@ test("authenticated YouTube identity must exactly match the locked SmokyBanana03
 })
 
 test("YouTube upload is hard-coded private with subscriber notifications disabled", async () => {
-  const calls: Array<{ url: string; method: string; body: unknown }> = []
+  const calls: Array<{ url: string; method: string; body: unknown; headers: Headers }> = []
   const fetcher = (async (input: URL | RequestInfo, init?: RequestInit) => {
     const url = String(input)
-    calls.push({ url, method: init?.method ?? "GET", body: init?.body ?? null })
+    calls.push({
+      url,
+      method: init?.method ?? "GET",
+      body: init?.body ?? null,
+      headers: new Headers(init?.headers),
+    })
 
     if (url === "https://oauth2.googleapis.com/token") {
       return new Response(JSON.stringify({ access_token: "access-token", expires_in: 3600 }), {
@@ -116,6 +121,10 @@ test("YouTube upload is hard-coded private with subscriber notifications disable
   assert.equal(parsed.snippet.categoryId, "20")
   assert.match(parsed.snippet.description, /#SmokyBanana03/u)
   assert.match(initiate.url, /notifySubscribers=false/u)
+
+  const mediaPut = calls.find((call) => call.url === "https://upload.youtube.test/session-1")
+  assert.ok(mediaPut)
+  assert.equal(mediaPut.headers.get("authorization"), "Bearer access-token")
 })
 
 test("auto-upload refuses a rendered job from any Twitch broadcaster other than SmokyBanana03", async () => {
