@@ -9,6 +9,7 @@ import {
   type TwitchVideoAnalysisRecord,
 } from "@/lib/server/twitch-media-factory"
 import { presignR2Object } from "@/lib/server/r2-presign"
+import { personalizeTwitchCreatorCopy } from "@/lib/server/twitch-creator-copy"
 
 export const TWITCH_VIDEO_ANALYSIS_VERSION = "twitch-video-analysis-v3" as const
 export const DEFAULT_TWITCH_VIDEO_ANALYSIS_MODEL = "google/gemini-2.5-flash" as const
@@ -88,16 +89,6 @@ function keywordTokens(...values: string[]) {
 function hashtag(value: string) {
   const normalized = value.replace(/[^A-Za-z0-9]/g, "")
   return normalized ? `#${normalized.slice(0, 60)}` : null
-}
-
-export function personalizeTwitchCreatorCopy(value: string, creatorName: string) {
-  const creator = truncate(creatorName || "SmokyBanana03", 80)
-  const possessive = `${creator}’s`
-  return value
-    .replace(/\b(?:this|the)\s+streamer(?:'s|’s)\b/gi, possessive)
-    .replace(/\bstreamer(?:'s|’s)\b/gi, possessive)
-    .replace(/\b(?:this|the)\s+streamer\b/gi, creator)
-    .replace(/\bstreamer\b/gi, creator)
 }
 
 export function parseTwitchVideoEvidenceText(text: string): TwitchVideoEvidence {
