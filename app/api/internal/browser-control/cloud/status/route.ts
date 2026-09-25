@@ -4,15 +4,14 @@ import {
   getCloudBrowserConfiguration,
   getCloudBrowserWorkerStatus,
 } from "@/lib/server/cloud-browser-dispatch"
-import { authorizeOwnerApiRequest } from "@/lib/server/owner-api-auth"
+import { browserAdminAuthorized } from "@/lib/server/browser-control"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
-  const auth = await authorizeOwnerApiRequest(request)
-  if (!auth.ok) {
-    return NextResponse.json({ ok: false, code: auth.code }, { status: auth.status })
+  if (!(await browserAdminAuthorized(request))) {
+    return NextResponse.json({ ok: false, code: "BROWSER_ADMIN_REQUIRED" }, { status: 401 })
   }
 
   const config = getCloudBrowserConfiguration()
