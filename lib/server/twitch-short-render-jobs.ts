@@ -138,6 +138,8 @@ const GITHUB_ACTIONS_ALLOWED_WORKFLOWS: Readonly<Record<string, string>> = {
     "Bagelwaffles/aspect-ai-webview-app/.github/workflows/twitch-short-render-worker.yml@refs/heads/main",
   "Twitch Latest Render Artifact Export":
     "Bagelwaffles/aspect-ai-webview-app/.github/workflows/twitch-short-export-latest.yml@refs/heads/main",
+  "Smoky YouTube VOD Upload Worker":
+    "Bagelwaffles/aspect-ai-webview-app/.github/workflows/smoky-youtube-vod-upload-worker.yml@refs/heads/main",
 }
 
 type GitHubActionsWorkerClaims = {
