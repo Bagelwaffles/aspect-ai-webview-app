@@ -164,10 +164,10 @@ async function shopifyAdminGraphql<T>(
 
   const envelope = graphQlEnvelopeSchema.safeParse(raw)
   if (!envelope.success) throw new Error("SHOPIFY_ADMIN_RESPONSE_INVALID")
-  if (envelope.data === null || envelope.data === undefined) {
+  if (envelope.data.errors?.length) {
     throw new Error("SHOPIFY_ADMIN_GRAPHQL_FAILED")
   }
-  if (envelope.data.errors?.length) {
+  if (envelope.data.data === null || envelope.data.data === undefined) {
     throw new Error("SHOPIFY_ADMIN_GRAPHQL_FAILED")
   }
 
