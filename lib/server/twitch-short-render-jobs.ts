@@ -7,6 +7,7 @@ import { isR2AssetStorageConfigured, presignR2Object } from "@/lib/server/r2-pre
 import { getLatestTwitchMediaQueue } from "@/lib/server/twitch-media-factory"
 
 export const TWITCH_SHORT_RENDER_VERSION = "twitch-short-render-v1" as const
+const TWITCH_SHORT_RENDER_LAYOUT_VERSION = "safe-text-v2" as const
 
 const JOB_KEY_PREFIX = "ams:twitch-short-render:v1:job:"
 const JOB_INDEX_KEY = "ams:twitch-short-render:v1:index"
@@ -271,7 +272,10 @@ function safeSegment(value: string) {
 }
 
 function jobId(streamId: string, clipId: string) {
-  return createHash("sha256").update(`${streamId}:${clipId}:short-v1`).digest("hex").slice(0, 32)
+  return createHash("sha256")
+    .update(`${streamId}:${clipId}:short-v1:${TWITCH_SHORT_RENDER_LAYOUT_VERSION}`)
+    .digest("hex")
+    .slice(0, 32)
 }
 
 async function saveJob(job: TwitchShortRenderJob, redis: Redis) {
@@ -350,7 +354,7 @@ export async function enqueueTwitchShortRender(
     safeSegment(queue.broadcasterId),
     safeSegment(queue.streamId),
     "shorts",
-    `${safeSegment(item.clipId)}.mp4`,
+    `${safeSegment(item.clipId)}-${TWITCH_SHORT_RENDER_LAYOUT_VERSION}.mp4`,
   ].join("/")
 
   const job = twitchShortRenderJobSchema.parse({
