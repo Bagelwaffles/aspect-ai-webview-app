@@ -16,7 +16,7 @@ importers:
   .:
     dependencies:
       '@ai-sdk/xai':
-        specifier: latest
+        specifier: 4.0.57
         version: 4.0.57(zod@3.25.76)
       '@hookform/resolvers':
         specifier: ^3.10.0
@@ -106,7 +106,7 @@ importers:
         specifier: 1.36.0
         version: 1.36.0
       ai:
-        specifier: latest
+        specifier: 7.0.97
         version: 7.0.97(zod@3.25.76)
       class-variance-authority:
         specifier: ^0.7.1
