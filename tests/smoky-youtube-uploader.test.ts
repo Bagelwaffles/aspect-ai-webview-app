@@ -66,7 +66,7 @@ test("YouTube upload is hard-coded private with subscriber notifications disable
       })
     }
     if (url === "https://media.example.test/short.mp4") {
-      return new Response(Buffer.from("fake-video-bytes"), {
+      return new Response(new TextEncoder().encode("fake-video-bytes"), {
         status: 200,
         headers: { "content-type": "video/mp4" },
       })
