@@ -84,9 +84,9 @@ test("connection verification uses server-side token header and pinned Admin API
 })
 
 test("product listing clamps the requested page size", async () => {
-  let requestBody: Record<string, unknown> | null = null
+  const requestBodies: Record<string, unknown>[] = []
   const fetcher = (async (_input: URL | RequestInfo, init?: RequestInit) => {
-    requestBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+    requestBodies.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>)
     return new Response(
       JSON.stringify({
         data: {
@@ -100,13 +100,14 @@ test("product listing clamps the requested page size", async () => {
   }) as typeof fetch
 
   await listShopifyProducts(500, { env: validEnv, fetch: fetcher })
+  const requestBody = requestBodies[0] as { variables?: Record<string, unknown> } | undefined
   assert.deepEqual(requestBody?.variables, { first: 50 })
 })
 
 test("product creation is forced to DRAFT regardless of caller input surface", async () => {
-  let requestBody: Record<string, unknown> | null = null
+  const requestBodies: Record<string, unknown>[] = []
   const fetcher = (async (_input: URL | RequestInfo, init?: RequestInit) => {
-    requestBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+    requestBodies.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>)
     return new Response(
       JSON.stringify({
         data: {
@@ -134,6 +135,7 @@ test("product creation is forced to DRAFT regardless of caller input surface", a
   )
   assert.equal(product.status, "DRAFT")
 
+  const requestBody = requestBodies[0] as { variables?: unknown } | undefined
   const variables = requestBody?.variables as
     | { product?: Record<string, unknown> }
     | undefined
