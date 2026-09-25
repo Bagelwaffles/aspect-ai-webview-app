@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { dispatchCloudBrowserWorker } from "@/lib/server/cloud-browser-dispatch"
-import { authorizeOwnerApiRequest } from "@/lib/server/owner-api-auth"
+import { browserAdminAuthorized } from "@/lib/server/browser-control"
+import { requestHasTrustedAppOrigin } from "@/lib/server/request-origin"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function POST(request: NextRequest) {
-  const auth = await authorizeOwnerApiRequest(request, { requireTrustedOrigin: true })
-  if (!auth.ok) {
-    return NextResponse.json({ ok: false, code: auth.code }, { status: auth.status })
+  if (!(await browserAdminAuthorized(request))) {
+    return NextResponse.json({ ok: false, code: "BROWSER_ADMIN_REQUIRED" }, { status: 401 })
+  }
+  if (!requestHasTrustedAppOrigin(request)) {
+    return NextResponse.json({ ok: false, code: "UNTRUSTED_ORIGIN" }, { status: 403 })
   }
 
   const result = await dispatchCloudBrowserWorker({ force: true })
