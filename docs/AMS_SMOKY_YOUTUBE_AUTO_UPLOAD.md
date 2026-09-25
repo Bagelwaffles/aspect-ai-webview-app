@@ -80,6 +80,14 @@ The source object must be under the SmokyBanana03 AMS-owned VOD namespace:
 
 A different broadcaster, clip namespace, path traversal, arbitrary public URL, or caller-selected YouTube destination is rejected.
 
+### Preferred Twitch-native transfer
+
+Twitch's Video Producer currently exposes an official **Export** action that sends a creator-owned VOD directly to a connected YouTube account without downloading the file locally.
+
+For VODs that still exist in Twitch Video Producer, prefer this official export path when the connected destination can be verified as the existing SmokyBanana03 YouTube channel. The AMS resumable R2 uploader remains the fallback for creator-owned media that has already been archived into AMS storage.
+
+The Twitch Export action is a product UI capability rather than a documented Helix export API. Any zero-touch automation of that path must therefore use the owner-authorized Browser Control worker, stay on Twitch's own Video Producer/Connections pages, stop on login/MFA/CAPTCHA/consent, and verify the destination YouTube identity before export.
+
 ### Remaining Twitch media-ingestion boundary
 
 Twitch's official Helix Videos API exposes VOD metadata/listing and deletion, but it does not expose a general endpoint that returns the raw full-length VOD media file. The AMS uploader therefore starts only after the creator-owned full video is present in AMS R2 through a separate compliant archive/import path.
