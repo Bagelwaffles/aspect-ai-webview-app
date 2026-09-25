@@ -7,6 +7,11 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/twitch-short-render-worker.yml"
+      - "lib/server/twitch-auto-factory.ts"
+      - "lib/server/twitch-short-render-jobs.ts"
+      - "lib/server/twitch-video-analysis.ts"
+      - "lib/server/twitch-creator-copy.ts"
+      - "scripts/render_twitch_short.py"
   schedule:
     - cron: "17,47 * * * *"
 
