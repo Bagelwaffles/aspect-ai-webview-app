@@ -13,6 +13,7 @@ import { z } from "zod"
 
 export const TWITCH_SCOPE = "user:read:broadcast"
 export const TWITCH_MEDIA_SCOPE = "channel:manage:clips"
+export const TWITCH_BROADCAST_SCOPE = "channel:manage:broadcast"
 export const TWITCH_OAUTH_COOKIE = "ams_twitch_oauth"
 
 const CONNECTION_KEY = "ams:twitch-pilot:v1:connection"
@@ -50,7 +51,7 @@ const validateResponseSchema = z.object({
 const oauthAttemptSchema = z.object({
   state: z.string().min(32).max(200),
   expiresAt: z.number().int().positive(),
-  capability: z.enum(["pilot", "media"]).default("pilot"),
+  capability: z.enum(["pilot", "media", "creator"]).default("pilot"),
 })
 
 const encryptedConnectionSchema = z.object({
@@ -246,7 +247,7 @@ function signOauthPayload(encoded: string, env: NodeJS.ProcessEnv) {
 export function createTwitchOauthAttempt(
   env: NodeJS.ProcessEnv = process.env,
   now = Date.now(),
-  capability: "pilot" | "media" = "pilot",
+  capability: "pilot" | "media" | "creator" = "pilot",
 ) {
   if (!isTwitchPilotConfigured(env) || !oauthSigningSecret(env)) {
     throw new Error("TWITCH_OAUTH_NOT_CONFIGURED")
@@ -295,6 +296,7 @@ export function buildTwitchAuthorizationUrl(
   state: string,
   env: NodeJS.ProcessEnv = process.env,
   includeMediaScope = false,
+  includeBroadcastScope = false,
 ) {
   const config = resolveTwitchConfig(env)
   if (!config) throw new Error("TWITCH_OAUTH_NOT_CONFIGURED")
@@ -304,9 +306,13 @@ export function buildTwitchAuthorizationUrl(
   url.searchParams.set("response_type", "code")
   url.searchParams.set(
     "scope",
-    [TWITCH_SCOPE, ...(includeMediaScope ? [TWITCH_MEDIA_SCOPE] : [])].join(" "),
+    [
+      TWITCH_SCOPE,
+      ...(includeMediaScope ? [TWITCH_MEDIA_SCOPE] : []),
+      ...(includeBroadcastScope ? [TWITCH_BROADCAST_SCOPE] : []),
+    ].join(" "),
   )
-  if (includeMediaScope) url.searchParams.set("force_verify", "true")
+  if (includeMediaScope || includeBroadcastScope) url.searchParams.set("force_verify", "true")
   url.searchParams.set("state", state)
   return url
 }
@@ -722,18 +728,27 @@ export function twitchMediaScopeEnabled(scopes: string[] | null | undefined) {
   return Boolean(scopes?.includes(TWITCH_MEDIA_SCOPE))
 }
 
+export function twitchBroadcastScopeEnabled(scopes: string[] | null | undefined) {
+  return Boolean(scopes?.includes(TWITCH_BROADCAST_SCOPE))
+}
+
 async function twitchUserRequest(
   url: URL,
   init: RequestInit,
   options: TwitchOptions = {},
+  requiredScope: string = TWITCH_MEDIA_SCOPE,
 ) {
   const env = options.env ?? process.env
   const config = resolveTwitchConfig(env)
   const existing = await loadConnection(options)
   const fetcher = options.fetcher ?? fetch
   if (!config || !existing) throw new Error("TWITCH_CONNECTION_REQUIRED")
-  if (!twitchMediaScopeEnabled(existing.record.scopes)) {
-    throw new Error("TWITCH_MEDIA_SCOPE_REQUIRED")
+  if (!existing.record.scopes.includes(requiredScope)) {
+    throw new Error(
+      requiredScope === TWITCH_BROADCAST_SCOPE
+        ? "TWITCH_BROADCAST_SCOPE_REQUIRED"
+        : "TWITCH_MEDIA_SCOPE_REQUIRED",
+    )
   }
 
   const call = (token: string) => fetcher(url, {
@@ -753,6 +768,63 @@ async function twitchUserRequest(
     response = await call(refreshed.accessToken)
   }
   return response
+}
+
+
+const smokyChannelMetadataSchema = z.object({
+  title: z.string().trim().min(1).max(140).optional(),
+  tags: z.array(z.string().trim().min(1).max(25)).max(10).optional(),
+  broadcasterLanguage: z.string().trim().regex(/^(?:[a-z]{2}|other)$/u).optional(),
+}).strict().refine(
+  (value) => value.title !== undefined || value.tags !== undefined || value.broadcasterLanguage !== undefined,
+  "At least one Twitch channel metadata field is required.",
+)
+
+export async function modifySmokyTwitchChannelInformation(
+  input: z.input<typeof smokyChannelMetadataSchema>,
+  options: TwitchOptions = {},
+) {
+  const existing = await loadConnection(options)
+  if (!existing) throw new Error("TWITCH_CONNECTION_REQUIRED")
+  if (
+    existing.record.broadcasterId !== "155477801" ||
+    existing.record.login.toLowerCase() !== "smokybanana03"
+  ) {
+    throw new Error("TWITCH_SMOKY_ACCOUNT_MISMATCH")
+  }
+
+  const parsed = smokyChannelMetadataSchema.parse(input)
+  const payload: Record<string, unknown> = {}
+  if (parsed.title !== undefined) payload.title = parsed.title
+  if (parsed.tags !== undefined) {
+    payload.tags = [...new Set(parsed.tags.map((tag) => tag.trim()).filter(Boolean))].slice(0, 10)
+  }
+  if (parsed.broadcasterLanguage !== undefined) {
+    payload.broadcaster_language = parsed.broadcasterLanguage
+  }
+
+  const url = new URL("https://api.twitch.tv/helix/channels")
+  url.searchParams.set("broadcaster_id", existing.record.broadcasterId)
+  const response = await twitchUserRequest(
+    url,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+    options,
+    TWITCH_BROADCAST_SCOPE,
+  )
+  if (!response.ok) {
+    throw new Error(`TWITCH_CHANNEL_UPDATE_FAILED:${response.status}`)
+  }
+  return {
+    broadcasterId: existing.record.broadcasterId,
+    login: existing.record.login,
+    title: parsed.title ?? null,
+    tags: (payload.tags as string[] | undefined) ?? null,
+    broadcasterLanguage: parsed.broadcasterLanguage ?? null,
+  }
 }
 
 export async function getTwitchClipDownloadUrls(
