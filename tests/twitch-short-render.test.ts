@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import test from "node:test"
 
 import {
@@ -87,4 +88,13 @@ test("render job schema keeps drafts private and bounded", () => {
   assert.equal(parsed.status, "pending")
   assert.match(parsed.outputObjectKey, /\/shorts\/clip-1\.mp4$/)
   assert.equal("publish" in parsed, false)
+})
+
+
+test("renderer wraps overlay copy inside vertical-video safe margins", () => {
+  const renderer = readFileSync("scripts/render_twitch_short.py", "utf8")
+  assert.match(renderer, /width=28, max_lines=3/)
+  assert.match(renderer, /width=42, max_lines=3/)
+  assert.match(renderer, /Style: Hook[^\n]*,96,96,190,1/)
+  assert.match(renderer, /Style: Caption[^\n]*,96,96,220,1/)
 })
