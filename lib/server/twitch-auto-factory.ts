@@ -18,6 +18,7 @@ import {
 import {
   enqueueTwitchShortRender,
   isTwitchShortRenderConfigured,
+  requeueGenericCreatorTwitchShortRenders,
 } from "@/lib/server/twitch-short-render-jobs"
 import {
   analyzeTwitchClipVideo,
@@ -303,6 +304,11 @@ export async function runTwitchAutomaticPrivateShorts() {
     }
   }
 
+  const repaired = await requeueGenericCreatorTwitchShortRenders().catch((error) => {
+    failures.push(`legacy-rerender:${safeError(error)}`)
+    return 0
+  })
+
   return {
     ok: true,
     skipped: null,
@@ -315,6 +321,7 @@ export async function runTwitchAutomaticPrivateShorts() {
     expired: reconciliation.failed.length,
     analyzed: analyzed.length,
     queued,
+    repaired,
     failures,
   }
 }
