@@ -481,10 +481,25 @@ export async function requeueGenericCreatorTwitchShortRenders(
     if (!legacy.publishMetadata || !hasGenericStreamerCopy(legacy)) continue
 
     const id = jobId(legacy.streamId, legacy.clipId)
-    const existing = await getTwitchShortRenderJob(id, { ...options, redis })
-    if (existing && existing.status !== "failed") continue
-
     const creatorName = creatorNameForLegacyJob(legacy, fallbackCreatorName)
+    const desiredShortDraft = {
+      ...legacy.shortDraft,
+      title: personalizeTwitchCreatorCopy(legacy.shortDraft.title, creatorName),
+      hook: personalizeTwitchCreatorCopy(legacy.shortDraft.hook, creatorName),
+      caption: personalizeTwitchCreatorCopy(legacy.shortDraft.caption, creatorName),
+    }
+    const desiredPublishMetadata = personalizePublishMetadata(legacy.publishMetadata, creatorName)
+    const existing = await getTwitchShortRenderJob(id, { ...options, redis })
+    if (existing?.status === "pending" || existing?.status === "rendering") continue
+    if (
+      existing?.status === "rendered" &&
+      existing.shortDraft.title === desiredShortDraft.title &&
+      existing.shortDraft.hook === desiredShortDraft.hook &&
+      existing.shortDraft.caption === desiredShortDraft.caption &&
+      existing.publishMetadata?.title === desiredPublishMetadata.title &&
+      existing.publishMetadata?.description === desiredPublishMetadata.description
+    ) continue
+
     const timestamp = nowIso(options)
     const outputObjectKey = [
       "creators",
@@ -506,19 +521,14 @@ export async function requeueGenericCreatorTwitchShortRenders(
       claimedAt: null,
       completedAt: null,
       errorCode: null,
-      shortDraft: {
-        ...legacy.shortDraft,
-        title: personalizeTwitchCreatorCopy(legacy.shortDraft.title, creatorName),
-        hook: personalizeTwitchCreatorCopy(legacy.shortDraft.hook, creatorName),
-        caption: personalizeTwitchCreatorCopy(legacy.shortDraft.caption, creatorName),
-      },
+      shortDraft: desiredShortDraft,
       videoAnalysis: legacy.videoAnalysis
         ? {
             ...legacy.videoAnalysis,
             reason: personalizeTwitchCreatorCopy(legacy.videoAnalysis.reason, creatorName),
           }
         : undefined,
-      publishMetadata: personalizePublishMetadata(legacy.publishMetadata, creatorName),
+      publishMetadata: desiredPublishMetadata,
     })
 
     await saveJob(next, redis)
