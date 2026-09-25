@@ -90,6 +90,16 @@ function hashtag(value: string) {
   return normalized ? `#${normalized.slice(0, 60)}` : null
 }
 
+export function personalizeTwitchCreatorCopy(value: string, creatorName: string) {
+  const creator = truncate(creatorName || "SmokyBanana03", 80)
+  const possessive = `${creator}’s`
+  return value
+    .replace(/\b(?:this|the)\s+streamer(?:'s|’s)\b/gi, possessive)
+    .replace(/\bstreamer(?:'s|’s)\b/gi, possessive)
+    .replace(/\b(?:this|the)\s+streamer\b/gi, creator)
+    .replace(/\bstreamer\b/gi, creator)
+}
+
 export function parseTwitchVideoEvidenceText(text: string): TwitchVideoEvidence {
   const trimmed = text.trim()
   const unfenced = trimmed
@@ -228,6 +238,7 @@ async function requestVideoEvidence(input: {
   signedUrl: string
   clipId: string
   title: string
+  creatorName: string
   duration: number
   retry: boolean
 }) {
@@ -235,6 +246,8 @@ async function requestVideoEvidence(input: {
     "Analyze this actual Twitch gameplay video for short-form repurposing.",
     `Clip ID: ${input.clipId}`,
     `Twitch title/context: ${input.title || "(untitled)"}`,
+    `Creator/channel name: ${input.creatorName || "SmokyBanana03"}`,
+    "When hook or caption refers to the creator, use the creator/channel name exactly; never use generic labels such as streamer, creator, or player in place of the name.",
     `Clip duration: approximately ${input.duration} seconds.`,
     "Return one VALID JSON object only. No markdown, no code fence, no commentary.",
     "Use exactly these keys:",
@@ -311,6 +324,7 @@ export async function analyzeTwitchClipVideo(
       signedUrl: signed.url,
       clipId: item.clipId,
       title: item.title,
+      creatorName: item.creatorName || queue.broadcasterLogin,
       duration,
       retry: attempt > 0,
     })
@@ -339,15 +353,19 @@ export async function analyzeTwitchClipVideo(
     bestEndSeconds = null
   }
 
+  const creatorName = item.creatorName || queue.broadcasterLogin
   const normalizedEvidence: TwitchVideoEvidence = {
     ...raw,
     score,
     recommendation,
+    reason: personalizeTwitchCreatorCopy(raw.reason, creatorName),
+    hook: personalizeTwitchCreatorCopy(raw.hook, creatorName),
+    caption: personalizeTwitchCreatorCopy(raw.caption, creatorName),
     bestStartSeconds,
     bestEndSeconds,
   }
   const publishMetadata = buildTwitchPublishMetadata({
-    creatorName: item.creatorName || queue.broadcasterLogin,
+    creatorName,
     sourceTitle: item.title,
     evidence: normalizedEvidence,
   })
@@ -359,12 +377,12 @@ export async function analyzeTwitchClipVideo(
     model,
     score,
     recommendation,
-    reason: raw.reason,
-    observedMoments: raw.observedMoments,
+    reason: normalizedEvidence.reason,
+    observedMoments: normalizedEvidence.observedMoments,
     bestStartSeconds,
     bestEndSeconds,
-    hook: raw.hook,
-    caption: raw.caption,
+    hook: normalizedEvidence.hook,
+    caption: normalizedEvidence.caption,
     publishMetadata,
     evidenceBoundary: raw.evidenceBoundary,
   })
