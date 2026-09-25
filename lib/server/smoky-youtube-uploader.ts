@@ -96,7 +96,6 @@ export function getSmokyYouTubeConfiguration(env: NodeJS.ProcessEnv = process.en
     enabled,
     expectedChannelId,
     configured:
-      enabled &&
       isRealSecret(clientId) &&
       isRealSecret(clientSecret) &&
       isRealSecret(refreshToken) &&
@@ -135,7 +134,10 @@ async function refreshAccessToken(
 
   const parsed = tokenSchema.safeParse(await safeJson(response))
   if (!parsed.success) throw new Error("SMOKY_YOUTUBE_TOKEN_INVALID")
-  return parsed.data.access_token
+  return {
+    accessToken: parsed.data.access_token,
+    expiresInSeconds: parsed.data.expires_in ?? 3600,
+  }
 }
 
 export async function verifySmokyYouTubeChannel(
@@ -166,6 +168,29 @@ export async function verifySmokyYouTubeChannel(
   }
 }
 
+export async function getVerifiedSmokyYouTubeAccess(
+  dependencies: Pick<Dependencies, "env" | "fetch"> = {},
+) {
+  const env = dependencies.env ?? process.env
+  const fetcher = dependencies.fetch ?? fetch
+  const config = getSmokyYouTubeConfiguration(env)
+  if (!config.configured || !config.expectedChannelId) {
+    throw new Error("SMOKY_YOUTUBE_NOT_CONFIGURED")
+  }
+  const token = await refreshAccessToken(config, fetcher)
+  const channel = await verifySmokyYouTubeChannel(
+    token.accessToken,
+    config.expectedChannelId,
+    fetcher,
+  )
+  return {
+    accessToken: token.accessToken,
+    expiresInSeconds: token.expiresInSeconds,
+    expectedChannelId: config.expectedChannelId,
+    channel,
+  }
+}
+
 function descriptionWithHashtags(description: string, hashtags: string[]) {
   const cleanTags = hashtags
     .map((tag) => tag.trim())
@@ -193,12 +218,9 @@ export async function uploadPrivateVideoToLockedSmokyChannel(
     throw new Error("SMOKY_YOUTUBE_NOT_CONFIGURED")
   }
 
-  const accessToken = await refreshAccessToken(config, fetcher)
-  const channel = await verifySmokyYouTubeChannel(
-    accessToken,
-    config.expectedChannelId,
-    fetcher,
-  )
+  const verified = await getVerifiedSmokyYouTubeAccess({ env, fetch: fetcher })
+  const accessToken = verified.accessToken
+  const channel = verified.channel
 
   let mediaResponse: Response
   try {
@@ -263,6 +285,7 @@ export async function uploadPrivateVideoToLockedSmokyChannel(
   const uploaded = await fetcher(resumableUrl, {
     method: "PUT",
     headers: {
+      Authorization: `Bearer ${accessToken}`,
       "Content-Type": contentType,
       "Content-Length": String(sourceBuffer.byteLength),
     },
