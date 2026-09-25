@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 import styles from "./marketing.module.css"
 
 const outcomes = [
@@ -72,6 +73,8 @@ function cx(...names: string[]) {
 }
 
 export default function HomePage() {
+  const subscriptionCheckoutLive = isContentAgentLaunchEnabled()
+
   return (
     <main className={styles.site}>
       <div className={cx("orb", "orb-one")} aria-hidden="true" />
@@ -112,10 +115,20 @@ export default function HomePage() {
           </h1>
 
           <p className={styles.heroText}>
-            Start with seven production-verified AI agents from $29/month, or choose the
-            $49 Quick Marketing Audit for a focused one-time review. AMS also supports content,
-            lead generation, follow-up, visibility, creator workflows, and day-to-day operations —
-            with human control where it matters.
+            {subscriptionCheckoutLive ? (
+              <>
+                Start with seven production-verified AI agents from $29/month, or choose the
+                $49 Quick Marketing Audit for a focused one-time review. AMS also supports content,
+                lead generation, follow-up, visibility, creator workflows, and day-to-day operations —
+                with human control where it matters.
+              </>
+            ) : (
+              <>
+                Seven AMS AI agents have production verification, but subscription checkout and paid AI
+                execution are temporarily paused while AMS runs in zero-cost mode. The $49 Quick Marketing
+                Audit remains the active paid starting point, and the full agent catalog stays visible for review.
+              </>
+            )}
           </p>
 
           <div className={styles.heroActions}>
@@ -137,8 +150,8 @@ export default function HomePage() {
               <span>Agents in catalog</span>
             </div>
             <div>
-              <strong>$29</strong>
-              <span>Plans from / month</span>
+              <strong>{subscriptionCheckoutLive ? "$29" : "PAUSED"}</strong>
+              <span>{subscriptionCheckoutLive ? "Plans from / month" : "Subscription checkout"}</span>
             </div>
             <div>
               <strong>$49</strong>
@@ -256,12 +269,13 @@ export default function HomePage() {
       <section className={cx("section", "agentSection")}>
         <div className={styles.sectionHeading}>
           <div>
-            <p className={styles.kicker}>Available now</p>
-            <h2>Start with agents already working in production.</h2>
+            <p className={styles.kicker}>{subscriptionCheckoutLive ? "Available now" : "Production verified"}</p>
+            <h2>{subscriptionCheckoutLive ? "Start with agents already working in production." : "Review agents already proven in production."}</h2>
           </div>
           <p>
-            These are three of the seven live agents included in AMS plans. The full Agent Store
-            shows all 33 agents and their current status.
+            {subscriptionCheckoutLive
+              ? "These are three of the seven live agents included in AMS plans. The full Agent Store shows all 33 agents and their current status."
+              : "These are three of the seven production-verified Live agents. Subscription checkout is temporarily paused; the full Agent Store still shows all 33 agents and their current status."}
           </p>
         </div>
 
