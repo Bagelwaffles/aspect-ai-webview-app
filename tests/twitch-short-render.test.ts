@@ -70,7 +70,7 @@ test("render job schema keeps drafts private and bounded", () => {
     broadcasterId: "155477801",
     clipId: "clip-1",
     sourceObjectKey: "creators/twitch/155477801/stream-1/clips/clip-1/landscape.mp4",
-    outputObjectKey: "creators/twitch/155477801/stream-1/shorts/clip-1.mp4",
+    outputObjectKey: "creators/twitch/155477801/stream-1/shorts/clip-1-safe-text-v2.mp4",
     status: "pending",
     attempts: 0,
     createdAt: "2026-09-19T00:00:00.000Z",
@@ -86,7 +86,7 @@ test("render job schema keeps drafts private and bounded", () => {
     },
   })
   assert.equal(parsed.status, "pending")
-  assert.match(parsed.outputObjectKey, /\/shorts\/clip-1\.mp4$/)
+  assert.match(parsed.outputObjectKey, /\/shorts\/clip-1-safe-text-v2\.mp4$/)
   assert.equal("publish" in parsed, false)
 })
 
