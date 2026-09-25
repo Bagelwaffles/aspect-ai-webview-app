@@ -1,0 +1,41 @@
+name: Vercel Cloud Browser Worker CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/vercel-browser-worker/**"
+      - "lib/server/cloud-browser-dispatch.ts"
+      - "app/api/internal/browser-control/cloud/**"
+      - "lib/server/browser-control.ts"
+      - "tests/cloud-browser-worker.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools/vercel-browser-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install cloud worker SDK
+        run: npm install --no-audit --no-fund
+      - name: Syntax check
+        run: |
+          node --check api/run.js
+          node --check api/pair.js
+          node --check api/status.js
+          node --check lib/auth.js
+          node --check lib/sandbox.js
+          node --check sandbox/worker.mjs
+      - name: Verify pinned runtime packages
+        run: |
+          node -e 'const p=require("./package.json"); if(p.dependencies["@vercel/sandbox"]!=="3.5.0") process.exit(1)'
