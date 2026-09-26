@@ -77,6 +77,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)",
+    "/login",
+    "/api/auth/:path*",
+    "/dashboard/:path*",
+    "/admin/ethical-agent-farm-requests",
   ],
 };
