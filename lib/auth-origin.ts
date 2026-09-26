@@ -71,3 +71,15 @@ export function isGoogleNextAuthExchangePath(pathname: string) {
     normalized === "/api/auth/callback/google"
   )
 }
+
+
+export function shouldBlockGoogleNextAuthExchange(
+  pathname: string,
+  requestUrl: string,
+  headers: HeaderReader,
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  if (!isGoogleNextAuthExchangePath(pathname)) return false
+  const state = authOriginState(requestUrl, headers, env)
+  return Boolean(state.configuredOrigin && !state.matches)
+}
