@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import test from "node:test"
 
 import {
@@ -68,4 +69,14 @@ test("ports are ignored when matching the apex host", () => {
     headers({ host: "aspectmarketingsolutions.app:443" }),
   )
   assert.equal(target?.href, `${AMS_CANONICAL_ORIGIN}/pricing`)
+})
+
+
+test("middleware canonicalization is limited to authentication entry surfaces", () => {
+  const middleware = readFileSync("middleware.ts", "utf8")
+  assert.match(middleware, /"\/login"/u)
+  assert.match(middleware, /"\/api\/auth\/:path\*"/u)
+  assert.match(middleware, /"\/dashboard\/:path\*"/u)
+  assert.doesNotMatch(middleware, /api\/webhooks/u)
+  assert.doesNotMatch(middleware, /\(\?!_next\/static/u)
 })
