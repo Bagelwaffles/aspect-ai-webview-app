@@ -6,16 +6,10 @@ import {
   verifyInternalAdminCookie,
 } from "@/app/lib/internal-admin-cookie";
 import { configuredOperatorOwnerEmail, isOperatorOwnerEmail } from "@/lib/operator-owner";
-import { canonicalProductionUrl } from "@/lib/canonical-origin";
 
 const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 
 export async function middleware(request: NextRequest) {
-  const canonicalUrl = canonicalProductionUrl(request.url, request.headers);
-  if (canonicalUrl) {
-    return NextResponse.redirect(canonicalUrl, 308);
-  }
-
   const requiresInternalAdmin =
     request.nextUrl.pathname === "/dashboard" ||
     request.nextUrl.pathname.startsWith("/dashboard/") ||
@@ -76,10 +70,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/login",
-    "/api/auth/:path*",
-    "/dashboard/:path*",
-    "/admin/ethical-agent-farm-requests",
-  ],
+  matcher: ["/dashboard/:path*", "/admin/ethical-agent-farm-requests"]
 };
