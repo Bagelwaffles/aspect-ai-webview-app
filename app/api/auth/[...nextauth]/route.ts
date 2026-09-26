@@ -1,7 +1,7 @@
 import NextAuth from "next-auth"
 
 import { authOptions } from "@/lib/auth"
-import { authOriginState, isGoogleNextAuthExchangePath } from "@/lib/auth-origin"
+import { shouldBlockGoogleNextAuthExchange } from "@/lib/auth-origin"
 import {
   authCallbackUrlFromRequest,
   isSafeAuthCallbackUrl,
@@ -19,20 +19,23 @@ type AuthRouteContext = {
 
 async function handler(request: Request, context: AuthRouteContext) {
   const requestUrl = new URL(request.url)
-  if (isGoogleNextAuthExchangePath(requestUrl.pathname)) {
-    const origin = authOriginState(request.url, request.headers)
-    if (origin.configuredOrigin && !origin.matches) {
-      return Response.json(
-        {
-          error: "Google sign-in is unavailable on this deployment origin.",
-          code: "AUTH_ORIGIN_MISMATCH",
-        },
-        {
-          status: 409,
-          headers: { "cache-control": "no-store" },
-        },
-      )
-    }
+  if (
+    shouldBlockGoogleNextAuthExchange(
+      requestUrl.pathname,
+      request.url,
+      request.headers,
+    )
+  ) {
+    return Response.json(
+      {
+        error: "Google sign-in is unavailable on this deployment origin.",
+        code: "AUTH_ORIGIN_MISMATCH",
+      },
+      {
+        status: 409,
+        headers: { "cache-control": "no-store" },
+      },
+    )
   }
 
   const callbackUrl = await authCallbackUrlFromRequest(request)
