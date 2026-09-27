@@ -2,12 +2,14 @@ import { AmsPublicHeader } from "@/components/ams-public-header"
 import { AmsPublicFooter } from "@/components/ams-public-footer"
 import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
+import { headers } from "next/headers"
 import { ShieldCheck } from "lucide-react"
 
 import { safeRelativeCallbackPath } from "@/app/lib/safe-relative-callback"
 import { CustomerLoginButton } from "@/components/customer-login-button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { authOptions, isCustomerAuthConfigured } from "@/lib/auth"
+import { authOriginState } from "@/lib/auth-origin"
 
 export const dynamic = "force-dynamic"
 
@@ -19,13 +21,25 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = (await searchParams) ?? {}
   const requestedCallback = params.next ?? params.callbackUrl
   const callbackUrl = safeRelativeCallbackPath(requestedCallback, "/grok-chat")
-  const session = isCustomerAuthConfigured() ? await getServerSession(authOptions).catch(() => null) : null
+  const requestHeaders = await headers()
+  const requestUrl = new URL(
+    requestHeaders.get("x-forwarded-proto")?.split(",")[0]?.trim() === "http" ? "http://placeholder.invalid" : "https://placeholder.invalid",
+  )
+  const forwardedHost =
+    requestHeaders.get("x-forwarded-host")?.split(",")[0]?.trim() ??
+    requestHeaders.get("host")?.split(",")[0]?.trim()
+  if (forwardedHost) requestUrl.host = forwardedHost
+  const authOrigin = authOriginState(requestUrl.href, requestHeaders)
+  const session = isCustomerAuthConfigured() && authOrigin.matches
+    ? await getServerSession(authOptions).catch(() => null)
+    : null
 
   if (session?.user?.email) {
     redirect(callbackUrl)
   }
 
   const configured = isCustomerAuthConfigured()
+  const originMismatch = Boolean(authOrigin.configuredOrigin && !authOrigin.matches)
 
   return (
     <>
@@ -42,8 +56,23 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {configured ? (
+          {configured && !originMismatch ? (
             <CustomerLoginButton callbackUrl={callbackUrl} />
+          ) : originMismatch ? (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+              <p className="font-semibold">Google sign-in is disabled on this preview deployment.</p>
+              <p className="mt-2 text-amber-100/80">
+                This preview is configured to return OAuth callbacks to the production AMS site, so starting sign-in here would lose the OAuth state cookie.
+              </p>
+              {authOrigin.configuredOrigin ? (
+                <a
+                  className="mt-3 inline-block font-semibold underline"
+                  href={`${authOrigin.configuredOrigin}/login?next=${encodeURIComponent(callbackUrl)}`}
+                >
+                  Continue on the production sign-in page
+                </a>
+              ) : null}
+            </div>
           ) : (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
               Customer sign-in is not configured yet. Google OAuth credentials and a NextAuth secret must be added to the staging environment before this page is enabled.
