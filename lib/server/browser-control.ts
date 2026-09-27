@@ -9,6 +9,7 @@ import {
   type BrowserJobInput,
   type BrowserRisk,
 } from "@/lib/browser-control-policy"
+import { dispatchCloudBrowserWorker } from "@/lib/server/cloud-browser-dispatch"
 
 const PREFIX = "ams:browser-control:v1"
 const PRIMARY_WORKER_KEY = `${PREFIX}:primary-worker`
@@ -310,6 +311,9 @@ export async function createBrowserJob(input: BrowserJobInput): Promise<BrowserJ
     detail: `${job.action} ${job.url} (${job.risk})`,
     jobId: job.id,
   })
+  if (status === "queued") {
+    await dispatchCloudBrowserWorker().catch(() => undefined)
+  }
   return job
 }
 
@@ -324,6 +328,7 @@ export async function approveBrowserJob(id: string): Promise<BrowserJob> {
   await putJob(redis, updated)
   await redis.rpush(QUEUE_KEY, id)
   await audit(redis, { at: updated.approvedAt!, type: "job.approved", detail: `${job.action} approved`, jobId: id })
+  await dispatchCloudBrowserWorker().catch(() => undefined)
   return updated
 }
 
