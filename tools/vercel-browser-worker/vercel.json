@@ -4,5 +4,6 @@
     "api/*.js": {
       "maxDuration": 300
     }
-  }
+  },
+  "installCommand": "npm install --no-audit --no-fund"
 }
