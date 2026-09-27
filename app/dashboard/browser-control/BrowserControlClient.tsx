@@ -66,15 +66,37 @@ export default function BrowserControlPage() {
   const [value, setValue] = useState("")
   const [secretRef, setSecretRef] = useState("")
   const [useCurrentPage, setUseCurrentPage] = useState(false)
+  const [cloud, setCloud] = useState<{
+    enabled: boolean
+    configured: boolean
+    paired: boolean
+    daemon: boolean
+    profilePresent?: boolean
+  } | null>(null)
 
   const refresh = useCallback(async () => {
-    const response = await fetch("/api/browser-control/status", { cache: "no-store" })
+    const [response, cloudResponse] = await Promise.all([
+      fetch("/api/browser-control/status", { cache: "no-store" }),
+      fetch("/api/internal/browser-control/cloud/status", { cache: "no-store" }),
+    ])
     if (!response.ok) {
       setMessage(`Status check failed (${response.status})`)
       setLoading(false)
       return
     }
     setSnapshot(await response.json())
+    if (cloudResponse.ok) {
+      const cloudBody = await cloudResponse.json()
+      setCloud({
+        enabled: Boolean(cloudBody.enabled),
+        configured: Boolean(cloudBody.configured),
+        paired: Boolean(cloudBody.paired),
+        daemon: Boolean(cloudBody.daemon),
+        profilePresent: Boolean(cloudBody.profilePresent),
+      })
+    } else {
+      setCloud(null)
+    }
     setLoading(false)
   }, [])
 
@@ -83,6 +105,30 @@ export default function BrowserControlPage() {
     const timer = window.setInterval(() => void refresh(), 5000)
     return () => window.clearInterval(timer)
   }, [refresh])
+
+  async function pairCloudWorker() {
+    setMessage("")
+    const response = await fetch("/api/internal/browser-control/cloud/pair", { method: "POST" })
+    const body = await response.json()
+    setMessage(
+      response.ok
+        ? "Vercel Cloud Browser Worker paired and started. No worker token was exposed."
+        : body.code || "Could not pair cloud browser worker",
+    )
+    await refresh()
+  }
+
+  async function startCloudWorker() {
+    setMessage("")
+    const response = await fetch("/api/internal/browser-control/cloud/run", { method: "POST" })
+    const body = await response.json()
+    setMessage(
+      response.ok
+        ? "Vercel Cloud Browser Worker dispatched."
+        : body.code || "Could not dispatch cloud browser worker",
+    )
+    await refresh()
+  }
 
   async function createPairing() {
     setMessage("")
@@ -162,7 +208,7 @@ export default function BrowserControlPage() {
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-300">AMS // Browser Control</p>
               <h1 className="mt-3 text-4xl font-black tracking-tight md:text-6xl">Give AMS a safe pair of hands.</h1>
-              <p className="mt-4 max-w-3xl text-slate-400">Owner-controlled browser automation with a dedicated Windows profile, one-time pairing, heartbeat proof, domain allowlists, approvals, captures, audit history, a local encrypted credential vault, and an emergency stop.</p>
+              <p className="mt-4 max-w-3xl text-slate-400">Owner-controlled browser automation with Vercel Sandbox cloud execution or the Windows fallback, one-time pairing, heartbeat proof, domain allowlists, approvals, captures, audit history, and an emergency stop.</p>
             </div>
             <div className={`rounded-full border px-4 py-2 text-sm font-bold uppercase tracking-wider ${badgeClasses(workerState)}`}>
               {workerState === "online" ? "● Worker Online" : "○ Worker Offline"}
@@ -204,6 +250,48 @@ export default function BrowserControlPage() {
           </article>
         </section>
 
+        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950 p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Vercel Cloud Browser</p>
+              <h2 className="mt-2 text-2xl font-black">Run Browser Control without leaving your computer on.</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-400">
+                The cloud worker uses a persistent Vercel Sandbox and Chromium profile while the existing AMS approvals, kill switch, allowlist, and audit trail stay authoritative. Cloud credential capture/fill remains blocked until a cloud vault is proven.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase ${badgeClasses(cloud?.configured ? "online" : "offline")}`}>
+                {cloud?.configured ? "Configured" : "Not configured"}
+              </span>
+              <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase ${badgeClasses(cloud?.paired ? "online" : "offline")}`}>
+                {cloud?.paired ? "Paired" : "Not paired"}
+              </span>
+              <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase ${badgeClasses(cloud?.daemon ? "online" : "offline")}`}>
+                {cloud?.daemon ? "Sandbox active" : "Sandbox idle"}
+              </span>
+            </div>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={pairCloudWorker}
+              disabled={!snapshot.configured || !cloud?.configured}
+              className="rounded-xl bg-cyan-300 px-5 py-3 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Pair Vercel Cloud Worker
+            </button>
+            <button
+              onClick={startCloudWorker}
+              disabled={!cloud?.configured || !cloud?.paired}
+              className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-5 py-3 font-bold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Wake Cloud Worker
+            </button>
+          </div>
+          <p className="mt-4 text-xs text-slate-500">
+            Production cutover stays disabled until preview proof passes. The Windows worker remains available as rollback.
+          </p>
+        </section>
+
         {!snapshot.configured ? (
           <section className="rounded-3xl border border-amber-400/25 bg-amber-400/5 p-6">
             <h2 className="text-xl font-black text-amber-100">Control storage is not configured.</h2>
@@ -213,9 +301,9 @@ export default function BrowserControlPage() {
 
         <section className="grid gap-5 lg:grid-cols-2">
           <article className="rounded-3xl border border-slate-800 bg-slate-950 p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Pair workstation</p>
-            <h2 className="mt-2 text-2xl font-black">One-time pairing. No password sharing.</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-400">The raw worker token is issued once to the workstation and stored locally. AMS stores only its SHA-256 digest.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Windows fallback</p>
+            <h2 className="mt-2 text-2xl font-black">Keep the local worker available for rollback.</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-400">The Windows worker remains the fallback during cloud validation and retains the DPAPI-only credential vault. Do not run both workers concurrently during final cutover testing.</p>
             <button onClick={createPairing} disabled={!snapshot.configured} className="mt-5 rounded-xl bg-cyan-300 px-5 py-3 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">Create 10-minute pairing code</button>
             {pairingCode ? (
               <div className="mt-5 rounded-2xl border border-cyan-400/30 bg-cyan-400/5 p-5">
@@ -351,7 +439,7 @@ export default function BrowserControlPage() {
           </div>
         </section>
 
-        <p className="pb-8 text-center text-xs text-slate-600">{loading ? "Checking browser control…" : "AMS Browser Control v1.2 · multi-step forms + local encrypted credential vault"}</p>
+        <p className="pb-8 text-center text-xs text-slate-600">{loading ? "Checking browser control…" : "AMS Browser Control · Vercel Sandbox cloud worker + Windows rollback"}</p>
       </div>
     </main>
   )
