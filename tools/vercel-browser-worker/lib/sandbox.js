@@ -173,6 +173,15 @@ async function installBrowserRuntime(sandbox) {
     throw new Error(`CLOUD_BROWSER_CHROMIUM_INSTALL_FAILED:${result.exitCode}`)
   }
 
+  result = await sandbox.runCommand({
+    cmd: "bash",
+    args: ["-lc", `if [ -s ${DAEMON_PID_PATH} ]; then kill "$(cat ${DAEMON_PID_PATH})" 2>/dev/null || true; fi; rm -f ${DAEMON_PID_PATH}`],
+    cwd: ROOT,
+  })
+  if (result.exitCode !== 0) {
+    throw new Error(`CLOUD_BROWSER_DAEMON_RESET_FAILED:${result.exitCode}`)
+  }
+
   result = await sandbox.runCommand("touch", [BROWSER_RUNTIME_MARKER_PATH])
   if (result.exitCode !== 0) {
     throw new Error(`CLOUD_BROWSER_RUNTIME_MARKER_FAILED:${result.exitCode}`)
