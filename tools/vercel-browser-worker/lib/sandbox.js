@@ -10,7 +10,7 @@ const SANDBOX_PACKAGE_PATH = `${ROOT}/package.json`
 const DAEMON_PID_PATH = `${ROOT}/daemon.pid`
 const DAEMON_LOG_PATH = `${ROOT}/daemon.log`
 const PLAYWRIGHT_BROWSERS_PATH = `${ROOT}/ms-playwright`
-const BROWSER_RUNTIME_MARKER_PATH = `${ROOT}/.browser-runtime-1.62.1`
+const BROWSER_RUNTIME_MARKER_PATH = `${ROOT}/.browser-runtime-1.62.1-v2`
 const DEFAULT_SANDBOX_NAME = "ams-browser-worker"
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000
 
@@ -117,6 +117,16 @@ const INSTALL_NETWORK_ALLOWLIST = [
   "registry.npmjs.org",
   "cdn.playwright.dev",
   "playwright.download.prss.microsoft.com",
+  "cdn.amazonlinux.com",
+  "*.amazonaws.com",
+]
+
+const CHROMIUM_SYSTEM_DEPS = [
+  "nss", "nspr", "libxkbcommon", "atk", "at-spi2-atk", "at-spi2-core",
+  "libXcomposite", "libXdamage", "libXrandr", "libXfixes", "libXcursor",
+  "libXi", "libXtst", "libXScrnSaver", "libXext", "mesa-libgbm", "libdrm",
+  "mesa-libGL", "mesa-libEGL", "cups-libs", "alsa-lib", "pango", "cairo",
+  "gtk3", "dbus-libs",
 ]
 
 function sandboxName(env = process.env) {
@@ -167,6 +177,17 @@ async function installBrowserRuntime(sandbox, { repair = false } = {}) {
 
   try {
     await writeRuntimeFiles(sandbox)
+    if (repair) {
+      const systemDeps = await sandbox.runCommand({
+        cmd: "bash",
+        args: ["-lc", `sudo dnf clean all >/dev/null && sudo dnf install -y --skip-broken ${CHROMIUM_SYSTEM_DEPS.join(" ")} >/dev/null && sudo ldconfig`],
+        cwd: ROOT,
+      })
+      if (systemDeps.exitCode !== 0) {
+        throw new Error(`CLOUD_BROWSER_SYSTEM_DEPS_INSTALL_FAILED:${systemDeps.exitCode}`)
+      }
+    }
+
     let result = await sandbox.runCommand({
       cmd: "npm",
       args: ["install", "--omit=dev", "--no-audit", "--no-fund"],
