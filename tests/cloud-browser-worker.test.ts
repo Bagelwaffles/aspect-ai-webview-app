@@ -94,6 +94,7 @@ test("Vercel Sandbox controller uses persistence and egress restriction", () => 
   assert.match(source, /ams-browser-worker/u)
   assert.match(source, /playwright.*1\.62\.1/u)
   assert.match(source, /playwright", "install", "--with-deps", "chromium"/u)
+  assert.match(source, /\.join\("\\n"\)/u)
   assert.doesNotMatch(source, /VERCEL_TOKEN/u)
 })
 

@@ -200,7 +200,7 @@ export async function startCloudBrowserDaemon(sandbox) {
     `nohup node ${WORKER_PATH} daemon >> ${DAEMON_LOG_PATH} 2>&1 &`,
     `echo $! > ${DAEMON_PID_PATH}`,
     "echo started",
-  ].join("; ")
+  ].join("\n")
 
   const result = await sandbox.runCommand({
     cmd: "bash",
