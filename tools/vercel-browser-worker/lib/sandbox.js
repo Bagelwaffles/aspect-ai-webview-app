@@ -9,6 +9,8 @@ const WORKER_PATH = `${ROOT}/worker.mjs`
 const SANDBOX_PACKAGE_PATH = `${ROOT}/package.json`
 const DAEMON_PID_PATH = `${ROOT}/daemon.pid`
 const DAEMON_LOG_PATH = `${ROOT}/daemon.log`
+const PLAYWRIGHT_BROWSERS_PATH = `${ROOT}/ms-playwright`
+const BROWSER_RUNTIME_MARKER_PATH = `${ROOT}/.browser-runtime-1.62.1`
 const DEFAULT_SANDBOX_NAME = "ams-browser-worker"
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000
 
@@ -165,10 +167,31 @@ async function installBrowserRuntime(sandbox) {
     cmd: "npx",
     args: ["playwright", "install", "--with-deps", "chromium"],
     cwd: ROOT,
+    env: { PLAYWRIGHT_BROWSERS_PATH },
   })
   if (result.exitCode !== 0) {
     throw new Error(`CLOUD_BROWSER_CHROMIUM_INSTALL_FAILED:${result.exitCode}`)
   }
+
+  result = await sandbox.runCommand({
+    cmd: "bash",
+    args: ["-lc", `if [ -s ${DAEMON_PID_PATH} ]; then kill "$(cat ${DAEMON_PID_PATH})" 2>/dev/null || true; fi; rm -f ${DAEMON_PID_PATH}`],
+    cwd: ROOT,
+  })
+  if (result.exitCode !== 0) {
+    throw new Error(`CLOUD_BROWSER_DAEMON_RESET_FAILED:${result.exitCode}`)
+  }
+
+  result = await sandbox.runCommand("touch", [BROWSER_RUNTIME_MARKER_PATH])
+  if (result.exitCode !== 0) {
+    throw new Error(`CLOUD_BROWSER_RUNTIME_MARKER_FAILED:${result.exitCode}`)
+  }
+}
+
+async function ensureBrowserRuntime(sandbox) {
+  await writeRuntimeFiles(sandbox)
+  const marker = await sandbox.runCommand("test", ["-f", BROWSER_RUNTIME_MARKER_PATH])
+  if (marker.exitCode !== 0) await installBrowserRuntime(sandbox)
 }
 
 export async function getCloudBrowserSandbox(env = process.env) {
@@ -181,11 +204,11 @@ export async function getCloudBrowserSandbox(env = process.env) {
       await installBrowserRuntime(sbx)
     },
     onResume: async (sbx) => {
-      await writeRuntimeFiles(sbx)
+      await ensureBrowserRuntime(sbx)
     },
   })
 
-  await writeRuntimeFiles(sandbox)
+  await ensureBrowserRuntime(sandbox)
   await sandbox.updateNetworkPolicy({
     allow: NETWORK_ALLOWLIST,
   })
@@ -206,6 +229,7 @@ export async function startCloudBrowserDaemon(sandbox) {
     cmd: "bash",
     args: ["-lc", command],
     cwd: ROOT,
+    env: { PLAYWRIGHT_BROWSERS_PATH },
   })
   if (result.exitCode !== 0) {
     throw new Error(`CLOUD_BROWSER_DAEMON_START_FAILED:${result.exitCode}`)
