@@ -97,6 +97,8 @@ test("Vercel Sandbox controller uses persistence and egress restriction", () => 
   assert.match(source, /PLAYWRIGHT_BROWSERS_PATH/u)
   assert.match(source, /\.browser-runtime-1\.62\.1/u)
   assert.match(source, /CLOUD_BROWSER_DAEMON_RESET_FAILED/u)
+  assert.match(source, /INSTALL_NETWORK_ALLOWLIST/u)
+  assert.match(source, /finally/u)
   assert.match(source, /\.join\("\\n"\)/u)
   assert.doesNotMatch(source, /VERCEL_TOKEN/u)
 })

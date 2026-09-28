@@ -113,6 +113,12 @@ const NETWORK_ALLOWLIST = [
   "*.manus.space"
 ]
 
+const INSTALL_NETWORK_ALLOWLIST = [
+  "registry.npmjs.org",
+  "cdn.playwright.dev",
+  "playwright.download.prss.microsoft.com",
+]
+
 function sandboxName(env = process.env) {
   const value = env.AMS_CLOUD_BROWSER_SANDBOX_NAME?.trim()
   if (!value) return DEFAULT_SANDBOX_NAME
@@ -152,46 +158,60 @@ async function writeRuntimeFiles(sandbox) {
   ])
 }
 
-async function installBrowserRuntime(sandbox) {
-  await writeRuntimeFiles(sandbox)
-  let result = await sandbox.runCommand({
-    cmd: "npm",
-    args: ["install", "--omit=dev", "--no-audit", "--no-fund"],
-    cwd: ROOT,
-  })
-  if (result.exitCode !== 0) {
-    throw new Error(`CLOUD_BROWSER_NPM_INSTALL_FAILED:${result.exitCode}`)
+async function installBrowserRuntime(sandbox, { repair = false } = {}) {
+  if (repair) {
+    await sandbox.updateNetworkPolicy({
+      allow: [...NETWORK_ALLOWLIST, ...INSTALL_NETWORK_ALLOWLIST],
+    })
   }
 
-  result = await sandbox.runCommand({
-    cmd: "npx",
-    args: ["playwright", "install", "--with-deps", "chromium"],
-    cwd: ROOT,
-    env: { PLAYWRIGHT_BROWSERS_PATH },
-  })
-  if (result.exitCode !== 0) {
-    throw new Error(`CLOUD_BROWSER_CHROMIUM_INSTALL_FAILED:${result.exitCode}`)
-  }
+  try {
+    await writeRuntimeFiles(sandbox)
+    let result = await sandbox.runCommand({
+      cmd: "npm",
+      args: ["install", "--omit=dev", "--no-audit", "--no-fund"],
+      cwd: ROOT,
+    })
+    if (result.exitCode !== 0) {
+      throw new Error(`CLOUD_BROWSER_NPM_INSTALL_FAILED:${result.exitCode}`)
+    }
 
-  result = await sandbox.runCommand({
-    cmd: "bash",
-    args: ["-lc", `if [ -s ${DAEMON_PID_PATH} ]; then kill "$(cat ${DAEMON_PID_PATH})" 2>/dev/null || true; fi; rm -f ${DAEMON_PID_PATH}`],
-    cwd: ROOT,
-  })
-  if (result.exitCode !== 0) {
-    throw new Error(`CLOUD_BROWSER_DAEMON_RESET_FAILED:${result.exitCode}`)
-  }
+    result = await sandbox.runCommand({
+      cmd: "npx",
+      args: repair
+        ? ["playwright", "install", "chromium"]
+        : ["playwright", "install", "--with-deps", "chromium"],
+      cwd: ROOT,
+      env: { PLAYWRIGHT_BROWSERS_PATH },
+    })
+    if (result.exitCode !== 0) {
+      throw new Error(`CLOUD_BROWSER_CHROMIUM_INSTALL_FAILED:${result.exitCode}`)
+    }
 
-  result = await sandbox.runCommand("touch", [BROWSER_RUNTIME_MARKER_PATH])
-  if (result.exitCode !== 0) {
-    throw new Error(`CLOUD_BROWSER_RUNTIME_MARKER_FAILED:${result.exitCode}`)
+    result = await sandbox.runCommand({
+      cmd: "bash",
+      args: ["-lc", `if [ -s ${DAEMON_PID_PATH} ]; then kill "$(cat ${DAEMON_PID_PATH})" 2>/dev/null || true; fi; rm -f ${DAEMON_PID_PATH}`],
+      cwd: ROOT,
+    })
+    if (result.exitCode !== 0) {
+      throw new Error(`CLOUD_BROWSER_DAEMON_RESET_FAILED:${result.exitCode}`)
+    }
+
+    result = await sandbox.runCommand("touch", [BROWSER_RUNTIME_MARKER_PATH])
+    if (result.exitCode !== 0) {
+      throw new Error(`CLOUD_BROWSER_RUNTIME_MARKER_FAILED:${result.exitCode}`)
+    }
+  } finally {
+    if (repair) {
+      await sandbox.updateNetworkPolicy({ allow: NETWORK_ALLOWLIST })
+    }
   }
 }
 
 async function ensureBrowserRuntime(sandbox) {
   await writeRuntimeFiles(sandbox)
   const marker = await sandbox.runCommand("test", ["-f", BROWSER_RUNTIME_MARKER_PATH])
-  if (marker.exitCode !== 0) await installBrowserRuntime(sandbox)
+  if (marker.exitCode !== 0) await installBrowserRuntime(sandbox, { repair: true })
 }
 
 export async function getCloudBrowserSandbox(env = process.env) {
