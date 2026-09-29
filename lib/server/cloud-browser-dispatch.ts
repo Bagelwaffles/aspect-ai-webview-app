@@ -104,6 +104,29 @@ export async function dispatchCloudBrowserWorker(
   }
 }
 
+export async function stopCloudBrowserWorker(
+  options: CloudBrowserOptions = {},
+) {
+  const env = options.env ?? process.env
+  const config = getCloudBrowserConfiguration(env)
+  if (!config.configured) {
+    return { status: "not_configured" as const }
+  }
+
+  try {
+    const result = await callCloudWorker("/api/stop", {
+      method: "POST",
+      body: "{}",
+    }, options)
+    return { status: "stopped" as const, result }
+  } catch (error) {
+    return {
+      status: "failed" as const,
+      code: error instanceof Error ? error.message.slice(0, 200) : "CLOUD_BROWSER_STOP_FAILED",
+    }
+  }
+}
+
 export async function pairCloudBrowserWorker(
   code: string,
   options: CloudBrowserOptions = {},
