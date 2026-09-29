@@ -6,6 +6,7 @@ import {
   dispatchCloudBrowserWorker,
   getCloudBrowserConfiguration,
   pairCloudBrowserWorker,
+  stopCloudBrowserWorker,
 } from "../lib/server/cloud-browser-dispatch"
 
 const validEnv: NodeJS.ProcessEnv = {
@@ -65,6 +66,28 @@ test("cloud dispatch authenticates server-to-server without exposing its key in 
   assert.doesNotMatch(calls[0].body, /cloud-browser-test-key/u)
 })
 
+test("cloud stop authenticates server-to-server without exposing its key in the body", async () => {
+  const calls: Array<{ url: string; authorization: string | null; body: string }> = []
+  const fetcher = (async (input: URL | RequestInfo, init?: RequestInit) => {
+    calls.push({
+      url: String(input),
+      authorization: new Headers(init?.headers).get("authorization"),
+      body: String(init?.body ?? ""),
+    })
+    return new Response(JSON.stringify({ ok: true, stopped: true }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })
+  }) as typeof fetch
+
+  const result = await stopCloudBrowserWorker({ env: validEnv, fetcher })
+  assert.equal(result.status, "stopped")
+  assert.equal(calls.length, 1)
+  assert.match(calls[0].url, /\/api\/stop$/u)
+  assert.equal(calls[0].authorization, `Bearer ${validEnv.AMS_CLOUD_BROWSER_DISPATCH_KEY}`)
+  assert.doesNotMatch(calls[0].body, /cloud-browser-test-key/u)
+})
+
 test("cloud pairing accepts only AMS one-time pairing code format", async () => {
   await assert.rejects(
     pairCloudBrowserWorker("not-a-pairing-code", { env: validEnv }),
@@ -109,4 +132,13 @@ test("cloud worker project pins the Vercel Sandbox SDK", () => {
     dependencies: Record<string, string>
   }
   assert.equal(pkg.dependencies["@vercel/sandbox"], "3.5.0")
+})
+
+
+test("cloud worker stop endpoint remains dispatch-key protected", () => {
+  const source = readFileSync("tools/vercel-browser-worker/api/stop.js", "utf8")
+  assert.match(source, /authorizeDispatch/u)
+  assert.match(source, /stopCloudBrowserSandbox/u)
+  assert.match(source, /METHOD_NOT_ALLOWED/u)
+  assert.match(source, /CLOUD_BROWSER_UNAUTHORIZED/u)
 })
