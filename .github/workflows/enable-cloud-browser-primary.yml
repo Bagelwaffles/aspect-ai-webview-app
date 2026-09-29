@@ -1,0 +1,94 @@
+name: Enable AMS cloud browser primary
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/enable-cloud-browser-primary.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ams-cloud-browser-primary-cutover
+  cancel-in-progress: false
+
+jobs:
+  cutover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    env:
+      VERCEL_ORG_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
+      VERCEL_PROJECT_ID: prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Checkout approved main
+        uses: actions/checkout@v4
+
+      - name: Require Vercel credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "::error::GitHub secret VERCEL_TOKEN is not configured."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable production cloud browser dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' 'true' | npx --yes vercel@latest env update AMS_CLOUD_BROWSER_ENABLED production --yes --token="$VERCEL_TOKEN"
+          echo "AMS_CLOUD_BROWSER_ENABLED production updated."
+
+      - name: Pull updated production configuration
+        shell: bash
+        run: npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build production release
+        shell: bash
+        run: npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy production release
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEPLOYMENT_URL=$(npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          echo "deployment_url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
+          echo "Production deployment completed."
+
+      - name: Verify public production health
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in / /dashboard/browser-control/lifecycle /api/auth/providers; do
+            code=$(curl -L -sS -o /dev/null -w '%{http_code}' "$DEPLOYMENT_URL$path")
+            echo "$path -> $code"
+            case "$path:$code" in
+              "/:200"|"/:301"|"/:302"|"/:307"|"/:308") ;;
+              "/dashboard/browser-control/lifecycle:200"|"/dashboard/browser-control/lifecycle:301"|"/dashboard/browser-control/lifecycle:302"|"/dashboard/browser-control/lifecycle:307"|"/dashboard/browser-control/lifecycle:308") ;;
+              "/api/auth/providers:200") ;;
+              *) exit 1 ;;
+            esac
+          done
+
+      - name: Cutover summary
+        shell: bash
+        run: |
+          {
+            echo "## AMS cloud browser primary cutover"
+            echo ""
+            echo "- Cloud dispatch flag: enabled for production"
+            echo "- Main production redeploy: complete"
+            echo "- Public health checks: passed"
+            echo "- Secrets: not printed"
+          } >> "$GITHUB_STEP_SUMMARY"
