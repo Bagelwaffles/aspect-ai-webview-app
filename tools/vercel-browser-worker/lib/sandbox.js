@@ -12,7 +12,7 @@ const DAEMON_LOG_PATH = `${ROOT}/daemon.log`
 const PLAYWRIGHT_BROWSERS_PATH = `${ROOT}/ms-playwright`
 const BROWSER_RUNTIME_MARKER_PATH = `${ROOT}/.browser-runtime-1.62.1-v2`
 const DEFAULT_SANDBOX_NAME = "ams-browser-worker"
-const SESSION_TIMEOUT_MS = 10 * 60 * 1000
+const SESSION_TIMEOUT_MS = 45 * 60 * 1000
 
 const NETWORK_ALLOWLIST = [
   "aspectmarketingsolutions.app",
