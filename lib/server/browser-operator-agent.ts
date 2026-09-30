@@ -7,6 +7,7 @@ import {
   type BrowserJobInput,
 } from "@/lib/browser-control-policy"
 import { runStructuredAgent, type StructuredAgentDefinition } from "@/lib/server/agent-runtime"
+import { runGeminiFreeTierStructured } from "@/lib/server/gemini-free-tier"
 
 const browserOperatorInputSchema = z.object({
   goal: z.string().trim().min(1).max(2_000),
@@ -36,6 +37,33 @@ const browserOperatorOutputSchema = z.object({
   proposedJob: proposedJobSchema.nullable(),
   state: z.enum(["ready", "goal_complete", "owner_action_required", "blocked"]),
 })
+
+const BROWSER_OPERATOR_GEMINI_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    reply: { type: "STRING" },
+    proposedJob: {
+      anyOf: [
+        {
+          type: "OBJECT",
+          properties: {
+            action: { type: "STRING", enum: [...BROWSER_ACTIONS] },
+            url: { type: "STRING" },
+            selector: { type: ["STRING", "NULL"] },
+            value: { type: ["STRING", "NULL"] },
+            secretRef: { type: ["STRING", "NULL"] },
+            useCurrentPage: { type: ["BOOLEAN", "NULL"] },
+            rationale: { type: "STRING" },
+          },
+          required: ["action", "url", "selector", "value", "secretRef", "useCurrentPage", "rationale"],
+        },
+        { type: "NULL" },
+      ],
+    },
+    state: { type: "STRING", enum: ["ready", "goal_complete", "owner_action_required", "blocked"] },
+  },
+  required: ["reply", "proposedJob", "state"],
+} as const
 
 export type BrowserOperatorInput = z.infer<typeof browserOperatorInputSchema>
 export type BrowserOperatorOutput = {
@@ -141,6 +169,28 @@ Execution strategy:
   }),
 }
 
+function browserOperatorProvider(env: NodeJS.ProcessEnv = process.env) {
+  return env.AMS_BROWSER_OPERATOR_PROVIDER?.trim().toLowerCase() || "gemini-free"
+}
+
+async function runBrowserOperatorPlanner(parsedInput: BrowserOperatorInput) {
+  const provider = browserOperatorProvider()
+  if (provider === "gemini-free") {
+    return runGeminiFreeTierStructured(
+      {
+        system: browserOperatorDefinition.system,
+        prompt: browserOperatorDefinition.buildPrompt(parsedInput),
+        responseSchema: BROWSER_OPERATOR_GEMINI_RESPONSE_SCHEMA as unknown as Record<string, unknown>,
+        outputSchema: browserOperatorOutputSchema,
+        temperature: browserOperatorDefinition.temperature,
+        maxOutputTokens: browserOperatorDefinition.maxOutputTokens,
+      },
+    )
+  }
+  if (provider === "gateway") return runStructuredAgent(browserOperatorDefinition, parsedInput)
+  throw new Error("BROWSER_OPERATOR_PROVIDER_UNSUPPORTED")
+}
+
 export async function planBrowserOperator(input: unknown): Promise<BrowserOperatorOutput> {
   const parsedInput = browserOperatorInputSchema.parse(input)
   if (looksLikeRawSecret(parsedInput.goal)) {
@@ -151,7 +201,7 @@ export async function planBrowserOperator(input: unknown): Promise<BrowserOperat
     }
   }
 
-  const modelPlanned = await runStructuredAgent(browserOperatorDefinition, parsedInput)
+  const modelPlanned = await runBrowserOperatorPlanner(parsedInput)
   const planned: BrowserOperatorOutput = {
     reply: modelPlanned.reply,
     state: modelPlanned.state,
