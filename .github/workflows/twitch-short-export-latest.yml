@@ -83,3 +83,31 @@ jobs:
           path: ${{ runner.temp }}/corrected-short.mp4
           if-no-files-found: error
           retention-days: 1
+
+      - name: Controlled private YouTube upload proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          token_response="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AMS_WORKER_AUDIENCE")"
+          worker_token="$(printf '%s' "$token_response" | jq -r '.value // empty')"
+          if [ -z "$worker_token" ]; then
+            echo "::error::GitHub OIDC worker token was not issued."
+            exit 1
+          fi
+          echo "::add-mask::$worker_token"
+
+          jq -n --arg renderJobId "${{ steps.export.outputs.job_id }}" \
+            '{renderJobId:$renderJobId,approved:true}' > "$RUNNER_TEMP/youtube-upload.json"
+
+          response="$(curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $worker_token" \
+            -H "Content-Type: application/json" \
+            --data-binary @"$RUNNER_TEMP/youtube-upload.json" \
+            "$AMS_APP_URL/api/internal/twitch/media/render/youtube")"
+
+          printf '%s' "$response" \
+            | jq '{ok,status,privacyStatus,videoId,channelVerified,reused,code}'
+          printf '%s' "$response" | jq -e '.ok == true and .privacyStatus == "private" and (.videoId | type == "string" and length > 0)' >/dev/null
