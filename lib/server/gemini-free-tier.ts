@@ -61,7 +61,7 @@ export async function runGeminiFreeTierStructured<TSchema extends z.ZodTypeAny>(
         ],
         generationConfig: {
           responseMimeType: "application/json",
-          responseSchema: input.responseSchema,
+          responseJsonSchema: input.responseSchema,
           temperature: input.temperature ?? 0.1,
           maxOutputTokens: input.maxOutputTokens ?? 900,
         },
