@@ -101,13 +101,26 @@ jobs:
           jq -n --arg renderJobId "${{ steps.export.outputs.job_id }}" \
             '{renderJobId:$renderJobId,approved:true}' > "$RUNNER_TEMP/youtube-upload.json"
 
-          response="$(curl --fail-with-body --silent --show-error \
+          set +e
+          http_code="$(curl --silent --show-error \
+            --output "$RUNNER_TEMP/youtube-response.json" \
+            --write-out "%{http_code}" \
             -X POST \
             -H "Authorization: Bearer $worker_token" \
             -H "Content-Type: application/json" \
             --data-binary @"$RUNNER_TEMP/youtube-upload.json" \
             "$AMS_APP_URL/api/internal/twitch/media/render/youtube")"
+          curl_status=$?
+          set -e
 
+          response="$(cat "$RUNNER_TEMP/youtube-response.json" 2>/dev/null || true)"
           printf '%s' "$response" \
-            | jq '{ok,status,privacyStatus,videoId,channelVerified,reused,code}'
+            | jq '{ok,status,privacyStatus,videoId,channelVerified,reused,code}' || true
+          echo "YouTube proof HTTP status: $http_code"
+
+          if [ "$curl_status" -ne 0 ] || [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::error::Controlled private YouTube upload proof failed with HTTP $http_code."
+            exit 1
+          fi
+
           printf '%s' "$response" | jq -e '.ok == true and .privacyStatus == "private" and (.videoId | type == "string" and length > 0)' >/dev/null
