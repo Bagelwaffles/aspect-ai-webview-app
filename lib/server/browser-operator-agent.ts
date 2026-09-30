@@ -39,28 +39,28 @@ const browserOperatorOutputSchema = z.object({
 })
 
 const BROWSER_OPERATOR_GEMINI_RESPONSE_SCHEMA = {
-  type: "OBJECT",
+  type: "object",
   properties: {
-    reply: { type: "STRING" },
+    reply: { type: "string" },
     proposedJob: {
       anyOf: [
         {
-          type: "OBJECT",
+          type: "object",
           properties: {
-            action: { type: "STRING", enum: [...BROWSER_ACTIONS] },
-            url: { type: "STRING" },
-            selector: { type: ["STRING", "NULL"] },
-            value: { type: ["STRING", "NULL"] },
-            secretRef: { type: ["STRING", "NULL"] },
-            useCurrentPage: { type: ["BOOLEAN", "NULL"] },
-            rationale: { type: "STRING" },
+            action: { type: "string", enum: [...BROWSER_ACTIONS] },
+            url: { type: "string" },
+            selector: { type: ["string", "null"] },
+            value: { type: ["string", "null"] },
+            secretRef: { type: ["string", "null"] },
+            useCurrentPage: { type: ["boolean", "null"] },
+            rationale: { type: "string" },
           },
           required: ["action", "url", "selector", "value", "secretRef", "useCurrentPage", "rationale"],
         },
-        { type: "NULL" },
+        { type: "null" },
       ],
     },
-    state: { type: "STRING", enum: ["ready", "goal_complete", "owner_action_required", "blocked"] },
+    state: { type: "string", enum: ["ready", "goal_complete", "owner_action_required", "blocked"] },
   },
   required: ["reply", "proposedJob", "state"],
 } as const
