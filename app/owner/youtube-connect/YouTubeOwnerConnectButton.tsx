@@ -3,10 +3,8 @@
 import { signIn, signOut } from "next-auth/react"
 
 import { Button } from "@/components/ui/button"
-import {
-  YOUTUBE_READONLY_SCOPE,
-  YOUTUBE_UPLOAD_SCOPE,
-} from "@/lib/server/youtube-owner-connection"
+const YOUTUBE_UPLOAD_SCOPE = "https://www.googleapis.com/auth/youtube.upload"
+const YOUTUBE_READONLY_SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
 
 export default function YouTubeOwnerConnectButton({
   mode = "connect",
