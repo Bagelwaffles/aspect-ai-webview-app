@@ -9,6 +9,12 @@ import {
   twitchShortRenderJobSchema,
   type TwitchShortRenderJob,
 } from "../lib/server/twitch-short-render-jobs"
+import {
+  SMOKYBANANA03_YOUTUBE_CHANNEL_ID,
+  storeYouTubeOwnerConnectionFromGoogle,
+  YOUTUBE_READONLY_SCOPE,
+  YOUTUBE_UPLOAD_SCOPE,
+} from "../lib/server/youtube-owner-connection"
 
 class MemoryRedis {
   private values = new Map<string, string>()
@@ -30,7 +36,7 @@ function env(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
     AMS_YOUTUBE_CLIENT_ID: "youtube-client-12345678901234567890",
     AMS_YOUTUBE_CLIENT_SECRET: "youtube-secret-123456789012345678",
     AMS_YOUTUBE_REFRESH_TOKEN: "youtube-refresh-123456789012345678",
-    AMS_YOUTUBE_CHANNEL_ID: "UC1234567890123456789012",
+    AMS_YOUTUBE_CHANNEL_ID: SMOKYBANANA03_YOUTUBE_CHANNEL_ID,
     ...overrides,
   }
 }
@@ -101,7 +107,7 @@ test("YouTube private uploader fails closed when credentials are absent", () => 
     {
       configured: false,
       privacyStatus: "private",
-      expectedChannelConfigured: false,
+      expectedChannelConfigured: true,
     },
   )
 })
@@ -276,4 +282,105 @@ test("YouTube private uploader fails before upload when the authorized channel d
   assert.equal(result.record.status, "failed")
   assert.equal(result.record.errorCode, "YOUTUBE_CHANNEL_MISMATCH")
   assert.equal(result.record.youtubeVideoId, null)
+})
+
+
+test("YouTube private uploader uses the encrypted owner OAuth connection without AMS YouTube env secrets", async () => {
+  const redis = new MemoryRedis()
+  const nativeEnv: NodeJS.ProcessEnv = {
+    NODE_ENV: "test",
+    GOOGLE_CLIENT_ID: "google-client-12345678901234567890",
+    GOOGLE_CLIENT_SECRET: "google-secret-12345678901234567890",
+    NEXTAUTH_SECRET: "nextauth-secret-with-enough-entropy-for-tests",
+    AMS_OWNER_EMAIL: "owner@example.com",
+  }
+  const videoId = "youtube-video-native-456"
+
+  const fetcher = (async (input: URL | RequestInfo) => {
+    const url = String(input)
+    if (url === "https://oauth2.googleapis.com/token") {
+      return new Response(JSON.stringify({ access_token: "access-token-native-123" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    }
+    if (url.startsWith("https://www.googleapis.com/youtube/v3/channels?")) {
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              id: SMOKYBANANA03_YOUTUBE_CHANNEL_ID,
+              snippet: { title: "SmokyBanana03" },
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      )
+    }
+    if (url === "https://r2.example.test/native-rendered.mp4") {
+      return new Response(new Uint8Array([0, 1, 2, 3, 4]), {
+        status: 200,
+        headers: { "content-type": "video/mp4" },
+      })
+    }
+    if (url.startsWith("https://www.googleapis.com/upload/youtube/v3/videos?")) {
+      return new Response("", {
+        status: 200,
+        headers: { location: "https://upload.example.test/native-session" },
+      })
+    }
+    if (url === "https://upload.example.test/native-session") {
+      return new Response(JSON.stringify({ id: videoId }), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      })
+    }
+    if (url.startsWith("https://www.googleapis.com/youtube/v3/videos?")) {
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              id: videoId,
+              snippet: { channelId: SMOKYBANANA03_YOUTUBE_CHANNEL_ID },
+              status: { privacyStatus: "private" },
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      )
+    }
+    return new Response("not found", { status: 404 })
+  }) as typeof fetch
+
+  await storeYouTubeOwnerConnectionFromGoogle(
+    {
+      email: "owner@example.com",
+      refreshToken: "native-refresh-token-12345678901234567890",
+      accessToken: "initial-access-token-1234567890",
+      scopes: [YOUTUBE_UPLOAD_SCOPE, YOUTUBE_READONLY_SCOPE],
+    },
+    {
+      env: nativeEnv,
+      redis: redis as never,
+      fetcher,
+    },
+  )
+
+  const result = await uploadRenderedTwitchShortPrivate(
+    { renderJobId: "render-job-123", approved: true },
+    {
+      env: nativeEnv,
+      redis: redis as never,
+      fetcher,
+      getRenderedShort: async () => ({
+        job: renderedJob(),
+        previewUrl: "https://r2.example.test/native-rendered.mp4",
+      }),
+    },
+  )
+
+  assert.equal(result.record.status, "succeeded")
+  assert.equal(result.record.youtubeVideoId, videoId)
+  assert.equal(result.record.channelId, SMOKYBANANA03_YOUTUBE_CHANNEL_ID)
+  assert.equal(result.record.privacyStatus, "private")
 })

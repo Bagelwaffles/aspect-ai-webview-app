@@ -6,6 +6,8 @@ declare module "next-auth" {
       /** Opaque server-derived identity; never sourced from request bodies. */
       customerSubject?: string
     }
+    youtubeConnectionStatus?: "connected" | "error"
+    youtubeConnectionError?: string
   }
 }
 
@@ -13,6 +15,8 @@ declare module "next-auth/jwt" {
   interface JWT {
     /** Opaque derivative of the signed provider subject. */
     customerSubject?: string
+    youtubeConnectionStatus?: "connected" | "error"
+    youtubeConnectionError?: string
   }
 }
 
