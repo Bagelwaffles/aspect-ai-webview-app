@@ -5,6 +5,11 @@ import {
   getRenderedShortPreview,
   type TwitchShortRenderJob,
 } from "@/lib/server/twitch-short-render-jobs"
+import {
+  getStoredYouTubeOwnerCredential,
+  resolveYouTubeOAuthClient,
+  SMOKYBANANA03_YOUTUBE_CHANNEL_ID,
+} from "@/lib/server/youtube-owner-connection"
 
 export const YOUTUBE_PRIVATE_UPLOAD_VERSION = "youtube-private-upload-v1" as const
 
@@ -89,24 +94,58 @@ async function saveRecord(record: YouTubePrivateUploadRecord, redis: RedisLike) 
 }
 
 function youtubeConfig(env: NodeJS.ProcessEnv = process.env) {
-  const clientId = clean(env.AMS_YOUTUBE_CLIENT_ID)
-  const clientSecret = clean(env.AMS_YOUTUBE_CLIENT_SECRET)
+  const client = resolveYouTubeOAuthClient(env)
+  const clientId = client?.clientId ?? null
+  const clientSecret = client?.clientSecret ?? null
   const refreshToken = clean(env.AMS_YOUTUBE_REFRESH_TOKEN)
-  const channelId = clean(env.AMS_YOUTUBE_CHANNEL_ID)
+  const configuredChannel = clean(env.AMS_YOUTUBE_CHANNEL_ID)
+  const channelId =
+    configuredChannel && /^UC[A-Za-z0-9_-]{20,40}$/u.test(configuredChannel)
+      ? configuredChannel
+      : SMOKYBANANA03_YOUTUBE_CHANNEL_ID
 
   const configured = Boolean(
     clientId &&
       clientSecret &&
       refreshToken &&
-      channelId &&
       !isPlaceholder(clientId) &&
       !isPlaceholder(clientSecret) &&
       !isPlaceholder(refreshToken) &&
-      !isPlaceholder(channelId) &&
-      /^UC[A-Za-z0-9_-]{20,40}$/u.test(channelId),
+      channelId === SMOKYBANANA03_YOUTUBE_CHANNEL_ID,
   )
 
   return { clientId, clientSecret, refreshToken, channelId, configured }
+}
+
+async function runtimeYouTubeConfig(options: Options) {
+  const env = options.env ?? process.env
+  const legacy = youtubeConfig(env)
+  if (legacy.configured) return legacy
+
+  try {
+    const stored = await getStoredYouTubeOwnerCredential({
+      env,
+      redis: runtimeRedis(options),
+    })
+    const client = resolveYouTubeOAuthClient(env)
+    if (
+      stored &&
+      client &&
+      stored.channelId === SMOKYBANANA03_YOUTUBE_CHANNEL_ID
+    ) {
+      return {
+        clientId: client.clientId,
+        clientSecret: client.clientSecret,
+        refreshToken: stored.refreshToken,
+        channelId: stored.channelId,
+        configured: true,
+      }
+    }
+  } catch {
+    // Keep the uploader fail-closed if the encrypted connection vault is unavailable.
+  }
+
+  return legacy
 }
 
 export function getYouTubePrivateUploaderConfiguration(env: NodeJS.ProcessEnv = process.env) {
@@ -160,7 +199,7 @@ async function authorizedChannelId(
   fetcher: typeof fetch,
 ) {
   const response = await fetcher(
-    "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true&maxResults=1",
+    "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true&maxResults=50",
     {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
@@ -171,9 +210,10 @@ async function authorizedChannelId(
     | { items?: Array<{ id?: unknown }> }
     | null
   if (!response.ok) throw new Error(`YOUTUBE_CHANNEL_HTTP_${response.status}`)
-  const actual = typeof json?.items?.[0]?.id === "string" ? json.items[0].id.trim() : ""
-  if (!actual) throw new Error("YOUTUBE_CHANNEL_ID_MISSING")
-  if (actual !== expectedChannelId) throw new Error("YOUTUBE_CHANNEL_MISMATCH")
+  const actual = (json?.items ?? [])
+    .map((item) => (typeof item.id === "string" ? item.id.trim() : ""))
+    .find((id) => id === expectedChannelId)
+  if (!actual) throw new Error("YOUTUBE_CHANNEL_MISMATCH")
   return actual
 }
 
@@ -227,7 +267,7 @@ export async function uploadRenderedTwitchShortPrivate(
     throw new Error("YOUTUBE_UPLOAD_RECONCILIATION_REQUIRED")
   }
 
-  const config = youtubeConfig(env)
+  const config = await runtimeYouTubeConfig({ ...options, env, redis })
   if (!config.configured || !config.channelId) throw new Error("YOUTUBE_UPLOADER_NOT_CONFIGURED")
 
   const rendered = await (options.getRenderedShort ?? ((jobId) => getRenderedShortPreview(jobId)))(
