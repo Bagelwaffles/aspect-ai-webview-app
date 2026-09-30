@@ -34,5 +34,6 @@ test("Browser Operator defaults to direct free Gemini and keeps Gateway opt-in o
   assert.match(source, /runGeminiFreeTierStructured/)
   assert.match(source, /provider === "gateway"/)
   assert.match(source, /BROWSER_OPERATOR_PROVIDER_UNSUPPORTED/)
-  const freeRunner = readFileSync("lib/server/gemini-free-tier.ts", "utf8")\n  assert.match(freeRunner, /gemini-3\.5-flash-lite/)
+  const freeRunner = readFileSync("lib/server/gemini-free-tier.ts", "utf8")
+  assert.match(freeRunner, /gemini-3\.5-flash-lite/)
 })
