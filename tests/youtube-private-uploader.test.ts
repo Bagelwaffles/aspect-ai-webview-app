@@ -9,6 +9,7 @@ import {
   twitchShortRenderJobSchema,
   type TwitchShortRenderJob,
 } from "../lib/server/twitch-short-render-jobs"
+import { SMOKYBANANA03_YOUTUBE_CHANNEL_ID } from "../lib/server/youtube-owner-connection"
 
 class MemoryRedis {
   private values = new Map<string, string>()
@@ -30,7 +31,7 @@ function env(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
     AMS_YOUTUBE_CLIENT_ID: "youtube-client-12345678901234567890",
     AMS_YOUTUBE_CLIENT_SECRET: "youtube-secret-123456789012345678",
     AMS_YOUTUBE_REFRESH_TOKEN: "youtube-refresh-123456789012345678",
-    AMS_YOUTUBE_CHANNEL_ID: "UC1234567890123456789012",
+    AMS_YOUTUBE_CHANNEL_ID: SMOKYBANANA03_YOUTUBE_CHANNEL_ID,
     ...overrides,
   }
 }
