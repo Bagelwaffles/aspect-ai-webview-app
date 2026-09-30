@@ -49,7 +49,7 @@ function scopes() {
   ]
 }
 
-function channelFetcher(channelId = SMOKYBANANA03_YOUTUBE_CHANNEL_ID) {
+function channelFetcher(channelId: string = SMOKYBANANA03_YOUTUBE_CHANNEL_ID) {
   return (async (input: URL | RequestInfo) => {
     const url = String(input)
     if (url.startsWith("https://www.googleapis.com/youtube/v3/channels?")) {
