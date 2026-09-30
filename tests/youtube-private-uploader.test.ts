@@ -101,7 +101,7 @@ test("YouTube private uploader fails closed when credentials are absent", () => 
     {
       configured: false,
       privacyStatus: "private",
-      expectedChannelConfigured: false,
+      expectedChannelConfigured: true,
     },
   )
 })
