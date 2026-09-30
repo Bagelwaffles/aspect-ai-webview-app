@@ -75,7 +75,7 @@ export const authOptions: NextAuthOptions = {
       if (
         account?.provider === "google" &&
         typeof account.scope === "string" &&
-        account.scope.split(/\\s+/u).includes(YOUTUBE_UPLOAD_SCOPE)
+        account.scope.split(/\s+/u).includes(YOUTUBE_UPLOAD_SCOPE)
       ) {
         const profileEmail =
           profile && typeof profile === "object" && "email" in profile && typeof profile.email === "string"
