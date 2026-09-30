@@ -33,6 +33,18 @@ A plan response must report that execution did not occur.
 10. **Observability** — executor health, provider latency/errors, spend/credits, retries, circuit breakers and incident state.
 11. **Kill switches** — global and provider/agent scoped.
 
+## Standard action lifecycle
+
+Every proactive AMS workflow uses the same control sequence:
+
+1. **Event** — observe a webhook, schedule, monitor result, customer request, or internal state change.
+2. **Proposed action** — convert the event into a narrow, typed action intent with provider, target, resource scope, summary, idempotency boundary, and a fingerprint that binds later approval to that exact intent.
+3. **Approval** — apply the shared governance policy. Read-only monitoring, drafting, recommendations, and private artifacts may proceed without an external side effect. Publishing, external messaging, and reversible external mutations require explicit human approval. Spending, billing, credential changes, permission changes, production configuration, deletion, and destructive mutations require explicit owner approval. Unknown action types fail closed.
+4. **Execution** — only a named provider adapter may execute an approved action. Owner credentials are not shared with workers or model context; the server retains scoped provider credentials and resource boundaries.
+5. **Audit log** — append the proposal fingerprint, approval actor/role, execution attempt, provider result, external identifier when available, and final state. A plan, approval, HTTP 200, or queued job is never proof of external delivery by itself.
+
+Browser Control already implements the same shape through risk classification, approval gates, idempotency, kill switch, worker state, execution results, and audit events. New workflows should reuse the shared action-governance policy instead of creating parallel approval semantics.
+
 ## Approval tiers
 
 - **Read/draft:** may run within authenticated customer scope when the agent is Live and entitled.
