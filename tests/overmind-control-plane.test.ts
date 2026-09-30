@@ -27,6 +27,7 @@ test("explicit live text agent can be included in a plan without claiming execut
   assert.equal(plan.id, "plan-test-1")
   assert.equal(plan.mode, "planning-only")
   assert.equal(plan.executionPerformed, false)
+  assert.deepEqual(plan.governanceLifecycle, ["event", "proposed_action", "approval", "execution", "audit_log"])
   assert.equal(plan.steps.length, 1)
   assert.equal(plan.steps[0]?.agentSlug, "content-agent")
   assert.equal(plan.steps[0]?.readiness, "ready-for-planning")
