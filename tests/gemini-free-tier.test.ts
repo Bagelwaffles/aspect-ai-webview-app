@@ -23,7 +23,7 @@ const responseSchema = {
 }
 
 test("Gemini free-tier runner requires a server-side API key", async () => {
-  assert.equal(isGeminiFreeTierConfigured({}), false)
+  assert.equal(isGeminiFreeTierConfigured({ NODE_ENV: "test" }), false)
   await assert.rejects(
     runGeminiFreeTierStructured(
       {
@@ -32,7 +32,7 @@ test("Gemini free-tier runner requires a server-side API key", async () => {
         responseSchema,
         outputSchema,
       },
-      { env: {} },
+      { env: { NODE_ENV: "test" } },
     ),
     /BROWSER_OPERATOR_GEMINI_NOT_CONFIGURED/u,
   )
@@ -70,7 +70,7 @@ test("Gemini free-tier runner sends the API key only in the request header", asy
       maxOutputTokens: 300,
     },
     {
-      env: { GEMINI_API_KEY: "gemini-test-secret" },
+      env: { NODE_ENV: "test", GEMINI_API_KEY: "gemini-test-secret" },
       fetcher,
     },
   )
@@ -99,7 +99,7 @@ test("Gemini free-tier runner fails closed on free-tier rate limits", async () =
         outputSchema,
       },
       {
-        env: { GEMINI_API_KEY: "gemini-test-secret" },
+        env: { NODE_ENV: "test", GEMINI_API_KEY: "gemini-test-secret" },
         fetcher,
       },
     ),
@@ -125,7 +125,7 @@ test("Gemini free-tier runner rejects malformed structured output", async () => 
         outputSchema,
       },
       {
-        env: { GEMINI_API_KEY: "gemini-test-secret" },
+        env: { NODE_ENV: "test", GEMINI_API_KEY: "gemini-test-secret" },
         fetcher,
       },
     ),
