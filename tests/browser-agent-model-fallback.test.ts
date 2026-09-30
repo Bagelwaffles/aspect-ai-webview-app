@@ -24,9 +24,9 @@ test("fallback routing is opt-in for non-browser structured agents", () => {
   )
 })
 
-
 test("Browser Operator defaults to direct free Gemini and keeps Gateway opt-in only", () => {
   const source = readFileSync("lib/server/browser-operator-agent.ts", "utf8")
+  const freeRunner = readFileSync("lib/server/gemini-free-tier.ts", "utf8")
 
   assert.match(source, /AMS_BROWSER_OPERATOR_PROVIDER/)
   assert.match(source, /\|\| "gemini-free"/)
@@ -34,6 +34,5 @@ test("Browser Operator defaults to direct free Gemini and keeps Gateway opt-in o
   assert.match(source, /runGeminiFreeTierStructured/)
   assert.match(source, /provider === "gateway"/)
   assert.match(source, /BROWSER_OPERATOR_PROVIDER_UNSUPPORTED/)
-  const freeRunner = readFileSync("lib/server/gemini-free-tier.ts", "utf8")
   assert.match(freeRunner, /gemini-3\.5-flash-lite/)
 })
