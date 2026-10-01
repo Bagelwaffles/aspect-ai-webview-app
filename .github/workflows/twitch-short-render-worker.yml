@@ -38,6 +38,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Wait for matching AMS production deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_commit="${GITHUB_SHA:0:12}"
+          health_file="$RUNNER_TEMP/ams-production-health.json"
+          matched=false
+
+          for attempt in $(seq 1 60); do
+            http_code="$(curl --max-time 15 --silent --show-error \
+              --output "$health_file" \
+              --write-out "%{http_code}" \
+              "$AMS_APP_URL/api/health" || true)"
+            actual_commit="$(jq -r '.commit // "unknown"' "$health_file" 2>/dev/null || printf 'unknown')"
+
+            if [ "$http_code" = "200" ] && [ "$actual_commit" = "$expected_commit" ]; then
+              echo "AMS production matches workflow commit $expected_commit."
+              matched=true
+              break
+            fi
+
+            echo "Production not ready for this worker yet (attempt $attempt/60, http=$http_code, commit=$actual_commit, expected=$expected_commit)."
+            sleep 5
+          done
+
+          if [ "$matched" != "true" ]; then
+            echo "::error::AMS production did not reach workflow commit $expected_commit. Twitch/YouTube automation was not executed."
+            exit 1
+          fi
+
       - name: Reconcile automatic private Shorts
         id: reconcile
         shell: bash
