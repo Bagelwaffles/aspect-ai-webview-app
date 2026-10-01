@@ -13,6 +13,8 @@ const PLAYWRIGHT_BROWSERS_PATH = `${ROOT}/ms-playwright`
 const BROWSER_RUNTIME_MARKER_PATH = `${ROOT}/.browser-runtime-1.62.1-v2`
 const DEFAULT_SANDBOX_NAME = "ams-browser-worker"
 const SESSION_TIMEOUT_MS = 45 * 60 * 1000
+const PROFILE_SNAPSHOT_RETENTION_MS = 90 * 24 * 60 * 60 * 1000
+const PROFILE_SNAPSHOT_RETENTION_DAYS = 90
 
 const NETWORK_ALLOWLIST = [
   "aspectmarketingsolutions.app",
@@ -250,6 +252,9 @@ export async function getCloudBrowserSandbox(env = process.env) {
   })
 
   await ensureBrowserRuntime(sandbox)
+  await sandbox.update({
+    snapshotExpiration: PROFILE_SNAPSHOT_RETENTION_MS,
+  })
   await sandbox.updateNetworkPolicy({
     allow: NETWORK_ALLOWLIST,
   })
@@ -312,7 +317,11 @@ export async function cloudBrowserSandboxStatus(sandbox) {
     args: ["-lc", `[ -s ${DAEMON_PID_PATH} ] && kill -0 "$(cat ${DAEMON_PID_PATH})" 2>/dev/null`],
     cwd: ROOT,
   })
-  return { ...parsed, daemon: daemon.exitCode === 0 }
+  return {
+    ...parsed,
+    daemon: daemon.exitCode === 0,
+    profileRetentionDays: PROFILE_SNAPSHOT_RETENTION_DAYS,
+  }
 }
 
 export async function stopCloudBrowserSandbox(sandbox) {
