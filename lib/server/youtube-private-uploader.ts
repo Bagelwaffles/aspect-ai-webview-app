@@ -217,13 +217,38 @@ async function authorizedChannelId(
   return actual
 }
 
+function canonicalText(value: string) {
+  return value.replace(/\r\n?/gu, "\n").normalize("NFC").trim()
+}
+
+function normalizeTag(tag: string) {
+  return canonicalText(tag).slice(0, 80)
+}
+
+function uniqueTags(tags: string[]) {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const raw of tags) {
+    const tag = normalizeTag(raw)
+    if (!tag || seen.has(tag)) continue
+    seen.add(tag)
+    result.push(tag)
+    if (result.length >= 20) break
+  }
+  return result
+}
+
+function comparableTags(tags: string[]) {
+  return [...new Set(tags.map(normalizeTag).filter(Boolean))].sort()
+}
+
 function metadataFor(job: TwitchShortRenderJob) {
   const youtube = job.publishMetadata?.youtube
   if (!youtube) throw new Error("YOUTUBE_UPLOAD_METADATA_REQUIRED")
   return {
-    title: youtube.title.slice(0, 100),
-    description: youtube.description.slice(0, 5_000),
-    tags: youtube.tags.slice(0, 20).map((tag) => tag.slice(0, 80)),
+    title: canonicalText(youtube.title).slice(0, 100),
+    description: canonicalText(youtube.description).slice(0, 5_000),
+    tags: uniqueTags(youtube.tags),
   }
 }
 
@@ -559,16 +584,16 @@ export async function verifyRenderedTwitchShortPrivate(renderJobId: string, opti
     !video || video.snippet.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID ||
     video.status.privacyStatus !== "private"
   ) throw new Error("YOUTUBE_UPLOAD_VERIFICATION_MISMATCH")
-  if (video.snippet.title !== metadata.title) {
+  if (canonicalText(video.snippet.title) !== canonicalText(metadata.title)) {
     throw new Error("YOUTUBE_UPLOAD_METADATA_TITLE_MISMATCH")
   }
-  if (video.snippet.description !== metadata.description) {
+  if (canonicalText(video.snippet.description) !== canonicalText(metadata.description)) {
     throw new Error("YOUTUBE_UPLOAD_METADATA_DESCRIPTION_MISMATCH")
   }
   if (video.snippet.categoryId !== "20") {
     throw new Error("YOUTUBE_UPLOAD_METADATA_CATEGORY_MISMATCH")
   }
-  if (JSON.stringify([...video.snippet.tags].sort()) !== JSON.stringify([...metadata.tags].sort())) {
+  if (JSON.stringify(comparableTags(video.snippet.tags)) !== JSON.stringify(comparableTags(metadata.tags))) {
     throw new Error("YOUTUBE_UPLOAD_METADATA_TAGS_MISMATCH")
   }
   const proof = {
