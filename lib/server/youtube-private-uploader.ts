@@ -217,13 +217,34 @@ async function authorizedChannelId(
   return actual
 }
 
+function normalizeTag(tag: string) {
+  return tag.trim().normalize("NFC").slice(0, 80)
+}
+
+function uniqueTags(tags: string[]) {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const raw of tags) {
+    const tag = normalizeTag(raw)
+    if (!tag || seen.has(tag)) continue
+    seen.add(tag)
+    result.push(tag)
+    if (result.length >= 20) break
+  }
+  return result
+}
+
+function comparableTags(tags: string[]) {
+  return [...new Set(tags.map(normalizeTag).filter(Boolean))].sort()
+}
+
 function metadataFor(job: TwitchShortRenderJob) {
   const youtube = job.publishMetadata?.youtube
   if (!youtube) throw new Error("YOUTUBE_UPLOAD_METADATA_REQUIRED")
   return {
     title: youtube.title.slice(0, 100),
     description: youtube.description.slice(0, 5_000),
-    tags: youtube.tags.slice(0, 20).map((tag) => tag.slice(0, 80)),
+    tags: uniqueTags(youtube.tags),
   }
 }
 
@@ -563,7 +584,7 @@ export async function verifyRenderedTwitchShortPrivate(renderJobId: string, opti
     video.snippet.title !== metadata.title ||
     video.snippet.description !== metadata.description ||
     video.snippet.categoryId !== "20" ||
-    JSON.stringify([...video.snippet.tags].sort()) !== JSON.stringify([...metadata.tags].sort())
+    JSON.stringify(comparableTags(video.snippet.tags)) !== JSON.stringify(comparableTags(metadata.tags))
   ) throw new Error("YOUTUBE_UPLOAD_METADATA_MISMATCH")
   const proof = {
     renderJobId: record.renderJobId,
