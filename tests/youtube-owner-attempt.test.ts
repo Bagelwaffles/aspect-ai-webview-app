@@ -17,6 +17,7 @@ class MemoryRedis {
   }
 }
 const env: NodeJS.ProcessEnv = {
+  NODE_ENV: "test",
   NEXTAUTH_SECRET: "test-owner-attempt-secret-with-sufficient-length",
   AMS_OWNER_EMAIL: "owner@example.com",
   GOOGLE_CLIENT_ID: "test-client-id", GOOGLE_CLIENT_SECRET: "test-client-secret",
