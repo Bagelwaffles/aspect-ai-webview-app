@@ -6,6 +6,7 @@ import {
 } from "@/lib/server/twitch-short-render-jobs"
 import {
   getYouTubePrivateUploadRecord,
+  getYouTubePrivateVerificationProof,
   uploadRenderedTwitchShortPrivate,
   verifyRenderedTwitchShortPrivate,
 } from "@/lib/server/youtube-private-uploader"
@@ -34,50 +35,88 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const jobs = await listLatestTwitchShortRenderJobs()
+    const jobs = (await listLatestTwitchShortRenderJobs())
+      .filter((job) => job.status === "rendered" && Boolean(job.publishMetadata?.youtube))
 
+    // Phase 1: prove every existing successful upload before any new upload is allowed.
     for (const job of jobs) {
-      if (job.status !== "rendered" || !job.publishMetadata?.youtube) continue
-
       const existing = await getYouTubePrivateUploadRecord(job.jobId)
+      if (existing?.status !== "succeeded" || !existing.youtubeVideoId) continue
 
-      if (existing?.status === "succeeded") {
-        try {
-          const verification = await verifyRenderedTwitchShortPrivate(job.jobId)
-          return json({
-            ...verification,
-            ok: true,
-            attempted: false,
-            verificationAttempted: true,
-            renderJobId: job.jobId,
-            clipId: job.clipId,
-            status: existing.status,
-            privacyStatus: existing.privacyStatus,
-            videoId: existing.youtubeVideoId,
-            attempts: existing.attempts,
-            reused: true,
-          })
-        } catch (error) {
-          const code = error instanceof Error ? error.message : "YOUTUBE_PRIVATE_UPLOAD_VERIFY_FAILED"
-          return json({
-            ok: false,
-            attempted: false,
-            verificationAttempted: true,
-            pendingVerification: code === TAGS_PENDING_CODE,
-            renderJobId: job.jobId,
-            clipId: job.clipId,
-            status: existing.status,
-            privacyStatus: existing.privacyStatus,
-            videoId: existing.youtubeVideoId,
-            attempts: existing.attempts,
-            reused: true,
-            code,
-          }, verificationStatus(code))
-        }
+      const proof = await getYouTubePrivateVerificationProof(job.jobId)
+      if (proof?.videoId === existing.youtubeVideoId) continue
+
+      try {
+        const verification = await verifyRenderedTwitchShortPrivate(job.jobId)
+        return json({
+          ...verification,
+          ok: true,
+          attempted: false,
+          verificationAttempted: true,
+          pendingVerification: false,
+          renderJobId: job.jobId,
+          clipId: job.clipId,
+          status: existing.status,
+          privacyStatus: existing.privacyStatus,
+          videoId: existing.youtubeVideoId,
+          attempts: existing.attempts,
+          reused: true,
+        })
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "YOUTUBE_PRIVATE_UPLOAD_VERIFY_FAILED"
+        return json({
+          ok: false,
+          attempted: false,
+          verificationAttempted: true,
+          pendingVerification: code === TAGS_PENDING_CODE,
+          renderJobId: job.jobId,
+          clipId: job.clipId,
+          status: existing.status,
+          privacyStatus: existing.privacyStatus,
+          videoId: existing.youtubeVideoId,
+          attempts: existing.attempts,
+          reused: true,
+          code,
+        }, verificationStatus(code))
+      }
+    }
+
+    // Phase 2: once all prior successful uploads have durable proof, upload at most one new render.
+    for (const job of jobs) {
+      const existing = await getYouTubePrivateUploadRecord(job.jobId)
+      if (existing?.status === "succeeded") continue
+
+      if (existing?.status === "uploading" || existing?.status === "reconciliation") {
+        return json({
+          ok: false,
+          attempted: false,
+          verificationAttempted: false,
+          renderJobId: job.jobId,
+          clipId: job.clipId,
+          status: existing.status,
+          privacyStatus: existing.privacyStatus,
+          videoId: existing.youtubeVideoId,
+          attempts: existing.attempts,
+          reused: true,
+          code: "YOUTUBE_UPLOAD_RECONCILIATION_REQUIRED",
+        }, 409)
       }
 
-      if (existing?.status === "uploading" || existing?.status === "reconciliation") continue
-      if ((existing?.attempts ?? 0) >= MAX_PRIVATE_UPLOAD_ATTEMPTS) continue
+      if ((existing?.attempts ?? 0) >= MAX_PRIVATE_UPLOAD_ATTEMPTS) {
+        return json({
+          ok: false,
+          attempted: false,
+          verificationAttempted: false,
+          renderJobId: job.jobId,
+          clipId: job.clipId,
+          status: existing?.status ?? "failed",
+          privacyStatus: existing?.privacyStatus ?? "private",
+          videoId: existing?.youtubeVideoId ?? null,
+          attempts: existing?.attempts ?? MAX_PRIVATE_UPLOAD_ATTEMPTS,
+          reused: Boolean(existing),
+          code: "YOUTUBE_PRIVATE_UPLOAD_ATTEMPTS_EXHAUSTED",
+        }, 409)
+      }
 
       const result = await uploadRenderedTwitchShortPrivate({
         renderJobId: job.jobId,
@@ -108,6 +147,7 @@ export async function POST(request: NextRequest) {
           ok: true,
           attempted: true,
           verificationAttempted: true,
+          pendingVerification: false,
           renderJobId: job.jobId,
           clipId: job.clipId,
           status: record.status,

@@ -15,6 +15,8 @@ export const YOUTUBE_PRIVATE_UPLOAD_VERSION = "youtube-private-upload-v1" as con
 
 const YOUTUBE_UPLOAD_TTL_SECONDS = 60 * 60 * 24 * 180
 const YOUTUBE_UPLOAD_KEY_PREFIX = "ams:youtube-private-upload:v1:job:"
+const YOUTUBE_VERIFICATION_KEY_PREFIX = "ams:youtube-private-upload:v1:verification:"
+const YOUTUBE_TAGS_MAX_CHARS = 500
 const MAX_VIDEO_BYTES = 250 * 1024 * 1024
 
 export const youtubePrivateUploadRecordSchema = z.object({
@@ -72,6 +74,10 @@ function nowIso(options: Options) {
 
 function uploadKey(renderJobId: string) {
   return `${YOUTUBE_UPLOAD_KEY_PREFIX}${renderJobId}`
+}
+
+function verificationKey(renderJobId: string) {
+  return `${YOUTUBE_VERIFICATION_KEY_PREFIX}${renderJobId}`
 }
 
 function parseRecord(raw: unknown): YouTubePrivateUploadRecord | null {
@@ -166,6 +172,42 @@ export async function getYouTubePrivateUploadRecord(
   return parseRecord(await redis.get<unknown>(uploadKey(renderJobId)))
 }
 
+export const youtubePrivateVerificationProofSchema = z.object({
+  renderJobId: z.string().min(1).max(200),
+  videoId: z.string().min(1).max(80),
+  channelId: z.string().min(1).max(120),
+  privacyStatus: z.literal("private"),
+  metadataVerified: z.literal(true),
+  categoryId: z.literal("20"),
+  expectedTagCount: z.number().int().min(0).max(20),
+  storedTagCount: z.number().int().min(0).max(20),
+  tagVerification: z.enum(["exact", "stored-subset"]),
+  notifySubscribers: z.literal(false),
+  notificationEvidence: z.literal("upload-request-policy"),
+  verificationSource: z.literal("youtube-data-api"),
+  verifiedAt: z.string().datetime(),
+}).strict()
+
+export type YouTubePrivateVerificationProof = z.infer<typeof youtubePrivateVerificationProofSchema>
+
+export async function getYouTubePrivateVerificationProof(
+  renderJobId: string,
+  options: Options = {},
+) {
+  const redis = runtimeRedis(options)
+  if (!redis) return null
+  const raw = await redis.get<unknown>(verificationKey(renderJobId))
+  if (!raw) return null
+  try {
+    const value = typeof raw === "string" ? JSON.parse(raw) : raw
+    const parsed = youtubePrivateVerificationProofSchema.safeParse(value)
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
+}
+
+
 async function accessToken(config: ReturnType<typeof youtubeConfig>, fetcher: typeof fetch) {
   if (!config.configured || !config.clientId || !config.clientSecret || !config.refreshToken) {
     throw new Error("YOUTUBE_UPLOADER_NOT_CONFIGURED")
@@ -247,13 +289,29 @@ function comparableTags(tags: string[]) {
   return [...new Set(tags.map(tagKey).filter(Boolean))].sort()
 }
 
+function youtubeTagWireLength(tag: string) {
+  return tag.length + (/\s/u.test(tag) ? 2 : 0)
+}
+
+function budgetYouTubeTags(tags: string[]) {
+  const result: string[] = []
+  let used = 0
+  for (const tag of uniqueTags(tags)) {
+    const cost = youtubeTagWireLength(tag) + (result.length ? 1 : 0)
+    if (used + cost > YOUTUBE_TAGS_MAX_CHARS) continue
+    result.push(tag)
+    used += cost
+  }
+  return result
+}
+
 function metadataFor(job: TwitchShortRenderJob) {
   const youtube = job.publishMetadata?.youtube
   if (!youtube) throw new Error("YOUTUBE_UPLOAD_METADATA_REQUIRED")
   return {
     title: canonicalText(youtube.title).slice(0, 100),
     description: canonicalText(youtube.description).slice(0, 5_000),
-    tags: uniqueTags(youtube.tags),
+    tags: budgetYouTubeTags(youtube.tags),
   }
 }
 
@@ -598,28 +656,38 @@ export async function verifyRenderedTwitchShortPrivate(renderJobId: string, opti
   if (video.snippet.categoryId !== "20") {
     throw new Error("YOUTUBE_UPLOAD_METADATA_CATEGORY_MISMATCH")
   }
-  if (JSON.stringify(comparableTags(video.snippet.tags)) !== JSON.stringify(comparableTags(metadata.tags))) {
+  const expectedTags = comparableTags(metadata.tags)
+  const storedTags = comparableTags(video.snippet.tags)
+  const expectedTagSet = new Set(expectedTags)
+  const unexpectedStoredTag = storedTags.find((tag) => !expectedTagSet.has(tag))
+  if (
+    unexpectedStoredTag ||
+    storedTags.length < Math.min(3, expectedTags.length)
+  ) {
     throw new Error("YOUTUBE_UPLOAD_METADATA_TAGS_MISMATCH")
   }
-  const proof = {
+  const proof = youtubePrivateVerificationProofSchema.parse({
     renderJobId: record.renderJobId,
     videoId: video.id,
     channelId: video.snippet.channelId,
     privacyStatus: video.status.privacyStatus,
     metadataVerified: true,
     categoryId: video.snippet.categoryId,
+    expectedTagCount: expectedTags.length,
+    storedTagCount: storedTags.length,
+    tagVerification:
+      storedTags.length === expectedTags.length ? "exact" : "stored-subset",
     // YouTube does not return notifySubscribers in videos.list. The uploader
     // always sends notifySubscribers=false in the original videos.insert request.
     notifySubscribers: false,
     notificationEvidence: "upload-request-policy",
     verificationSource: "youtube-data-api",
     verifiedAt: nowIso(options),
-  }
-  const proofKey = `ams:youtube-private-upload:v1:verification:${renderJobId}`
+  })
+  const proofKey = verificationKey(renderJobId)
   await redis.set(proofKey, JSON.stringify(proof), { ex: YOUTUBE_UPLOAD_TTL_SECONDS })
-  const stored = await redis.get<unknown>(proofKey)
-  const durable = typeof stored === "string" ? JSON.parse(stored) : stored
-  if (!durable || typeof durable !== "object" || !("videoId" in durable) || durable.videoId !== proof.videoId) {
+  const durable = await getYouTubePrivateVerificationProof(renderJobId, { ...options, redis })
+  if (!durable || durable.videoId !== proof.videoId) {
     throw new Error("YOUTUBE_VERIFICATION_STORE_FAILED")
   }
   return proof

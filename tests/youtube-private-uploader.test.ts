@@ -3,6 +3,7 @@ import test from "node:test"
 
 import {
   getYouTubePrivateUploaderConfiguration,
+  getYouTubePrivateVerificationProof,
   uploadRenderedTwitchShortPrivate,
   verifyRenderedTwitchShortPrivate,
 } from "../lib/server/youtube-private-uploader"
@@ -207,13 +208,19 @@ test("YouTube private uploader uploads exactly once, forces private, and verifie
     return new Response("not found", { status: 404 })
   }) as typeof fetch
 
+  const job = renderedJob()
+  job.publishMetadata!.youtube.tags = Array.from(
+    { length: 20 },
+    (_, index) => `long tag ${index + 1} ${"x".repeat(52)}`,
+  )
+
   const options = {
     env: env(),
     redis: redis as never,
     fetcher,
     now: () => new Date("2026-09-30T13:00:00.000Z"),
     getRenderedShort: async () => ({
-      job: renderedJob(),
+      job,
       previewUrl: "https://r2.example.test/rendered.mp4",
     }),
   }
@@ -237,6 +244,13 @@ test("YouTube private uploader uploads exactly once, forces private, and verifie
   const metadata = JSON.parse(initCall.body)
   assert.equal(metadata.status.privacyStatus, "private")
   assert.equal(metadata.snippet.categoryId, "20")
+  const uploadedTags = metadata.snippet.tags as string[]
+  const tagBudget = uploadedTags.reduce(
+    (total, tag, index) => total + tag.length + (/\s/u.test(tag) ? 2 : 0) + (index ? 1 : 0),
+    0,
+  )
+  assert.ok(uploadedTags.length >= 3)
+  assert.ok(tagBudget <= 500)
 
   const callCountAfterFirst = calls.length
   const second = await uploadRenderedTwitchShortPrivate(
@@ -437,16 +451,28 @@ test("private video verification reads API metadata, persists proof, and never u
 })
 
 
-test("private video verification accepts provider-normalized text and case-equivalent de-duplicated tags", async () => {
+test("private video verification accepts provider-normalized text and a stored tag subset", async () => {
   const fixture = await verificationFixture()
   fixture.job.publishMetadata!.youtube.title = "Quick triple kill  "
   fixture.job.publishMetadata!.youtube.description = "Actual Twitch footage from SmokyBanana03. #Gaming #Shorts\r\n"
-  fixture.job.publishMetadata!.youtube.tags = ["gaming", "Twitch", "shorts", "Gaming"]
+  fixture.job.publishMetadata!.youtube.tags = [
+    "gaming",
+    "Twitch",
+    "shorts",
+    "Call of Duty",
+    "SmokyBanana03",
+  ]
   fixture.video.snippet.title = "Quick triple kill"
   fixture.video.snippet.description = "Actual Twitch footage from SmokyBanana03. #Gaming #Shorts"
   fixture.video.snippet.tags = ["Shorts", "GAMING", "twitch"]
   const proof = await verifyRenderedTwitchShortPrivate("render-job-123", fixture.options)
   assert.equal(proof.metadataVerified, true)
+  assert.equal(proof.tagVerification, "stored-subset")
+  assert.equal(proof.expectedTagCount, 5)
+  assert.equal(proof.storedTagCount, 3)
+  const durable = await getYouTubePrivateVerificationProof("render-job-123", fixture.options)
+  assert.equal(durable?.videoId, "verified-video-123")
+  assert.equal(durable?.tagVerification, "stored-subset")
 })
 
 test("private video verification fails closed on altered metadata, wrong channel or public privacy", async () => {
