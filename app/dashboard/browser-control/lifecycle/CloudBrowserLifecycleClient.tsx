@@ -9,6 +9,7 @@ type CloudStatus = {
   paired: boolean
   daemon: boolean
   profilePresent?: boolean
+  profileRetentionDays?: number
 }
 
 export default function CloudBrowserLifecycleClient() {
@@ -30,6 +31,7 @@ export default function CloudBrowserLifecycleClient() {
       paired: Boolean(body.paired),
       daemon: Boolean(body.daemon),
       profilePresent: Boolean(body.profilePresent),
+      profileRetentionDays: typeof body.profileRetentionDays === "number" ? body.profileRetentionDays : undefined,
     })
   }, [])
 
@@ -73,6 +75,7 @@ export default function CloudBrowserLifecycleClient() {
             <div><span className="text-slate-500">Paired</span><p className="mt-1 font-bold">{status?.paired ? "Yes" : "No"}</p></div>
             <div><span className="text-slate-500">Sandbox daemon</span><p className="mt-1 font-bold">{status?.daemon ? "Active" : "Idle"}</p></div>
             <div><span className="text-slate-500">Persistent profile</span><p className="mt-1 font-bold">{status?.profilePresent ? "Present" : "Not yet detected"}</p></div>
+            <div><span className="text-slate-500">Profile snapshot retention</span><p className="mt-1 font-bold">{status?.profileRetentionDays ? `${status.profileRetentionDays} days, refreshed on use` : "Checking"}</p></div>
           </div>
 
           {message ? <p className="mt-5 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-sm text-cyan-100">{message}</p> : null}
@@ -98,7 +101,7 @@ export default function CloudBrowserLifecycleClient() {
         </section>
 
         <section className="rounded-3xl border border-emerald-400/20 bg-emerald-400/5 p-5 text-sm leading-6 text-emerald-100">
-          Use Sleep only when the worker is idle. After Sleep, Wake should restore the same named Sandbox and persistent browser profile.
+          Use Sleep only when the worker is idle. After Sleep, Wake restores the same named Sandbox and persistent browser profile. Provider-controlled session expiration, MFA, and security reauthentication still apply.
         </section>
 
         <Link href="/dashboard/browser-control" className="inline-block font-bold text-cyan-300 underline">
