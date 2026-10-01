@@ -521,3 +521,70 @@ export async function uploadRenderedTwitchShortPrivate(
     }
   }
 }
+
+/** Read back the existing video; this path never uploads or alters YouTube content. */
+export async function verifyRenderedTwitchShortPrivate(renderJobId: string, options: Options = {}) {
+  const redis = runtimeRedis(options)
+  if (!redis) throw new Error("YOUTUBE_UPLOAD_STORE_UNAVAILABLE")
+  const record = await getYouTubePrivateUploadRecord(renderJobId, { ...options, redis })
+  if (
+    record?.status !== "succeeded" || !record.youtubeVideoId ||
+    record.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID
+  ) throw new Error("YOUTUBE_UPLOAD_VERIFIED_RECORD_REQUIRED")
+  const rendered = await (options.getRenderedShort ?? ((jobId) => getRenderedShortPreview(jobId)))(renderJobId)
+  if (!rendered || rendered.job.status !== "rendered" || rendered.job.jobId !== record.renderJobId) {
+    throw new Error("YOUTUBE_RENDERED_SHORT_NOT_READY")
+  }
+  const metadata = metadataFor(rendered.job)
+  const config = await runtimeYouTubeConfig({ ...options, redis })
+  const fetcher = options.fetcher ?? fetch
+  const token = await accessToken(config, fetcher)
+  const response = await fetcher(
+    `https://www.googleapis.com/youtube/v3/videos?part=id%2Csnippet%2Cstatus&id=${encodeURIComponent(record.youtubeVideoId)}`,
+    { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(15_000) },
+  )
+  if (!response.ok) throw new Error(`YOUTUBE_VERIFY_HTTP_${response.status}`)
+  const payload: unknown = await response.json().catch(() => null)
+  const videoSchema = z.object({
+    id: z.string(),
+    snippet: z.object({
+      channelId: z.string(), title: z.string(), description: z.string(),
+      tags: z.array(z.string()).default([]), categoryId: z.string(),
+    }),
+    status: z.object({ privacyStatus: z.string() }),
+  })
+  const parsed = z.object({ items: z.array(videoSchema) }).safeParse(payload)
+  const video = parsed.success ? parsed.data.items.find(item => item.id === record.youtubeVideoId) : null
+  if (
+    !video || video.snippet.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID ||
+    video.status.privacyStatus !== "private"
+  ) throw new Error("YOUTUBE_UPLOAD_VERIFICATION_MISMATCH")
+  if (
+    video.snippet.title !== metadata.title ||
+    video.snippet.description !== metadata.description ||
+    video.snippet.categoryId !== "20" ||
+    JSON.stringify([...video.snippet.tags].sort()) !== JSON.stringify([...metadata.tags].sort())
+  ) throw new Error("YOUTUBE_UPLOAD_METADATA_MISMATCH")
+  const proof = {
+    renderJobId: record.renderJobId,
+    videoId: video.id,
+    channelId: video.snippet.channelId,
+    privacyStatus: video.status.privacyStatus,
+    metadataVerified: true,
+    categoryId: video.snippet.categoryId,
+    // YouTube does not return notifySubscribers in videos.list. The uploader
+    // always sends notifySubscribers=false in the original videos.insert request.
+    notifySubscribers: false,
+    notificationEvidence: "upload-request-policy",
+    verificationSource: "youtube-data-api",
+    verifiedAt: nowIso(options),
+  }
+  const proofKey = `ams:youtube-private-upload:v1:verification:${renderJobId}`
+  await redis.set(proofKey, JSON.stringify(proof), { ex: YOUTUBE_UPLOAD_TTL_SECONDS })
+  const stored = await redis.get<unknown>(proofKey)
+  const durable = typeof stored === "string" ? JSON.parse(stored) : stored
+  if (!durable || typeof durable !== "object" || !("videoId" in durable) || durable.videoId !== proof.videoId) {
+    throw new Error("YOUTUBE_VERIFICATION_STORE_FAILED")
+  }
+  return proof
+}

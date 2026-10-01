@@ -5,6 +5,7 @@ import {
 } from "@/lib/server/twitch-short-render-jobs"
 import {
   uploadRenderedTwitchShortPrivate,
+  verifyRenderedTwitchShortPrivate,
 } from "@/lib/server/youtube-private-uploader"
 
 export const runtime = "nodejs"
@@ -47,7 +48,10 @@ export async function POST(request: NextRequest) {
       record.errorCode === "YOUTUBE_UPLOADER_NOT_CONFIGURED" ? 503 :
       502
 
+    const verification = ok ? await verifyRenderedTwitchShortPrivate(renderJobId) : null
+
     return json({
+      ...verification,
       ok,
       status: record.status,
       privacyStatus: record.privacyStatus,

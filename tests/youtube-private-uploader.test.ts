@@ -4,6 +4,7 @@ import test from "node:test"
 import {
   getYouTubePrivateUploaderConfiguration,
   uploadRenderedTwitchShortPrivate,
+  verifyRenderedTwitchShortPrivate,
 } from "../lib/server/youtube-private-uploader"
 import {
   twitchShortRenderJobSchema,
@@ -383,4 +384,75 @@ test("YouTube private uploader uses the encrypted owner OAuth connection without
   assert.equal(result.record.youtubeVideoId, videoId)
   assert.equal(result.record.channelId, SMOKYBANANA03_YOUTUBE_CHANNEL_ID)
   assert.equal(result.record.privacyStatus, "private")
+})
+
+async function verificationFixture() {
+  const redis = new MemoryRedis()
+  await redis.set("ams:youtube-private-upload:v1:job:render-job-123", JSON.stringify({
+    version: "youtube-private-upload-v1", renderJobId: "render-job-123", clipId: "clip-123",
+    status: "succeeded", privacyStatus: "private", youtubeVideoId: "verified-video-123",
+    channelId: SMOKYBANANA03_YOUTUBE_CHANNEL_ID, attempts: 1,
+    createdAt: "2026-09-30T13:00:00.000Z", updatedAt: "2026-09-30T13:00:00.000Z",
+    completedAt: "2026-09-30T13:00:00.000Z", errorCode: null,
+  }))
+  const job = renderedJob()
+  const video = {
+    id: "verified-video-123",
+    snippet: { ...job.publishMetadata!.youtube, channelId: String(SMOKYBANANA03_YOUTUBE_CHANNEL_ID), categoryId: "20" },
+    status: { privacyStatus: "private" },
+  }
+  const calls: string[] = []
+  const fetcher = (async (input: URL | RequestInfo) => {
+    const url = String(input)
+    calls.push(url)
+    if (url === "https://oauth2.googleapis.com/token") {
+      return new Response(JSON.stringify({ access_token: "test-verification-access-token" }), { status: 200 })
+    }
+    if (url.startsWith("https://www.googleapis.com/youtube/v3/videos?")) {
+      return new Response(JSON.stringify({ items: [video] }), { status: 200 })
+    }
+    throw new Error("unexpected_fetch")
+  }) as typeof fetch
+  return { redis, video, calls, options: {
+    env: env(), redis: redis as never, fetcher,
+    getRenderedShort: async () => ({ job, previewUrl: "https://r2.example.test/not-fetched.mp4" }),
+  } }
+}
+
+test("private video verification reads API metadata, persists proof, and never uploads", async () => {
+  const fixture = await verificationFixture()
+  const proof = await verifyRenderedTwitchShortPrivate("render-job-123", fixture.options)
+  assert.equal(proof.metadataVerified, true)
+  assert.equal(proof.channelId, SMOKYBANANA03_YOUTUBE_CHANNEL_ID)
+  assert.equal(proof.privacyStatus, "private")
+  assert.equal(proof.categoryId, "20")
+  assert.equal(proof.notifySubscribers, false)
+  assert.equal(proof.notificationEvidence, "upload-request-policy")
+  assert.equal(proof.verificationSource, "youtube-data-api")
+  const stored = await fixture.redis.get<string>("ams:youtube-private-upload:v1:verification:render-job-123")
+  assert.equal(JSON.parse(stored!).videoId, "verified-video-123")
+  assert.equal(fixture.calls.some(url => url.includes("/upload/") || url.includes("r2.example")), false)
+  await verifyRenderedTwitchShortPrivate("render-job-123", fixture.options)
+  assert.equal(fixture.calls.length, 4)
+})
+
+test("private video verification fails closed on altered metadata, wrong channel or public privacy", async () => {
+  for (const change of ["title", "description", "tags", "category", "channel", "privacy"] as const) {
+    const fixture = await verificationFixture()
+    if (change === "title") fixture.video.snippet.title = "changed"
+    if (change === "description") fixture.video.snippet.description = "changed"
+    if (change === "tags") fixture.video.snippet.tags = ["changed"]
+    if (change === "category") fixture.video.snippet.categoryId = "22"
+    if (change === "channel") fixture.video.snippet.channelId = "UC0000000000000000000000"
+    if (change === "privacy") fixture.video.status.privacyStatus = "public"
+    await assert.rejects(verifyRenderedTwitchShortPrivate("render-job-123", fixture.options), /YOUTUBE_UPLOAD_(?:METADATA|VERIFICATION)_MISMATCH/u)
+    assert.equal(await fixture.redis.get("ams:youtube-private-upload:v1:verification:render-job-123"), null)
+  }
+})
+
+test("private video verification requires an existing successful upload", async () => {
+  await assert.rejects(verifyRenderedTwitchShortPrivate("missing", {
+    env: env(), redis: new MemoryRedis() as never,
+    fetcher: (async () => { throw new Error("unexpected_fetch") }) as typeof fetch,
+  }), /YOUTUBE_UPLOAD_VERIFIED_RECORD_REQUIRED/u)
 })
