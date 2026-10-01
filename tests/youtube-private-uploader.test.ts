@@ -437,14 +437,14 @@ test("private video verification reads API metadata, persists proof, and never u
 })
 
 
-test("private video verification accepts provider-normalized text and de-duplicated tags", async () => {
+test("private video verification accepts provider-normalized text and case-equivalent de-duplicated tags", async () => {
   const fixture = await verificationFixture()
   fixture.job.publishMetadata!.youtube.title = "Quick triple kill  "
   fixture.job.publishMetadata!.youtube.description = "Actual Twitch footage from SmokyBanana03. #Gaming #Shorts\r\n"
-  fixture.job.publishMetadata!.youtube.tags = ["gaming", "twitch", "shorts", "gaming"]
+  fixture.job.publishMetadata!.youtube.tags = ["gaming", "Twitch", "shorts", "Gaming"]
   fixture.video.snippet.title = "Quick triple kill"
   fixture.video.snippet.description = "Actual Twitch footage from SmokyBanana03. #Gaming #Shorts"
-  fixture.video.snippet.tags = ["shorts", "gaming", "twitch"]
+  fixture.video.snippet.tags = ["Shorts", "GAMING", "twitch"]
   const proof = await verifyRenderedTwitchShortPrivate("render-job-123", fixture.options)
   assert.equal(proof.metadataVerified, true)
 })

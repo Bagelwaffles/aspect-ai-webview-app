@@ -15,12 +15,17 @@ export const dynamic = "force-dynamic"
 export const maxDuration = 300
 
 const MAX_PRIVATE_UPLOAD_ATTEMPTS = 3
+const TAGS_PENDING_CODE = "YOUTUBE_UPLOAD_METADATA_TAGS_MISMATCH"
 
 function json(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, {
     status,
     headers: { "Cache-Control": "no-store" },
   })
+}
+
+function verificationStatus(code: string) {
+  return code === TAGS_PENDING_CODE ? 202 : 500
 }
 
 export async function POST(request: NextRequest) {
@@ -35,7 +40,42 @@ export async function POST(request: NextRequest) {
       if (job.status !== "rendered" || !job.publishMetadata?.youtube) continue
 
       const existing = await getYouTubePrivateUploadRecord(job.jobId)
-      if (existing?.status === "succeeded") continue
+
+      if (existing?.status === "succeeded") {
+        try {
+          const verification = await verifyRenderedTwitchShortPrivate(job.jobId)
+          return json({
+            ...verification,
+            ok: true,
+            attempted: false,
+            verificationAttempted: true,
+            renderJobId: job.jobId,
+            clipId: job.clipId,
+            status: existing.status,
+            privacyStatus: existing.privacyStatus,
+            videoId: existing.youtubeVideoId,
+            attempts: existing.attempts,
+            reused: true,
+          })
+        } catch (error) {
+          const code = error instanceof Error ? error.message : "YOUTUBE_PRIVATE_UPLOAD_VERIFY_FAILED"
+          return json({
+            ok: false,
+            attempted: false,
+            verificationAttempted: true,
+            pendingVerification: code === TAGS_PENDING_CODE,
+            renderJobId: job.jobId,
+            clipId: job.clipId,
+            status: existing.status,
+            privacyStatus: existing.privacyStatus,
+            videoId: existing.youtubeVideoId,
+            attempts: existing.attempts,
+            reused: true,
+            code,
+          }, verificationStatus(code))
+        }
+      }
+
       if (existing?.status === "uploading" || existing?.status === "reconciliation") continue
       if ((existing?.attempts ?? 0) >= MAX_PRIVATE_UPLOAD_ATTEMPTS) continue
 
@@ -49,6 +89,7 @@ export async function POST(request: NextRequest) {
         return json({
           ok: false,
           attempted: true,
+          verificationAttempted: false,
           renderJobId: job.jobId,
           clipId: job.clipId,
           status: record.status,
@@ -66,6 +107,7 @@ export async function POST(request: NextRequest) {
           ...verification,
           ok: true,
           attempted: true,
+          verificationAttempted: true,
           renderJobId: job.jobId,
           clipId: job.clipId,
           status: record.status,
@@ -79,6 +121,8 @@ export async function POST(request: NextRequest) {
         return json({
           ok: false,
           attempted: true,
+          verificationAttempted: true,
+          pendingVerification: code === TAGS_PENDING_CODE,
           renderJobId: job.jobId,
           clipId: job.clipId,
           status: record.status,
@@ -87,13 +131,14 @@ export async function POST(request: NextRequest) {
           attempts: record.attempts,
           reused: result.reused,
           code,
-        }, 500)
+        }, verificationStatus(code))
       }
     }
 
     return json({
       ok: true,
       attempted: false,
+      verificationAttempted: false,
       skipped: "NO_PENDING_PRIVATE_UPLOAD",
     })
   } catch (error) {

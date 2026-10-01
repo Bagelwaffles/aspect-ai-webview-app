@@ -225,13 +225,18 @@ function normalizeTag(tag: string) {
   return canonicalText(tag).slice(0, 80)
 }
 
+function tagKey(tag: string) {
+  return normalizeTag(tag).toLocaleLowerCase("en-US")
+}
+
 function uniqueTags(tags: string[]) {
   const seen = new Set<string>()
   const result: string[] = []
   for (const raw of tags) {
     const tag = normalizeTag(raw)
-    if (!tag || seen.has(tag)) continue
-    seen.add(tag)
+    const key = tagKey(tag)
+    if (!tag || !key || seen.has(key)) continue
+    seen.add(key)
     result.push(tag)
     if (result.length >= 20) break
   }
@@ -239,7 +244,7 @@ function uniqueTags(tags: string[]) {
 }
 
 function comparableTags(tags: string[]) {
-  return [...new Set(tags.map(normalizeTag).filter(Boolean))].sort()
+  return [...new Set(tags.map(tagKey).filter(Boolean))].sort()
 }
 
 function metadataFor(job: TwitchShortRenderJob) {

@@ -48,11 +48,42 @@ export async function POST(request: NextRequest) {
       record.errorCode === "YOUTUBE_UPLOADER_NOT_CONFIGURED" ? 503 :
       502
 
-    const verification = ok ? await verifyRenderedTwitchShortPrivate(renderJobId) : null
+    if (ok) {
+      try {
+        const verification = await verifyRenderedTwitchShortPrivate(renderJobId)
+        return json({
+          ...verification,
+          ok: true,
+          pendingVerification: false,
+          status: record.status,
+          privacyStatus: record.privacyStatus,
+          videoId: record.youtubeVideoId,
+          channelVerified: Boolean(record.channelId),
+          reused: result.reused,
+          code: null,
+        }, 200)
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "YOUTUBE_PRIVATE_UPLOAD_VERIFY_FAILED"
+        if (code === "YOUTUBE_UPLOAD_METADATA_TAGS_MISMATCH") {
+          return json({
+            ok: false,
+            pendingVerification: true,
+            status: record.status,
+            privacyStatus: record.privacyStatus,
+            videoId: record.youtubeVideoId,
+            channelId: record.channelId,
+            channelVerified: Boolean(record.channelId),
+            reused: result.reused,
+            code,
+          }, 202)
+        }
+        throw error
+      }
+    }
 
     return json({
-      ...verification,
-      ok,
+      ok: false,
+      pendingVerification: false,
       status: record.status,
       privacyStatus: record.privacyStatus,
       videoId: record.youtubeVideoId,
