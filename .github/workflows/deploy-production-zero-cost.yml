@@ -50,7 +50,7 @@ jobs:
         run: npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
 
       - name: Build approved zero-cost release
-        run: npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
+        run: npx --yes vercel@latest env run -e production --token="$VERCEL_TOKEN" -- npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
 
       - name: Deploy approved zero-cost release
         id: deploy
