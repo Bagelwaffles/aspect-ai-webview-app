@@ -445,7 +445,10 @@ test("private video verification fails closed on altered metadata, wrong channel
     if (change === "category") fixture.video.snippet.categoryId = "22"
     if (change === "channel") fixture.video.snippet.channelId = "UC0000000000000000000000"
     if (change === "privacy") fixture.video.status.privacyStatus = "public"
-    await assert.rejects(verifyRenderedTwitchShortPrivate("render-job-123", fixture.options), /YOUTUBE_UPLOAD_(?:METADATA|VERIFICATION)_MISMATCH/u)
+    await assert.rejects(
+      verifyRenderedTwitchShortPrivate("render-job-123", fixture.options),
+      /YOUTUBE_UPLOAD_(?:METADATA_(?:TITLE|DESCRIPTION|TAGS|CATEGORY)_MISMATCH|VERIFICATION_MISMATCH)/u,
+    )
     assert.equal(await fixture.redis.get("ams:youtube-private-upload:v1:verification:render-job-123"), null)
   }
 })

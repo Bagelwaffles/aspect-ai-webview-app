@@ -559,12 +559,18 @@ export async function verifyRenderedTwitchShortPrivate(renderJobId: string, opti
     !video || video.snippet.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID ||
     video.status.privacyStatus !== "private"
   ) throw new Error("YOUTUBE_UPLOAD_VERIFICATION_MISMATCH")
-  if (
-    video.snippet.title !== metadata.title ||
-    video.snippet.description !== metadata.description ||
-    video.snippet.categoryId !== "20" ||
-    JSON.stringify([...video.snippet.tags].sort()) !== JSON.stringify([...metadata.tags].sort())
-  ) throw new Error("YOUTUBE_UPLOAD_METADATA_MISMATCH")
+  if (video.snippet.title !== metadata.title) {
+    throw new Error("YOUTUBE_UPLOAD_METADATA_TITLE_MISMATCH")
+  }
+  if (video.snippet.description !== metadata.description) {
+    throw new Error("YOUTUBE_UPLOAD_METADATA_DESCRIPTION_MISMATCH")
+  }
+  if (video.snippet.categoryId !== "20") {
+    throw new Error("YOUTUBE_UPLOAD_METADATA_CATEGORY_MISMATCH")
+  }
+  if (JSON.stringify([...video.snippet.tags].sort()) !== JSON.stringify([...metadata.tags].sort())) {
+    throw new Error("YOUTUBE_UPLOAD_METADATA_TAGS_MISMATCH")
+  }
   const proof = {
     renderJobId: record.renderJobId,
     videoId: video.id,
