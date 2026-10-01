@@ -113,6 +113,10 @@ test("Vercel cloud executor preserves Browser Control safety gates", () => {
 test("Vercel Sandbox controller uses persistence and egress restriction", () => {
   const source = readFileSync("tools/vercel-browser-worker/lib/sandbox.js", "utf8")
   assert.match(source, /Sandbox\.getOrCreate/u)
+  assert.match(source, /snapshotExpiration/u)
+  assert.match(source, /PROFILE_SNAPSHOT_RETENTION_MS/u)
+  assert.match(source, /90 \* 24 \* 60 \* 60 \* 1000/u)
+  assert.match(source, /profileRetentionDays/u)
   assert.match(source, /updateNetworkPolicy/u)
   assert.match(source, /ams-browser-worker/u)
   assert.match(source, /playwright.*1\.62\.1/u)
