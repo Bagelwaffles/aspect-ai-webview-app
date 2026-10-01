@@ -60,19 +60,35 @@ export async function POST(request: NextRequest) {
         }, 502)
       }
 
-      const verification = await verifyRenderedTwitchShortPrivate(job.jobId)
-      return json({
-        ...verification,
-        ok: true,
-        attempted: true,
-        renderJobId: job.jobId,
-        clipId: job.clipId,
-        status: record.status,
-        privacyStatus: record.privacyStatus,
-        videoId: record.youtubeVideoId,
-        attempts: record.attempts,
-        reused: result.reused,
-      })
+      try {
+        const verification = await verifyRenderedTwitchShortPrivate(job.jobId)
+        return json({
+          ...verification,
+          ok: true,
+          attempted: true,
+          renderJobId: job.jobId,
+          clipId: job.clipId,
+          status: record.status,
+          privacyStatus: record.privacyStatus,
+          videoId: record.youtubeVideoId,
+          attempts: record.attempts,
+          reused: result.reused,
+        })
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "YOUTUBE_PRIVATE_UPLOAD_VERIFY_FAILED"
+        return json({
+          ok: false,
+          attempted: true,
+          renderJobId: job.jobId,
+          clipId: job.clipId,
+          status: record.status,
+          privacyStatus: record.privacyStatus,
+          videoId: record.youtubeVideoId,
+          attempts: record.attempts,
+          reused: result.reused,
+          code,
+        }, 500)
+      }
     }
 
     return json({
