@@ -20,7 +20,7 @@ Required merge gate:
 1. GitHub test/type/build workflows pass on Node 24.
 2. Vercel preview is READY.
 3. Main preview `GET /api/health` reports `runtime.node` beginning with `v24.`.
-4. Browser-worker authenticated `GET /api/status` reports `nodeVersion` beginning with `v24.`.
+4. Browser-worker preview-only `GET /api/runtime` reports `nodeVersion` beginning with `v24.`.
 5. No production promotion until those proofs are recorded.
 
 Official notice: https://vercel.com/changelog/node-js-20-is-being-deprecated
