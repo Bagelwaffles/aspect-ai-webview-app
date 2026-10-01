@@ -119,7 +119,7 @@ jobs:
 
           response="$(cat "$RUNNER_TEMP/youtube-reconcile.json" 2>/dev/null || true)"
           printf '%s' "$response" \
-            | jq '{ok,attempted,skipped,renderJobId,clipId,status,privacyStatus,videoId,channelId,metadataVerified,attempts,reused,code}' || true
+            | jq '{ok,attempted,verificationAttempted,pendingVerification,skipped,renderJobId,clipId,status,privacyStatus,videoId,channelId,metadataVerified,attempts,reused,code}' || true
 
           if [ "$curl_status" -ne 0 ] || [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
             echo "::warning::Private YouTube upload reconciliation failed with HTTP $http_code; the rendered job remains intact and will be retried."
@@ -270,12 +270,18 @@ jobs:
 
           response="$(cat "$RUNNER_TEMP/youtube-response.json" 2>/dev/null || true)"
           printf '%s' "$response" \
-            | jq '{ok,status,privacyStatus,videoId,channelId,channelVerified,reused,metadataVerified,categoryId,notifySubscribers,notificationEvidence,verificationSource,verifiedAt,code}' || true
+            | jq '{ok,pendingVerification,status,privacyStatus,videoId,channelId,channelVerified,reused,metadataVerified,categoryId,notifySubscribers,notificationEvidence,verificationSource,verifiedAt,code}' || true
           echo "Private YouTube upload HTTP status: $http_code"
 
           if [ "$curl_status" -ne 0 ] || [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
             echo "::error::Private YouTube upload failed with HTTP $http_code. The render stays complete and the next worker run will retry the upload."
             exit 1
+          fi
+
+          if [ "$http_code" -eq 202 ]; then
+            printf '%s' "$response" | jq -e '.pendingVerification == true and .status == "succeeded" and .privacyStatus == "private" and .channelId == "UCPbMNjvwKOtuFX-1rAtCJSg" and .channelVerified == true and .code == "YOUTUBE_UPLOAD_METADATA_TAGS_MISMATCH" and (.videoId | type == "string" and length > 0)' >/dev/null
+            echo "::warning::Private YouTube upload succeeded; tag readback is still pending and will be re-verified without re-uploading."
+            exit 0
           fi
 
           printf '%s' "$response" | jq -e '.ok == true and .status == "succeeded" and .privacyStatus == "private" and .channelId == "UCPbMNjvwKOtuFX-1rAtCJSg" and .channelVerified == true and .metadataVerified == true and .categoryId == "20" and .notifySubscribers == false and .verificationSource == "youtube-data-api" and (.videoId | type == "string" and length > 0)' >/dev/null
