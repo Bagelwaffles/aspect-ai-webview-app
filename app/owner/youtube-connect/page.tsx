@@ -49,10 +49,10 @@ export default async function YouTubeOwnerConnectPage() {
         {!signedInEmail ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Sign in with the AMS owner Google account and approve the YouTube permissions.
+              First sign in with the AMS owner Google account. Then connect the SmokyBanana03 brand channel.
               The refresh token is encrypted server-side and is never shown in this page.
             </p>
-            <YouTubeOwnerConnectButton />
+            <YouTubeOwnerConnectButton mode="signin" />
           </div>
         ) : !ownerSignedIn ? (
           <div className="space-y-4">
@@ -78,7 +78,7 @@ export default async function YouTubeOwnerConnectPage() {
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Owner sign-in is valid, but YouTube upload authorization has not been stored yet.
+              Owner sign-in is valid. Connect YouTube and select SmokyBanana03 • PS5 FPS in Google’s channel chooser.
             </p>
             {connectionError ? (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-sm">

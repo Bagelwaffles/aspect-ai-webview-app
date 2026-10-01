@@ -2,6 +2,8 @@ import { createHash } from "node:crypto"
 
 import type { NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
+import { cookies } from "next/headers"
+import { consumeYouTubeOwnerAttempt, YOUTUBE_OWNER_ATTEMPT_COOKIE } from "@/lib/server/youtube-owner-attempt"
 
 import {
   YOUTUBE_UPLOAD_SCOPE,
@@ -88,9 +90,24 @@ export const authOptions: NextAuthOptions = {
           typeof account.refresh_token === "string" ? account.refresh_token : null
 
         try {
-          if (!email || !refreshToken) throw new Error("YOUTUBE_REFRESH_TOKEN_REQUIRED")
+          if (!refreshToken) throw new Error("YOUTUBE_REFRESH_TOKEN_REQUIRED")
+          const cookieStore = await cookies()
+          const attemptValue = cookieStore.get(YOUTUBE_OWNER_ATTEMPT_COOKIE)?.value
+          const ownerAttempt = attemptValue
+            ? await consumeYouTubeOwnerAttempt(attemptValue)
+            : null
+          if (!ownerAttempt && !email) throw new Error("YOUTUBE_OWNER_REQUIRED")
+          // A Brand Account has its own Google identity. Restore only the owner
+          // identity authenticated before the single-use, owner-initiated grant.
+          if (ownerAttempt) {
+            token.email = ownerAttempt.email
+            token.sub = ownerAttempt.providerSubject
+            token.customerSubject = customerSubjectFromProviderSubject(ownerAttempt.providerSubject) ?? undefined
+            delete token.name
+            delete token.picture
+          }
           await storeYouTubeOwnerConnectionFromGoogle({
-            email,
+            email: ownerAttempt?.email ?? email!,
             refreshToken,
             accessToken:
               typeof account.access_token === "string" ? account.access_token : null,
