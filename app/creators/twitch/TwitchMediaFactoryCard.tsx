@@ -14,6 +14,14 @@ export type TwitchShortRendererStatus = {
     clipId: string
     status: "pending" | "rendering" | "rendered" | "failed"
     errorCode: string | null
+    youtubeUpload?: {
+      status: "pending" | "uploading" | "succeeded" | "failed" | "reconciliation"
+      privacyStatus: "private"
+      youtubeVideoId: string | null
+      channelId: string | null
+      attempts: number
+      errorCode: string | null
+    } | null
   }>
 }
 
@@ -248,7 +256,7 @@ export default function TwitchMediaFactoryCard({
         </div>
 
         <div className="rounded-lg border p-3 text-xs">
-          9:16 renderer: {shortRenderer?.configured ? "configured" : "setup required"} · rendered Shorts stay private until a separate publish approval.
+          9:16 renderer: {shortRenderer?.configured ? "configured" : "setup required"} · rendered Shorts are uploaded to the verified SmokyBanana03 channel as Private for owner review. Public publishing remains disabled.
         </div>
 
         {message ? <div className="rounded-lg border p-3 text-foreground">{message}</div> : null}
@@ -368,6 +376,28 @@ export default function TwitchMediaFactoryCard({
                             <Film className="mr-2 h-4 w-4" />
                             {busy === `preview:${job.jobId}` ? "Opening…" : "Open rendered Short"}
                           </Button>
+                        ) : null}
+                        {job.youtubeUpload ? (
+                          <Badge variant="outline">Private YouTube: {job.youtubeUpload.status}</Badge>
+                        ) : job.status === "rendered" ? (
+                          <Badge variant="outline">Private YouTube: queued</Badge>
+                        ) : null}
+                        {job.youtubeUpload?.status === "succeeded" && job.youtubeUpload.youtubeVideoId ? (
+                          <Button asChild variant="outline" size="sm">
+                            <a
+                              href={`https://www.youtube.com/watch?v=${encodeURIComponent(job.youtubeUpload.youtubeVideoId)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Review private upload
+                            </a>
+                          </Button>
+                        ) : null}
+                        {job.youtubeUpload?.status === "failed" ? (
+                          <span className="text-xs text-amber-600">
+                            Private upload retry {job.youtubeUpload.attempts}/3
+                            {job.youtubeUpload.errorCode ? ` · ${job.youtubeUpload.errorCode}` : ""}
+                          </span>
                         ) : null}
                       </>
                     ) : null

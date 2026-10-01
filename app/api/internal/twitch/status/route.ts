@@ -8,6 +8,7 @@ import {
   listLatestTwitchShortRenderJobs,
 } from "@/lib/server/twitch-short-render-jobs"
 import { getTwitchPilotStatus } from "@/lib/server/twitch-pilot"
+import { getYouTubePrivateUploadRecord } from "@/lib/server/youtube-private-uploader"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -34,6 +35,12 @@ export async function GET(request: NextRequest) {
       mediaFactory,
       twitch.connection?.scopes,
     )
+    const shortRenderJobsWithUploads = await Promise.all(
+      shortRenderJobs.map(async (job) => ({
+        ...job,
+        youtubeUpload: await getYouTubePrivateUploadRecord(job.jobId),
+      })),
+    )
     return json({
       ok: true,
       ...twitch,
@@ -41,7 +48,7 @@ export async function GET(request: NextRequest) {
       mediaFactory: currentMediaFactory,
       shortRenderer: {
         configured: isTwitchShortRenderConfigured(),
-        jobs: shortRenderJobs,
+        jobs: shortRenderJobsWithUploads,
       },
     })
   } catch {
