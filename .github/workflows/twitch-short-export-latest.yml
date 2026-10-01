@@ -115,7 +115,7 @@ jobs:
 
           response="$(cat "$RUNNER_TEMP/youtube-response.json" 2>/dev/null || true)"
           printf '%s' "$response" \
-            | jq '{ok,status,privacyStatus,videoId,channelVerified,reused,code}' || true
+            | jq '{ok,status,privacyStatus,videoId,channelId,channelVerified,reused,metadataVerified,categoryId,notifySubscribers,notificationEvidence,verificationSource,verifiedAt,code}' || true
           echo "YouTube proof HTTP status: $http_code"
 
           if [ "$curl_status" -ne 0 ] || [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
@@ -123,4 +123,4 @@ jobs:
             exit 1
           fi
 
-          printf '%s' "$response" | jq -e '.ok == true and .privacyStatus == "private" and (.videoId | type == "string" and length > 0)' >/dev/null
+          printf '%s' "$response" | jq -e '.ok == true and .status == "succeeded" and .privacyStatus == "private" and .channelId == "UCPbMNjvwKOtuFX-1rAtCJSg" and .channelVerified == true and .metadataVerified == true and .categoryId == "20" and .notifySubscribers == false and .verificationSource == "youtube-data-api" and (.videoId | type == "string" and length > 0)' >/dev/null
