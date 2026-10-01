@@ -94,6 +94,8 @@ The browser runs as a daemon during an active Sandbox session, preserving the li
 
 The Chromium profile and last approved URL are persisted. If Vercel suspends the Sandbox between steps, the next dispatch resumes the Sandbox and restores the authenticated browser profile.
 
+AMS explicitly sets the named Sandbox snapshot-retention window to 90 days. Vercel refreshes snapshot expiration when a snapshot is used, so an actively used AMS Browser Control profile keeps extending that window. This preserves browser-managed cookies and local session state across normal Sandbox stop/resume cycles. Provider-controlled cookie expiry, logout, MFA, CAPTCHA, consent, and security reauthentication still take precedence.
+
 ## Production gate
 
 Do not retire the Windows worker until all are verified in preview:
