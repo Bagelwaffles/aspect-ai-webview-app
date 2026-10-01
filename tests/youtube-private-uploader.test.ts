@@ -413,7 +413,7 @@ async function verificationFixture() {
     }
     throw new Error("unexpected_fetch")
   }) as typeof fetch
-  return { redis, video, calls, options: {
+  return { redis, video, job, calls, options: {
     env: env(), redis: redis as never, fetcher,
     getRenderedShort: async () => ({ job, previewUrl: "https://r2.example.test/not-fetched.mp4" }),
   } }
@@ -434,6 +434,19 @@ test("private video verification reads API metadata, persists proof, and never u
   assert.equal(fixture.calls.some(url => url.includes("/upload/") || url.includes("r2.example")), false)
   await verifyRenderedTwitchShortPrivate("render-job-123", fixture.options)
   assert.equal(fixture.calls.length, 4)
+})
+
+
+test("private video verification accepts provider-normalized text and de-duplicated tags", async () => {
+  const fixture = await verificationFixture()
+  fixture.job.publishMetadata!.youtube.title = "Quick triple kill  "
+  fixture.job.publishMetadata!.youtube.description = "Actual Twitch footage from SmokyBanana03. #Gaming #Shorts\r\n"
+  fixture.job.publishMetadata!.youtube.tags = ["gaming", "twitch", "shorts", "gaming"]
+  fixture.video.snippet.title = "Quick triple kill"
+  fixture.video.snippet.description = "Actual Twitch footage from SmokyBanana03. #Gaming #Shorts"
+  fixture.video.snippet.tags = ["shorts", "gaming", "twitch"]
+  const proof = await verifyRenderedTwitchShortPrivate("render-job-123", fixture.options)
+  assert.equal(proof.metadataVerified, true)
 })
 
 test("private video verification fails closed on altered metadata, wrong channel or public privacy", async () => {
