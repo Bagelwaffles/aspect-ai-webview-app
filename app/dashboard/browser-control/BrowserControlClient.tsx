@@ -305,9 +305,9 @@ export default function BrowserControlPage() {
 
         <section className="grid gap-5 lg:grid-cols-2">
           <article className="rounded-3xl border border-slate-800 bg-slate-950 p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Windows fallback</p>
-            <h2 className="mt-2 text-2xl font-black">Keep the local worker available for rollback.</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-400">The Windows worker remains the fallback during cloud validation and retains the DPAPI-only credential vault. Do not run both workers concurrently during final cutover testing.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Windows worker retirement</p>
+            <h2 className="mt-2 text-2xl font-black">Cloud execution is primary.</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-400">Non-primary workers cannot claim Browser Control jobs. After final cloud verification, remove the old Windows startup task and local pairing/profile material with the retirement script below. The Uploads folder is preserved unless explicitly purged.</p>
             <button onClick={createPairing} disabled={!snapshot.configured} className="mt-5 rounded-xl bg-cyan-300 px-5 py-3 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">Create 10-minute pairing code</button>
             {pairingCode ? (
               <div className="mt-5 rounded-2xl border border-cyan-400/30 bg-cyan-400/5 p-5">
@@ -317,10 +317,11 @@ export default function BrowserControlPage() {
               </div>
             ) : null}
             <div className="mt-5 rounded-2xl bg-black/30 p-4 text-xs leading-6 text-slate-400">
-              <p className="font-bold text-slate-200">Windows install path:</p>
-              <code className="mt-2 block break-all">tools/browser-worker/install.ps1</code>
-              <p className="mt-2">Approved upload folder: <code>%LOCALAPPDATA%\AMS\BrowserWorker\Uploads</code></p>
-              <p className="mt-2">Credential vault: Windows DPAPI CurrentUser encryption. Raw secret values never cross the Browser Control API.</p>
+              <p className="font-bold text-slate-200">Windows retirement path:</p>
+              <code className="mt-2 block break-all">tools/browser-worker/uninstall.ps1</code>
+              <p className="mt-2">Run from a normal non-elevated PowerShell window after syncing the repository.</p>
+              <p className="mt-2">Approved upload folder preserved by default: <code>%LOCALAPPDATA%\AMS\BrowserWorker\Uploads</code></p>
+              <p className="mt-2">The script removes the local pairing file, dedicated browser profile, logs, and DPAPI secret vault.</p>
             </div>
           </article>
 

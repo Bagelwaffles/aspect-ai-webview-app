@@ -96,6 +96,30 @@ The worker tries Microsoft Edge first and Chrome second. You can override the Pl
 $env:AMS_BROWSER_CHANNEL = "msedge"
 ```
 
+## Retire the Windows worker after cloud cutover
+
+Once the Vercel Sandbox worker is the verified primary executor, the Windows worker can be retired without changing cloud Browser Control.
+
+From this folder in a normal, non-elevated PowerShell window:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\uninstall.ps1
+```
+
+The retirement script is idempotent. It:
+
+- stops and deletes the current-user `AMS Browser Worker` scheduled task when present
+- removes the Startup-folder fallback entry
+- stops matching local Browser Worker processes
+- removes the local pairing credential file
+- removes the dedicated Edge/Chrome profile, worker logs, and DPAPI secret vault
+- preserves `%LOCALAPPDATA%\AMS\BrowserWorker\Uploads` by default
+
+To remove the Uploads folder too, run `.\uninstall.ps1 -PurgeUploads`.
+
+The cloud control plane already restricts job claims to the designated primary worker, so a stale non-primary Windows process cannot execute queued Browser Control jobs.
+
 ## Stop locally
 
 Use the AMS dashboard emergency stop to prevent new jobs. You can also close the local worker process or remove/disable the current-user startup entry created by the installer.
