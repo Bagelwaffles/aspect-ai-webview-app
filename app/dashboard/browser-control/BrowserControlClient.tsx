@@ -197,6 +197,10 @@ export default function BrowserControlPage() {
   }
 
   const workerState = snapshot.worker?.online ? "online" : "offline"
+  const cloudPrimary = snapshot.worker?.platform === "Vercel Sandbox"
+  const availableActions = cloudPrimary
+    ? BROWSER_ACTIONS.filter((item) => !SECRET_ACTIONS.includes(item))
+    : BROWSER_ACTIONS
   const interactiveAction = INTERACTIVE_ACTIONS.includes(action)
   const secretAction = SECRET_ACTIONS.includes(action)
 
@@ -256,7 +260,7 @@ export default function BrowserControlPage() {
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Vercel Cloud Browser</p>
               <h2 className="mt-2 text-2xl font-black">Run Browser Control without leaving your computer on.</h2>
               <p className="mt-3 text-sm leading-6 text-slate-400">
-                The cloud worker uses a persistent Vercel Sandbox and Chromium profile while the existing AMS approvals, kill switch, allowlist, and audit trail stay authoritative. Cloud credential capture/fill remains blocked until a cloud vault is proven.
+                The cloud worker uses a persistent Vercel Sandbox and Chromium profile while the existing AMS approvals, kill switch, allowlist, and audit trail stay authoritative. Only the designated primary worker may claim jobs. Cloud credential capture/fill remains blocked; credential entry is an owner-only step through the secure login console or official provider OAuth/API.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -288,7 +292,7 @@ export default function BrowserControlPage() {
             </button>
           </div>
           <p className="mt-4 text-xs text-slate-500">
-            Production cutover stays disabled until preview proof passes. The Windows worker remains available as rollback.
+            Vercel is the production execution target. The Windows worker may remain installed for rollback, but non-primary workers cannot claim Browser Control jobs.
           </p>
         </section>
 
@@ -348,7 +352,7 @@ export default function BrowserControlPage() {
                 }}
                 className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3"
               >
-                {BROWSER_ACTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+                {availableActions.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </label>
             <label className="text-sm font-semibold text-slate-300">URL
