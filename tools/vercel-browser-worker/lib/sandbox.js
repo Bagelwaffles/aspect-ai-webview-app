@@ -134,9 +134,6 @@ const REMOTE_LOGIN_PROVIDER_SUFFIXES = [
   "x.com",
   "twitter.com",
   "x.ai",
-  "google.com",
-  "youtube.com",
-  "youtu.be",
   "twitch.tv",
   "streamlabs.com",
   "fiverr.com",
@@ -199,6 +196,20 @@ async function workerSource() {
 
 async function remoteLoginSource() {
   return readFile(sourcePath("remote-login.mjs"))
+}
+
+function googleOwnedRemoteLoginUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl)
+    const hostname = url.hostname.toLowerCase().replace(/\.$/u, "")
+    return [
+      "google.com",
+      "youtube.com",
+      "youtu.be",
+    ].some((suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`))
+  } catch {
+    return false
+  }
 }
 
 function safeRemoteLoginUrl(rawUrl) {
@@ -389,11 +400,13 @@ export async function startCloudBrowserDaemon(sandbox) {
 }
 
 export async function startCloudBrowserLoginSession(sandbox, input = {}) {
-  const target = safeRemoteLoginUrl(
-    typeof input.targetUrl === "string" && input.targetUrl.trim()
-      ? input.targetUrl.trim()
-      : "https://accounts.google.com/",
-  )
+  const rawTarget = typeof input.targetUrl === "string" ? input.targetUrl.trim() : ""
+  if (!rawTarget) throw new Error("CLOUD_LOGIN_URL_REQUIRED")
+  if (googleOwnedRemoteLoginUrl(rawTarget)) {
+    throw new Error("CLOUD_LOGIN_PROVIDER_UNSUPPORTED")
+  }
+
+  const target = safeRemoteLoginUrl(rawTarget)
   if (!target) throw new Error("CLOUD_LOGIN_URL_NOT_ALLOWED")
 
   await stopProcessFromPidFile(sandbox, REMOTE_LOGIN_PID_PATH)
