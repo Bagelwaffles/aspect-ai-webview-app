@@ -283,6 +283,17 @@ export async function recordBrowserHeartbeat(
 export async function createBrowserJob(input: BrowserJobInput): Promise<BrowserJob> {
   const redis = getRedis()
   if ((await redis.get<string>(KILL_SWITCH_KEY)) === "1") throw new Error("BROWSER_CONTROL_DISABLED")
+
+  if (input.action === "capture_secret" || input.action === "fill_secret") {
+    const primaryWorkerId = await redis.get<string>(PRIMARY_WORKER_KEY)
+    const primaryWorker = primaryWorkerId
+      ? await redis.get<BrowserWorkerRecord>(workerKey(primaryWorkerId))
+      : null
+    if (primaryWorker?.platform === "Vercel Sandbox") {
+      throw new Error("CLOUD_SECRET_VAULT_NOT_ENABLED")
+    }
+  }
+
   if (input.idempotencyKey) {
     const existingId = await redis.get<string>(idempotencyKey(input.idempotencyKey))
     if (existingId) {
@@ -335,6 +346,12 @@ export async function approveBrowserJob(id: string): Promise<BrowserJob> {
 export async function claimBrowserJob(workerId: string): Promise<{ disabled: boolean; job: BrowserJob | null }> {
   const redis = getRedis()
   if ((await redis.get<string>(KILL_SWITCH_KEY)) === "1") return { disabled: true, job: null }
+
+  const primaryWorkerId = await redis.get<string>(PRIMARY_WORKER_KEY)
+  if (!primaryWorkerId || primaryWorkerId !== workerId) {
+    return { disabled: false, job: null }
+  }
+
   await recoverStaleRunningJobs(redis)
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
