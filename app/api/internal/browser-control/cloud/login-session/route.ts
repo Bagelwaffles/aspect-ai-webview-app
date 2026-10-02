@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { startCloudBrowserLoginSession } from "@/lib/server/cloud-browser-dispatch"
-import { browserAdminAuthorized } from "@/lib/server/browser-control"
+import { browserAdminAuthorized, getBrowserControlSnapshot } from "@/lib/server/browser-control"
 import { requestHasTrustedAppOrigin } from "@/lib/server/request-origin"
 
 export const runtime = "nodejs"
@@ -13,6 +13,14 @@ export async function POST(request: NextRequest) {
   }
   if (!requestHasTrustedAppOrigin(request)) {
     return NextResponse.json({ ok: false, code: "UNTRUSTED_ORIGIN" }, { status: 403 })
+  }
+
+  const snapshot = await getBrowserControlSnapshot()
+  if (!snapshot.configured) {
+    return NextResponse.json({ ok: false, code: "BROWSER_CONTROL_STORAGE_UNAVAILABLE" }, { status: 503 })
+  }
+  if (snapshot.worker?.currentJobId || snapshot.jobs.some((job) => job.status === "running")) {
+    return NextResponse.json({ ok: false, code: "BROWSER_JOB_ACTIVE" }, { status: 409 })
   }
 
   const body = await request.json().catch(() => null)
