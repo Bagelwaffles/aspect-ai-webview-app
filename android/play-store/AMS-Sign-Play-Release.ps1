@@ -13,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 
 $ExpectedCertificateSha1 = '32:48:3E:C2:E4:3F:6B:52:7B:27:21:0D:6B:A1:F0:00:55:35:45:C0'
 $ExpectedPackage = 'com.aspectmarketingsolutions.app'
-$ExpectedVersionCode = '20000'
+$ExpectedVersionCode = '20001'
 $ExpectedVersionName = '2.0.0'
 $ExpectedCompileSdk = '36'
 $ExpectedTargetSdk = '36'

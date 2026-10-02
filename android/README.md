@@ -6,8 +6,10 @@ This directory is the modern Android replacement for the July 2025 `Aspect AI-so
 
 - Google Play application ID / package: `com.aspectmarketingsolutions.app`
 - App name: `Aspect Marketing Solutions`
-- Version code: `20000`
+- Version code: `20001`
 - Version name: `2.0.0`
+
+Version code `20000` is already active in the Play Console closed-testing track. Any replacement bundle must use `20001` or higher.
 
 The recovered July 2025 source used the obsolete package `com.aspectai.webview`, but the existing Google Play Console app record for Aspect Marketing Solutions is registered as `com.aspectmarketingsolutions.app`. The Play Console record is authoritative for this release, so the modern Android project now uses that exact package identity.
 
@@ -32,7 +34,7 @@ The app provides native platform-health reporting, a truthful launch-agent statu
 - compileSdk 36
 - targetSdk 36
 - minSdk 24
-- Android Gradle Plugin 9.3.1
+- Android Gradle Plugin 9.3.3
 - Gradle 9.5.0 in CI
 - JDK 17
 
