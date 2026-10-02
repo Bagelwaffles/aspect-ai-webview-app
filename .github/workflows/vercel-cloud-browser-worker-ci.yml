@@ -49,6 +49,7 @@ jobs:
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_TEAM: kimberleyaversbiz-4131s-projects
+      VERCEL_TEAM_ID: team_tyt9FpAEguBeBOiFqBMO3ZCg
       VERCEL_PROJECT_ID: prj_drTYJyu4QyqebEt3yYnXqhZwG3aC
       SANDBOX_NAME: ams-browser-worker
       ROOT: /vercel/sandbox/ams-browser
@@ -62,6 +63,19 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${VERCEL_TOKEN:-}" || { echo "VERCEL_TOKEN is unavailable"; exit 1; }
+
+      - name: Enforce 90-day snapshot retention
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            "https://api.vercel.com/v2/sandboxes/$SANDBOX_NAME?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID" \
+            --header "Authorization: Bearer $VERCEL_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{"snapshotExpiration":7776000000}' \
+            > /tmp/ams-sandbox-retention.json
+          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/ams-sandbox-retention.json","utf8")); if(!x.sandbox) process.exit(2); console.log("snapshotRetentionUpdate=accepted")'
 
       - name: Verify paired profile before sleep
         shell: bash
