@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : "browser_operator_failed"
-    const status = message === "AMS_AGENT_RUNTIME_UNAVAILABLE" ? 503 : message === "BROWSER_CONTROL_STORAGE_UNAVAILABLE" ? 503 : message === "BROWSER_CONTROL_DISABLED" ? 423 : 500
+    const status = message === "AMS_AGENT_RUNTIME_UNAVAILABLE" || message.startsWith("BROWSER_OPERATOR_GEMINI_") ? 503 : message === "BROWSER_CONTROL_STORAGE_UNAVAILABLE" ? 503 : message === "BROWSER_CONTROL_DISABLED" ? 423 : 500
     return NextResponse.json({ error: message }, { status })
   }
 }
