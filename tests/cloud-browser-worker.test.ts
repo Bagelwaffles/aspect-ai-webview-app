@@ -223,3 +223,23 @@ test("cloud daemon releases persistent profile before owner login takes control"
   assert.match(worker, /await context\.close\(\)\.catch/u)
   assert.match(worker, /process\.on\("SIGTERM", \(\) => \{ void shutdown\(\) \}\)/u)
 })
+
+
+test("cloud login controller explicitly excludes Google-owned interactive authentication", () => {
+  const source = readFileSync("tools/vercel-browser-worker/lib/sandbox.js", "utf8")
+  const consoleSource = readFileSync("tools/vercel-browser-worker/sandbox/remote-login.mjs", "utf8")
+  const lifecycle = readFileSync("app/dashboard/browser-control/lifecycle/CloudBrowserLifecycleClient.tsx", "utf8")
+
+  assert.match(source, /CLOUD_LOGIN_PROVIDER_UNSUPPORTED/u)
+  assert.match(source, /googleOwnedRemoteLoginUrl/u)
+  assert.doesNotMatch(
+    source.slice(source.indexOf("const REMOTE_LOGIN_PROVIDER_SUFFIXES"), source.indexOf("const INSTALL_NETWORK_ALLOWLIST")),
+    /"google\.com"|"youtube\.com"|"youtu\.be"/u,
+  )
+  assert.doesNotMatch(
+    consoleSource.slice(consoleSource.indexOf("const PROVIDER_SUFFIXES"), consoleSource.indexOf("const AMS_VERCEL_PATTERNS")),
+    /"google\.com"|"youtube\.com"|"youtu\.be"/u,
+  )
+  assert.match(lifecycle, /Google, YouTube, and Google Play/u)
+  assert.doesNotMatch(lifecycle, /useState\("https:\/\/accounts\.google\.com\/"\)/u)
+})
