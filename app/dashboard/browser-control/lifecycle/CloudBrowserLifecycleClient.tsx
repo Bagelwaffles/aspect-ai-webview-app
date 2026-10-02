@@ -8,6 +8,7 @@ type CloudStatus = {
   configured: boolean
   paired: boolean
   daemon: boolean
+  remoteLoginActive?: boolean
   profilePresent?: boolean
   profileRetentionDays?: number
 }
@@ -16,6 +17,8 @@ export default function CloudBrowserLifecycleClient() {
   const [status, setStatus] = useState<CloudStatus | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState("")
+  const [loginUrl, setLoginUrl] = useState("https://accounts.google.com/")
+  const [launchUrl, setLaunchUrl] = useState("")
 
   const refresh = useCallback(async () => {
     const response = await fetch("/api/internal/browser-control/cloud/status", { cache: "no-store" })
@@ -30,6 +33,7 @@ export default function CloudBrowserLifecycleClient() {
       configured: Boolean(body.configured),
       paired: Boolean(body.paired),
       daemon: Boolean(body.daemon),
+      remoteLoginActive: Boolean(body.remoteLoginActive),
       profilePresent: Boolean(body.profilePresent),
       profileRetentionDays: typeof body.profileRetentionDays === "number" ? body.profileRetentionDays : undefined,
     })
@@ -42,6 +46,7 @@ export default function CloudBrowserLifecycleClient() {
   async function mutate(path: "stop" | "run") {
     setBusy(true)
     setMessage("")
+    setLaunchUrl("")
     try {
       const response = await fetch(`/api/internal/browser-control/cloud/${path}`, { method: "POST" })
       const body = await response.json()
@@ -58,14 +63,38 @@ export default function CloudBrowserLifecycleClient() {
     }
   }
 
+  async function startOwnerLogin() {
+    setBusy(true)
+    setMessage("")
+    setLaunchUrl("")
+    try {
+      const response = await fetch("/api/internal/browser-control/cloud/login-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetUrl: loginUrl.trim() }),
+      })
+      const body = await response.json()
+      if (!response.ok || typeof body.launchUrl !== "string") {
+        setMessage(body.code || "Secure cloud login session failed")
+        return
+      }
+      setLaunchUrl(body.launchUrl)
+      const minutes = Math.max(1, Math.ceil(Number(body.expiresInSeconds || 600) / 60))
+      setMessage(`Secure owner login is ready for ${minutes} minutes. The Browser Control daemon is paused while the console owns the persistent Chromium profile and will restart automatically when the console closes or expires.`)
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#050711] px-4 py-8 text-slate-100 md:px-8">
       <div className="mx-auto max-w-3xl space-y-6">
         <header className="rounded-3xl border border-cyan-400/20 bg-slate-950 p-6 md:p-8">
           <p className="text-xs font-black uppercase tracking-[0.24em] text-cyan-300">AMS // Cloud Browser Lifecycle</p>
-          <h1 className="mt-3 text-3xl font-black md:text-5xl">Stop and resume the persistent Vercel Sandbox.</h1>
+          <h1 className="mt-3 text-3xl font-black md:text-5xl">Persistent Vercel browser control.</h1>
           <p className="mt-4 text-sm leading-6 text-slate-400">
-            Owner-only lifecycle controls for verifying that the named Sandbox snapshots its filesystem and resumes with the same browser profile. No Browser Control job is created by these buttons.
+            Owner-only lifecycle controls for the named Sandbox, plus an ephemeral login console for provider sign-in and MFA without putting provider credentials into AMS chat, Redis, or Browser Control jobs.
           </p>
         </header>
 
@@ -74,6 +103,7 @@ export default function CloudBrowserLifecycleClient() {
             <div><span className="text-slate-500">Configured</span><p className="mt-1 font-bold">{status?.configured ? "Yes" : "No"}</p></div>
             <div><span className="text-slate-500">Paired</span><p className="mt-1 font-bold">{status?.paired ? "Yes" : "No"}</p></div>
             <div><span className="text-slate-500">Sandbox daemon</span><p className="mt-1 font-bold">{status?.daemon ? "Active" : "Idle"}</p></div>
+            <div><span className="text-slate-500">Owner login console</span><p className="mt-1 font-bold">{status?.remoteLoginActive ? "Active" : "Closed"}</p></div>
             <div><span className="text-slate-500">Persistent profile</span><p className="mt-1 font-bold">{status?.profilePresent ? "Present" : "Not yet detected"}</p></div>
             <div><span className="text-slate-500">Profile snapshot retention</span><p className="mt-1 font-bold">{status?.profileRetentionDays ? `${status.profileRetentionDays} days, refreshed on use` : "Checking"}</p></div>
           </div>
@@ -83,7 +113,7 @@ export default function CloudBrowserLifecycleClient() {
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <button
               type="button"
-              disabled={busy || !status?.configured || !status?.paired}
+              disabled={busy || Boolean(status?.remoteLoginActive) || !status?.configured || !status?.paired}
               onClick={() => void mutate("stop")}
               className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-5 py-3 font-black text-amber-100 disabled:opacity-40"
             >
@@ -91,7 +121,7 @@ export default function CloudBrowserLifecycleClient() {
             </button>
             <button
               type="button"
-              disabled={busy || !status?.configured || !status?.paired}
+              disabled={busy || Boolean(status?.remoteLoginActive) || !status?.configured || !status?.paired}
               onClick={() => void mutate("run")}
               className="rounded-xl bg-cyan-300 px-5 py-3 font-black text-slate-950 disabled:opacity-40"
             >
@@ -100,8 +130,43 @@ export default function CloudBrowserLifecycleClient() {
           </div>
         </section>
 
+        <section className="rounded-3xl border border-violet-400/20 bg-violet-400/5 p-6">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-200">Secure owner login</p>
+          <p className="mt-3 text-sm leading-6 text-slate-300">
+            Start a ten-minute console only when a provider requires login, MFA, consent, CAPTCHA, or another human security check. The temporary access token stays in the launch URL fragment and is removed from the address bar as soon as the console opens.
+          </p>
+          <label className="mt-4 block text-xs font-bold uppercase tracking-wide text-slate-400" htmlFor="cloud-login-url">Provider URL</label>
+          <input
+            id="cloud-login-url"
+            type="url"
+            value={loginUrl}
+            onChange={(event) => setLoginUrl(event.target.value)}
+            disabled={busy || Boolean(status?.remoteLoginActive)}
+            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 disabled:opacity-40"
+          />
+          <button
+            type="button"
+            disabled={busy || Boolean(status?.remoteLoginActive) || !status?.configured || !status?.paired}
+            onClick={() => void startOwnerLogin()}
+            className="mt-3 w-full rounded-xl border border-violet-300/30 bg-violet-300 px-5 py-3 font-black text-slate-950 disabled:opacity-40"
+          >
+            Start Secure Cloud Login
+          </button>
+          {launchUrl ? (
+            <a
+              href={launchUrl}
+              target="_blank"
+              rel="noreferrer"
+              referrerPolicy="no-referrer"
+              className="mt-3 block rounded-xl border border-emerald-300/30 bg-emerald-300/10 px-5 py-3 text-center font-black text-emerald-100"
+            >
+              Open Secure Cloud Login Console
+            </a>
+          ) : null}
+        </section>
+
         <section className="rounded-3xl border border-emerald-400/20 bg-emerald-400/5 p-5 text-sm leading-6 text-emerald-100">
-          Use Sleep only when the worker is idle. After Sleep, Wake restores the same named Sandbox and persistent browser profile. Provider-controlled session expiration, MFA, and security reauthentication still apply.
+          Provider passwords and MFA values are entered only inside the temporary Sandbox console. AMS does not store them. After the session closes, the same persistent Chromium profile returns to the cloud Browser Control daemon. Provider-controlled session expiration and future reauthentication still apply.
         </section>
 
         <Link href="/dashboard/browser-control" className="inline-block font-bold text-cyan-300 underline">

@@ -435,11 +435,16 @@ async function daemon() {
     return page
   }
 
-  const cleanPid = async () => {
+  let stopping = false
+  const shutdown = async () => {
+    if (stopping) return
+    stopping = true
+    if (context) await context.close().catch(() => undefined)
     await writeFile(DAEMON_PID_PATH, "", "utf8").catch(() => undefined)
+    process.exit(0)
   }
-  process.on("SIGTERM", () => { void cleanPid(); process.exit(0) })
-  process.on("SIGINT", () => { void cleanPid(); process.exit(0) })
+  process.on("SIGTERM", () => { void shutdown() })
+  process.on("SIGINT", () => { void shutdown() })
 
   while (true) {
     try {
