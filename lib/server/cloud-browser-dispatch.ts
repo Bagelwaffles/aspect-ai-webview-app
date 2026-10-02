@@ -1,6 +1,7 @@
 type CloudBrowserOptions = {
   env?: NodeJS.ProcessEnv
   fetcher?: typeof fetch
+  timeoutMs?: number
 }
 
 function clean(value: string | undefined) {
@@ -55,7 +56,7 @@ async function callCloudWorker(
   }
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 8_000)
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 8_000)
   try {
     const response = await fetcher(new URL(path, config.url), {
       ...init,
@@ -150,4 +151,33 @@ export async function getCloudBrowserWorkerStatus(
   options: CloudBrowserOptions = {},
 ) {
   return callCloudWorker("/api/status", { method: "GET" }, options)
+}
+
+
+export async function startCloudBrowserLoginSession(
+  targetUrl: string | undefined,
+  options: CloudBrowserOptions = {},
+) {
+  const config = getCloudBrowserConfiguration(options.env ?? process.env)
+  if (!config.configured) {
+    return { status: "not_configured" as const }
+  }
+
+  try {
+    const result = await callCloudWorker("/api/login-session", {
+      method: "POST",
+      body: JSON.stringify({ targetUrl }),
+    }, { ...options, timeoutMs: options.timeoutMs ?? 25_000 })
+    const launchUrl = typeof result.launchUrl === "string" ? result.launchUrl : ""
+    const expiresInSeconds = typeof result.expiresInSeconds === "number" ? result.expiresInSeconds : 0
+    if (!launchUrl.startsWith("https://") || !expiresInSeconds) {
+      throw new Error("CLOUD_LOGIN_SESSION_RESPONSE_INVALID")
+    }
+    return { status: "ready" as const, launchUrl, expiresInSeconds }
+  } catch (error) {
+    return {
+      status: "failed" as const,
+      code: error instanceof Error ? error.message.slice(0, 200) : "CLOUD_LOGIN_SESSION_FAILED",
+    }
+  }
 }
