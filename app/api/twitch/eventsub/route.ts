@@ -5,6 +5,7 @@ import {
   resolveStreamIntelligenceTrigger,
 } from "@/lib/server/stream-intelligence"
 import { syncLatestTwitchMediaQueue } from "@/lib/server/twitch-media-factory"
+import { autoApplySmokyLiveMetadata } from "@/lib/server/twitch-live-metadata"
 import {
   processTwitchEventSubNotification,
   recordTwitchSubscriptionChallenge,
@@ -67,7 +68,10 @@ export async function POST(request: NextRequest) {
             if (intelligenceJob.phase === "post-stream") {
               await new Promise((resolve) => setTimeout(resolve, 5_000))
             }
-            await generateStreamIntelligencePackage(intelligenceJob)
+            const intelligence = await generateStreamIntelligencePackage(intelligenceJob)
+            if (intelligenceJob.phase === "live" && result.type === "stream.online") {
+              await autoApplySmokyLiveMetadata(intelligence)
+            }
             if (intelligenceJob.phase === "post-stream") {
               await syncLatestTwitchMediaQueue()
             }

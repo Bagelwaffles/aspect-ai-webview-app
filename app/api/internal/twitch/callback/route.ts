@@ -4,6 +4,7 @@ import { authorizeOwnerApiRequest } from "@/lib/server/owner-api-auth"
 import {
   exchangeTwitchAuthorizationCode,
   readTwitchOauthAttempt,
+  TWITCH_BROADCAST_SCOPE,
   TWITCH_MEDIA_SCOPE,
   TWITCH_OAUTH_COOKIE,
   TWITCH_SCOPE,
@@ -47,13 +48,24 @@ export async function GET(request: NextRequest) {
     const result = await exchangeTwitchAuthorizationCode(
       code,
       {},
-      attempt.capability === "media" ? [TWITCH_SCOPE, TWITCH_MEDIA_SCOPE] : [TWITCH_SCOPE],
+      attempt.capability === "creator"
+        ? [TWITCH_SCOPE, TWITCH_MEDIA_SCOPE, TWITCH_BROADCAST_SCOPE]
+        : attempt.capability === "media"
+          ? [TWITCH_SCOPE, TWITCH_MEDIA_SCOPE]
+          : [TWITCH_SCOPE],
     )
     console.info("TWITCH_OAUTH_CALLBACK_SUCCESS", {
       capability: attempt.capability,
       scopes: result.connection.scopes,
     })
-    return creatorRedirect(request, attempt.capability === "media" ? "media-enabled" : "connected")
+    return creatorRedirect(
+      request,
+      attempt.capability === "creator"
+        ? "creator-enabled"
+        : attempt.capability === "media"
+          ? "media-enabled"
+          : "connected",
+    )
   } catch (error) {
     const codeValue = error instanceof Error ? error.message : "TWITCH_CONNECTION_FAILED"
     console.warn("TWITCH_OAUTH_CALLBACK_FAILED", { code: codeValue })

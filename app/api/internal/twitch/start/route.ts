@@ -19,10 +19,11 @@ function creatorUrl(request: NextRequest, state: string) {
 
 export async function GET(request: NextRequest) {
   const auth = await authorizeOwnerApiRequest(request)
-  const capability = request.nextUrl.searchParams.get("capability") === "media" ? "media" : "pilot"
+  const requestedCapability = request.nextUrl.searchParams.get("capability")
+  const capability = requestedCapability === "creator" ? "creator" : requestedCapability === "media" ? "media" : "pilot"
   if (!auth.ok) {
     const login = new URL("/login", request.url)
-    login.searchParams.set("callbackUrl", capability === "media" ? "/api/internal/twitch/start?capability=media" : "/api/internal/twitch/start")
+    login.searchParams.set("callbackUrl", capability === "creator" ? "/api/internal/twitch/start?capability=creator" : capability === "media" ? "/api/internal/twitch/start?capability=media" : "/api/internal/twitch/start")
     return NextResponse.redirect(login)
   }
 
@@ -33,7 +34,12 @@ export async function GET(request: NextRequest) {
   try {
     const attempt = createTwitchOauthAttempt(process.env, Date.now(), capability)
     const response = NextResponse.redirect(
-      buildTwitchAuthorizationUrl(attempt.state, process.env, capability === "media"),
+      buildTwitchAuthorizationUrl(
+        attempt.state,
+        process.env,
+        capability === "media" || capability === "creator",
+        capability === "creator",
+      ),
     )
     response.cookies.set(TWITCH_OAUTH_COOKIE, attempt.cookieValue, {
       httpOnly: true,
