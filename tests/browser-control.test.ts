@@ -413,3 +413,63 @@ test("browser control worker result route preserves structured owner action", as
     __setBrowserControlRedisForTests(null)
   }
 })
+
+
+test("only the designated primary Browser Control worker can claim jobs", async () => {
+  useMemoryRedis()
+  try {
+    const { code: windowsCode } = await createBrowserPairingCode()
+    const windows = await pairBrowserWorker({
+      code: windowsCode,
+      name: "Windows rollback worker",
+      version: "test",
+      platform: "win32",
+      browser: "Edge",
+    })
+
+    const { code: cloudCode } = await createBrowserPairingCode()
+    const cloud = await pairBrowserWorker({
+      code: cloudCode,
+      name: "AMS Vercel Cloud Browser Worker",
+      version: "test",
+      platform: "Vercel Sandbox",
+      browser: "Chromium headless",
+    })
+
+    const job = await createBrowserJob({
+      action: "inspect",
+      url: "https://www.aspectmarketingsolutions.app/",
+    })
+
+    assert.equal((await claimBrowserJob(windows.workerId)).job, null)
+    assert.equal((await claimBrowserJob(cloud.workerId)).job?.id, job.id)
+  } finally {
+    __setBrowserControlRedisForTests(null)
+  }
+})
+
+test("cloud-primary Browser Control rejects Windows-only secret vault jobs before queueing", async () => {
+  useMemoryRedis()
+  try {
+    const { code } = await createBrowserPairingCode()
+    await pairBrowserWorker({
+      code,
+      name: "AMS Vercel Cloud Browser Worker",
+      version: "test",
+      platform: "Vercel Sandbox",
+      browser: "Chromium headless",
+    })
+
+    await assert.rejects(
+      () => createBrowserJob({
+        action: "fill_secret",
+        url: "https://www.linkedin.com/developers/apps/example/auth",
+        selector: "input[type='password']",
+        secretRef: "linkedin.client_secret",
+      }),
+      /CLOUD_SECRET_VAULT_NOT_ENABLED/u,
+    )
+  } finally {
+    __setBrowserControlRedisForTests(null)
+  }
+})
