@@ -155,3 +155,20 @@ test("Browser Agent automatically recovers current-page origin mismatches", () =
   assert.match(client, /recovering the correct page automatically/)
   assert.match(client, /window\.setTimeout\(\(\) => void continueGoal\(\), 500\)/)
 })
+
+
+test("Windows Browser Worker retirement script removes local execution state while preserving uploads by default", () => {
+  const source = readFileSync("tools/browser-worker/uninstall.ps1", "utf8")
+
+  assert.match(source, /AMS Browser Worker/u)
+  assert.match(source, /schtasks\.exe \/End/u)
+  assert.match(source, /schtasks\.exe \/Delete/u)
+  assert.match(source, /AMS Browser Worker\.cmd/u)
+  assert.match(source, /credentials\.json/u)
+  assert.match(source, /EdgeProfile/u)
+  assert.match(source, /Secrets/u)
+  assert.match(source, /logs/u)
+  assert.match(source, /PurgeUploads/u)
+  assert.match(source, /Uploads preserved at/u)
+  assert.doesNotMatch(source, /Remove-Item -LiteralPath \$UploadRoot -Recurse -Force[^\n]*\n(?!.*PurgeUploads)/u)
+})
