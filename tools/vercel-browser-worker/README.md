@@ -82,6 +82,21 @@ The worker detects and stops on:
 
 No bypass logic is implemented.
 
+For those owner-only steps, the lifecycle page can start a ten-minute **Secure Cloud Login Console** on an exposed Vercel Sandbox port. The console temporarily pauses the polling daemon so it can use the same persistent Chromium profile without profile-lock contention.
+
+Security properties:
+
+- a fresh 256-bit access token is generated for every console session
+- the token is placed only in the URL fragment, then removed from the browser address bar immediately
+- frame and input endpoints require the bearer token and return Cache-Control: no-store
+- provider navigation remains restricted to the same AMS-approved provider families
+- credentials and MFA values are never sent through AMS chat, Redis, Browser Control jobs, or audit history
+- the console stores no provider credential values and writes no credential payloads to logs
+- the console expires after ten minutes and restarts the normal cloud worker daemon automatically
+- closing the console also restarts the normal daemon immediately
+
+The console does not bypass provider security checks. It gives the owner a direct interactive surface to satisfy them.
+
 ## Network security
 
 The Sandbox is installed with normal network access only during first-time Chromium setup. Before browser jobs run, the Vercel Sandbox egress firewall is changed to an allowlist covering the same approved AMS providers plus their required static/CDN domains.
@@ -109,4 +124,5 @@ Do not retire the Windows worker until all are verified in preview:
 7. Kill switch prevents new cloud jobs.
 8. A Sandbox sleep/resume preserves the browser login profile.
 9. Runtime logs contain no credentials.
-10. Windows worker remains available but is not concurrently polling during the final cutover.
+10. Secure Cloud Login Console can complete a real provider owner-authentication step against the persistent profile.
+11. Windows worker remains available but is not concurrently polling during the final cutover.
