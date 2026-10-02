@@ -32,9 +32,6 @@ const PROVIDER_SUFFIXES = [
   "x.com",
   "twitter.com",
   "x.ai",
-  "google.com",
-  "youtube.com",
-  "youtu.be",
   "twitch.tv",
   "streamlabs.com",
   "fiverr.com",
@@ -83,7 +80,7 @@ function safeUrl(rawUrl) {
 
 function requiredEnvironment() {
   const token = process.env.AMS_REMOTE_LOGIN_TOKEN?.trim()
-  const target = safeUrl(process.env.AMS_REMOTE_LOGIN_URL?.trim() || "https://accounts.google.com/")
+  const target = safeUrl(process.env.AMS_REMOTE_LOGIN_URL?.trim() || "")
   const expiresAt = Number(process.env.AMS_REMOTE_LOGIN_EXPIRES_AT)
   const port = Number(process.env.AMS_REMOTE_LOGIN_PORT || "6080")
   if (!token || token.length < 32 || !target || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
@@ -152,7 +149,7 @@ button.danger{border-color:#fb7185;color:#fecdd3}input.url{flex:1;min-width:220p
 </section>
 <section class="panel">
   <div class="row">
-    <input id="url" class="url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://accounts.google.com/">
+    <input id="url" class="url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://www.linkedin.com/login">
     <button id="go">Go</button>
     <button id="reload">Reload</button>
     <button id="close" class="danger">Close secure session</button>

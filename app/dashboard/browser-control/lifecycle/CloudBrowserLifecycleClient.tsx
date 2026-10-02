@@ -17,7 +17,7 @@ export default function CloudBrowserLifecycleClient() {
   const [status, setStatus] = useState<CloudStatus | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState("")
-  const [loginUrl, setLoginUrl] = useState("https://accounts.google.com/")
+  const [loginUrl, setLoginUrl] = useState("")
   const [launchUrl, setLaunchUrl] = useState("")
 
   const refresh = useCallback(async () => {
@@ -75,7 +75,14 @@ export default function CloudBrowserLifecycleClient() {
       })
       const body = await response.json()
       if (!response.ok || typeof body.launchUrl !== "string") {
-        setMessage(body.code || "Secure cloud login session failed")
+        const code = typeof body.code === "string" ? body.code : ""
+        if (code === "CLOUD_LOGIN_PROVIDER_UNSUPPORTED") {
+          setMessage("Google, YouTube, and Google Play authentication are not supported in the Vercel login console. Use the official AMS OAuth/API connection or your normal phone browser instead.")
+        } else if (code === "CLOUD_LOGIN_URL_REQUIRED") {
+          setMessage("Enter a supported provider login URL first.")
+        } else {
+          setMessage(code || "Secure cloud login session failed")
+        }
         return
       }
       setLaunchUrl(body.launchUrl)
@@ -113,7 +120,7 @@ export default function CloudBrowserLifecycleClient() {
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <button
               type="button"
-              disabled={busy || Boolean(status?.remoteLoginActive) || !status?.configured || !status?.paired}
+              disabled={busy || Boolean(status?.remoteLoginActive) || !status?.configured || !status?.paired || !loginUrl.trim()}
               onClick={() => void mutate("stop")}
               className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-5 py-3 font-black text-amber-100 disabled:opacity-40"
             >
@@ -133,7 +140,10 @@ export default function CloudBrowserLifecycleClient() {
         <section className="rounded-3xl border border-violet-400/20 bg-violet-400/5 p-6">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-200">Secure owner login</p>
           <p className="mt-3 text-sm leading-6 text-slate-300">
-            Start a ten-minute console only when a provider requires login, MFA, consent, CAPTCHA, or another human security check. The temporary access token stays in the launch URL fragment and is removed from the address bar as soon as the console opens.
+            Start a ten-minute console only when a supported provider requires login, MFA, consent, CAPTCHA, or another human security check. The temporary access token stays in the launch URL fragment and is removed from the address bar as soon as the console opens.
+          </p>
+          <p className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/5 px-4 py-3 text-xs leading-5 text-amber-100">
+            Google, YouTube, and Google Play block this automated Chromium environment. AMS uses official Google OAuth/API connections for supported workflows; Play Console-only owner steps must be completed in your normal browser.
           </p>
           <label className="mt-4 block text-xs font-bold uppercase tracking-wide text-slate-400" htmlFor="cloud-login-url">Provider URL</label>
           <input
@@ -141,6 +151,7 @@ export default function CloudBrowserLifecycleClient() {
             type="url"
             value={loginUrl}
             onChange={(event) => setLoginUrl(event.target.value)}
+            placeholder="https://www.linkedin.com/login"
             disabled={busy || Boolean(status?.remoteLoginActive)}
             className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 disabled:opacity-40"
           />
