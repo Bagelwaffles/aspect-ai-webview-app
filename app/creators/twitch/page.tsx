@@ -28,9 +28,9 @@ export default function TwitchPilotPage() {
         <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
           <div className="space-y-5">
             <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-primary"><Twitch className="h-4 w-4" />Twitch Watcher pilot</div>
-            <h1 className="text-4xl font-black tracking-tight sm:text-6xl">Connect one channel. Prove every event. Automate nothing dangerous.</h1>
+            <h1 className="text-4xl font-black tracking-tight sm:text-6xl">Connect your stream. Verify your videos. Publish automatically.</h1>
             <p className="max-w-3xl text-lg leading-8 text-muted-foreground">
-              This operator console is the controlled activation path for AMS Twitch Watcher. The first production proof is deliberately read-only: Twitch authorization, signed stream events, VOD references, creator markers, existing Twitch clips, and a durable metadata-backed stream summary.
+              This owner console tracks Twitch streams and clips, analyzes available footage, and manages verified YouTube uploads and automatic publishing.
             </p>
           </div>
           <Card>
@@ -39,7 +39,7 @@ export default function TwitchPilotPage() {
               <CardTitle>Hard boundaries</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
-              <p>No automatic chat messages, moderation, posting, clip creation, deletion, spending, or Twitch account mutation. Owner-approved clip creation is available only after optional clip-management authorization.</p>
+              <p>Authorized clip creation requires Twitch clip-management access. Automatic YouTube publishing uses the connected SmokyBanana03 channel and verifies each upload before publication.</p>
               <p>No gameplay-analysis claim unless AMS actually receives media content later.</p>
               <p>No commercial availability until an authorized real channel completes the online → offline → summary acceptance run.</p>
             </CardContent>

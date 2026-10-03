@@ -211,7 +211,7 @@ export default function TwitchPilotConsole() {
         </CardHeader>
         <CardContent className="space-y-4 text-sm leading-6 text-muted-foreground">
           <div className="flex gap-2"><ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-primary" /><span>Requested scope: {status.connection?.scopes.join(", ")}</span></div>
-          <p>EventSub is limited to stream online/offline and channel metadata updates. No automatic publishing, chat, moderation, or account changes are enabled.</p>
+          <p>EventSub tracks stream online/offline and channel metadata updates. Selected Shorts and verified full VODs publish automatically when automatic publishing is enabled.</p>
           <Button variant="outline" disabled={disconnecting} onClick={() => void disconnect()}>{disconnecting ? "Disconnecting…" : "Disconnect Twitch"}</Button>
         </CardContent>
       </Card>
