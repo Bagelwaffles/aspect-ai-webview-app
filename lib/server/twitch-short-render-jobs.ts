@@ -28,6 +28,11 @@ export const twitchShortRenderJobSchema = z.object({
   streamId: z.string().min(1).max(120),
   broadcasterId: z.string().min(1).max(120),
   clipId: z.string().min(1).max(160),
+  autoPublish: z.object({
+    sourceVideoId: z.string().min(1).max(160),
+    rank: z.number().int().min(1).max(3),
+    selectedAt: z.string().datetime(),
+  }).strict().optional(),
   sourceObjectKey: z.string().min(1).max(1000),
   outputObjectKey: z.string().min(1).max(1000),
   status: z.enum(["pending", "rendering", "rendered", "failed"]),
@@ -82,6 +87,10 @@ type Options = {
   env?: NodeJS.ProcessEnv
   redis?: Redis | null
   now?: () => Date
+  autoPublishSelection?: {
+    sourceVideoId: string
+    rank: 1 | 2 | 3
+  }
 }
 
 function clean(value: string | undefined) {
@@ -428,6 +437,13 @@ export async function enqueueTwitchShortRender(
     streamId: queue.streamId,
     broadcasterId: queue.broadcasterId,
     clipId: item.clipId,
+    autoPublish: options.autoPublishSelection
+      ? {
+          sourceVideoId: options.autoPublishSelection.sourceVideoId,
+          rank: options.autoPublishSelection.rank,
+          selectedAt: timestamp,
+        }
+      : undefined,
     sourceObjectKey: item.objectKey,
     outputObjectKey,
     status: "pending",

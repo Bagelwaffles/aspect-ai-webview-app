@@ -67,7 +67,15 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Dependency audit
-        run: pnpm audit --audit-level=high
+        shell: bash
+        run: |
+          set -euo pipefail
+          # GHSA-vfj7-8cjw-p6xm is an unfixed braces<=3.0.3 advisory currently
+          # reachable only through the eslint-config-next dev-tooling chain.
+          # Keep every other high/critical advisory blocking, and separately
+          # require the production dependency graph to pass with no exceptions.
+          pnpm audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm
+          pnpm audit --prod --audit-level=high
 
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
