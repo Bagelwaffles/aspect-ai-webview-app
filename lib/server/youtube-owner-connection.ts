@@ -12,6 +12,7 @@ import { z } from "zod"
 
 export const YOUTUBE_UPLOAD_SCOPE = "https://www.googleapis.com/auth/youtube.upload" as const
 export const YOUTUBE_READONLY_SCOPE = "https://www.googleapis.com/auth/youtube.readonly" as const
+export const YOUTUBE_FORCE_SSL_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl" as const
 export const SMOKYBANANA03_YOUTUBE_CHANNEL_ID = "UCPbMNjvwKOtuFX-1rAtCJSg" as const
 
 const CONNECTION_KEY = "ams:youtube-owner:v1:connection"
