@@ -84,7 +84,7 @@ def main():
             source = root / "source.mp4"
             # A public, owner-authorized Twitch recording only. No cookie/profile import or access bypass.
             subprocess.run(["python", "-m", "yt_dlp", "--no-playlist", "--quiet", "--no-warnings", "--write-info-json",
-                "--abort-on-unavailable-fragments", "--max-filesize", "8G", "-f", "best[height<=1080]/best", "--remux-video", "mp4",
+                "--abort-on-unavailable-fragments", "--max-filesize", "16G", "-f", "best[height<=1080]/best", "--remux-video", "mp4",
                 "-o", str(source), f"https://www.twitch.tv/videos/{job['vodId']}"], check=True, timeout=2 * 3600,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             info = json.loads(info_path.read_text())
@@ -98,7 +98,7 @@ def main():
             if abs(float(probe(source)["format"]["duration"]) - actual) > 5:
                 raise RuntimeError("TWITCH_VOD_SOURCE_INCOMPLETE")
             output = root / "branded-vod.mp4"
-            proof = render(source, output, job["streamer"], job["title"], job["createdAt"][:10])
+            proof = render(source, output, job["streamer"], job["title"], job["createdAt"][:10], consume_source=True)
             # Hash proof records the exact branded output; it carries no credential or session data.
             digest = hashlib.sha256()
             with output.open("rb") as stream:

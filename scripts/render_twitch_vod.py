@@ -15,7 +15,7 @@ def probe(path):
     ]))
 
 
-def render(source, output, streamer, title, date, width=1920, height=1080):
+def render(source, output, streamer, title, date, width=1920, height=1080, consume_source=False):
     if not streamer.strip() or len(streamer) > 80:
         raise ValueError("Streamer name required")
     info = probe(source)
@@ -67,6 +67,9 @@ def render(source, output, streamer, title, date, width=1920, height=1080):
                  "-c:a", "aac", "-ar", "48000", "-ac", "2", "-af", "aresample=async=1:first_pts=0",
                  "-video_track_timescale", "15360", "-t", str(duration), str(root / "body.mp4")]
         subprocess.run(args, check=True)
+        # The worker owns a disposable download. Release it before writing the final copy.
+        if consume_source:
+            pathlib.Path(source).unlink()
         playlist = root / "concat.txt"
         playlist.write_text("".join(f"file '{root / part}'\n" for part in ["intro.mp4", "body.mp4", "outro.mp4"]))
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(playlist),
