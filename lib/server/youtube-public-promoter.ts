@@ -300,6 +300,12 @@ export async function promoteRenderedTwitchShortPublic(
     throw new Error("YOUTUBE_PUBLIC_STREAM_CAP_REACHED")
   }
 
+  const fetcher = options.fetcher ?? fetch
+  const auth = await accessToken({ ...options, env }, redis)
+  if (auth.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID) {
+    throw new Error("YOUTUBE_CHANNEL_MISMATCH")
+  }
+
   const timestamp = nowIso(options)
   let record = await saveRecord({
     version: YOUTUBE_PUBLIC_PROMOTION_VERSION,
@@ -317,14 +323,7 @@ export async function promoteRenderedTwitchShortPublic(
     errorCode: null,
   }, redis)
 
-  const fetcher = options.fetcher ?? fetch
-
   try {
-    const auth = await accessToken({ ...options, env }, redis)
-    if (auth.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID) {
-      throw new Error("YOUTUBE_CHANNEL_MISMATCH")
-    }
-
     const before = await readVideo(record.youtubeVideoId, auth.token, fetcher)
     if (before.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID) {
       throw new Error("YOUTUBE_CHANNEL_MISMATCH")
