@@ -1,0 +1,29 @@
+name: Twitch Full VOD Proof
+on:
+  pull_request:
+    paths:
+      - 'scripts/render_twitch_vod.py'
+      - 'scripts/twitch_vod_worker.py'
+      - '.github/workflows/twitch-vod-proof.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: twitch-vod-proof-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  full-vod-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install media tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          python -m pip install yt-dlp==2026.8.19
+      - name: Prove complete real VOD download and branding without uploading
+        run: python scripts/twitch_vod_worker.py --proof-vod-id 2886543084

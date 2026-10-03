@@ -120,7 +120,7 @@ export function buildTwitchPublishMetadata(input: {
   const evidence = input.evidence
   const observedLead = evidence.observedMoments[0] || evidence.hook
   const titleBase = truncate(observedLead || evidence.hook || "Gameplay highlight", 105)
-  const canonicalTitle = truncate(titleBase, 140)
+  const canonicalTitle = truncate(`${creator} | ${titleBase}`, 140)
   const youtubeTitle = truncate(canonicalTitle, 100)
   const description = truncate(
     `${evidence.caption}\n\nActual Twitch footage from ${creator}. ${evidence.evidenceBoundary}`,
@@ -301,7 +301,12 @@ export async function analyzeTwitchClipVideo(
   }
 
   if (!options.force && item.videoAnalysis?.version === TWITCH_VIDEO_ANALYSIS_VERSION) {
-    return twitchVideoAnalysisRecordSchema.parse(item.videoAnalysis)
+    const cached = twitchVideoAnalysisRecordSchema.parse(item.videoAnalysis)
+    const publishMetadata = buildTwitchPublishMetadata({ creatorName: queue.broadcasterLogin,
+      sourceTitle: item.title, evidence: cached })
+    const corrected = twitchVideoAnalysisRecordSchema.parse({ ...cached, publishMetadata })
+    await saveTwitchMediaVideoAnalysis(item.clipId, corrected, { env })
+    return corrected
   }
 
   const signed = presignR2Object("GET", item.objectKey, { expiresInSeconds: 900 }, env)
@@ -315,7 +320,7 @@ export async function analyzeTwitchClipVideo(
       signedUrl: signed.url,
       clipId: item.clipId,
       title: item.title,
-      creatorName: item.creatorName || queue.broadcasterLogin,
+      creatorName: queue.broadcasterLogin,
       duration,
       retry: attempt > 0,
     })
@@ -344,7 +349,7 @@ export async function analyzeTwitchClipVideo(
     bestEndSeconds = null
   }
 
-  const creatorName = item.creatorName || queue.broadcasterLogin
+  const creatorName = queue.broadcasterLogin
   const normalizedEvidence: TwitchVideoEvidence = {
     ...raw,
     score,

@@ -1,3 +1,5 @@
+import { Redis } from "@upstash/redis"
+import { randomUUID } from "node:crypto"
 import {
   createTwitchClipFromVod,
   getTwitchPilotStatus,
@@ -19,6 +21,7 @@ import {
   enqueueTwitchShortRender,
   isTwitchShortRenderConfigured,
   requeueGenericCreatorTwitchShortRenders,
+  listLatestTwitchShortRenderJobs,
 } from "@/lib/server/twitch-short-render-jobs"
 import {
   analyzeTwitchClipVideo,
@@ -193,7 +196,27 @@ function safeError(error: unknown) {
   return error.name.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80) || "ERROR"
 }
 
-export async function runTwitchAutomaticPrivateShorts() {
+export async function runTwitchAutomaticPrivateShorts(input: { vodId?: string; windowHours?: number; windowEnd?: string; privateOnly?: boolean } = {}) {
+  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN
+  if (!url || !token) return { ok: true, skipped: "TWITCH_MEDIA_STORE_UNAVAILABLE", created: 0, queued: 0, failures: [] as string[] }
+  const redis = new Redis({ url, token })
+  const lockKey = "ams:twitch-auto-factory:v1:global-lock"
+  const lock = randomUUID()
+  if (!await redis.set(lockKey, lock, { nx: true, ex: 1800 })) {
+    return { ok: true, skipped: "TWITCH_FACTORY_BUSY", created: 0, queued: 0, failures: [] as string[] }
+  }
+  try { return await runTwitchAutomaticPrivateShortsLocked(input) }
+  finally {
+    // Redis compare-and-delete prevents an expired worker from releasing a newer worker's lease.
+    await redis.eval("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end", [lockKey], [lock])
+  }
+}
+
+async function runTwitchAutomaticPrivateShortsLocked(input: { vodId?: string; windowHours?: number; windowEnd?: string; privateOnly?: boolean }) {
+  const windowHours = input.windowHours ?? 24
+  const windowEnd = input.windowEnd ? new Date(input.windowEnd) : undefined
+  const queueKey = input.vodId ? `backfill-${input.vodId}` : dailyQueueKey()
   const status = await getTwitchPilotStatus()
   const scopes = status.connection?.scopes ?? []
 
@@ -204,7 +227,8 @@ export async function runTwitchAutomaticPrivateShorts() {
     return { ok: true, skipped: "TWITCH_SHORT_RENDER_NOT_CONFIGURED", created: 0, queued: 0, failures: [] as string[] }
   }
 
-  const archive = await getTwitchRecentArchive(24)
+  const archive = await getTwitchRecentArchive(windowHours, {}, windowEnd)
+  if (input.vodId) archive.vods = archive.vods.filter(vod => vod.id === input.vodId)
   if (!archive.vods.length) {
     return {
       ok: true,
@@ -278,11 +302,12 @@ export async function runTwitchAutomaticPrivateShorts() {
     }
   }
 
-  const refreshedArchive = await getTwitchRecentArchive(24).catch((error) => {
+  const refreshedArchive = await getTwitchRecentArchive(windowHours, {}, windowEnd).catch((error) => {
     failures.push(`archive-refresh:${safeError(error)}`)
     return archive
   })
 
+  if (input.vodId) refreshedArchive.vods = refreshedArchive.vods.filter(vod => vod.id === input.vodId)
   const combinedClips = [...refreshedArchive.clips]
   const combinedClipIds = new Set(combinedClips.map((clip) => clip.id))
   for (const clip of reconciliation.materialized) {
@@ -302,7 +327,7 @@ export async function runTwitchAutomaticPrivateShorts() {
     .slice(0, TWITCH_AUTO_FACTORY_MAX_DAY_CLIPS)
 
   const queue = await syncTwitchDailyMediaQueue({
-    dayKey: dailyQueueKey(),
+    dayKey: queueKey,
     broadcasterId: status.connection.broadcasterId,
     broadcasterLogin: status.connection.login,
     scopes,
@@ -329,7 +354,7 @@ export async function runTwitchAutomaticPrivateShorts() {
 
       if (!current) {
         latest = await syncTwitchDailyMediaQueue({
-          dayKey: dailyQueueKey(),
+          dayKey: queueKey,
           broadcasterId: status.connection.broadcasterId,
           broadcasterLogin: status.connection.login,
           scopes,
@@ -362,10 +387,14 @@ export async function runTwitchAutomaticPrivateShorts() {
   const ranked = selectBestAnalyzedClipsPerStream(analyzed)
 
   let queued = 0
+  const previousClipJobs = input.privateOnly
+    ? new Set((await listLatestTwitchShortRenderJobs()).filter(job => job.status !== "failed").map(job => job.clipId))
+    : new Set<string>()
   for (const candidate of ranked) {
     try {
+      if (previousClipJobs.has(candidate.clipId)) continue
       await enqueueTwitchShortRender(candidate.clipId, {
-        autoPublishSelection: {
+        autoPublishSelection: input.privateOnly ? undefined : {
           sourceVideoId: candidate.sourceVideoId,
           rank: candidate.rank,
         },
@@ -384,12 +413,12 @@ export async function runTwitchAutomaticPrivateShorts() {
   return {
     ok: true,
     skipped: null,
-    windowHours: 24,
+    windowHours,
     vodCount: refreshedArchive.vods.length,
     clipCount: dayClips.length,
     created,
     verified: reconciliation.materialized.length,
-    pending: reconciliation.pending.length + trackedCreated,
+    pending: reconciliation.pending.filter(clip => !input.vodId || clip.vodId === input.vodId).length + trackedCreated,
     expired: reconciliation.failed.length,
     analyzed: analyzed.length,
     selected: ranked.length,
