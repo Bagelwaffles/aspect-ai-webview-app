@@ -1,4 +1,5 @@
 """Cloud-only full-VOD worker. Secrets and upload session URLs never enter logs."""
+import argparse
 import hashlib
 import json
 import os
@@ -117,5 +118,36 @@ def main():
         raise RuntimeError(code) from None
 
 
+def prove_full_vod(vod_id):
+    # Unprivileged CI proof: public media only, no AMS API, OAuth, or YouTube upload.
+    if not vod_id.isdigit():
+        raise ValueError("Invalid proof VOD ID")
+    with tempfile.TemporaryDirectory(prefix="ams-vod-proof-") as temp:
+        source = pathlib.Path(temp) / "source.mp4"
+        subprocess.run(["python", "-m", "yt_dlp", "--no-playlist", "--quiet", "--no-warnings",
+            "--write-info-json", "--abort-on-unavailable-fragments", "--max-filesize", "1G",
+            "-f", "best[height<=480]/best", "--remux-video", "mp4", "-o", str(source),
+            f"https://www.twitch.tv/videos/{vod_id}"], check=True, timeout=600,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        info = json.loads(source.with_suffix(".info.json").read_text())
+        if (info.get("uploader_id") or "").lower() != "smokybanana03" or str(info.get("id", "")).lstrip("v") != vod_id:
+            raise RuntimeError("TWITCH_VOD_SOURCE_IDENTITY_MISMATCH")
+        duration = float(probe(source)["format"]["duration"])
+        if abs(duration - float(info.get("duration") or 0)) > 5:
+            raise RuntimeError("TWITCH_VOD_SOURCE_INCOMPLETE")
+        output = pathlib.Path(temp) / "branded-vod.mp4"
+        proof = render(source, output, "SmokyBanana03", info.get("title") or "Full Stream", "2026-09-28", consume_source=True)
+        if source.exists():
+            raise RuntimeError("TWITCH_VOD_TEMP_SOURCE_NOT_RELEASED")
+        print(json.dumps({"vodId": vod_id, "proof": proof, "bytes": output.stat().st_size,
+            "youtubeUploadAttempted": False}), flush=True)
+
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--proof-vod-id")
+    arguments = parser.parse_args()
+    if arguments.proof_vod_id:
+        prove_full_vod(arguments.proof_vod_id)
+    else:
+        main()
