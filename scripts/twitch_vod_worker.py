@@ -73,6 +73,7 @@ def main():
         print(json.dumps({k: result.get(k) for k in ["skipped", "vodId", "cursor", "created", "queued", "failures"]}), flush=True)
     except RuntimeError as error:
         print("Clip catch-up: " + str(error), flush=True)
+    print(json.dumps(api({"action": "publish"})["result"]), flush=True)
     job = api({"action": "next"})["job"]
     if not job:
         print("No pending full VOD.", flush=True)
@@ -117,6 +118,7 @@ def main():
         api({"action": "complete", "vodId": job["vodId"], "lease": job["lease"], "errorCode": code[:100]})
         raise RuntimeError(code) from None
 
+    print(json.dumps(api({"action": "publish"})["result"]), flush=True)
 
 def prove_full_vod(vod_id):
     # Unprivileged CI proof: public media only, no AMS API, OAuth, or YouTube upload.

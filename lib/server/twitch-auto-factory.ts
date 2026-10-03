@@ -387,7 +387,7 @@ async function runTwitchAutomaticPrivateShortsLocked(input: { vodId?: string; wi
   const ranked = selectBestAnalyzedClipsPerStream(analyzed)
 
   let queued = 0
-  const previousClipJobs = input.privateOnly
+  const previousClipJobs = input.vodId || input.privateOnly
     ? new Set((await listLatestTwitchShortRenderJobs()).filter(job => job.status !== "failed").map(job => job.clipId))
     : new Set<string>()
   for (const candidate of ranked) {

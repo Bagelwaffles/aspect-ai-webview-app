@@ -1,7 +1,8 @@
+import { isYouTubePublicAutopublishEnabled } from "@/lib/server/youtube-public-promoter"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { authorizeMediaWorker } from "@/lib/server/twitch-short-render-jobs"
-import { beginTwitchVodUpload, claimTwitchVod, completeTwitchVod, getTwitchCatchupStatus, runTwitchClipCatchup } from "@/lib/server/twitch-catchup"
+import { beginTwitchVodUpload, claimTwitchVod, completeTwitchVod, getTwitchCatchupStatus, runTwitchClipCatchup, publishVerifiedTwitchVods } from "@/lib/server/twitch-catchup"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const maxDuration = 300
@@ -10,6 +11,7 @@ const lease = z.string().uuid()
 const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("status") }).strict(),
   z.object({ action: z.literal("clips") }).strict(),
+  z.object({ action: z.literal("publish") }).strict(),
   z.object({ action: z.literal("next") }).strict(),
   z.object({ action: z.literal("begin"), vodId, lease, bytes: z.number().int().positive() }).strict(),
   z.object({ action: z.literal("complete"), vodId, lease, videoId: z.string().regex(/^[A-Za-z0-9_-]{11}$/).optional(), errorCode: z.string().max(100).optional() }).strict(),
@@ -24,8 +26,9 @@ export async function POST(request: NextRequest) {
     if (body.action === "status") {
       const { plan, jobs } = await getTwitchCatchupStatus()
       return json({ ok: true, hasWork: Boolean(plan && plan.clipCursor < plan.clipVodIds.length) ||
-        jobs.some(job => job.status === "pending" || job.status === "rendering") })
+        jobs.some(job => job.status === "pending" || job.status === "rendering" || (job.status === "verified" && isYouTubePublicAutopublishEnabled())) })
     }
+    if (body.action === "publish") return json({ ok: true, result: await publishVerifiedTwitchVods() })
     if (body.action === "clips") return json({ ok: true, result: await runTwitchClipCatchup() })
     if (body.action === "next") return json({ ok: true, job: await claimTwitchVod() })
     if (body.action === "begin") return json({ ok: true, ...await beginTwitchVodUpload(body) })

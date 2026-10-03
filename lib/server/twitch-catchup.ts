@@ -3,7 +3,9 @@ import { Redis } from "@upstash/redis"
 import { z } from "zod"
 import { getTwitchPilotStatus, getTwitchRecentArchive, type TwitchRecentVod } from "./twitch-pilot"
 import { runTwitchAutomaticPrivateShorts } from "./twitch-auto-factory"
-import { getStoredYouTubeOwnerCredential, resolveYouTubeOAuthClient, SMOKYBANANA03_YOUTUBE_CHANNEL_ID } from "./youtube-owner-connection"
+import { getStoredYouTubeOwnerCredential, resolveYouTubeOAuthClient, SMOKYBANANA03_YOUTUBE_CHANNEL_ID, YOUTUBE_FORCE_SSL_SCOPE } from "./youtube-owner-connection"
+
+import { isYouTubePublicAutopublishEnabled } from "./youtube-public-promoter"
 
 const TTL = 180 * 24 * 3600
 const INDEX = "ams:twitch-catchup:v1:index"
@@ -12,7 +14,7 @@ const prefix = "ams:twitch-catchup:v1:vod:"
 const jobSchema = z.object({
   vodId: z.string().regex(/^\d+$/), streamer: z.literal("SmokyBanana03"), title: z.string(),
   createdAt: z.string().datetime(), durationSeconds: z.number().positive(),
-  status: z.enum(["pending", "rendering", "uploading", "verified", "failed", "reconciliation"]),
+  status: z.enum(["pending", "rendering", "uploading", "verified", "published", "failed", "reconciliation"]),
   lease: z.string().nullable(), youtubeVideoId: z.string().nullable(), errorCode: z.string().nullable(),
   metadata: z.object({ title: z.string().max(100), description: z.string().max(5000) }),
 }).strict()
@@ -89,7 +91,7 @@ export async function runTwitchClipCatchup(options: Options = {}) {
   if (!await redis.set(lock, "locked", { nx: true, ex: 900 })) return { skipped: "TWITCH_CATCHUP_BUSY" }
   try {
     const result = await runTwitchAutomaticPrivateShorts({ vodId: plan.clipVodIds[plan.clipCursor],
-      windowHours: 14 * 24, windowEnd: plan.endedAt, privateOnly: true })
+      windowHours: 14 * 24, windowEnd: plan.endedAt, privateOnly: false })
     const pending = "pending" in result ? result.pending ?? 0 : 0
     if (!result.skipped && !result.failures.length && !pending) {
       await redis.set(PLAN, JSON.stringify({ ...plan, clipCursor: plan.clipCursor + 1, clipFailures: [] }), { ex: TTL })
@@ -120,11 +122,12 @@ async function leasedJob(vodId: string, lease: string, options: Options) {
   if (job.lease !== lease || await redis.get(prefix + vodId + ":lock") !== lease) throw new Error("TWITCH_VOD_LEASE_INVALID")
   return { redis, job }
 }
-async function youtubeToken(options: Options) {
+async function youtubeToken(options: Options, requireEdit = false) {
   const env = options.env ?? process.env
-  const credential = await getStoredYouTubeOwnerCredential({ env })
+  const credential = await getStoredYouTubeOwnerCredential({ env, redis: options.redis as never })
   const client = resolveYouTubeOAuthClient(env)
   if (!credential || !client || credential.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID) throw new Error("YOUTUBE_VOD_CONNECTION_REQUIRED")
+  if (requireEdit && !credential.scopes.some(scope => [YOUTUBE_FORCE_SSL_SCOPE, "https://www.googleapis.com/auth/youtube"].includes(scope))) throw new Error("YOUTUBE_VOD_EDIT_SCOPE_REQUIRED")
   const fetcher = options.fetcher ?? fetch
   const response = await fetcher("https://oauth2.googleapis.com/token", {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -186,4 +189,60 @@ export async function completeTwitchVod(input: { vodId: string; lease: string; v
   const result = await save({ ...job, youtubeVideoId: input.videoId, status: "verified", errorCode: null }, redis)
   await redis.del(prefix + job.vodId + ":lock")
   return result
+}
+
+// Public promotion only changes the existing, privately verified upload. A timeout is
+// reconciled by reading YouTube on the next cycle, never by uploading another copy.
+export async function publishVerifiedTwitchVods(options: Options = {}) {
+  if (!isYouTubePublicAutopublishEnabled(options.env ?? process.env)) return { skipped: "YOUTUBE_PUBLIC_AUTOPUBLISH_DISABLED", published: 0 }
+  const redis = db(options)
+  const lock = "ams:twitch-catchup:v1:publish-lock"
+  if (!await redis.set(lock, "locked", { nx: true, ex: 600 })) return { skipped: "TWITCH_CATCHUP_BUSY", published: 0 }
+  let published = 0
+  try {
+    const { jobs } = await getTwitchCatchupStatus({ ...options, redis })
+    const pending = jobs.filter(job => job.status === "verified" && job.youtubeVideoId)
+    if (!pending.length) return { published }
+    const token = await youtubeToken({ ...options, redis }, true)
+    const fetcher = options.fetcher ?? fetch
+    for (const job of pending.slice(0, 3)) {
+      try {
+        const inspect = async () => {
+          const response = await fetcher(`https://www.googleapis.com/youtube/v3/videos?part=snippet%2Cstatus%2CprocessingDetails&id=${job.youtubeVideoId}`, {
+            headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20_000),
+          })
+          const body = await response.json() as { items?: Array<{ snippet: { channelId: string; title: string; description: string }; status: Record<string, unknown>; processingDetails?: { processingStatus?: string } }> }
+          const video = body.items?.[0]
+          if (!response.ok || !video || video.snippet.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID ||
+            video.snippet.title !== job.metadata.title || video.snippet.description !== job.metadata.description) throw new Error("YOUTUBE_VOD_PUBLIC_PROOF_FAILED")
+          return video
+        }
+        let video = await inspect()
+        if (video.status.privacyStatus !== "public") {
+          if (video.status.privacyStatus !== "private") throw new Error("YOUTUBE_VOD_SOURCE_NOT_PRIVATE")
+          if (video.processingDetails?.processingStatus !== "succeeded") {
+            await save({ ...job, errorCode: "YOUTUBE_VOD_PROCESSING_PENDING" }, redis)
+            continue
+          }
+          const status: Record<string, unknown> = { privacyStatus: "public" }
+          for (const key of ["embeddable", "license", "publicStatsViewable", "selfDeclaredMadeForKids", "containsSyntheticMedia"]) {
+            if (typeof video.status[key] === "boolean" || (key === "license" && typeof video.status[key] === "string")) status[key] = video.status[key]
+          }
+          const update = await fetcher("https://www.googleapis.com/youtube/v3/videos?part=status", {
+            method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ id: job.youtubeVideoId, status }), signal: AbortSignal.timeout(20_000),
+          })
+          if (!update.ok) throw new Error(`YOUTUBE_VOD_PUBLIC_HTTP_${update.status}`)
+          video = await inspect()
+        }
+        if (video.status.privacyStatus !== "public") throw new Error("YOUTUBE_VOD_PUBLIC_NOT_VERIFIED")
+        await save({ ...job, status: "published", errorCode: null }, redis)
+        published++
+      } catch (error) {
+        const code = error instanceof Error && /^YOUTUBE_[A-Z0-9_]+$/.test(error.message) ? error.message : "YOUTUBE_VOD_PUBLIC_RECONCILIATION_PENDING"
+        await save({ ...job, errorCode: code }, redis)
+      }
+    }
+    return { published }
+  } finally { await redis.del(lock) }
 }
