@@ -36,8 +36,8 @@ test("selects the best two clips per stream and adds a third only above the qual
     { clipId: "a-third", sourceVideoId: "vod-a", score: TWITCH_AUTO_FACTORY_THIRD_CLIP_SCORE_MIN, analysis: analysis("a-third", TWITCH_AUTO_FACTORY_THIRD_CLIP_SCORE_MIN) },
     { clipId: "a-fourth", sourceVideoId: "vod-a", score: 91, analysis: analysis("a-fourth", 91) },
     { clipId: "b-best", sourceVideoId: "vod-b", score: 90, analysis: analysis("b-best", 90) },
-    { clipId: "b-second", sourceVideoId: "vod-b", score: 72, analysis: analysis("b-second", 72) },
-    { clipId: "b-third-weak", sourceVideoId: "vod-b", score: TWITCH_AUTO_FACTORY_THIRD_CLIP_SCORE_MIN - 1, analysis: analysis("b-third-weak", TWITCH_AUTO_FACTORY_THIRD_CLIP_SCORE_MIN - 1) },
+    { clipId: "b-second", sourceVideoId: "vod-b", score: TWITCH_AUTO_FACTORY_THIRD_CLIP_SCORE_MIN - 1, analysis: analysis("b-second", TWITCH_AUTO_FACTORY_THIRD_CLIP_SCORE_MIN - 1) },
+    { clipId: "b-third-weak", sourceVideoId: "vod-b", score: 72, analysis: analysis("b-third-weak", 72) },
     { clipId: "b-skip", sourceVideoId: "vod-b", score: 99, analysis: analysis("b-skip", 99, "skip") },
   ])
 
