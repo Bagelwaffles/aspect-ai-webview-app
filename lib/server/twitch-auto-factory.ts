@@ -28,7 +28,16 @@ import {
 export const TWITCH_AUTO_FACTORY_MAX_CLIPS_PER_VOD = 3
 export const TWITCH_AUTO_FACTORY_MAX_DAY_CLIPS = 15
 export const TWITCH_AUTO_FACTORY_MAX_ANALYSES = 15
-export const TWITCH_AUTO_FACTORY_MAX_RENDERS = 6
+export const TWITCH_AUTO_FACTORY_MAX_RENDERS_PER_STREAM = 3
+export const TWITCH_AUTO_FACTORY_THIRD_CLIP_SCORE_MIN = 75
+
+type RankedAnalyzedClip = {
+  clipId: string
+  sourceVideoId: string
+  score: number
+  analysis: TwitchVideoAnalysisRecord
+  rank: 1 | 2 | 3
+}
 
 type AutomaticVodClipCandidate = {
   id: string
@@ -121,6 +130,53 @@ export function selectDailyVodSampleCandidates(
     !existing.some((clip) => typeof clip.vodOffset === "number" && Math.abs(clip.vodOffset - candidate.positionSeconds) <= 5) &&
     !reservedForVod.some((item) => Math.abs(item.vodOffset - candidate.positionSeconds) <= 5),
   ).slice(0, remaining)
+}
+
+export function selectBestAnalyzedClipsPerStream(
+  analyzed: Array<{
+    clipId: string
+    sourceVideoId: string
+    score: number
+    analysis: TwitchVideoAnalysisRecord
+  }>,
+): RankedAnalyzedClip[] {
+  const groups = new Map<string, typeof analyzed>()
+  for (const candidate of analyzed) {
+    if (!candidate.sourceVideoId || !isTwitchVideoAnalysisRenderEligible(candidate.analysis)) continue
+    const current = groups.get(candidate.sourceVideoId) ?? []
+    current.push(candidate)
+    groups.set(candidate.sourceVideoId, current)
+  }
+
+  const selected: RankedAnalyzedClip[] = []
+  for (const [sourceVideoId, candidates] of groups) {
+    const ranked = [...candidates].sort((left, right) =>
+      right.score - left.score || left.clipId.localeCompare(right.clipId),
+    )
+    const topTwo = ranked.slice(0, 2)
+    topTwo.forEach((candidate, index) => {
+      selected.push({
+        ...candidate,
+        sourceVideoId,
+        rank: (index + 1) as 1 | 2,
+      })
+    })
+
+    const third = ranked[2]
+    if (
+      third &&
+      third.score >= TWITCH_AUTO_FACTORY_THIRD_CLIP_SCORE_MIN &&
+      selected.filter((item) => item.sourceVideoId === sourceVideoId).length < TWITCH_AUTO_FACTORY_MAX_RENDERS_PER_STREAM
+    ) {
+      selected.push({
+        ...third,
+        sourceVideoId,
+        rank: 3,
+      })
+    }
+  }
+
+  return selected
 }
 
 function dailyQueueKey(now = new Date()) {
@@ -255,7 +311,12 @@ export async function runTwitchAutomaticPrivateShorts() {
   const clipIds = (queue?.items ?? [])
     .slice(0, TWITCH_AUTO_FACTORY_MAX_ANALYSES)
     .map((item) => item.clipId)
-  const analyzed: Array<{ clipId: string; score: number; analysis: TwitchVideoAnalysisRecord }> = []
+  const analyzed: Array<{
+    clipId: string
+    sourceVideoId: string
+    score: number
+    analysis: TwitchVideoAnalysisRecord
+  }> = []
 
   for (const clipId of clipIds) {
     try {
@@ -283,21 +344,28 @@ export async function runTwitchAutomaticPrivateShorts() {
       }
 
       const analysis = await analyzeTwitchClipVideo(clipId)
-      analyzed.push({ clipId, score: analysis.score, analysis })
+      analyzed.push({
+        clipId,
+        sourceVideoId: current.videoId,
+        score: analysis.score,
+        analysis,
+      })
     } catch (error) {
       failures.push(`${clipId}:analysis:${safeError(error)}`)
     }
   }
 
-  const ranked = [...analyzed]
-    .sort((left, right) => right.score - left.score)
-    .slice(0, TWITCH_AUTO_FACTORY_MAX_RENDERS)
+  const ranked = selectBestAnalyzedClipsPerStream(analyzed)
 
   let queued = 0
   for (const candidate of ranked) {
     try {
-      if (!isTwitchVideoAnalysisRenderEligible(candidate.analysis)) continue
-      await enqueueTwitchShortRender(candidate.clipId)
+      await enqueueTwitchShortRender(candidate.clipId, {
+        autoPublishSelection: {
+          sourceVideoId: candidate.sourceVideoId,
+          rank: candidate.rank,
+        },
+      })
       queued += 1
     } catch (error) {
       failures.push(`${candidate.clipId}:render:${safeError(error)}`)
@@ -320,6 +388,7 @@ export async function runTwitchAutomaticPrivateShorts() {
     pending: reconciliation.pending.length + trackedCreated,
     expired: reconciliation.failed.length,
     analyzed: analyzed.length,
+    selected: ranked.length,
     queued,
     repaired,
     failures,
