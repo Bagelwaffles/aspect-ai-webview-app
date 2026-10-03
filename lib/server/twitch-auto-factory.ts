@@ -26,8 +26,8 @@ import {
 } from "@/lib/server/twitch-video-analysis"
 
 export const TWITCH_AUTO_FACTORY_MAX_CLIPS_PER_VOD = 3
-export const TWITCH_AUTO_FACTORY_MAX_DAY_CLIPS = 15
-export const TWITCH_AUTO_FACTORY_MAX_ANALYSES = 15
+export const TWITCH_AUTO_FACTORY_MAX_DAY_CLIPS = 30
+export const TWITCH_AUTO_FACTORY_MAX_ANALYSES = 30
 export const TWITCH_AUTO_FACTORY_MAX_RENDERS_PER_STREAM = 3
 export const TWITCH_AUTO_FACTORY_THIRD_CLIP_SCORE_MIN = 75
 
@@ -292,9 +292,13 @@ export async function runTwitchAutomaticPrivateShorts() {
     }
   }
 
-  const dayClips = combinedClips
-    .filter((clip) => refreshedArchive.vods.some((vod) => vod.id === clip.videoId))
-    .sort((left, right) => Date.parse(right.createdAt || "0") - Date.parse(left.createdAt || "0"))
+  const dayClips = refreshedArchive.vods
+    .flatMap((vod) =>
+      combinedClips
+        .filter((clip) => clip.videoId === vod.id)
+        .sort((left, right) => Date.parse(right.createdAt || "0") - Date.parse(left.createdAt || "0"))
+        .slice(0, TWITCH_AUTO_FACTORY_MAX_CLIPS_PER_VOD),
+    )
     .slice(0, TWITCH_AUTO_FACTORY_MAX_DAY_CLIPS)
 
   const queue = await syncTwitchDailyMediaQueue({
