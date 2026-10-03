@@ -11,6 +11,7 @@ import TwitchMediaFactoryCard, {
   type TwitchMediaFactoryStatus,
   type TwitchShortRendererStatus,
 } from "./TwitchMediaFactoryCard"
+import TwitchCatchupCard from "./TwitchCatchupCard"
 
 type Summary = {
   title?: string
@@ -317,6 +318,7 @@ export default function TwitchPilotConsole() {
         </CardContent>
       </Card>
 
+      <TwitchCatchupCard />
       <TwitchMediaFactoryCard
         mediaFactory={mediaFactory}
         shortRenderer={shortRenderer}

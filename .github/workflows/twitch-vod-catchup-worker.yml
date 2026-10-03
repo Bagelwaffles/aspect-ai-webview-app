@@ -1,0 +1,35 @@
+name: Twitch VOD Catch-up Worker
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '9,39 * * * *'
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: twitch-vod-catchup-worker
+  cancel-in-progress: false
+jobs:
+  catchup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    environment: production
+    env:
+      AMS_APP_URL: https://www.aspectmarketingsolutions.app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require matching production
+        shell: bash
+        run: |
+          set -euo pipefail
+          health="$(curl --fail --silent --show-error --max-time 30 "$AMS_APP_URL/api/health")"
+          actual="$(printf '%s' "$health" | jq -r '.commit')"
+          expected="${GITHUB_SHA:0:12}"
+          test "$actual" = "$expected"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned public-media downloader
+        run: python -m pip install yt-dlp==2026.8.19
+      - name: Process authorized catch-up queue
+        run: python scripts/twitch_vod_worker.py

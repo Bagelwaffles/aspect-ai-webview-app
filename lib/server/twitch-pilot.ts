@@ -991,26 +991,44 @@ export function twitchDurationToSeconds(value: string) {
 export async function getTwitchRecentArchive(
   hours = 24,
   options: TwitchOptions = {},
+  windowEnd?: Date,
 ): Promise<TwitchRecentArchive> {
   const existing = await loadConnection(options)
   if (!existing) throw new Error("TWITCH_CONNECTION_REQUIRED")
-  const boundedHours = Math.max(1, Math.min(48, Math.trunc(hours)))
-  const now = (options.now ?? (() => new Date()))()
+  if (!Number.isFinite(hours)) throw new Error("TWITCH_ARCHIVE_WINDOW_INVALID")
+  const boundedHours = Math.max(1, Math.min(31 * 24, Math.trunc(hours)))
+  const now = windowEnd ?? (options.now ?? (() => new Date()))()
   const endedAt = now.toISOString()
   const startedAt = new Date(now.getTime() - boundedHours * 60 * 60 * 1000).toISOString()
 
+  async function pages(endpoint: string, params: Record<string, string>) {
+    const data: unknown[] = []
+    let cursor = ""
+    for (let page = 0; page < 20; page++) {
+      const body = await helixGet(endpoint, { ...params, ...(cursor ? { after: cursor } : {}) }, options) as {
+        data?: Array<{ created_at?: string }>; pagination?: { cursor?: string }
+      }
+      data.push(...(body.data ?? []))
+      cursor = body.pagination?.cursor ?? ""
+      if (!cursor) return { data }
+      if (endpoint === "videos" && (body.data ?? []).some(item =>
+        item.created_at && Date.parse(item.created_at) < Date.parse(startedAt))) return { data }
+    }
+    throw new Error("TWITCH_ARCHIVE_PAGINATION_LIMIT")
+  }
   const [videosBody, clipsBody] = await Promise.all([
-    helixGet("videos", {
+    pages("videos", {
       user_id: existing.record.broadcasterId,
       type: "archive",
       first: "100",
-    }, options),
-    helixGet("clips", {
+    }),
+    pages("clips", {
       broadcaster_id: existing.record.broadcasterId,
       started_at: startedAt,
-      ended_at: endedAt,
+      // Newly created clips from historical VODs must remain discoverable on later reconciliation runs.
+      ended_at: windowEnd ? (options.now ?? (() => new Date()))().toISOString() : endedAt,
       first: "100",
-    }, options),
+    }),
   ])
 
   const rawVideos = (videosBody as {
@@ -1041,7 +1059,8 @@ export async function getTwitchRecentArchive(
     .filter((video) =>
       Boolean(video.id) &&
       Boolean(video.createdAt) &&
-      Date.parse(video.createdAt) >= Date.parse(startedAt),
+      Date.parse(video.createdAt) >= Date.parse(startedAt) &&
+      Date.parse(video.createdAt) <= Date.parse(endedAt),
     )
 
   const rawClips = (clipsBody as {

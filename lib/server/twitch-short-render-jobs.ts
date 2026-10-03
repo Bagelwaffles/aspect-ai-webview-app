@@ -143,6 +143,8 @@ const GITHUB_ACTIONS_WORKER_AUDIENCE = "ams-twitch-worker"
 const GITHUB_ACTIONS_WORKER_REPOSITORY = "Bagelwaffles/aspect-ai-webview-app"
 const GITHUB_ACTIONS_WORKER_REPOSITORY_ID = "1026496028"
 const GITHUB_ACTIONS_ALLOWED_WORKFLOWS: Readonly<Record<string, string>> = {
+  "Twitch VOD Catch-up Worker":
+    "Bagelwaffles/aspect-ai-webview-app/.github/workflows/twitch-vod-catchup-worker.yml@refs/heads/main",
   "Twitch Short Render Worker":
     "Bagelwaffles/aspect-ai-webview-app/.github/workflows/twitch-short-render-worker.yml@refs/heads/main",
   "Twitch Latest Render Artifact Export":
@@ -417,7 +419,7 @@ export async function enqueueTwitchShortRender(
   }
 
   const timestamp = nowIso(options)
-  const creatorName = item.creatorName || queue.broadcasterLogin
+  const creatorName = queue.broadcasterLogin
   const personalizedPublishMetadata = personalizePublishMetadata(
     item.videoAnalysis.publishMetadata,
     creatorName,
