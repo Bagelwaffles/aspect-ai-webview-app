@@ -5,6 +5,7 @@ import { signIn, signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 const YOUTUBE_UPLOAD_SCOPE = "https://www.googleapis.com/auth/youtube.upload"
 const YOUTUBE_READONLY_SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
+const YOUTUBE_FORCE_SSL_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl"
 
 export default function YouTubeOwnerConnectButton({
   mode = "connect",
@@ -34,7 +35,7 @@ export default function YouTubeOwnerConnectButton({
       const result = await response.json()
       if (!response.ok || result.ok !== true) throw new Error("connection_failed")
       await signIn("google", { callbackUrl: "/owner/youtube-connect" }, {
-        scope: ["openid", "email", "profile", YOUTUBE_UPLOAD_SCOPE, YOUTUBE_READONLY_SCOPE].join(" "),
+        scope: ["openid", "email", "profile", YOUTUBE_UPLOAD_SCOPE, YOUTUBE_READONLY_SCOPE, YOUTUBE_FORCE_SSL_SCOPE].join(" "),
         access_type: "offline", prompt: "consent select_account", include_granted_scopes: "true",
       })
     } catch { setFailed(true); setBusy(false) }
