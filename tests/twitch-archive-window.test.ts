@@ -6,12 +6,12 @@ import { getTwitchRecentArchive } from "../lib/server/twitch-pilot"
 test("historical archive paginates VODs and clips and includes newly generated historical clips", async () => {
   const key = Buffer.alloc(32, 7)
   const iv = Buffer.alloc(12, 3)
-  const cipher = createCipheriv("aes-256-gcm", key, iv)
+  const cipher = createCipheriv("aes-256-gcm", new Uint8Array(key), new Uint8Array(iv))
   const cipherText = cipher.update(JSON.stringify({ accessToken: "test-access", refreshToken: "test-refresh", expiresAt: null }), "utf8", "hex") + cipher.final("hex")
   const record = { broadcasterId: "123", login: "smokybanana03", displayName: "SmokyBanana03", scopes: [],
     connectedAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z", cipherText,
     iv: iv.toString("base64"), authTag: cipher.getAuthTag().toString("base64") }
-  const env = { AMS_CONNECTION_ENCRYPTION_KEY: key.toString("base64"), AMS_TWITCH_CLIENT_ID: "test-client",
+  const env = { NODE_ENV: "test" as const, AMS_CONNECTION_ENCRYPTION_KEY: key.toString("base64"), AMS_TWITCH_CLIENT_ID: "test-client",
     AMS_TWITCH_CLIENT_SECRET: "test-client-secret", AMS_TWITCH_EVENTSUB_SECRET: "test-eventsub-secret-123456789", PUBLIC_APP_URL: "https://ams.example.test" }
   const requests: URL[] = []
   const fetcher: typeof fetch = async input => {
