@@ -146,8 +146,14 @@ def prove_full_vod(vod_id):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--proof-vod-id")
+    parser.add_argument("--check-pending", action="store_true")
     arguments = parser.parse_args()
-    if arguments.proof_vod_id:
+    if arguments.check_pending:
+        has_work = api({"action": "status"})["hasWork"]
+        with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+            output.write("has_work=" + str(bool(has_work)).lower() + "\n")
+        print("Catch-up work available: " + str(bool(has_work)), flush=True)
+    elif arguments.proof_vod_id:
         prove_full_vod(arguments.proof_vod_id)
     else:
         main()

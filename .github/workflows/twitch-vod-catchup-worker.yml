@@ -29,7 +29,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Check whether catch-up work remains
+        id: pending
+        run: python scripts/twitch_vod_worker.py --check-pending
       - name: Prepare full-VOD media capacity
+        if: steps.pending.outputs.has_work == 'true'
         run: |
           # Unused SDKs on this disposable hosted runner; no application data is removed.
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
@@ -37,6 +41,8 @@ jobs:
           sudo apt-get install -y ffmpeg fonts-dejavu-core
           df -h "$RUNNER_TEMP"
       - name: Install pinned public-media downloader
+        if: steps.pending.outputs.has_work == 'true'
         run: python -m pip install yt-dlp==2026.8.19
       - name: Process authorized catch-up queue
+        if: steps.pending.outputs.has_work == 'true'
         run: python scripts/twitch_vod_worker.py
