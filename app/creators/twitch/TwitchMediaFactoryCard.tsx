@@ -252,11 +252,11 @@ export default function TwitchMediaFactoryCard({
           <Button variant="outline" size="sm" disabled={busy === "refresh"} onClick={() => void refreshQueue()}>
             <RefreshCcw className="mr-2 h-4 w-4" />{busy === "refresh" ? "Refreshing…" : "Refresh last 24 hours"}
           </Button>
-          <span>No automatic posting, messaging, moderation, or spending is enabled.</span>
+          <span>Selected Shorts publish automatically after verification when automatic publishing is enabled.</span>
         </div>
 
         <div className="rounded-lg border p-3 text-xs">
-          9:16 renderer: {shortRenderer?.configured ? "configured" : "setup required"} · rendered Shorts are uploaded to the verified SmokyBanana03 channel as Private for owner review. Public publishing remains disabled.
+          9:16 renderer: {shortRenderer?.configured ? "configured" : "setup required"} · rendered Shorts upload privately to the verified SmokyBanana03 channel first. Selected clips then publish automatically when automatic publishing is enabled.
         </div>
 
         {message ? <div className="rounded-lg border p-3 text-foreground">{message}</div> : null}

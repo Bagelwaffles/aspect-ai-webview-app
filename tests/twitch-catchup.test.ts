@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { claimTwitchVod, completeTwitchVod, beginTwitchVodUpload, getTwitchCatchupStatus, validateYouTubeSessionUrl, vodMetadata } from "../lib/server/twitch-catchup"
+import { claimTwitchVod, completeTwitchVod, beginTwitchVodUpload, getTwitchCatchupStatus, publishVerifiedTwitchVods, validateYouTubeSessionUrl, vodMetadata } from "../lib/server/twitch-catchup"
 
 function store() {
   const data = new Map<string, unknown>()
@@ -56,4 +56,72 @@ test("uncertain upload is fenced from a duplicate claim or upload session", asyn
   assert.equal(status.jobs[0].status, "reconciliation")
   assert.equal(await claimTwitchVod(state), null)
   await assert.rejects(beginTwitchVodUpload({ vodId: "123", lease: job.lease!, bytes: 123 }, state), /RECONCILIATION_REQUIRED/)
+})
+
+import { storeYouTubeOwnerConnectionFromGoogle, SMOKYBANANA03_YOUTUBE_CHANNEL_ID, YOUTUBE_FORCE_SSL_SCOPE, YOUTUBE_READONLY_SCOPE, YOUTUBE_UPLOAD_SCOPE } from "../lib/server/youtube-owner-connection"
+
+async function publisher(scenario: "normal" | "ambiguous" | "wrong-channel" | "processing" | "no-edit" = "normal") {
+  const state = seeded()
+  const key = "ams:twitch-catchup:v1:vod:123"
+  const job = JSON.parse(state.data.get(key) as string)
+  state.data.set(key, JSON.stringify({ ...job, status: "verified", youtubeVideoId: "abcdefghijk" }))
+  const env: NodeJS.ProcessEnv = { NODE_ENV: "test", GOOGLE_CLIENT_ID: "google-client-12345678901234567890",
+    GOOGLE_CLIENT_SECRET: "google-secret-12345678901234567890", NEXTAUTH_SECRET: "test-secret-with-enough-entropy-for-vod-promotion",
+    AMS_OWNER_EMAIL: "owner@example.com", AMS_TWITCH_YOUTUBE_PUBLIC_AUTOPUBLISH: "true" }
+  let privacy = "private", updates = 0
+  const fetcher = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 })
+    if (url.includes("/channels?")) return json({ items: [{ id: SMOKYBANANA03_YOUTUBE_CHANNEL_ID, snippet: { title: "SmokyBanana03" } }] })
+    if (url.includes("/token")) return json({ access_token: "test-access-token" })
+    if (init?.method === "PUT") {
+      updates++
+      const body = JSON.parse(String(init.body))
+      assert.equal(body.id, "abcdefghijk")
+      assert.equal(body.status.privacyStatus, "public")
+      assert.equal(body.status.selfDeclaredMadeForKids, false)
+      privacy = "public"
+      if (scenario === "ambiguous") throw new Error("transport timeout")
+      return json({ id: body.id })
+    }
+    if (url.includes("/videos?")) return json({ items: [{ snippet: { ...job.metadata,
+      channelId: scenario === "wrong-channel" ? "wrong" : SMOKYBANANA03_YOUTUBE_CHANNEL_ID },
+      status: { privacyStatus: privacy, selfDeclaredMadeForKids: false },
+      processingDetails: { processingStatus: scenario === "processing" ? "processing" : "succeeded" } }] })
+    throw new Error("unexpected endpoint")
+  }) as typeof fetch
+  await storeYouTubeOwnerConnectionFromGoogle({ email: "owner@example.com", refreshToken: "test-refresh-token-12345678901234567890",
+    accessToken: "initial-token", scopes: [YOUTUBE_UPLOAD_SCOPE, YOUTUBE_READONLY_SCOPE, ...(scenario === "no-edit" ? [] : [YOUTUBE_FORCE_SSL_SCOPE])] },
+    { ...state, env, fetcher })
+  return { ...state, env, fetcher, updates: () => updates }
+}
+test("verified full VODs publish the existing video once and verify Public", async () => {
+  const options = await publisher()
+  assert.equal((await publishVerifiedTwitchVods(options)).published, 1)
+  assert.equal((await getTwitchCatchupStatus(options)).jobs[0].status, "published")
+  await publishVerifiedTwitchVods(options)
+  assert.equal(options.updates(), 1)
+})
+test("ambiguous public update reconciles by read-back without repeating the update", async () => {
+  const options = await publisher("ambiguous")
+  assert.equal((await publishVerifiedTwitchVods(options)).published, 0)
+  assert.equal((await getTwitchCatchupStatus(options)).jobs[0].status, "verified")
+  assert.equal((await publishVerifiedTwitchVods(options)).published, 1)
+  assert.equal(options.updates(), 1)
+})
+test("disabled publishing, wrong channel and unfinished processing cannot publish", async () => {
+  for (const scenario of ["wrong-channel", "processing"] as const) {
+    const options = await publisher(scenario)
+    assert.equal((await publishVerifiedTwitchVods(options)).published, 0)
+    assert.equal(options.updates(), 0)
+  }
+  const options = await publisher()
+  options.env.AMS_TWITCH_YOUTUBE_PUBLIC_AUTOPUBLISH = "false"
+  assert.equal((await publishVerifiedTwitchVods(options)).published, 0)
+  assert.equal(options.updates(), 0)
+})
+test("public VOD promotion requires an owner edit scope", async () => {
+  const options = await publisher("no-edit")
+  await assert.rejects(publishVerifiedTwitchVods(options), /EDIT_SCOPE_REQUIRED/)
+  assert.equal(options.updates(), 0)
 })

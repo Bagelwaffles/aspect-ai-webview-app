@@ -19,7 +19,7 @@ export default function TwitchCatchupCard() {
     return () => clearInterval(timer)
   }, [])
   async function start() {
-    if (!window.confirm("Process the best clips from the last 14 days and upload each available full stream from the past month with a branded intro/outro and AMS credit? These uploads remain Private.")) return
+    if (!window.confirm("Process the best clips from the last 14 days and upload each available full stream from the past month with a branded intro/outro and AMS credit? Selected Shorts and verified full VODs publish automatically when automatic publishing is enabled.")) return
     setBusy(true)
     try {
       const response = await fetch("/api/internal/twitch/catchup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approved: true }) })
@@ -32,7 +32,7 @@ export default function TwitchCatchupCard() {
   }
   return <Card>
     <CardHeader><CardTitle>Catch up clips & full streams</CardTitle><CardDescription>
-      Best clips from the last two weeks, plus each available full stream from the past month. Full VODs include a 5-second intro, 7-second outro, the streamer’s name, and “Created by Aspect Marketing Solutions (AMS).” Uploads remain Private.
+      Best clips from the last two weeks, plus each available full stream from the past month. Full VODs include a 5-second intro, 7-second outro, the streamer’s name, and “Created by Aspect Marketing Solutions (AMS).” Uploads are verified privately first, then selected Shorts and full VODs publish automatically when automatic publishing is enabled.
     </CardDescription></CardHeader>
     <CardContent className="space-y-4">
       <Button disabled={busy} onClick={() => void start()}>{busy ? "Queueing…" : "Start two-week clips & monthly VOD catch-up"}</Button>
@@ -42,7 +42,7 @@ export default function TwitchCatchupCard() {
       <div className="space-y-2">{state?.jobs.map(job => <div className="rounded-lg border p-3 text-sm" key={job.vodId}>
         <p>SmokyBanana03 · {job.createdAt.slice(0, 10)} · {job.title} · {job.status}</p>
         {job.errorCode && <p className="text-amber-600">{job.errorCode}</p>}
-        {job.status === "verified" && job.youtubeVideoId && <a className="underline" target="_blank" rel="noreferrer" href={`https://www.youtube.com/watch?v=${encodeURIComponent(job.youtubeVideoId)}`}>Review private full VOD</a>}
+        {["verified", "published"].includes(job.status) && job.youtubeVideoId && <a className="underline" target="_blank" rel="noreferrer" href={`https://www.youtube.com/watch?v=${encodeURIComponent(job.youtubeVideoId)}`}>{job.status === "published" ? "View public full VOD" : "Review full VOD awaiting publication"}</a>}
       </div>)}</div>
       <p className="text-xs text-muted-foreground">Only recordings still available on Twitch can be recovered. Queued, failed, or reconciliation items have not been verified as successful uploads.</p>
     </CardContent>
