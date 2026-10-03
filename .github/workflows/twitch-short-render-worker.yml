@@ -12,8 +12,10 @@ on:
       - "lib/server/twitch-video-analysis.ts"
       - "lib/server/twitch-creator-copy.ts"
       - "lib/server/youtube-private-uploader.ts"
+      - "lib/server/youtube-public-promoter.ts"
       - "app/api/internal/twitch/media/render/youtube/route.ts"
       - "app/api/internal/twitch/media/render/youtube/auto/route.ts"
+      - "app/api/internal/twitch/media/render/youtube/public/auto/route.ts"
       - "scripts/render_twitch_short.py"
   schedule:
     - cron: "17,47 * * * *"
@@ -95,7 +97,7 @@ jobs:
             echo "needs_verify=false" >> "$GITHUB_OUTPUT"
           else
             printf '%s' "$response" \
-              | jq '{ok, skipped, windowHours, vodCount, clipCount, created, verified, pending, expired, analyzed, queued, failureCount:(.failures | length), failures:(.failures // [])}'
+              | jq '{ok, skipped, windowHours, vodCount, clipCount, created, verified, pending, expired, analyzed, selected, queued, failureCount:(.failures | length), failures:(.failures // [])}'
             needs_verify="$(printf '%s' "$response" | jq -r 'if ((.created // 0) > 0 or (.pending // 0) > 0) then "true" else "false" end')"
             echo "needs_verify=$needs_verify" >> "$GITHUB_OUTPUT"
           fi
@@ -121,7 +123,7 @@ jobs:
             -H "Authorization: Bearer $worker_token" \
             "$AMS_APP_URL/api/internal/twitch/media/auto")"
           printf '%s' "$response" \
-            | jq '{ok, skipped, windowHours, vodCount, clipCount, created, verified, pending, expired, analyzed, queued, failureCount:(.failures | length), failures:(.failures // [])}'
+            | jq '{ok, skipped, windowHours, vodCount, clipCount, created, verified, pending, expired, analyzed, selected, queued, failureCount:(.failures | length), failures:(.failures // [])}'
 
       - name: Reconcile pending private YouTube upload
         shell: bash
@@ -153,6 +155,38 @@ jobs:
 
           if [ "$curl_status" -ne 0 ] || [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
             echo "::warning::Private YouTube upload reconciliation failed with HTTP $http_code; the rendered job remains intact and will be retried."
+          fi
+
+      - name: Reconcile verified public YouTube promotion
+        shell: bash
+        run: |
+          set -euo pipefail
+          token_response="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AMS_WORKER_AUDIENCE")"
+          worker_token="$(printf '%s' "$token_response" | jq -r '.value // empty')"
+          if [ -z "$worker_token" ]; then
+            echo "::warning::GitHub OIDC worker token was not issued for public promotion reconciliation."
+            exit 0
+          fi
+          echo "::add-mask::$worker_token"
+
+          set +e
+          http_code="$(curl --silent --show-error \
+            --output "$RUNNER_TEMP/youtube-public-reconcile.json" \
+            --write-out "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $worker_token" \
+            "$AMS_APP_URL/api/internal/twitch/media/render/youtube/public/auto")"
+          curl_status=$?
+          set -e
+
+          response="$(cat "$RUNNER_TEMP/youtube-public-reconcile.json" 2>/dev/null || true)"
+          printf '%s' "$response" \
+            | jq '{ok,attempted,skipped,renderJobId,clipId,sourceVideoId,rank,status,privacyStatus,videoId,channelId,attempts,reused,code}' || true
+
+          if [ "$curl_status" -ne 0 ] || [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::warning::Public YouTube promotion reconciliation returned HTTP $http_code. No duplicate upload is attempted; the verified private video remains intact."
           fi
 
       - name: Claim render job
