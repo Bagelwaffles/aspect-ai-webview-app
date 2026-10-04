@@ -77,6 +77,9 @@ jobs:
           pnpm audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm
           pnpm audit --prod --audit-level=high
 
+      - name: Twitch media worker syntax check
+        run: python3 -m py_compile scripts/twitch_vod_worker.py scripts/render_twitch_vod.py
+
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
 
