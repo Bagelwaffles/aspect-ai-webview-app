@@ -13,6 +13,7 @@ import { z } from "zod"
 
 export const TWITCH_SCOPE = "user:read:broadcast"
 export const TWITCH_MEDIA_SCOPE = "channel:manage:clips"
+export const TWITCH_METADATA_SCOPE = "channel:manage:broadcast"
 export const TWITCH_OAUTH_COOKIE = "ams_twitch_oauth"
 
 const CONNECTION_KEY = "ams:twitch-pilot:v1:connection"
@@ -50,7 +51,7 @@ const validateResponseSchema = z.object({
 const oauthAttemptSchema = z.object({
   state: z.string().min(32).max(200),
   expiresAt: z.number().int().positive(),
-  capability: z.enum(["pilot", "media"]).default("pilot"),
+  capability: z.enum(["pilot", "media", "metadata"]).default("pilot"),
 })
 
 const encryptedConnectionSchema = z.object({
@@ -246,7 +247,7 @@ function signOauthPayload(encoded: string, env: NodeJS.ProcessEnv) {
 export function createTwitchOauthAttempt(
   env: NodeJS.ProcessEnv = process.env,
   now = Date.now(),
-  capability: "pilot" | "media" = "pilot",
+  capability: "pilot" | "media" | "metadata" = "pilot",
 ) {
   if (!isTwitchPilotConfigured(env) || !oauthSigningSecret(env)) {
     throw new Error("TWITCH_OAUTH_NOT_CONFIGURED")
@@ -295,6 +296,7 @@ export function buildTwitchAuthorizationUrl(
   state: string,
   env: NodeJS.ProcessEnv = process.env,
   includeMediaScope = false,
+  includeMetadataScope = false,
 ) {
   const config = resolveTwitchConfig(env)
   if (!config) throw new Error("TWITCH_OAUTH_NOT_CONFIGURED")
@@ -304,9 +306,9 @@ export function buildTwitchAuthorizationUrl(
   url.searchParams.set("response_type", "code")
   url.searchParams.set(
     "scope",
-    [TWITCH_SCOPE, ...(includeMediaScope ? [TWITCH_MEDIA_SCOPE] : [])].join(" "),
+    [TWITCH_SCOPE, ...(includeMediaScope ? [TWITCH_MEDIA_SCOPE] : []), ...(includeMetadataScope ? [TWITCH_METADATA_SCOPE] : [])].join(" "),
   )
-  if (includeMediaScope) url.searchParams.set("force_verify", "true")
+  if (includeMediaScope || includeMetadataScope) url.searchParams.set("force_verify", "true")
   url.searchParams.set("state", state)
   return url
 }
@@ -450,6 +452,13 @@ export async function exchangeTwitchAuthorizationCode(
   if (validation.client_id !== config.clientId) throw new Error("TWITCH_CLIENT_ID_MISMATCH")
   if (!requiredScopes.every((scope) => validation.scopes.includes(scope))) {
     throw new Error("TWITCH_REQUIRED_SCOPE_MISSING")
+  }
+
+  if (requiredScopes.includes(TWITCH_METADATA_SCOPE)) {
+    const existing = await loadConnection(options)
+    if (!existing || existing.record.login.toLowerCase() !== "smokybanana03" || validation.login.toLowerCase() !== "smokybanana03" || validation.user_id !== existing.record.broadcasterId) {
+      throw new Error("TWITCH_METADATA_CHANNEL_MISMATCH")
+    }
   }
 
   const now = (options.now ?? (() => new Date()))()
@@ -1454,4 +1463,49 @@ export async function disconnectTwitchPilot(options: TwitchOptions = {}) {
   }).catch(() => null)
   await redis.del(CONNECTION_KEY, SESSION_KEY, SUBSCRIPTION_KEY)
   return { alreadyDisconnected: false }
+}
+
+
+export const twitchMetadataInputSchema = z.object({
+  title: z.string().trim().min(1).max(140).optional(),
+  tags: z.array(z.string().min(1).max(25).regex(/^[\p{L}\p{N}]+$/u)).max(10).optional(),
+}).strict().refine(value => value.title !== undefined || value.tags !== undefined)
+
+async function ownedTwitchMetadataConnection(options: TwitchOptions) {
+  const existing = await loadConnection(options)
+  if (!existing) throw new Error("TWITCH_CONNECTION_REQUIRED")
+  if (existing.record.login.toLowerCase() !== "smokybanana03") throw new Error("TWITCH_METADATA_CHANNEL_MISMATCH")
+  return existing
+}
+
+export async function getOwnedTwitchMetadata(options: TwitchOptions = {}) {
+  const existing = await ownedTwitchMetadataConnection(options)
+  const result = await helixGet("channels", { broadcaster_id: existing.record.broadcasterId }, options) as { data?: Array<{ broadcaster_id: string; broadcaster_login: string; title: string; game_name: string; broadcaster_language: string; tags: string[] }> }
+  const channel = result.data?.[0]
+  if (!channel || channel.broadcaster_id !== existing.record.broadcasterId || channel.broadcaster_login.toLowerCase() !== "smokybanana03") throw new Error("TWITCH_METADATA_CHANNEL_MISMATCH")
+  return { login: channel.broadcaster_login, title: channel.title, category: channel.game_name, language: channel.broadcaster_language, tags: channel.tags ?? [], canEdit: existing.record.scopes.includes(TWITCH_METADATA_SCOPE) }
+}
+
+export async function updateOwnedTwitchMetadata(input: unknown, options: TwitchOptions = {}) {
+  const patch = twitchMetadataInputSchema.parse(input)
+  const existing = await ownedTwitchMetadataConnection(options)
+  if (!existing.record.scopes.includes(TWITCH_METADATA_SCOPE)) throw new Error("TWITCH_METADATA_SCOPE_REQUIRED")
+  const env = options.env ?? process.env
+  const config = resolveTwitchConfig(env)
+  if (!config) throw new Error("TWITCH_OAUTH_NOT_CONFIGURED")
+  const fetcher = options.fetcher ?? fetch
+  // Validate the actual token subject before any external mutation.
+  let token = existing.secret.accessToken
+  let validation = await validateUserToken(token, fetcher).catch(() => null)
+  if (!validation) { const refreshed = await refreshTwitchUserToken(options); token = refreshed.accessToken; validation = refreshed.validation }
+  if (validation.user_id !== existing.record.broadcasterId || validation.login.toLowerCase() !== "smokybanana03" || validation.client_id !== config.clientId) throw new Error("TWITCH_METADATA_CHANNEL_MISMATCH")
+  if (!validation.scopes.includes(TWITCH_METADATA_SCOPE)) throw new Error("TWITCH_METADATA_SCOPE_REQUIRED")
+  await getOwnedTwitchMetadata(options)
+  const url = new URL("https://api.twitch.tv/helix/channels")
+  url.searchParams.set("broadcaster_id", existing.record.broadcasterId)
+  const response = await fetcher(url, { method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Client-Id": config.clientId, "Content-Type": "application/json" }, body: JSON.stringify(patch), cache: "no-store", signal: AbortSignal.timeout(15000) })
+  if (response.status !== 204) throw new Error("TWITCH_METADATA_UPDATE_FAILED")
+  const channel = await getOwnedTwitchMetadata(options)
+  if (patch.title !== undefined && channel.title !== patch.title || patch.tags !== undefined && JSON.stringify([...channel.tags].sort()) !== JSON.stringify([...patch.tags].sort())) throw new Error("TWITCH_METADATA_READBACK_FAILED")
+  return channel
 }

@@ -12,6 +12,7 @@ import TwitchMediaFactoryCard, {
   type TwitchShortRendererStatus,
 } from "./TwitchMediaFactoryCard"
 import TwitchCatchupCard from "./TwitchCatchupCard"
+import TwitchMetadataCard from "./TwitchMetadataCard"
 
 type Summary = {
   title?: string
@@ -207,7 +208,7 @@ export default function TwitchPilotConsole() {
             <Button variant="outline" size="sm" onClick={() => void refresh()}><RefreshCcw className="mr-2 h-4 w-4" />Refresh</Button>
           </div>
           <CardTitle>{status.connection?.displayName ?? status.connection?.login}</CardTitle>
-          <CardDescription>@{status.connection?.login} · read-only Twitch authorization</CardDescription>
+          <CardDescription>@{status.connection?.login} · connected Twitch authorization</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm leading-6 text-muted-foreground">
           <div className="flex gap-2"><ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-primary" /><span>Requested scope: {status.connection?.scopes.join(", ")}</span></div>
@@ -215,6 +216,8 @@ export default function TwitchPilotConsole() {
           <Button variant="outline" disabled={disconnecting} onClick={() => void disconnect()}>{disconnecting ? "Disconnecting…" : "Disconnect Twitch"}</Button>
         </CardContent>
       </Card>
+
+      <TwitchMetadataCard />
 
       <Card className="border-violet-500/25 bg-violet-500/5">
         <CardHeader>
