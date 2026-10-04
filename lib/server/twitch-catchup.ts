@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { Redis } from "@upstash/redis"
 import { z } from "zod"
-import { getTwitchPilotStatus, getTwitchRecentArchive, type TwitchRecentVod } from "./twitch-pilot"
+import { getOwnedTwitchLiveStream, getTwitchPilotStatus, getTwitchRecentArchive, type TwitchRecentVod } from "./twitch-pilot"
 import { runTwitchAutomaticPrivateShorts } from "./twitch-auto-factory"
 import { getStoredYouTubeOwnerCredential, resolveYouTubeOAuthClient, SMOKYBANANA03_YOUTUBE_CHANNEL_ID, YOUTUBE_FORCE_SSL_SCOPE } from "./youtube-owner-connection"
 
@@ -10,6 +10,7 @@ import { isYouTubePublicAutopublishEnabled } from "./youtube-public-promoter"
 const TTL = 180 * 24 * 3600
 const INDEX = "ams:twitch-catchup:v1:index"
 const PLAN = "ams:twitch-catchup:v1:plan"
+const DISCOVERY = "ams:twitch-catchup:v1:discovery"
 const prefix = "ams:twitch-catchup:v1:vod:"
 const jobSchema = z.object({
   vodId: z.string().regex(/^\d+$/), streamer: z.literal("SmokyBanana03"), title: z.string(),
@@ -21,7 +22,8 @@ const jobSchema = z.object({
 }).strict()
 export type TwitchVodJob = z.infer<typeof jobSchema>
 type Store = Pick<Redis, "get" | "set" | "del">
-type Options = { redis?: Store; env?: NodeJS.ProcessEnv; fetcher?: typeof fetch }
+type Options = { redis?: Store; env?: NodeJS.ProcessEnv; fetcher?: typeof fetch;
+  getStatus?: typeof getTwitchPilotStatus; getArchive?: typeof getTwitchRecentArchive; getLiveStream?: typeof getOwnedTwitchLiveStream }
 function db(options: Options): Store {
   if (options.redis) return options.redis
   const env = options.env ?? process.env
@@ -50,33 +52,39 @@ export async function getTwitchCatchupStatus(options: Options = {}) {
   const ids = await read<string[]>(redis, INDEX) ?? []
   const jobs = await Promise.all(ids.map(id => read<TwitchVodJob>(redis, prefix + id)))
   // No OAuth tokens or resumable upload session URLs are stored in or exposed by this status.
-  return { plan: await read<{ clipVodIds: string[]; clipCursor: number; endedAt: string; startedAt: string; clipFailures?: string[] }>(redis, PLAN),
+  return { discovery: await read<{ checkedAt: string; newlyQueued: number; completedVodCount: number }>(redis, DISCOVERY),
+    plan: await read<{ clipVodIds: string[]; clipCursor: number; endedAt: string; startedAt: string; clipFailures?: string[] }>(redis, PLAN),
     jobs: jobs.filter((job): job is TwitchVodJob => Boolean(job)) }
 }
-export async function startTwitchCatchup(options: Options = {}) {
+export async function startTwitchCatchup(options: Options = {}, includeClipPlan = true) {
   const redis = db(options)
   const lock = "ams:twitch-catchup:v1:start-lock"
   if (!await redis.set(lock, "locked", { nx: true, ex: 120 })) throw new Error("TWITCH_CATCHUP_BUSY")
   try {
-    const status = await getTwitchPilotStatus({ env: options.env })
+    const status = await (options.getStatus ?? getTwitchPilotStatus)({ ...options, redis: redis as never })
     if (!status.connected || status.connection?.login.toLowerCase() !== "smokybanana03") throw new Error("TWITCH_CATCHUP_CHANNEL_MISMATCH")
-    const archive = await getTwitchRecentArchive(31 * 24, { env: options.env })
+    const live = await (options.getLiveStream ?? getOwnedTwitchLiveStream)({ ...options, redis: redis as never })
+    const archive = await (options.getArchive ?? getTwitchRecentArchive)(31 * 24, { ...options, redis: redis as never }, undefined, includeClipPlan)
     const monthStart = new Date(archive.endedAt)
     monthStart.setUTCMonth(monthStart.getUTCMonth() - 1)
-    const vods = archive.vods.filter(vod => Date.parse(vod.createdAt) >= monthStart.getTime())
+    const vods = archive.vods.filter(vod => Date.parse(vod.createdAt) >= monthStart.getTime() &&
+      (!live || vod.streamId !== live.streamId && Date.parse(vod.createdAt) < Date.parse(live.startedAt)))
       .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
     const existingIds = await read<string[]>(redis, INDEX) ?? []
+    let newlyQueued = 0
     for (const vod of vods) {
       if (!/^\d+$/.test(vod.id) || !vod.durationSeconds) continue
       if (await read(redis, prefix + vod.id)) continue
       await save({ vodId: vod.id, streamer: "SmokyBanana03", title: vod.title, createdAt: vod.createdAt,
         durationSeconds: vod.durationSeconds, status: "pending", lease: null, youtubeVideoId: null,
         errorCode: null, metadata: vodMetadata(vod) }, redis)
+      newlyQueued++
     }
     await redis.set(INDEX, JSON.stringify([...new Set([...existingIds, ...vods.map(vod => vod.id)])]), { ex: TTL })
+    await redis.set(DISCOVERY, JSON.stringify({ checkedAt: new Date().toISOString(), newlyQueued, completedVodCount: vods.length }), { ex: TTL })
     const clipStart = new Date(Date.parse(archive.endedAt) - 14 * 24 * 3600_000).toISOString()
     const previous = await read<{ clipCursor: number; clipVodIds: string[] }>(redis, PLAN)
-    if (!previous || previous.clipCursor >= previous.clipVodIds.length) {
+    if (includeClipPlan && (!previous || previous.clipCursor >= previous.clipVodIds.length)) {
       await redis.set(PLAN, JSON.stringify({ startedAt: clipStart, endedAt: archive.endedAt, clipCursor: 0,
         clipVodIds: vods.filter(vod => Date.parse(vod.createdAt) >= Date.parse(clipStart)).map(vod => vod.id) }), { ex: TTL })
     }

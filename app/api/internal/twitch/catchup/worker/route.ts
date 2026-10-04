@@ -2,7 +2,8 @@ import { isYouTubePublicAutopublishEnabled } from "@/lib/server/youtube-public-p
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { authorizeMediaWorker } from "@/lib/server/twitch-short-render-jobs"
-import { beginTwitchVodUpload, claimTwitchVod, completeTwitchVod, getTwitchCatchupStatus, runTwitchClipCatchup, publishVerifiedTwitchVods } from "@/lib/server/twitch-catchup"
+import { runAutomaticTwitchMetadata } from "@/lib/server/twitch-live-automation"
+import { startTwitchCatchup, beginTwitchVodUpload, claimTwitchVod, completeTwitchVod, getTwitchCatchupStatus, runTwitchClipCatchup, publishVerifiedTwitchVods } from "@/lib/server/twitch-catchup"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const maxDuration = 300
@@ -24,6 +25,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = parsed.data
     if (body.action === "status") {
+      await runAutomaticTwitchMetadata().catch(() => console.error("TWITCH_LIVE_METADATA_FAILED"))
+      // Discover first, even when the old queue is empty. Delayed Twitch VOD
+      // availability is recovered by the next scheduled worker check.
+      await startTwitchCatchup({}, false).catch(error => {
+        if (!(error instanceof Error) || error.message !== "TWITCH_CATCHUP_BUSY") throw error
+      })
       const { plan, jobs } = await getTwitchCatchupStatus()
       return json({ ok: true, hasWork: Boolean(plan && plan.clipCursor < plan.clipVodIds.length) ||
         jobs.some(job => job.status === "pending" || job.status === "rendering" || job.status === "blocked" || (job.status === "failed" && job.errorCode === "YOUTUBE_CONNECTION_VAULT_UNAVAILABLE" && !job.youtubeVideoId) || (job.status === "verified" && isYouTubePublicAutopublishEnabled())) })

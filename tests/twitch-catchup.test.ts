@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { claimTwitchVod, completeTwitchVod, beginTwitchVodUpload, getTwitchCatchupStatus, publishVerifiedTwitchVods, retryRemovedTwitchVod, retryCancelledTwitchVod, validateYouTubeSessionUrl, vodMetadata } from "../lib/server/twitch-catchup"
+import { startTwitchCatchup, claimTwitchVod, completeTwitchVod, beginTwitchVodUpload, getTwitchCatchupStatus, publishVerifiedTwitchVods, retryRemovedTwitchVod, retryCancelledTwitchVod, validateYouTubeSessionUrl, vodMetadata } from "../lib/server/twitch-catchup"
 
 function store() {
   const data = new Map<string, unknown>()
@@ -22,6 +22,33 @@ function seeded() {
     errorCode: null, metadata: vodMetadata({ id: "123", title: "Game", createdAt: "2026-10-03T20:00:00.000Z" }) }))
   return state
 }
+test("automatic discovery queues newly completed VODs once, excludes a live recording and preserves completed clip plan and uploads", async () => {
+  const state = seeded()
+  const original = JSON.parse(state.data.get("ams:twitch-catchup:v1:vod:123") as string)
+  state.data.set("ams:twitch-catchup:v1:vod:123", JSON.stringify({ ...original, status: "published", youtubeVideoId: "abcdefghijk" }))
+  const plan = JSON.stringify({ clipVodIds: ["123"], clipCursor: 1, startedAt: "2026-09-20T00:00:00.000Z", endedAt: "2026-10-03T00:00:00.000Z" })
+  state.data.set("ams:twitch-catchup:v1:plan", plan)
+  const session = { streamId: "live", startedAt: "2026-10-04T01:00:00.000Z", endedAt: null as string | null }
+  const options = { ...state, getStatus: async () => ({ connected: true, connection: { login: "smokybanana03" }, session }) as never,
+    getLiveStream: async () => session.endedAt ? null : { streamId: session.streamId, startedAt: session.startedAt },
+    getArchive: async (...args: unknown[]) => {
+      assert.equal(args[3], false)
+      return { startedAt: "2026-09-03T00:00:00.000Z", endedAt: "2026-10-04T02:00:00.000Z", clips: [],
+        vods: [{ id: "123", streamId: "old", title: "Game", createdAt: "2026-10-03T20:00:00.000Z", durationSeconds: 60 },
+          { id: "456", streamId: "ended", title: "Completed", createdAt: "2026-10-03T21:00:00.000Z", durationSeconds: 300 },
+          { id: "789", streamId: "live", title: "Still streaming", createdAt: "2026-10-04T01:00:00.000Z", durationSeconds: 300 }] } as never
+    } }
+  await startTwitchCatchup(options, false); await startTwitchCatchup(options, false)
+  let jobs = (await getTwitchCatchupStatus(state)).jobs
+  assert.deepEqual(jobs.map(job => job.vodId), ["123", "456"])
+  assert.equal(jobs[0].status, "published"); assert.equal(jobs[0].youtubeVideoId, "abcdefghijk")
+  assert.equal(state.data.get("ams:twitch-catchup:v1:plan"), plan)
+  assert.equal((await getTwitchCatchupStatus(state)).discovery?.newlyQueued, 0)
+  session.endedAt = "2026-10-04T02:00:00.000Z"
+  await startTwitchCatchup(options, false)
+  jobs = (await getTwitchCatchupStatus(state)).jobs
+  assert.equal(jobs.length, 3); assert.equal(jobs[2].status, "pending")
+})
 test("full VOD metadata identifies the streamer, recording date, source and AMS", () => {
   const metadata = vodMetadata({ id: "123", title: "x".repeat(1000), createdAt: "2026-10-03T20:00:00.000Z" })
   assert.ok(metadata.title.startsWith("SmokyBanana03 | 2026-10-03 | Full Stream"))
