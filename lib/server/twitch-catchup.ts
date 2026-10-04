@@ -254,7 +254,7 @@ export async function setTwitchVodThumbnail(input: {
     const response = await (options.fetcher ?? fetch)(
       `https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${encodeURIComponent(input.videoId)}&uploadType=media`,
       { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "image/jpeg" },
-        body: jpeg, signal: AbortSignal.timeout(30_000) },
+        body: new Uint8Array(jpeg), signal: AbortSignal.timeout(30_000) },
     )
     if (!response.ok) throw new Error(`YOUTUBE_VOD_THUMBNAIL_HTTP_${response.status}`)
     await save({ ...job, thumbnailStatus: "uploaded", thumbnailUpdatedAt: new Date().toISOString(),
