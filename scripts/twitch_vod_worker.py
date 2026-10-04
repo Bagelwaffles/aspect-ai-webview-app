@@ -144,11 +144,14 @@ def prove_full_vod(vod_id):
         duration = float(probe(source)["format"]["duration"])
         if abs(duration - float(info.get("duration") or 0)) > 5:
             raise RuntimeError("TWITCH_VOD_SOURCE_INCOMPLETE")
+        thumbnail = pathlib.Path(temp) / "youtube-thumbnail.jpg"
+        thumbnail_proof = render_thumbnail(source, thumbnail, "SmokyBanana03", info.get("title") or "Full Stream", "2026-09-28")
         output = pathlib.Path(temp) / "branded-vod.mp4"
         proof = render(source, output, "SmokyBanana03", info.get("title") or "Full Stream", "2026-09-28", consume_source=True)
         if source.exists():
             raise RuntimeError("TWITCH_VOD_TEMP_SOURCE_NOT_RELEASED")
         print(json.dumps({"vodId": vod_id, "proof": proof, "bytes": output.stat().st_size,
+            "thumbnailProof": thumbnail_proof, "thumbnailBytes": thumbnail.stat().st_size,
             "youtubeUploadAttempted": False}), flush=True)
 
 
