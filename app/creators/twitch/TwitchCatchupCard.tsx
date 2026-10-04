@@ -4,7 +4,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 type State = { plan: { clipCursor: number; clipVodIds: string[]; clipFailures?: string[] } | null;
   discovery: { checkedAt: string; newlyQueued: number; completedVodCount: number } | null;
-  jobs: Array<{ vodId: string; createdAt: string; title: string; status: string; youtubeVideoId: string | null; errorCode: string | null }> }
+  monitoring?: { worker: { lastScheduledSucceededAt: string | null; lastErrorCode: string | null } | null; scheduledStale: boolean; stalledVodIds: string[] };
+  jobs: Array<{ vodId: string; createdAt: string; updatedAt?: string; title: string; status: string; youtubeVideoId: string | null;
+    errorCode: string | null; stalled?: boolean; staleForSeconds?: number; thumbnailStatus?: "pending" | "uploaded" | "failed";
+    thumbnailErrorCode?: string | null }> }
+const jobStatusLabel = (status: string, stalled?: boolean) => stalled ? "Stalled — needs attention" : ({
+  pending: "Queued", rendering: "Rendering", uploading: "Uploading to YouTube", verified: "YouTube verified",
+  published: "Public", blocked: "Queued for eligibility recheck", failed: "Failed", reconciliation: "Verifying upload state",
+}[status] ?? status)
+
 export default function TwitchCatchupCard() {
   const [state, setState] = useState<State | null>(null)
   const [busy, setBusy] = useState(false)
