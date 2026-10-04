@@ -63,7 +63,7 @@ export default function TwitchCatchupCard() {
     finally { setBusy(false) }
   }
   return <Card>
-    <CardHeader><CardTitle>Catch up clips & full streams</CardTitle><CardDescription>
+    <CardHeader><CardTitle>Automatic Twitch to YouTube processing</CardTitle><CardDescription>
       Best clips from the last two weeks, plus each available full stream from the past month. Full VODs include a 5-second intro, 7-second outro, the streamer’s name, and “Created by Aspect Marketing Solutions (AMS).” Uploads are verified privately first, then selected Shorts and full VODs publish automatically when automatic publishing is enabled.
     </CardDescription></CardHeader>
     <CardContent className="space-y-4">
@@ -71,7 +71,7 @@ export default function TwitchCatchupCard() {
       <p className={state?.monitoring?.scheduledStale ? "text-sm text-amber-600" : "text-sm text-emerald-600"}>Scheduled worker: {state?.monitoring?.scheduledStale ? "needs confirmation" : "healthy"} · Last scheduled success: {state?.monitoring?.worker?.lastScheduledSucceededAt ? new Date(state.monitoring.worker.lastScheduledSucceededAt).toLocaleString() : "not recorded yet"} · Stalled active jobs: {state?.monitoring?.stalledVodIds?.length ?? 0}</p>
       {state?.monitoring?.worker?.lastErrorCode && <p className="text-sm text-amber-600">Latest worker error: {state.monitoring.worker.lastErrorCode}</p>}
       {state?.discovery && <p className="text-sm text-muted-foreground">Last full-VOD discovery: {new Date(state.discovery.checkedAt).toLocaleString()} · {state.discovery.newlyQueued} newly queued · {state.discovery.completedVodCount} completed recordings found.</p>}
-      <Button disabled={busy} onClick={() => void start()}>{busy ? "Queueing…" : "Start two-week clips & monthly VOD catch-up"}</Button>
+      <Button disabled={busy} onClick={() => void start()}>{busy ? "Running…" : "Manual recovery: run catch-up now"}</Button>
       {message && <p className="text-sm">{message}</p>}
       {state?.plan && <p className="text-sm">Historical stream clip review: {state.plan.clipCursor}/{state.plan.clipVodIds.length} streams completed.</p>}
       {!!state?.plan?.clipFailures?.length && <p className="text-sm text-amber-600">Clip review needs attention: {state.plan.clipFailures.join(" · ")}</p>}
