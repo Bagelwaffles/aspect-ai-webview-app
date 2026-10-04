@@ -6,6 +6,7 @@ const LATEST = PREFIX + "latest"
 const TTL = 180 * 24 * 3600
 type Channel = Awaited<ReturnType<typeof getOwnedTwitchMetadata>>
 type Record = { streamId: string; sourceTitle: string; category: string; title: string; tags: string[];
+  baseTitle: string; baseTags: string[];
   status: "pending" | "verified" | "skipped" | "failed"; code: string | null; updatedAt: string }
 type Store = Pick<Redis, "get" | "set" | "del">
 type Options = { env?: NodeJS.ProcessEnv; redis?: Store;
@@ -60,8 +61,17 @@ export async function runAutomaticTwitchMetadata(expectedStreamId?: string, opti
     if (record?.status === "verified" || record?.status === "skipped") return record
     const channel = options.getChannel ? await options.getChannel() : await getOwnedTwitchMetadata({ env: options.env, redis: redis as never })
     if (channel.login.toLowerCase() !== "smokybanana03" || !channel.canEdit) return { skipped: "TWITCH_METADATA_SCOPE_REQUIRED" }
-    record ??= { streamId: session.streamId, sourceTitle: session.title, category: session.categoryName,
-      ...buildAutomaticTwitchMetadata(channel), status: "pending", code: null, updatedAt: "" }
+    if (!record) {
+      const previous = await read(redis, LATEST)
+      // A PS5 stream can reuse the last automatic title/tags. Recover the
+      // original wording before adding the new game, rather than accumulating
+      // old game names on successive streams. Manual changes remain intact.
+      const inherited = previous?.status === "verified" && channel.title === previous.title && sameTags(channel.tags, previous.tags)
+      const baseTitle = inherited ? previous.baseTitle ?? previous.sourceTitle : channel.title
+      const baseTags = inherited ? previous.baseTags ?? channel.tags : channel.tags
+      record = { streamId: session.streamId, sourceTitle: session.title, category: session.categoryName, baseTitle, baseTags,
+        ...buildAutomaticTwitchMetadata({ ...channel, title: baseTitle, tags: baseTags }), status: "pending", code: null, updatedAt: "" }
+    }
     if (channel.title === record.title && sameTags(channel.tags, record.tags)) { record.status = "verified"; record.code = null; return save() }
     if (channel.title !== record.sourceTitle || channel.category !== record.category) {
       record.status = "skipped"; record.code = "TWITCH_METADATA_MANUAL_CHANGE"; return save()

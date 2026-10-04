@@ -14,7 +14,7 @@ function fixture() {
   const options = { redis: redis as never, getStatus: async () => ({ connected: true, connection: { login: "smokybanana03" }, session }),
     getChannel: async () => channel,
     updateChannel: async (patch: { title: string; tags: string[] }, expected: { streamId: string; title: string; category: string }) => {
-      assert.equal(expected.streamId, "stream-a"); assert.equal(expected.title, "Just chill"); assert.equal(expected.category, "Call of Duty")
+      assert.equal(expected.streamId, session.streamId); assert.equal(expected.title, session.title); assert.equal(expected.category, session.categoryName)
       writes++; channel = { ...channel, ...patch }
       if (lostResponse) throw new Error("TWITCH_METADATA_UPDATE_FAILED")
       return channel
@@ -56,4 +56,16 @@ test("concurrent automatic calls cannot apply twice", async () => {
   const f = fixture()
   await Promise.all([runAutomaticTwitchMetadata("stream-a", f.options), runAutomaticTwitchMetadata("stream-a", f.options)])
   assert.equal(f.writes(), 1)
+})
+test("a new game does not inherit the previous automatically added game title or tag", async () => {
+  const f = fixture()
+  const first = await runAutomaticTwitchMetadata("stream-a", f.options)
+  assert.ok("title" in first)
+  f.session.streamId = "stream-b"; f.session.title = first.title; f.session.categoryName = "Fallout"
+  f.setChannel({ category: "Fallout" })
+  const second = await runAutomaticTwitchMetadata("stream-b", f.options)
+  assert.ok("title" in second)
+  assert.equal(second.title, "Fallout | Just chill | SmokyBanana03")
+  assert.deepEqual(second.tags, ["SmokyBanana03", "Fallout", "English", "Gaming"])
+  assert.equal(f.writes(), 2)
 })
