@@ -68,6 +68,8 @@ export default function TwitchCatchupCard() {
     </CardDescription></CardHeader>
     <CardContent className="space-y-4">
       <p className="text-sm">Future completed streams from SmokyBanana03 are queued automatically. Live recordings wait until the stream ends.</p>
+      <p className={state?.monitoring?.scheduledStale ? "text-sm text-amber-600" : "text-sm text-emerald-600"}>Scheduled worker: {state?.monitoring?.scheduledStale ? "needs confirmation" : "healthy"} · Last scheduled success: {state?.monitoring?.worker?.lastScheduledSucceededAt ? new Date(state.monitoring.worker.lastScheduledSucceededAt).toLocaleString() : "not recorded yet"} · Stalled active jobs: {state?.monitoring?.stalledVodIds?.length ?? 0}</p>
+      {state?.monitoring?.worker?.lastErrorCode && <p className="text-sm text-amber-600">Latest worker error: {state.monitoring.worker.lastErrorCode}</p>}
       {state?.discovery && <p className="text-sm text-muted-foreground">Last full-VOD discovery: {new Date(state.discovery.checkedAt).toLocaleString()} · {state.discovery.newlyQueued} newly queued · {state.discovery.completedVodCount} completed recordings found.</p>}
       <Button disabled={busy} onClick={() => void start()}>{busy ? "Queueing…" : "Start two-week clips & monthly VOD catch-up"}</Button>
       {message && <p className="text-sm">{message}</p>}
