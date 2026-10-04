@@ -73,7 +73,7 @@ export default function TwitchCatchupCard() {
       {message && <p className="text-sm">{message}</p>}
       {state?.plan && <p className="text-sm">Historical stream clip review: {state.plan.clipCursor}/{state.plan.clipVodIds.length} streams completed.</p>}
       {!!state?.plan?.clipFailures?.length && <p className="text-sm text-amber-600">Clip review needs attention: {state.plan.clipFailures.join(" · ")}</p>}
-      {state?.jobs.some(job => job.status === "blocked") && <p className="text-sm text-amber-600">Full streams over 15 minutes are waiting for <a href="https://www.youtube.com/verify" target="_blank" rel="noreferrer" className="underline">YouTube phone verification</a>. They resume automatically after YouTube enables long uploads.</p>}
+      {state?.jobs.some(job => job.status === "blocked" && job.errorCode === "YOUTUBE_LONG_UPLOAD_VERIFICATION_REQUIRED") && <p className="text-sm text-muted-foreground">Some older VODs are queued for an automatic long-upload eligibility recheck. This saved queue state does not mean the channel is currently unverified.</p>}
       <div className="space-y-2">{state?.jobs.map(job => <div className="rounded-lg border p-3 text-sm" key={job.vodId}>
         <p>SmokyBanana03 · {job.createdAt.slice(0, 10)} · {job.title} · {job.status}</p>
         {job.status === "rendering" && <Button disabled={busy} variant="outline" onClick={() => void retryCancelled(job.vodId)}>Requeue confirmed cancelled renderer</Button>}
