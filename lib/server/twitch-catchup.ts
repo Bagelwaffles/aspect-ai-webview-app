@@ -11,6 +11,9 @@ const TTL = 180 * 24 * 3600
 const INDEX = "ams:twitch-catchup:v1:index"
 const PLAN = "ams:twitch-catchup:v1:plan"
 const DISCOVERY = "ams:twitch-catchup:v1:discovery"
+const WORKER = "ams:twitch-catchup:v1:worker"
+const ACTIVE_JOB_STALL_MS = 7 * 3600_000
+const SCHEDULE_STALL_MS = 3 * 3600_000
 const prefix = "ams:twitch-catchup:v1:vod:"
 const jobSchema = z.object({
   vodId: z.string().regex(/^\d+$/), streamer: z.literal("SmokyBanana03"), title: z.string(),
@@ -18,6 +21,10 @@ const jobSchema = z.object({
   status: z.enum(["pending", "rendering", "uploading", "verified", "published", "blocked", "failed", "reconciliation"]),
   lease: z.string().nullable(), youtubeVideoId: z.string().nullable(), errorCode: z.string().nullable(),
   previousYoutubeVideoIds: z.array(z.string()).max(10).optional(),
+  updatedAt: z.string().datetime().optional(),
+  thumbnailStatus: z.enum(["pending", "uploaded", "failed"]).optional(),
+  thumbnailUpdatedAt: z.string().datetime().optional(),
+  thumbnailErrorCode: z.string().max(100).nullable().optional(),
   metadata: z.object({ title: z.string().max(100), description: z.string().max(5000) }),
 }).strict()
 export type TwitchVodJob = z.infer<typeof jobSchema>
@@ -36,9 +43,11 @@ async function read<T>(redis: Store, key: string): Promise<T | null> {
   const raw = await redis.get<unknown>(key)
   return raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) as T : null
 }
-async function save(job: TwitchVodJob, redis: Store) {
-  await redis.set(prefix + job.vodId, JSON.stringify(jobSchema.parse(job)), { ex: TTL })
-  return job
+async function save(job: TwitchVodJob & { stalled?: boolean; staleForSeconds?: number }, redis: Store) {
+  const { stalled: _stalled, staleForSeconds: _staleForSeconds, ...persistable } = job
+  const stored = jobSchema.parse({ ...persistable, updatedAt: new Date().toISOString() })
+  await redis.set(prefix + stored.vodId, JSON.stringify(stored), { ex: TTL })
+  return stored
 }
 export function vodMetadata(vod: Pick<TwitchRecentVod, "id" | "title" | "createdAt">) {
   const date = vod.createdAt.slice(0, 10)
@@ -47,14 +56,69 @@ export function vodMetadata(vod: Pick<TwitchRecentVod, "id" | "title" | "created
     description: `Full Twitch stream from SmokyBanana03, recorded ${date}.\n\n${vod.title.slice(0, 1000)}\n\nStreamer: SmokyBanana03\nSource: https://www.twitch.tv/videos/${vod.id}\nFollow: https://www.twitch.tv/smokybanana03\n\nCreated by Aspect Marketing Solutions (AMS)\nhttps://www.aspectmarketingsolutions.app\n\nIncludes a 5-second introduction and a 7-second outro. Original stream footage is preserved.\n#SmokyBanana03 #TwitchVOD #Gaming`,
   }
 }
+type WorkerHealth = {
+  lastStartedAt: string | null
+  lastSucceededAt: string | null
+  lastScheduledStartedAt: string | null
+  lastScheduledSucceededAt: string | null
+  lastTrigger: string | null
+  lastErrorCode: string | null
+}
+
 export async function getTwitchCatchupStatus(options: Options = {}) {
   const redis = db(options)
   const ids = await read<string[]>(redis, INDEX) ?? []
-  const jobs = await Promise.all(ids.map(id => read<TwitchVodJob>(redis, prefix + id)))
+  const storedJobs = (await Promise.all(ids.map(id => read<TwitchVodJob>(redis, prefix + id))))
+    .filter((job): job is TwitchVodJob => Boolean(job))
+  const now = Date.now()
+  const jobs = storedJobs.map(job => {
+    const staleForSeconds = job.updatedAt
+      ? Math.max(0, Math.floor((now - Date.parse(job.updatedAt)) / 1000))
+      : 0
+    const stalled = Boolean(job.updatedAt) && ["rendering", "uploading", "reconciliation"].includes(job.status) &&
+      staleForSeconds * 1000 > ACTIVE_JOB_STALL_MS
+    return { ...job, stalled, staleForSeconds }
+  })
+  const worker = await read<WorkerHealth>(redis, WORKER)
+  const scheduledAge = worker?.lastScheduledSucceededAt ? now - Date.parse(worker.lastScheduledSucceededAt) : null
   // No OAuth tokens or resumable upload session URLs are stored in or exposed by this status.
   return { discovery: await read<{ checkedAt: string; newlyQueued: number; completedVodCount: number }>(redis, DISCOVERY),
     plan: await read<{ clipVodIds: string[]; clipCursor: number; endedAt: string; startedAt: string; clipFailures?: string[] }>(redis, PLAN),
-    jobs: jobs.filter((job): job is TwitchVodJob => Boolean(job)) }
+    monitoring: {
+      worker,
+      scheduledStale: scheduledAge === null || scheduledAge > SCHEDULE_STALL_MS,
+      stalledVodIds: jobs.filter(job => job.stalled).map(job => job.vodId),
+    },
+    jobs }
+}
+
+export async function recordTwitchCatchupWorker(input: {
+  phase: "started" | "succeeded" | "failed"
+  trigger: string
+  errorCode?: string
+}, options: Options = {}) {
+  const redis = db(options)
+  const now = new Date().toISOString()
+  const current = await read<WorkerHealth>(redis, WORKER) ?? {
+    lastStartedAt: null, lastSucceededAt: null, lastScheduledStartedAt: null,
+    lastScheduledSucceededAt: null, lastTrigger: null, lastErrorCode: null,
+  }
+  const scheduled = input.trigger === "schedule"
+  const next: WorkerHealth = {
+    ...current,
+    lastTrigger: input.trigger.slice(0, 40),
+    lastErrorCode: input.phase === "failed" ? (input.errorCode ?? "TWITCH_CATCHUP_WORKER_FAILED").slice(0, 100) : null,
+    ...(input.phase === "started" ? {
+      lastStartedAt: now,
+      ...(scheduled ? { lastScheduledStartedAt: now } : {}),
+    } : {}),
+    ...(input.phase === "succeeded" ? {
+      lastSucceededAt: now,
+      ...(scheduled ? { lastScheduledSucceededAt: now } : {}),
+    } : {}),
+  }
+  await redis.set(WORKER, JSON.stringify(next), { ex: TTL })
+  return next
 }
 export async function startTwitchCatchup(options: Options = {}, includeClipPlan = true) {
   const redis = db(options)
@@ -77,7 +141,7 @@ export async function startTwitchCatchup(options: Options = {}, includeClipPlan 
       if (await read(redis, prefix + vod.id)) continue
       await save({ vodId: vod.id, streamer: "SmokyBanana03", title: vod.title, createdAt: vod.createdAt,
         durationSeconds: vod.durationSeconds, status: "pending", lease: null, youtubeVideoId: null,
-        errorCode: null, metadata: vodMetadata(vod) }, redis)
+        errorCode: null, thumbnailStatus: "pending", thumbnailErrorCode: null, metadata: vodMetadata(vod) }, redis)
       newlyQueued++
     }
     await redis.set(INDEX, JSON.stringify([...new Set([...existingIds, ...vods.map(vod => vod.id)])]), { ex: TTL })
@@ -173,6 +237,40 @@ async function youtubeToken(options: Options, requireEdit = false, requireLongUp
   if (requireLongUploads && channels.items?.find(item => item.id === SMOKYBANANA03_YOUTUBE_CHANNEL_ID)?.status?.longUploadsStatus !== "allowed") throw new Error("YOUTUBE_LONG_UPLOAD_VERIFICATION_REQUIRED")
   return body.access_token
 }
+export async function setTwitchVodThumbnail(input: {
+  vodId: string
+  lease: string
+  videoId: string
+  jpegBase64: string
+}, options: Options = {}) {
+  if (!/^[A-Za-z0-9_-]{11}$/.test(input.videoId)) throw new Error("YOUTUBE_VOD_THUMBNAIL_VIDEO_INVALID")
+  const { redis, job } = await leasedJob(input.vodId, input.lease, options)
+  if (job.status !== "uploading") throw new Error("YOUTUBE_VOD_RECONCILIATION_REQUIRED")
+  let jpeg: Buffer
+  try { jpeg = Buffer.from(input.jpegBase64, "base64") } catch { throw new Error("YOUTUBE_VOD_THUMBNAIL_INVALID") }
+  if (jpeg.length < 1024 || jpeg.length > 2 * 1024 * 1024 || jpeg[0] !== 0xff || jpeg[1] !== 0xd8) {
+    throw new Error("YOUTUBE_VOD_THUMBNAIL_INVALID")
+  }
+  try {
+    const token = await youtubeToken({ ...options, redis })
+    const response = await (options.fetcher ?? fetch)(
+      `https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${encodeURIComponent(input.videoId)}&uploadType=media`,
+      { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "image/jpeg" },
+        body: new Uint8Array(jpeg), signal: AbortSignal.timeout(30_000) },
+    )
+    if (!response.ok) throw new Error(`YOUTUBE_VOD_THUMBNAIL_HTTP_${response.status}`)
+    await save({ ...job, thumbnailStatus: "uploaded", thumbnailUpdatedAt: new Date().toISOString(),
+      thumbnailErrorCode: null }, redis)
+    return { status: "uploaded" as const }
+  } catch (error) {
+    const code = error instanceof Error && /^YOUTUBE_[A-Z0-9_]+$/.test(error.message)
+      ? error.message : "YOUTUBE_VOD_THUMBNAIL_FAILED"
+    await save({ ...job, thumbnailStatus: "failed", thumbnailUpdatedAt: new Date().toISOString(),
+      thumbnailErrorCode: code }, redis)
+    return { status: "failed" as const, code }
+  }
+}
+
 export function validateYouTubeSessionUrl(value: string) {
   const url = new URL(value)
   if (url.protocol !== "https:" || url.hostname !== "www.googleapis.com" || url.username || url.password ||

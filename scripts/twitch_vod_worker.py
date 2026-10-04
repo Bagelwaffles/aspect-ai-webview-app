@@ -1,5 +1,6 @@
 """Cloud-only full-VOD worker. Secrets and upload session URLs never enter logs."""
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -9,7 +10,7 @@ import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
-from render_twitch_vod import render, probe
+from render_twitch_vod import render, probe, render_thumbnail
 
 
 def request(url, body=None, headers=None, method=None, timeout=120):
@@ -99,6 +100,8 @@ def main():
                 raise RuntimeError("TWITCH_VOD_SOURCE_DURATION_MISMATCH")
             if abs(float(probe(source)["format"]["duration"]) - actual) > 5:
                 raise RuntimeError("TWITCH_VOD_SOURCE_INCOMPLETE")
+            thumbnail = root / "youtube-thumbnail.jpg"
+            thumbnail_proof = render_thumbnail(source, thumbnail, job["streamer"], job["title"], job["createdAt"][:10])
             output = root / "branded-vod.mp4"
             proof = render(source, output, job["streamer"], job["title"], job["createdAt"][:10], consume_source=True)
             # Hash proof records the exact branded output; it carries no credential or session data.
@@ -106,9 +109,13 @@ def main():
             with output.open("rb") as stream:
                 for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                     digest.update(chunk)
-            print(json.dumps({"vodId": job["vodId"], "renderProof": proof, "sha256": digest.hexdigest()}), flush=True)
+            print(json.dumps({"vodId": job["vodId"], "renderProof": proof, "thumbnailProof": thumbnail_proof,
+                "sha256": digest.hexdigest()}), flush=True)
             session = api({"action": "begin", "vodId": job["vodId"], "lease": job["lease"], "bytes": output.stat().st_size})
             video_id = upload(output, session["uploadUrl"])
+            thumbnail_result = api({"action": "thumbnail", "vodId": job["vodId"], "lease": job["lease"],
+                "videoId": video_id, "jpegBase64": base64.b64encode(thumbnail.read_bytes()).decode("ascii")})
+            print(json.dumps({"vodId": job["vodId"], "thumbnail": thumbnail_result.get("thumbnail")}), flush=True)
             complete = api({"action": "complete", "vodId": job["vodId"], "lease": job["lease"], "videoId": video_id})
             print(json.dumps({"vodId": job["vodId"], "youtubeVideoId": video_id, "status": complete["job"]["status"],
                 "privacyStatus": "private"}), flush=True)
@@ -137,11 +144,14 @@ def prove_full_vod(vod_id):
         duration = float(probe(source)["format"]["duration"])
         if abs(duration - float(info.get("duration") or 0)) > 5:
             raise RuntimeError("TWITCH_VOD_SOURCE_INCOMPLETE")
+        thumbnail = pathlib.Path(temp) / "youtube-thumbnail.jpg"
+        thumbnail_proof = render_thumbnail(source, thumbnail, "SmokyBanana03", info.get("title") or "Full Stream", "2026-09-28")
         output = pathlib.Path(temp) / "branded-vod.mp4"
         proof = render(source, output, "SmokyBanana03", info.get("title") or "Full Stream", "2026-09-28", consume_source=True)
         if source.exists():
             raise RuntimeError("TWITCH_VOD_TEMP_SOURCE_NOT_RELEASED")
         print(json.dumps({"vodId": vod_id, "proof": proof, "bytes": output.stat().st_size,
+            "thumbnailProof": thumbnail_proof, "thumbnailBytes": thumbnail.stat().st_size,
             "youtubeUploadAttempted": False}), flush=True)
 
 
@@ -151,11 +161,33 @@ if __name__ == "__main__":
     parser.add_argument("--check-pending", action="store_true")
     arguments = parser.parse_args()
     if arguments.check_pending:
-        has_work = api({"action": "status"})["hasWork"]
+        trigger = os.environ.get("GITHUB_EVENT_NAME", "other")[:40] or "other"
+        api({"action": "heartbeat", "phase": "started", "trigger": trigger})
+        try:
+            has_work = api({"action": "status"})["hasWork"]
+        except Exception as error:
+            code = str(error) if isinstance(error, RuntimeError) else "TWITCH_VOD_" + type(error).__name__.upper()
+            try:
+                api({"action": "heartbeat", "phase": "failed", "trigger": trigger, "errorCode": code[:100]})
+            finally:
+                raise
         with open(os.environ["GITHUB_OUTPUT"], "a") as output:
             output.write("has_work=" + str(bool(has_work)).lower() + "\n")
         print("Catch-up work available: " + str(bool(has_work)), flush=True)
+        if not has_work:
+            api({"action": "heartbeat", "phase": "succeeded", "trigger": trigger})
     elif arguments.proof_vod_id:
         prove_full_vod(arguments.proof_vod_id)
     else:
-        main()
+        trigger = os.environ.get("GITHUB_EVENT_NAME", "other")[:40] or "other"
+        api({"action": "heartbeat", "phase": "started", "trigger": trigger})
+        try:
+            main()
+        except Exception as error:
+            code = str(error) if isinstance(error, RuntimeError) else "TWITCH_VOD_" + type(error).__name__.upper()
+            try:
+                api({"action": "heartbeat", "phase": "failed", "trigger": trigger, "errorCode": code[:100]})
+            finally:
+                raise
+        else:
+            api({"action": "heartbeat", "phase": "succeeded", "trigger": trigger})

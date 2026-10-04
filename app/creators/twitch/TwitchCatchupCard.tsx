@@ -4,7 +4,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 type State = { plan: { clipCursor: number; clipVodIds: string[]; clipFailures?: string[] } | null;
   discovery: { checkedAt: string; newlyQueued: number; completedVodCount: number } | null;
-  jobs: Array<{ vodId: string; createdAt: string; title: string; status: string; youtubeVideoId: string | null; errorCode: string | null }> }
+  monitoring?: { worker: { lastScheduledSucceededAt: string | null; lastErrorCode: string | null } | null; scheduledStale: boolean; stalledVodIds: string[] };
+  jobs: Array<{ vodId: string; createdAt: string; updatedAt?: string; title: string; status: string; youtubeVideoId: string | null;
+    errorCode: string | null; stalled?: boolean; staleForSeconds?: number; thumbnailStatus?: "pending" | "uploaded" | "failed";
+    thumbnailErrorCode?: string | null }> }
+const jobStatusLabel = (status: string, stalled?: boolean) => stalled ? "Stalled — needs attention" : ({
+  pending: "Queued", rendering: "Rendering", uploading: "Uploading to YouTube", verified: "YouTube verified",
+  published: "Public", blocked: "Queued for eligibility recheck", failed: "Failed", reconciliation: "Verifying upload state",
+}[status] ?? status)
+
 export default function TwitchCatchupCard() {
   const [state, setState] = useState<State | null>(null)
   const [busy, setBusy] = useState(false)
@@ -55,19 +63,23 @@ export default function TwitchCatchupCard() {
     finally { setBusy(false) }
   }
   return <Card>
-    <CardHeader><CardTitle>Catch up clips & full streams</CardTitle><CardDescription>
+    <CardHeader><CardTitle>Automatic Twitch to YouTube processing</CardTitle><CardDescription>
       Best clips from the last two weeks, plus each available full stream from the past month. Full VODs include a 5-second intro, 7-second outro, the streamer’s name, and “Created by Aspect Marketing Solutions (AMS).” Uploads are verified privately first, then selected Shorts and full VODs publish automatically when automatic publishing is enabled.
     </CardDescription></CardHeader>
     <CardContent className="space-y-4">
       <p className="text-sm">Future completed streams from SmokyBanana03 are queued automatically. Live recordings wait until the stream ends.</p>
+      <p className={state?.monitoring?.scheduledStale ? "text-sm text-amber-600" : "text-sm text-emerald-600"}>Scheduled worker: {state?.monitoring?.scheduledStale ? "needs confirmation" : "healthy"} · Last scheduled success: {state?.monitoring?.worker?.lastScheduledSucceededAt ? new Date(state.monitoring.worker.lastScheduledSucceededAt).toLocaleString() : "not recorded yet"} · Stalled active jobs: {state?.monitoring?.stalledVodIds?.length ?? 0}</p>
+      {state?.monitoring?.worker?.lastErrorCode && <p className="text-sm text-amber-600">Latest worker error: {state.monitoring.worker.lastErrorCode}</p>}
       {state?.discovery && <p className="text-sm text-muted-foreground">Last full-VOD discovery: {new Date(state.discovery.checkedAt).toLocaleString()} · {state.discovery.newlyQueued} newly queued · {state.discovery.completedVodCount} completed recordings found.</p>}
-      <Button disabled={busy} onClick={() => void start()}>{busy ? "Queueing…" : "Start two-week clips & monthly VOD catch-up"}</Button>
+      <Button disabled={busy} onClick={() => void start()}>{busy ? "Running…" : "Manual recovery: run catch-up now"}</Button>
       {message && <p className="text-sm">{message}</p>}
       {state?.plan && <p className="text-sm">Historical stream clip review: {state.plan.clipCursor}/{state.plan.clipVodIds.length} streams completed.</p>}
       {!!state?.plan?.clipFailures?.length && <p className="text-sm text-amber-600">Clip review needs attention: {state.plan.clipFailures.join(" · ")}</p>}
-      {state?.jobs.some(job => job.status === "blocked") && <p className="text-sm text-amber-600">Full streams over 15 minutes are waiting for <a href="https://www.youtube.com/verify" target="_blank" rel="noreferrer" className="underline">YouTube phone verification</a>. They resume automatically after YouTube enables long uploads.</p>}
+      {state?.jobs.some(job => job.status === "blocked" && job.errorCode === "YOUTUBE_LONG_UPLOAD_VERIFICATION_REQUIRED") && <p className="text-sm text-muted-foreground">Some older VODs are queued for an automatic long-upload eligibility recheck. This saved queue state does not mean the channel is currently unverified.</p>}
       <div className="space-y-2">{state?.jobs.map(job => <div className="rounded-lg border p-3 text-sm" key={job.vodId}>
-        <p>SmokyBanana03 · {job.createdAt.slice(0, 10)} · {job.title} · {job.status}</p>
+        <p>SmokyBanana03 · {job.createdAt.slice(0, 10)} · {job.title} · {jobStatusLabel(job.status, job.stalled)}</p>
+        {job.thumbnailStatus === "uploaded" && <p className="text-xs text-emerald-600">Branded YouTube thumbnail uploaded.</p>}
+        {job.thumbnailStatus === "failed" && <p className="text-xs text-amber-600">Branded thumbnail needs attention{job.thumbnailErrorCode ? `: ${job.thumbnailErrorCode}` : "."}</p>}
         {job.status === "rendering" && <Button disabled={busy} variant="outline" onClick={() => void retryCancelled(job.vodId)}>Requeue confirmed cancelled renderer</Button>}
         {job.youtubeVideoId && ["YOUTUBE_VOD_PUBLIC_PROOF_FAILED", "YOUTUBE_VOD_REMOVED_OR_UNAVAILABLE"].includes(job.errorCode ?? "") && <Button disabled={busy} variant="outline" onClick={() => void retryRemoved(job)}>Requeue confirmed removed upload</Button>}
         {job.errorCode && <p className="text-amber-600">{job.errorCode}</p>}

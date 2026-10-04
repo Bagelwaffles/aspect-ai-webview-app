@@ -16,6 +16,61 @@ def probe(path):
     ]))
 
 
+def render_thumbnail(source, output, streamer, title, date, width=1280, height=720):
+    """Create a branded 16:9 YouTube thumbnail from genuine stream footage."""
+    if not streamer.strip() or len(streamer) > 80:
+        raise ValueError("Streamer name required")
+    info = probe(source)
+    duration = float(info["format"]["duration"])
+    if duration <= 0:
+        raise ValueError("VOD duration required")
+    seek = min(max(duration * 0.18, 2.0), max(2.0, duration - 2.0))
+    with tempfile.TemporaryDirectory(prefix="ams-vod-thumb-") as temp:
+        root = pathlib.Path(temp)
+        texts = {
+            "streamer": streamer,
+            "title": "\n".join(textwrap.wrap(title[:120], width=34)[:2]),
+            "date": date,
+            "credit": "CREATED BY AMS",
+            "label": "FULL STREAM",
+        }
+        for key, value in texts.items():
+            (root / f"{key}.txt").write_text(value, encoding="utf-8")
+        font = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        bold = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        logo = pathlib.Path(__file__).resolve().parent / "assets" / "smokybanana03.jpg"
+        if not logo.is_file():
+            raise ValueError("SmokyBanana03 brand asset missing")
+
+        def draw(key, size, y, color="white", weight=False):
+            return (f"drawtext=fontfile={bold if weight else font}:textfile={root / (key + '.txt')}"
+                    f":expansion=none:fontsize={size}:fontcolor={color}:x=54:y={y}:line_spacing=10")
+
+        graph = (
+            f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1,"
+            "drawbox=x=0:y=0:w=iw:h=ih:color=black@0.18:t=fill,"
+            "drawbox=x=0:y=ih*0.56:w=iw:h=ih*0.44:color=0x08090f@0.90:t=fill,"
+            "drawbox=x=54:y=ih*0.60:w=145:h=6:color=0xffd166:t=fill,"
+            + ",".join([
+                draw("label", 26, "h*0.635", "0xc4a0ed", True),
+                draw("title", 48, "h*0.69", "white", True),
+                draw("streamer", 28, "h*0.865", "0xffd166", True),
+                draw("date", 22, "h*0.915", "0xcfc8dc"),
+                draw("credit", 18, "h*0.952", "0xb2adbf"),
+            ])
+            + "[bg];[1:v]scale=164:164,setsar=1[logo];"
+            + "[bg][logo]overlay=x=W-w-46:y=42[v]"
+        )
+        subprocess.run([
+            "ffmpeg", "-y", "-v", "error", "-ss", f"{seek:.3f}", "-i", str(source),
+            "-loop", "1", "-i", str(logo), "-filter_complex", graph,
+            "-map", "[v]", "-frames:v", "1", "-q:v", "3", str(output),
+        ], check=True)
+    if not pathlib.Path(output).is_file() or pathlib.Path(output).stat().st_size < 1024:
+        raise ValueError("Thumbnail render failed")
+    return {"width": width, "height": height, "bytes": pathlib.Path(output).stat().st_size}
+
+
 def render(source, output, streamer, title, date, width=1920, height=1080, consume_source=False):
     if not streamer.strip() or len(streamer) > 80:
         raise ValueError("Streamer name required")
