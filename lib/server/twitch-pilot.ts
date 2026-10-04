@@ -1001,6 +1001,7 @@ export async function getTwitchRecentArchive(
   hours = 24,
   options: TwitchOptions = {},
   windowEnd?: Date,
+  includeClips = true,
 ): Promise<TwitchRecentArchive> {
   const existing = await loadConnection(options)
   if (!existing) throw new Error("TWITCH_CONNECTION_REQUIRED")
@@ -1031,13 +1032,13 @@ export async function getTwitchRecentArchive(
       type: "archive",
       first: "100",
     }),
-    pages("clips", {
+    includeClips ? pages("clips", {
       broadcaster_id: existing.record.broadcasterId,
       started_at: startedAt,
       // Newly created clips from historical VODs must remain discoverable on later reconciliation runs.
       ended_at: windowEnd ? (options.now ?? (() => new Date()))().toISOString() : endedAt,
       first: "100",
-    }),
+    }) : Promise.resolve({ data: [] }),
   ])
 
   const rawVideos = (videosBody as {
@@ -1486,7 +1487,17 @@ export async function getOwnedTwitchMetadata(options: TwitchOptions = {}) {
   return { login: channel.broadcaster_login, title: channel.title, category: channel.game_name, language: channel.broadcaster_language, tags: channel.tags ?? [], canEdit: existing.record.scopes.includes(TWITCH_METADATA_SCOPE) }
 }
 
-export async function updateOwnedTwitchMetadata(input: unknown, options: TwitchOptions = {}) {
+export async function getOwnedTwitchLiveStream(options: TwitchOptions = {}) {
+  const existing = await ownedTwitchMetadataConnection(options)
+  const result = await helixGet("streams", { user_id: existing.record.broadcasterId }, options) as { data?: Array<{ id: string; user_id: string; user_login: string; started_at: string }> }
+  const stream = result.data?.[0]
+  if (!stream) return null
+  if (stream.user_id !== existing.record.broadcasterId || stream.user_login.toLowerCase() !== "smokybanana03") throw new Error("TWITCH_METADATA_CHANNEL_MISMATCH")
+  if (!stream.id || !Number.isFinite(Date.parse(stream.started_at))) throw new Error("TWITCH_LIVE_STREAM_INVALID")
+  return { streamId: stream.id, startedAt: stream.started_at }
+}
+
+export async function updateOwnedTwitchMetadata(input: unknown, options: TwitchOptions = {}, expectedLive?: { streamId: string; title: string; category: string }) {
   const patch = twitchMetadataInputSchema.parse(input)
   const existing = await ownedTwitchMetadataConnection(options)
   if (!existing.record.scopes.includes(TWITCH_METADATA_SCOPE)) throw new Error("TWITCH_METADATA_SCOPE_REQUIRED")
@@ -1500,7 +1511,13 @@ export async function updateOwnedTwitchMetadata(input: unknown, options: TwitchO
   if (!validation) { const refreshed = await refreshTwitchUserToken(options); token = refreshed.accessToken; validation = refreshed.validation }
   if (validation.user_id !== existing.record.broadcasterId || validation.login.toLowerCase() !== "smokybanana03" || validation.client_id !== config.clientId) throw new Error("TWITCH_METADATA_CHANNEL_MISMATCH")
   if (!validation.scopes.includes(TWITCH_METADATA_SCOPE)) throw new Error("TWITCH_METADATA_SCOPE_REQUIRED")
-  await getOwnedTwitchMetadata(options)
+  const before = await getOwnedTwitchMetadata(options)
+  if (expectedLive) {
+    const live = await helixGet("streams", { user_id: existing.record.broadcasterId }, options) as { data?: Array<{ id: string; user_id: string; title: string; game_name: string }> }
+    const stream = live.data?.[0]
+    if (!stream || stream.id !== expectedLive.streamId || stream.user_id !== existing.record.broadcasterId) throw new Error("TWITCH_METADATA_STREAM_CHANGED")
+    if (stream.title !== expectedLive.title || stream.game_name !== expectedLive.category || before.title !== expectedLive.title || before.category !== expectedLive.category) throw new Error("TWITCH_METADATA_MANUAL_CHANGE")
+  }
   const url = new URL("https://api.twitch.tv/helix/channels")
   url.searchParams.set("broadcaster_id", existing.record.broadcasterId)
   const response = await fetcher(url, { method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Client-Id": config.clientId, "Content-Type": "application/json" }, body: JSON.stringify(patch), cache: "no-store", signal: AbortSignal.timeout(15000) })

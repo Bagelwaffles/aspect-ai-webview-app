@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 type State = { plan: { clipCursor: number; clipVodIds: string[]; clipFailures?: string[] } | null;
+  discovery: { checkedAt: string; newlyQueued: number; completedVodCount: number } | null;
   jobs: Array<{ vodId: string; createdAt: string; title: string; status: string; youtubeVideoId: string | null; errorCode: string | null }> }
 export default function TwitchCatchupCard() {
   const [state, setState] = useState<State | null>(null)
@@ -58,6 +59,8 @@ export default function TwitchCatchupCard() {
       Best clips from the last two weeks, plus each available full stream from the past month. Full VODs include a 5-second intro, 7-second outro, the streamer’s name, and “Created by Aspect Marketing Solutions (AMS).” Uploads are verified privately first, then selected Shorts and full VODs publish automatically when automatic publishing is enabled.
     </CardDescription></CardHeader>
     <CardContent className="space-y-4">
+      <p className="text-sm">Future completed streams from SmokyBanana03 are queued automatically. Live recordings wait until the stream ends.</p>
+      {state?.discovery && <p className="text-sm text-muted-foreground">Last full-VOD discovery: {new Date(state.discovery.checkedAt).toLocaleString()} · {state.discovery.newlyQueued} newly queued · {state.discovery.completedVodCount} completed recordings found.</p>}
       <Button disabled={busy} onClick={() => void start()}>{busy ? "Queueing…" : "Start two-week clips & monthly VOD catch-up"}</Button>
       {message && <p className="text-sm">{message}</p>}
       {state?.plan && <p className="text-sm">Historical stream clip review: {state.plan.clipCursor}/{state.plan.clipVodIds.length} streams completed.</p>}

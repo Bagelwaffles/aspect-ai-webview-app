@@ -5,6 +5,8 @@ import {
   resolveStreamIntelligenceTrigger,
 } from "@/lib/server/stream-intelligence"
 import { syncLatestTwitchMediaQueue } from "@/lib/server/twitch-media-factory"
+import { startTwitchCatchup } from "@/lib/server/twitch-catchup"
+import { runAutomaticTwitchMetadata } from "@/lib/server/twitch-live-automation"
 import {
   processTwitchEventSubNotification,
   recordTwitchSubscriptionChallenge,
@@ -63,6 +65,14 @@ export async function POST(request: NextRequest) {
         : resolveStreamIntelligenceTrigger(result.type, result.streamId)
       if (intelligenceJob) {
         after(async () => {
+          // Run independently: an AI draft failure must not prevent metadata
+          // application or discovery of the completed stream's full recording.
+          if (result.type === "stream.online") {
+            await runAutomaticTwitchMetadata(intelligenceJob.streamId).catch(() => console.error("TWITCH_LIVE_METADATA_FAILED"))
+          }
+          if (result.type === "stream.offline") {
+            await startTwitchCatchup({}, false).catch(() => console.error("TWITCH_VOD_DISCOVERY_FAILED"))
+          }
           try {
             if (intelligenceJob.phase === "post-stream") {
               await new Promise((resolve) => setTimeout(resolve, 5_000))

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict"
 import { createCipheriv } from "node:crypto"
 import test from "node:test"
-import { buildTwitchAuthorizationUrl, getOwnedTwitchMetadata, TWITCH_METADATA_SCOPE, twitchMetadataInputSchema, updateOwnedTwitchMetadata } from "../lib/server/twitch-pilot"
+import { buildTwitchAuthorizationUrl, getOwnedTwitchLiveStream, getOwnedTwitchMetadata, TWITCH_METADATA_SCOPE, twitchMetadataInputSchema, updateOwnedTwitchMetadata } from "../lib/server/twitch-pilot"
 
-function fixture(settings: { login?: string; tokenUser?: string; scopes?: string[]; readback?: boolean } = {}) {
+function fixture(settings: { login?: string; tokenUser?: string; scopes?: string[]; readback?: boolean; live?: "matching" | "offline" | "new-stream" | "manual" } = {}) {
   const scopes = settings.scopes ?? ["user:read:broadcast", "channel:manage:clips", TWITCH_METADATA_SCOPE]
   const key = Buffer.alloc(32, 7), iv = Buffer.alloc(12, 3)
   const cipher = createCipheriv("aes-256-gcm", new Uint8Array(key), new Uint8Array(iv))
@@ -16,6 +16,7 @@ function fixture(settings: { login?: string; tokenUser?: string; scopes?: string
     const url = new URL(String(input))
     if (url.pathname === "/oauth2/validate") return Response.json({ client_id: "test-client", login: "smokybanana03", user_id: settings.tokenUser ?? "123", scopes })
     if (url.pathname === "/oauth2/token") return Response.json({ access_token: "test-app-token" })
+    if (url.pathname === "/helix/streams") return Response.json({ data: settings.live === "offline" ? [] : [{ id: settings.live === "new-stream" ? "stream-b" : "stream-a", user_id: "123", user_login: "smokybanana03", started_at: "2026-10-04T01:00:00.000Z", title: settings.live === "manual" ? "Owner title" : title, game_name: "Call of Duty" }] })
     if (init?.method === "PATCH") {
       const body = JSON.parse(String(init.body)); patches.push({ url, body })
       if (settings.readback !== false) { if (body.title !== undefined) title = body.title; if (body.tags !== undefined) tags = body.tags }
@@ -62,4 +63,19 @@ test("token subject mismatch cannot mutate Twitch", async () => {
 test("failed readback is never reported as a verified save", async () => {
   const { options } = fixture({ readback: false })
   await assert.rejects(updateOwnedTwitchMetadata({ title: "New title" }, options), /TWITCH_METADATA_READBACK_FAILED/)
+})
+test("automatic metadata rechecks real live stream ID and original title immediately before PATCH", async () => {
+  for (const live of ["offline", "new-stream", "manual"] as const) {
+    const f = fixture({ live })
+    await assert.rejects(updateOwnedTwitchMetadata({ title: "New title" }, f.options, { streamId: "stream-a", title: "Original title", category: "Call of Duty" }), /STREAM_CHANGED|MANUAL_CHANGE/)
+    assert.equal(f.patches.length, 0)
+  }
+  const f = fixture({ live: "matching" })
+  await updateOwnedTwitchMetadata({ title: "New title" }, f.options, { streamId: "stream-a", title: "Original title", category: "Call of Duty" })
+  assert.equal(f.patches.length, 1)
+})
+test("VOD discovery queries actual live state only for the stored owned channel", async () => {
+  assert.deepEqual(await getOwnedTwitchLiveStream(fixture().options), { streamId: "stream-a", startedAt: "2026-10-04T01:00:00.000Z" })
+  assert.equal(await getOwnedTwitchLiveStream(fixture({ live: "offline" }).options), null)
+  await assert.rejects(getOwnedTwitchLiveStream(fixture({ login: "anotherchannel" }).options), /CHANNEL_MISMATCH/)
 })
