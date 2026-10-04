@@ -107,7 +107,10 @@ export async function claimTwitchVod(options: Options = {}) {
   const { jobs } = await getTwitchCatchupStatus({ ...options, redis })
   let longUploadsAllowed: boolean | undefined
   for (const job of [...jobs].sort((a, b) => a.durationSeconds - b.durationSeconds)) {
-    if (!["pending", "rendering", "blocked"].includes(job.status)) continue
+    const safeRetry = job.status === "failed" && job.errorCode === "YOUTUBE_CONNECTION_VAULT_UNAVAILABLE" && !job.youtubeVideoId
+    if (!["pending", "rendering", "blocked"].includes(job.status) && !safeRetry) continue
+    // This failure occurs before a resumable upload session is created. Never retry uploading/reconciliation jobs.
+    if (safeRetry && job.lease && await redis.get(prefix + job.vodId + ":lock") === job.lease) await redis.del(prefix + job.vodId + ":lock")
     if (job.durationSeconds + 12 > 900) {
       if (longUploadsAllowed === undefined) {
         try { await youtubeToken({ ...options, redis }, false, true); longUploadsAllowed = true }
@@ -127,7 +130,7 @@ export async function claimTwitchVod(options: Options = {}) {
     const lease = randomUUID()
     if (!await redis.set(prefix + job.vodId + ":lock", lease, { nx: true, ex: 6 * 3600 })) continue
     const current = await read<TwitchVodJob>(redis, prefix + job.vodId)
-    if (!current || !["pending", "rendering", "blocked"].includes(current.status)) continue
+    if (!current || !["pending", "rendering", "blocked"].includes(current.status) && !(current.status === "failed" && current.errorCode === "YOUTUBE_CONNECTION_VAULT_UNAVAILABLE" && !current.youtubeVideoId)) continue
     return save({ ...current, status: "rendering", lease, errorCode: null }, redis)
   }
   return null
@@ -142,7 +145,7 @@ async function leasedJob(vodId: string, lease: string, options: Options) {
 }
 async function youtubeToken(options: Options, requireEdit = false, requireLongUploads = false) {
   const env = options.env ?? process.env
-  const credential = await getStoredYouTubeOwnerCredential({ env, redis: options.redis as never })
+  const credential = await getStoredYouTubeOwnerCredential({ env, redis: db(options) as never })
   const client = resolveYouTubeOAuthClient(env)
   if (!credential || !client || credential.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID) throw new Error("YOUTUBE_VOD_CONNECTION_REQUIRED")
   if (requireEdit && !credential.scopes.some(scope => [YOUTUBE_FORCE_SSL_SCOPE, "https://www.googleapis.com/auth/youtube"].includes(scope))) throw new Error("YOUTUBE_VOD_EDIT_SCOPE_REQUIRED")

@@ -190,3 +190,41 @@ test("confirmed cancelled renderer can resume but upload sessions remain fenced"
   state.data.set("ams:twitch-catchup:v1:vod:123", JSON.stringify({ ...job, status: "uploading" }))
   await assert.rejects(retryCancelledTwitchVod({ vodId: "123", approved: true }, state), /CANCELLED_RETRY_NOT_ALLOWED/)
 })
+
+
+test("pre-upload vault failures can resume but upload ambiguity cannot", async () => {
+  const options = await publisher()
+  options.allowLong()
+  const key = "ams:twitch-catchup:v1:vod:123"
+  const job = JSON.parse(options.data.get(key) as string)
+  options.data.set(key, JSON.stringify({ ...job, durationSeconds: 950, status: "failed", lease: "old-lease", youtubeVideoId: null, errorCode: "YOUTUBE_CONNECTION_VAULT_UNAVAILABLE" }))
+  options.data.set(key + ":lock", "old-lease")
+  const resumed = await claimTwitchVod(options)
+  assert.equal(resumed?.status, "rendering")
+  assert.notEqual(resumed?.lease, "old-lease")
+  options.data.set(key, JSON.stringify({ ...resumed, status: "reconciliation", errorCode: "YOUTUBE_CONNECTION_VAULT_UNAVAILABLE" }))
+  assert.equal(await claimTwitchVod(options), null)
+})
+
+test("production upload initiation resolves the configured Redis vault when no store is injected", async () => {
+  const options = await publisher()
+  options.allowLong()
+  const key = "ams:twitch-catchup:v1:vod:123"
+  const job = JSON.parse(options.data.get(key) as string)
+  options.data.set(key, JSON.stringify({ ...job, durationSeconds: 950, status: "pending", youtubeVideoId: null }))
+  const claimed = (await claimTwitchVod(options))!
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async (input, init) => {
+    assert.equal(new URL(String(input)).hostname, "redis.example.test")
+    const commands = JSON.parse(String(init?.body))
+    const execute = ([command, name, value]: string[]) => ({ result: command.toLowerCase() === "get" ? options.data.get(name) ?? null : (options.data.set(name, value), "OK") })
+    return Response.json(Array.isArray(commands[0]) ? commands.map(execute) : execute(commands))
+  }
+  try {
+    const result = await beginTwitchVodUpload({ vodId: "123", lease: claimed.lease!, bytes: 1234 }, {
+      env: { ...options.env, UPSTASH_REDIS_REST_URL: "https://redis.example.test", UPSTASH_REDIS_REST_TOKEN: "test-redis" },
+      fetcher: async (input, init) => String(input).includes("/upload/") ? new Response(null, { status: 200, headers: { location: "https://www.googleapis.com/upload/youtube/v3/videos?upload_id=test" } }) : options.fetcher(input, init),
+    })
+    assert.match(result.uploadUrl, /upload_id=test/)
+  } finally { globalThis.fetch = originalFetch }
+})

@@ -5,6 +5,7 @@ import {
   exchangeTwitchAuthorizationCode,
   readTwitchOauthAttempt,
   TWITCH_MEDIA_SCOPE,
+  TWITCH_METADATA_SCOPE,
   TWITCH_OAUTH_COOKIE,
   TWITCH_SCOPE,
 } from "@/lib/server/twitch-pilot"
@@ -47,13 +48,13 @@ export async function GET(request: NextRequest) {
     const result = await exchangeTwitchAuthorizationCode(
       code,
       {},
-      attempt.capability === "media" ? [TWITCH_SCOPE, TWITCH_MEDIA_SCOPE] : [TWITCH_SCOPE],
+      attempt.capability === "metadata" ? [TWITCH_SCOPE, TWITCH_MEDIA_SCOPE, TWITCH_METADATA_SCOPE] : attempt.capability === "media" ? [TWITCH_SCOPE, TWITCH_MEDIA_SCOPE] : [TWITCH_SCOPE],
     )
     console.info("TWITCH_OAUTH_CALLBACK_SUCCESS", {
       capability: attempt.capability,
       scopes: result.connection.scopes,
     })
-    return creatorRedirect(request, attempt.capability === "media" ? "media-enabled" : "connected")
+    return creatorRedirect(request, attempt.capability === "metadata" ? "metadata-enabled" : attempt.capability === "media" ? "media-enabled" : "connected")
   } catch (error) {
     const codeValue = error instanceof Error ? error.message : "TWITCH_CONNECTION_FAILED"
     console.warn("TWITCH_OAUTH_CALLBACK_FAILED", { code: codeValue })
