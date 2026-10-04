@@ -67,13 +67,13 @@ def upload(path, url):
 
 
 def main():
+    print(json.dumps(api({"action": "publish"})["result"]), flush=True)
     # One historical stream's best clips and one complete VOD per cycle, never a bulk burst.
     try:
         result = api({"action": "clips"})["result"]
         print(json.dumps({k: result.get(k) for k in ["skipped", "vodId", "cursor", "created", "queued", "failures"]}), flush=True)
     except RuntimeError as error:
         print("Clip catch-up: " + str(error), flush=True)
-    print(json.dumps(api({"action": "publish"})["result"]), flush=True)
     job = api({"action": "next"})["job"]
     if not job:
         print("No pending full VOD.", flush=True)

@@ -30,6 +30,29 @@ export default function TwitchCatchupCard() {
     } catch { setMessage("Catch-up could not start. Refresh to check its status before retrying.") }
     finally { setBusy(false) }
   }
+  async function retryCancelled(vodId: string) {
+    if (!window.confirm("Confirm the GitHub renderer was cancelled or stopped before its YouTube upload began. Requeue this recording?")) return
+    setBusy(true)
+    try {
+      const response = await fetch("/api/internal/twitch/catchup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "retry-cancelled", approved: true, vodId }) })
+      const body = await response.json()
+      if (response.ok) setState(body)
+      else setMessage(body.code ?? "Could not requeue the cancelled recording.")
+    } catch { setMessage("Refresh to check its status before retrying.") }
+    finally { setBusy(false) }
+  }
+  async function retryRemoved(job: NonNullable<State>["jobs"][number]) {
+    if (!window.confirm("Confirm YouTube removed this video or rejected it for length. Queue a replacement that will wait for YouTube long-upload verification?")) return
+    setBusy(true)
+    try {
+      const response = await fetch("/api/internal/twitch/catchup", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "retry-removed", approved: true, vodId: job.vodId, videoId: job.youtubeVideoId }) })
+      const body = await response.json()
+      if (response.ok) setState(body)
+      else setMessage(body.code ?? "Could not requeue the removed upload.")
+    } catch { setMessage("Refresh to check the removed upload before retrying.") }
+    finally { setBusy(false) }
+  }
   return <Card>
     <CardHeader><CardTitle>Catch up clips & full streams</CardTitle><CardDescription>
       Best clips from the last two weeks, plus each available full stream from the past month. Full VODs include a 5-second intro, 7-second outro, the streamer’s name, and “Created by Aspect Marketing Solutions (AMS).” Uploads are verified privately first, then selected Shorts and full VODs publish automatically when automatic publishing is enabled.
@@ -39,8 +62,11 @@ export default function TwitchCatchupCard() {
       {message && <p className="text-sm">{message}</p>}
       {state?.plan && <p className="text-sm">Historical stream clip review: {state.plan.clipCursor}/{state.plan.clipVodIds.length} streams completed.</p>}
       {!!state?.plan?.clipFailures?.length && <p className="text-sm text-amber-600">Clip review needs attention: {state.plan.clipFailures.join(" · ")}</p>}
+      {state?.jobs.some(job => job.status === "blocked") && <p className="text-sm text-amber-600">Full streams over 15 minutes are waiting for <a href="https://www.youtube.com/verify" target="_blank" rel="noreferrer" className="underline">YouTube phone verification</a>. They resume automatically after YouTube enables long uploads.</p>}
       <div className="space-y-2">{state?.jobs.map(job => <div className="rounded-lg border p-3 text-sm" key={job.vodId}>
         <p>SmokyBanana03 · {job.createdAt.slice(0, 10)} · {job.title} · {job.status}</p>
+        {job.status === "rendering" && <Button disabled={busy} variant="outline" onClick={() => void retryCancelled(job.vodId)}>Requeue confirmed cancelled renderer</Button>}
+        {job.youtubeVideoId && ["YOUTUBE_VOD_PUBLIC_PROOF_FAILED", "YOUTUBE_VOD_REMOVED_OR_UNAVAILABLE"].includes(job.errorCode ?? "") && <Button disabled={busy} variant="outline" onClick={() => void retryRemoved(job)}>Requeue confirmed removed upload</Button>}
         {job.errorCode && <p className="text-amber-600">{job.errorCode}</p>}
         {["verified", "published"].includes(job.status) && job.youtubeVideoId && <a className="underline" target="_blank" rel="noreferrer" href={`https://www.youtube.com/watch?v=${encodeURIComponent(job.youtubeVideoId)}`}>{job.status === "published" ? "View public full VOD" : "Review full VOD awaiting publication"}</a>}
       </div>)}</div>

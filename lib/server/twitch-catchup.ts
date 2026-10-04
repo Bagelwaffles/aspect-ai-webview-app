@@ -14,8 +14,9 @@ const prefix = "ams:twitch-catchup:v1:vod:"
 const jobSchema = z.object({
   vodId: z.string().regex(/^\d+$/), streamer: z.literal("SmokyBanana03"), title: z.string(),
   createdAt: z.string().datetime(), durationSeconds: z.number().positive(),
-  status: z.enum(["pending", "rendering", "uploading", "verified", "published", "failed", "reconciliation"]),
+  status: z.enum(["pending", "rendering", "uploading", "verified", "published", "blocked", "failed", "reconciliation"]),
   lease: z.string().nullable(), youtubeVideoId: z.string().nullable(), errorCode: z.string().nullable(),
+  previousYoutubeVideoIds: z.array(z.string()).max(10).optional(),
   metadata: z.object({ title: z.string().max(100), description: z.string().max(5000) }),
 }).strict()
 export type TwitchVodJob = z.infer<typeof jobSchema>
@@ -104,13 +105,30 @@ export async function runTwitchClipCatchup(options: Options = {}) {
 export async function claimTwitchVod(options: Options = {}) {
   const redis = db(options)
   const { jobs } = await getTwitchCatchupStatus({ ...options, redis })
+  let longUploadsAllowed: boolean | undefined
   for (const job of [...jobs].sort((a, b) => a.durationSeconds - b.durationSeconds)) {
-    if (job.status !== "pending" && job.status !== "rendering") continue
+    if (!["pending", "rendering", "blocked"].includes(job.status)) continue
+    if (job.durationSeconds + 12 > 900) {
+      if (longUploadsAllowed === undefined) {
+        try { await youtubeToken({ ...options, redis }, false, true); longUploadsAllowed = true }
+        catch (error) {
+          if (!(error instanceof Error) || error.message !== "YOUTUBE_LONG_UPLOAD_VERIFICATION_REQUIRED") throw error
+          longUploadsAllowed = false
+        }
+      }
+      if (!longUploadsAllowed) {
+        // Do not clear an active renderer's lock. It will also check eligibility
+        // before uploading; a cancelled renderer can resume after its lease expires.
+        if (job.status === "rendering") continue
+        await save({ ...job, status: "blocked", errorCode: "YOUTUBE_LONG_UPLOAD_VERIFICATION_REQUIRED" }, redis)
+        continue
+      }
+    }
     const lease = randomUUID()
     if (!await redis.set(prefix + job.vodId + ":lock", lease, { nx: true, ex: 6 * 3600 })) continue
     const current = await read<TwitchVodJob>(redis, prefix + job.vodId)
-    if (!current || !["pending", "rendering"].includes(current.status)) continue
-    return save({ ...current, status: "rendering", lease }, redis)
+    if (!current || !["pending", "rendering", "blocked"].includes(current.status)) continue
+    return save({ ...current, status: "rendering", lease, errorCode: null }, redis)
   }
   return null
 }
@@ -122,7 +140,7 @@ async function leasedJob(vodId: string, lease: string, options: Options) {
   if (job.lease !== lease || await redis.get(prefix + vodId + ":lock") !== lease) throw new Error("TWITCH_VOD_LEASE_INVALID")
   return { redis, job }
 }
-async function youtubeToken(options: Options, requireEdit = false) {
+async function youtubeToken(options: Options, requireEdit = false, requireLongUploads = false) {
   const env = options.env ?? process.env
   const credential = await getStoredYouTubeOwnerCredential({ env, redis: options.redis as never })
   const client = resolveYouTubeOAuthClient(env)
@@ -136,11 +154,12 @@ async function youtubeToken(options: Options, requireEdit = false) {
   })
   const body = await response.json() as { access_token?: string }
   if (!response.ok || !body.access_token) throw new Error("YOUTUBE_VOD_TOKEN_FAILED")
-  const channel = await fetcher("https://www.googleapis.com/youtube/v3/channels?part=id&mine=true", {
+  const channel = await fetcher("https://www.googleapis.com/youtube/v3/channels?part=id%2Cstatus&mine=true", {
     headers: { Authorization: `Bearer ${body.access_token}` }, signal: AbortSignal.timeout(20_000),
   })
-  const channels = await channel.json() as { items?: Array<{ id: string }> }
+  const channels = await channel.json() as { items?: Array<{ id: string; status?: { longUploadsStatus?: string } }> }
   if (!channel.ok || !channels.items?.some(item => item.id === SMOKYBANANA03_YOUTUBE_CHANNEL_ID)) throw new Error("YOUTUBE_VOD_CHANNEL_MISMATCH")
+  if (requireLongUploads && channels.items?.find(item => item.id === SMOKYBANANA03_YOUTUBE_CHANNEL_ID)?.status?.longUploadsStatus !== "allowed") throw new Error("YOUTUBE_LONG_UPLOAD_VERIFICATION_REQUIRED")
   return body.access_token
 }
 export function validateYouTubeSessionUrl(value: string) {
@@ -153,7 +172,7 @@ export async function beginTwitchVodUpload(input: { vodId: string; lease: string
   if (!Number.isSafeInteger(input.bytes) || input.bytes <= 0 || input.bytes > 256 * 1024 ** 3) throw new Error("YOUTUBE_VOD_SIZE_INVALID")
   const { redis, job } = await leasedJob(input.vodId, input.lease, options)
   if (job.status !== "rendering") throw new Error("YOUTUBE_VOD_RECONCILIATION_REQUIRED")
-  const token = await youtubeToken(options)
+  const token = await youtubeToken(options, false, job.durationSeconds + 12 > 900)
   // Persist an ambiguity fence before contacting YouTube. Never automatically start a second session.
   await save({ ...job, status: "uploading" }, redis)
   const response = await (options.fetcher ?? fetch)("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet%2Cstatus&notifySubscribers=false", {
@@ -172,6 +191,11 @@ export async function beginTwitchVodUpload(input: { vodId: string; lease: string
 export async function completeTwitchVod(input: { vodId: string; lease: string; videoId?: string; errorCode?: string }, options: Options = {}) {
   const { redis, job } = await leasedJob(input.vodId, input.lease, options)
   if (input.errorCode) {
+    if (job.status !== "uploading" && input.errorCode === "YOUTUBE_LONG_UPLOAD_VERIFICATION_REQUIRED") {
+      const result = await save({ ...job, status: "blocked", lease: null, errorCode: input.errorCode }, redis)
+      await redis.del(prefix + job.vodId + ":lock")
+      return result
+    }
     return save({ ...job, status: job.status === "uploading" ? "reconciliation" : "failed",
       errorCode: input.errorCode.replace(/[^A-Z0-9_:]/g, "_").slice(0, 100) }, redis)
   }
@@ -213,6 +237,7 @@ export async function publishVerifiedTwitchVods(options: Options = {}) {
           })
           const body = await response.json() as { items?: Array<{ snippet: { channelId: string; title: string; description: string }; status: Record<string, unknown>; processingDetails?: { processingStatus?: string } }> }
           const video = body.items?.[0]
+          if (response.ok && !video) throw new Error("YOUTUBE_VOD_REMOVED_OR_UNAVAILABLE")
           if (!response.ok || !video || video.snippet.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID ||
             video.snippet.title !== job.metadata.title || video.snippet.description !== job.metadata.description) throw new Error("YOUTUBE_VOD_PUBLIC_PROOF_FAILED")
           return video
@@ -220,7 +245,7 @@ export async function publishVerifiedTwitchVods(options: Options = {}) {
         let video = await inspect()
         if (video.status.privacyStatus !== "public") {
           if (video.status.privacyStatus !== "private") throw new Error("YOUTUBE_VOD_SOURCE_NOT_PRIVATE")
-          if (video.processingDetails?.processingStatus !== "succeeded") {
+          if (video.processingDetails?.processingStatus !== "succeeded" && video.status.uploadStatus !== "processed") {
             await save({ ...job, errorCode: "YOUTUBE_VOD_PROCESSING_PENDING" }, redis)
             continue
           }
@@ -240,9 +265,42 @@ export async function publishVerifiedTwitchVods(options: Options = {}) {
         published++
       } catch (error) {
         const code = error instanceof Error && /^YOUTUBE_[A-Z0-9_]+$/.test(error.message) ? error.message : "YOUTUBE_VOD_PUBLIC_RECONCILIATION_PENDING"
-        await save({ ...job, errorCode: code }, redis)
+        await save({ ...job, status: code === "YOUTUBE_VOD_REMOVED_OR_UNAVAILABLE" ? "reconciliation" : job.status, errorCode: code }, redis)
       }
     }
     return { published }
   } finally { await redis.del(lock) }
+}
+
+// An owner-confirmed removed/rejected upload can be replaced. A missing video alone
+// never automatically clears the duplicate-upload fence.
+export async function retryRemovedTwitchVod(input: { vodId: string; videoId: string; approved: boolean }, options: Options = {}) {
+  if (!input.approved) throw new Error("TWITCH_CATCHUP_APPROVAL_REQUIRED")
+  const redis = db(options)
+  const raw = await read<TwitchVodJob>(redis, prefix + input.vodId)
+  if (!raw || raw.youtubeVideoId !== input.videoId || !["verified", "reconciliation"].includes(raw.status) ||
+    !["YOUTUBE_VOD_PUBLIC_PROOF_FAILED", "YOUTUBE_VOD_REMOVED_OR_UNAVAILABLE"].includes(raw.errorCode ?? "")) throw new Error("YOUTUBE_VOD_RETRY_NOT_ALLOWED")
+  const token = await youtubeToken({ ...options, redis })
+  const response = await (options.fetcher ?? fetch)(`https://www.googleapis.com/youtube/v3/videos?part=status&id=${input.videoId}`, {
+    headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20_000),
+  })
+  const body = await response.json() as { items?: Array<{ status?: { uploadStatus?: string; rejectionReason?: string } }> }
+  if (!response.ok || !Array.isArray(body.items)) throw new Error("YOUTUBE_VOD_REMOVAL_NOT_VERIFIED")
+  const video = body.items[0]
+  if (video && !(video.status?.uploadStatus === "rejected" && video.status.rejectionReason === "length")) throw new Error("YOUTUBE_VOD_RETRY_EXISTING_VIDEO")
+  await save({ ...raw, status: "pending", lease: null, youtubeVideoId: null, errorCode: null,
+    previousYoutubeVideoIds: [...(raw.previousYoutubeVideoIds ?? []), input.videoId].slice(-10) }, redis)
+  return getTwitchCatchupStatus({ ...options, redis })
+}
+
+export async function retryCancelledTwitchVod(input: { vodId: string; approved: boolean }, options: Options = {}) {
+  if (!input.approved) throw new Error("TWITCH_CATCHUP_APPROVAL_REQUIRED")
+  const redis = db(options)
+  const job = await read<TwitchVodJob>(redis, prefix + input.vodId)
+  // The owner must first confirm that the renderer was stopped. Uploading or
+  // ambiguous sessions remain fenced and are never reset by this operation.
+  if (!job || job.status !== "rendering" || job.youtubeVideoId) throw new Error("YOUTUBE_VOD_CANCELLED_RETRY_NOT_ALLOWED")
+  await save({ ...job, status: "pending", lease: null, errorCode: null }, redis)
+  await redis.del(prefix + job.vodId + ":lock")
+  return getTwitchCatchupStatus({ ...options, redis })
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { claimTwitchVod, completeTwitchVod, beginTwitchVodUpload, getTwitchCatchupStatus, publishVerifiedTwitchVods, validateYouTubeSessionUrl, vodMetadata } from "../lib/server/twitch-catchup"
+import { claimTwitchVod, completeTwitchVod, beginTwitchVodUpload, getTwitchCatchupStatus, publishVerifiedTwitchVods, retryRemovedTwitchVod, retryCancelledTwitchVod, validateYouTubeSessionUrl, vodMetadata } from "../lib/server/twitch-catchup"
 
 function store() {
   const data = new Map<string, unknown>()
@@ -60,7 +60,7 @@ test("uncertain upload is fenced from a duplicate claim or upload session", asyn
 
 import { storeYouTubeOwnerConnectionFromGoogle, SMOKYBANANA03_YOUTUBE_CHANNEL_ID, YOUTUBE_FORCE_SSL_SCOPE, YOUTUBE_READONLY_SCOPE, YOUTUBE_UPLOAD_SCOPE } from "../lib/server/youtube-owner-connection"
 
-async function publisher(scenario: "normal" | "ambiguous" | "wrong-channel" | "processing" | "no-edit" = "normal") {
+async function publisher(scenario: "normal" | "ambiguous" | "wrong-channel" | "processing" | "no-edit" | "processed" | "removed" = "normal") {
   const state = seeded()
   const key = "ams:twitch-catchup:v1:vod:123"
   const job = JSON.parse(state.data.get(key) as string)
@@ -68,11 +68,11 @@ async function publisher(scenario: "normal" | "ambiguous" | "wrong-channel" | "p
   const env: NodeJS.ProcessEnv = { NODE_ENV: "test", GOOGLE_CLIENT_ID: "google-client-12345678901234567890",
     GOOGLE_CLIENT_SECRET: "google-secret-12345678901234567890", NEXTAUTH_SECRET: "test-secret-with-enough-entropy-for-vod-promotion",
     AMS_OWNER_EMAIL: "owner@example.com", AMS_TWITCH_YOUTUBE_PUBLIC_AUTOPUBLISH: "true" }
-  let privacy = "private", updates = 0
+  let privacy = "private", updates = 0, longUploads = "eligible"
   const fetcher = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 })
-    if (url.includes("/channels?")) return json({ items: [{ id: SMOKYBANANA03_YOUTUBE_CHANNEL_ID, snippet: { title: "SmokyBanana03" } }] })
+    if (url.includes("/channels?")) return json({ items: [{ id: SMOKYBANANA03_YOUTUBE_CHANNEL_ID, snippet: { title: "SmokyBanana03" }, status: { longUploadsStatus: longUploads } }] })
     if (url.includes("/token")) return json({ access_token: "test-access-token" })
     if (init?.method === "PUT") {
       updates++
@@ -84,16 +84,17 @@ async function publisher(scenario: "normal" | "ambiguous" | "wrong-channel" | "p
       if (scenario === "ambiguous") throw new Error("transport timeout")
       return json({ id: body.id })
     }
+    if (url.includes("/videos?") && scenario === "removed") return json({ items: [] })
     if (url.includes("/videos?")) return json({ items: [{ snippet: { ...job.metadata,
       channelId: scenario === "wrong-channel" ? "wrong" : SMOKYBANANA03_YOUTUBE_CHANNEL_ID },
-      status: { privacyStatus: privacy, selfDeclaredMadeForKids: false },
-      processingDetails: { processingStatus: scenario === "processing" ? "processing" : "succeeded" } }] })
+      status: { privacyStatus: privacy, selfDeclaredMadeForKids: false, uploadStatus: scenario === "processed" ? "processed" : "uploaded" },
+      processingDetails: { processingStatus: ["processing", "processed"].includes(scenario) ? "processing" : "succeeded" } }] })
     throw new Error("unexpected endpoint")
   }) as typeof fetch
   await storeYouTubeOwnerConnectionFromGoogle({ email: "owner@example.com", refreshToken: "test-refresh-token-12345678901234567890",
     accessToken: "initial-token", scopes: [YOUTUBE_UPLOAD_SCOPE, YOUTUBE_READONLY_SCOPE, ...(scenario === "no-edit" ? [] : [YOUTUBE_FORCE_SSL_SCOPE])] },
     { ...state, env, fetcher })
-  return { ...state, env, fetcher, updates: () => updates }
+  return { ...state, env, fetcher, updates: () => updates, allowLong: () => { longUploads = "allowed" } }
 }
 test("verified full VODs publish the existing video once and verify Public", async () => {
   const options = await publisher()
@@ -124,4 +125,68 @@ test("public VOD promotion requires an owner edit scope", async () => {
   const options = await publisher("no-edit")
   await assert.rejects(publishVerifiedTwitchVods(options), /EDIT_SCOPE_REQUIRED/)
   assert.equal(options.updates(), 0)
+})
+
+test("provider processed status permits publication when detailed processing readback lags", async () => {
+  const options = await publisher("processed")
+  assert.equal((await publishVerifiedTwitchVods(options)).published, 1)
+})
+test("missing video requires reconciliation, never automatic duplicate upload", async () => {
+  const options = await publisher("removed")
+  assert.equal((await publishVerifiedTwitchVods(options)).published, 0)
+  const job = (await getTwitchCatchupStatus(options)).jobs[0]
+  assert.equal(job.status, "reconciliation")
+  assert.equal(job.errorCode, "YOUTUBE_VOD_REMOVED_OR_UNAVAILABLE")
+  assert.equal(await claimTwitchVod(options), null)
+})
+test("long recordings are blocked before rendering and automatically resume after channel verification", async () => {
+  const options = await publisher()
+  const key = "ams:twitch-catchup:v1:vod:123"
+  const job = JSON.parse(options.data.get(key) as string)
+  options.data.set(key, JSON.stringify({ ...job, status: "pending", youtubeVideoId: null, durationSeconds: 889 }))
+  assert.equal(await claimTwitchVod(options), null)
+  assert.equal((await getTwitchCatchupStatus(options)).jobs[0].status, "blocked")
+  options.allowLong()
+  const resumed = (await claimTwitchVod(options))!
+  assert.equal(resumed.status, "rendering")
+  assert.equal(resumed.errorCode, null)
+})
+test("eligibility is rechecked before upload session creation", async () => {
+  const options = await publisher()
+  const key = "ams:twitch-catchup:v1:vod:123"
+  const job = JSON.parse(options.data.get(key) as string)
+  options.data.set(key, JSON.stringify({ ...job, status: "pending", youtubeVideoId: null }))
+  const claimed = (await claimTwitchVod(options))!
+  options.data.set(key, JSON.stringify({ ...claimed, durationSeconds: 901 }))
+  await assert.rejects(beginTwitchVodUpload({ vodId: "123", lease: claimed.lease!, bytes: 1234 }, options), /LONG_UPLOAD_VERIFICATION_REQUIRED/)
+  assert.equal((await getTwitchCatchupStatus(options)).jobs[0].status, "rendering")
+  await completeTwitchVod({ vodId: "123", lease: claimed.lease!, errorCode: "YOUTUBE_LONG_UPLOAD_VERIFICATION_REQUIRED" }, options)
+  assert.equal((await getTwitchCatchupStatus(options)).jobs[0].status, "blocked")
+  options.allowLong()
+  assert.equal((await claimTwitchVod(options))?.status, "rendering")
+})
+test("removed-video retry requires owner confirmation and cannot replace an existing video", async () => {
+  const options = await publisher()
+  const key = "ams:twitch-catchup:v1:vod:123"
+  const job = JSON.parse(options.data.get(key) as string)
+  options.data.set(key, JSON.stringify({ ...job, errorCode: "YOUTUBE_VOD_PUBLIC_PROOF_FAILED" }))
+  await assert.rejects(retryRemovedTwitchVod({ vodId: "123", videoId: "abcdefghijk", approved: false }, options), /APPROVAL_REQUIRED/)
+  await assert.rejects(retryRemovedTwitchVod({ vodId: "123", videoId: "abcdefghijk", approved: true }, options), /RETRY_EXISTING_VIDEO/)
+  const removed = await publisher("removed")
+  await publishVerifiedTwitchVods(removed)
+  await retryRemovedTwitchVod({ vodId: "123", videoId: "abcdefghijk", approved: true }, removed)
+  const reset = (await getTwitchCatchupStatus(removed)).jobs[0]
+  assert.equal(reset.status, "pending")
+  assert.equal(reset.youtubeVideoId, null)
+  assert.deepEqual(reset.previousYoutubeVideoIds, ["abcdefghijk"])
+})
+
+test("confirmed cancelled renderer can resume but upload sessions remain fenced", async () => {
+  const state = seeded()
+  const job = (await claimTwitchVod(state))!
+  await assert.rejects(retryCancelledTwitchVod({ vodId: "123", approved: false }, state), /APPROVAL_REQUIRED/)
+  await retryCancelledTwitchVod({ vodId: "123", approved: true }, state)
+  assert.equal((await claimTwitchVod(state))?.status, "rendering")
+  state.data.set("ams:twitch-catchup:v1:vod:123", JSON.stringify({ ...job, status: "uploading" }))
+  await assert.rejects(retryCancelledTwitchVod({ vodId: "123", approved: true }, state), /CANCELLED_RETRY_NOT_ALLOWED/)
 })

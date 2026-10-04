@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authorizeOwnerApiRequest } from "@/lib/server/owner-api-auth"
-import { getTwitchCatchupStatus, startTwitchCatchup } from "@/lib/server/twitch-catchup"
+import { getTwitchCatchupStatus, startTwitchCatchup, retryRemovedTwitchVod, retryCancelledTwitchVod } from "@/lib/server/twitch-catchup"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -24,6 +24,16 @@ export async function POST(request: NextRequest) {
   if (!auth.ok) return json({ ok: false, code: auth.code }, auth.status)
   const body = await request.json().catch(() => null)
   if (body?.approved !== true) return json({ ok: false, code: "TWITCH_CATCHUP_APPROVAL_REQUIRED" }, 400)
+  if (body.action === "retry-cancelled") {
+    if (!/^\d+$/.test(body.vodId ?? "")) return json({ ok: false, code: "TWITCH_CATCHUP_INPUT_INVALID" }, 400)
+    try { return json({ ok: true, ...publicStatus(await retryCancelledTwitchVod({ vodId: body.vodId, approved: true })) }) }
+    catch (error) { return json({ ok: false, code: safeError(error) }, 503) }
+  }
+  if (body.action === "retry-removed") {
+    if (!/^\d+$/.test(body.vodId ?? "") || !/^[A-Za-z0-9_-]{11}$/.test(body.videoId ?? "")) return json({ ok: false, code: "TWITCH_CATCHUP_INPUT_INVALID" }, 400)
+    try { return json({ ok: true, ...publicStatus(await retryRemovedTwitchVod({ ...body, approved: true })) }) }
+    catch (error) { return json({ ok: false, code: safeError(error) }, 503) }
+  }
   try { return json({ ok: true, ...publicStatus(await startTwitchCatchup()) }) }
   catch (error) { return json({ ok: false, code: safeError(error) }, 503) }
 }
