@@ -71,9 +71,10 @@ export async function getTwitchCatchupStatus(options: Options = {}) {
     .filter((job): job is TwitchVodJob => Boolean(job))
   const now = Date.now()
   const jobs = storedJobs.map(job => {
-    const changedAt = job.updatedAt ?? job.createdAt
-    const staleForSeconds = Math.max(0, Math.floor((now - Date.parse(changedAt)) / 1000))
-    const stalled = ["rendering", "uploading", "reconciliation"].includes(job.status) &&
+    const staleForSeconds = job.updatedAt
+      ? Math.max(0, Math.floor((now - Date.parse(job.updatedAt)) / 1000))
+      : 0
+    const stalled = Boolean(job.updatedAt) && ["rendering", "uploading", "reconciliation"].includes(job.status) &&
       staleForSeconds * 1000 > ACTIVE_JOB_STALL_MS
     return { ...job, stalled, staleForSeconds }
   })
