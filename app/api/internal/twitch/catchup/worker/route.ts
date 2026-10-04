@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (body.action === "status") {
       const { plan, jobs } = await getTwitchCatchupStatus()
       return json({ ok: true, hasWork: Boolean(plan && plan.clipCursor < plan.clipVodIds.length) ||
-        jobs.some(job => job.status === "pending" || job.status === "rendering" || job.status === "blocked" || (job.status === "verified" && isYouTubePublicAutopublishEnabled())) })
+        jobs.some(job => job.status === "pending" || job.status === "rendering" || job.status === "blocked" || (job.status === "failed" && job.errorCode === "YOUTUBE_CONNECTION_VAULT_UNAVAILABLE" && !job.youtubeVideoId) || (job.status === "verified" && isYouTubePublicAutopublishEnabled())) })
     }
     if (body.action === "publish") return json({ ok: true, result: await publishVerifiedTwitchVods() })
     if (body.action === "clips") return json({ ok: true, result: await runTwitchClipCatchup() })
