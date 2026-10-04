@@ -163,7 +163,14 @@ if __name__ == "__main__":
     if arguments.check_pending:
         trigger = os.environ.get("GITHUB_EVENT_NAME", "other")[:40] or "other"
         api({"action": "heartbeat", "phase": "started", "trigger": trigger})
-        has_work = api({"action": "status"})["hasWork"]
+        try:
+            has_work = api({"action": "status"})["hasWork"]
+        except Exception as error:
+            code = str(error) if isinstance(error, RuntimeError) else "TWITCH_VOD_" + type(error).__name__.upper()
+            try:
+                api({"action": "heartbeat", "phase": "failed", "trigger": trigger, "errorCode": code[:100]})
+            finally:
+                raise
         with open(os.environ["GITHUB_OUTPUT"], "a") as output:
             output.write("has_work=" + str(bool(has_work)).lower() + "\n")
         print("Catch-up work available: " + str(bool(has_work)), flush=True)
