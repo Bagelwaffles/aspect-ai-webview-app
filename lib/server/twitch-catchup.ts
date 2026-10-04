@@ -43,9 +43,10 @@ async function read<T>(redis: Store, key: string): Promise<T | null> {
   const raw = await redis.get<unknown>(key)
   return raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) as T : null
 }
-async function save(job: TwitchVodJob, redis: Store) {
-  const stored = jobSchema.parse({ ...job, updatedAt: new Date().toISOString() })
-  await redis.set(prefix + job.vodId, JSON.stringify(stored), { ex: TTL })
+async function save(job: TwitchVodJob & { stalled?: boolean; staleForSeconds?: number }, redis: Store) {
+  const { stalled: _stalled, staleForSeconds: _staleForSeconds, ...persistable } = job
+  const stored = jobSchema.parse({ ...persistable, updatedAt: new Date().toISOString() })
+  await redis.set(prefix + stored.vodId, JSON.stringify(stored), { ex: TTL })
   return stored
 }
 export function vodMetadata(vod: Pick<TwitchRecentVod, "id" | "title" | "createdAt">) {
