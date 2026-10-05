@@ -56,7 +56,7 @@ export async function GET() {
 
   try {
     const result = await generateText({
-      model: "openai/gpt-6.1-sol",
+      model: "openai/gpt-5.4-mini",
       system,
       prompt,
       temperature: 0.4,
@@ -65,8 +65,8 @@ export async function GET() {
 
     return json({
       ok: true,
-      benchmark: "vercel-ai-gateway",
-      model: "openai/gpt-6.1-sol",
+      benchmark: "vercel-ai-gateway-production-tier",
+      model: "openai/gpt-5.4-mini",
       latencyMs: Date.now() - startedAt,
       text: result.text,
       usage: result.usage,
