@@ -30,6 +30,8 @@ Optional controls:
 
 No production environment variable should be enabled until preview verification is complete.
 
+The preview acceptance probe is additionally restricted to `VERCEL_ENV=preview` and requires `AMS_MANAGED_INTELLIGENCE_PROBE_TOKEN`; it is not a customer-facing route.
+
 ## Acceptance gate
 
 The pilot is technically proven only after:
