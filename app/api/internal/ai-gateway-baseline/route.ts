@@ -7,10 +7,7 @@ export const dynamic = "force-dynamic"
 export const maxDuration = 120
 
 function json(body: Record<string, unknown>, status = 200) {
-  return NextResponse.json(body, {
-    status,
-    headers: { "Cache-Control": "no-store" },
-  })
+  return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } })
 }
 
 const outputSchema = z
@@ -45,49 +42,40 @@ const prompt = [
   "Evidence: The official quickstart creates managed agent sessions through POST /v1/agents/sessions and demonstrates gpt-6-astra with an OpenAI-hosted environment.",
 ].join("\n")
 
-const candidates = [
-  "google/gemini-2.5-flash-lite",
-  "openai/gpt-4.1-nano",
-] as const
-
 export async function GET() {
-  if (process.env.VERCEL_ENV !== "preview") {
-    return json({ ok: false, code: "NOT_FOUND" }, 404)
+  if (process.env.VERCEL_ENV !== "preview") return json({ ok: false, code: "NOT_FOUND" }, 404)
+
+  const startedAt = Date.now()
+
+  try {
+    const result = await generateText({
+      model: "openai/gpt-5.4-mini",
+      output: Output.object({ schema: outputSchema }),
+      system,
+      prompt,
+      temperature: 0.4,
+      maxOutputTokens: 1_200,
+      providerOptions: {
+        gateway: {
+          models: ["google/gemini-2.5-flash-lite"],
+        },
+      },
+    })
+
+    return json({
+      ok: true,
+      benchmark: "blocked-primary-to-structured-gemini-fallback",
+      latencyMs: Date.now() - startedAt,
+      output: result.output,
+      usage: result.usage,
+      finishReason: result.finishReason,
+      providerMetadata: result.providerMetadata ?? null,
+    })
+  } catch (error) {
+    return json({
+      ok: false,
+      code: "AI_GATEWAY_GEMINI_FALLBACK_FAILED",
+      message: error instanceof Error ? error.message : "UNKNOWN_FAILURE",
+    }, 502)
   }
-
-  const attempts: Array<Record<string, unknown>> = []
-
-  for (const model of candidates) {
-    const startedAt = Date.now()
-    try {
-      const result = await generateText({
-        model,
-        output: Output.object({ schema: outputSchema }),
-        system,
-        prompt,
-        temperature: 0.4,
-        maxOutputTokens: 1_200,
-      })
-
-      attempts.push({
-        model,
-        ok: true,
-        latencyMs: Date.now() - startedAt,
-        output: result.output,
-        usage: result.usage,
-        finishReason: result.finishReason,
-        providerMetadata: result.providerMetadata ?? null,
-      })
-      return json({ ok: true, benchmark: "structured-fallback-discovery", winner: model, attempts })
-    } catch (error) {
-      attempts.push({
-        model,
-        ok: false,
-        latencyMs: Date.now() - startedAt,
-        error: error instanceof Error ? error.message : "UNKNOWN_FAILURE",
-      })
-    }
-  }
-
-  return json({ ok: false, code: "NO_STRUCTURED_FALLBACK_AVAILABLE", attempts }, 503)
 }
