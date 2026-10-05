@@ -32,6 +32,8 @@ No production environment variable should be enabled until preview verification 
 
 The preview acceptance probe is additionally restricted to `VERCEL_ENV=preview` and requires `AMS_MANAGED_INTELLIGENCE_PROBE_TOKEN`; it is not a customer-facing route.
 
+The acceptance credential is temporary and must be removed with the preview probe route before merge.
+
 ## Acceptance gate
 
 The pilot is technically proven only after:
