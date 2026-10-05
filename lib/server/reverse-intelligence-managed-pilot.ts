@@ -282,9 +282,22 @@ export async function runManagedIntelligencePilot(
       continue
     }
 
+    const completedTurn = turnSchema.parse(
+      await apiJson(
+        `/${encodeURIComponent(created.id)}/turns/${encodeURIComponent(turn.id)}`,
+        { method: "GET" },
+        apiKey,
+        fetcher,
+      ),
+    )
+
+    if (completedTurn.status !== "completed") {
+      throw new Error("MANAGED_INTELLIGENCE_TURN_STATE_CHANGED")
+    }
+
     const items = sessionItemListSchema.parse(
       await apiJson(
-        `/${encodeURIComponent(created.id)}/turns/${encodeURIComponent(turn.id)}/items?order=asc&limit=100`,
+        `/${encodeURIComponent(created.id)}/turns/${encodeURIComponent(completedTurn.id)}/items?order=asc&limit=100`,
         { method: "GET" },
         apiKey,
         fetcher,
@@ -298,11 +311,11 @@ export async function runManagedIntelligencePilot(
 
     return {
       sessionId: created.id,
-      turnId: turn.id,
+      turnId: completedTurn.id,
       model,
       outputText,
       latencyMs: Date.now() - startedAt,
-      usage: normalizedUsage(turn),
+      usage: normalizedUsage(completedTurn),
     }
   }
 
