@@ -40,7 +40,7 @@ The pilot is technically proven only after:
 2. Preview deployment builds successfully.
 3. A real managed Agents API session completes from preview.
 4. The brief is source-backed and does not invent unsupported facts.
-5. Session and turn identifiers are captured.
+5. Session and turn identifiers, end-to-end latency, and provider token usage are captured.
 6. Cost and latency are compared with the existing AMS structured-agent path.
 7. Failure behavior is verified without misreporting success.
 

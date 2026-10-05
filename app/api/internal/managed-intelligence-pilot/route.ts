@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
       turnId: result.turnId,
       model: result.model,
       outputText: result.outputText,
+      latencyMs: result.latencyMs,
+      usage: result.usage,
     })
   } catch (error) {
     const code = error instanceof Error ? error.message : "MANAGED_INTELLIGENCE_FAILED"

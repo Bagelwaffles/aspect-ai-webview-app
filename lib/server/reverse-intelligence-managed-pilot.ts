@@ -15,10 +15,26 @@ const sessionSchema = z.object({
   status: z.string().optional(),
 })
 
+const tokenUsageSchema = z
+  .object({
+    input_tokens: z.number().int().nonnegative(),
+    input_tokens_details: z
+      .object({ cached_tokens: z.number().int().nonnegative().default(0) })
+      .default({ cached_tokens: 0 }),
+    output_tokens: z.number().int().nonnegative(),
+    output_tokens_details: z
+      .object({ reasoning_tokens: z.number().int().nonnegative().default(0) })
+      .default({ reasoning_tokens: 0 }),
+    total_tokens: z.number().int().nonnegative(),
+  })
+  .nullable()
+  .optional()
+
 const turnSchema = z.object({
   id: z.string().min(1),
   status: z.string(),
   error: z.unknown().nullable().optional(),
+  usage: tokenUsageSchema,
 })
 
 const turnListSchema = z.object({
@@ -48,6 +64,16 @@ export type ManagedIntelligencePilotResult = {
   turnId: string
   model: string
   outputText: string
+  latencyMs: number
+  usage:
+    | {
+        inputTokens: number
+        cachedInputTokens: number
+        outputTokens: number
+        reasoningTokens: number
+        totalTokens: number
+      }
+    | null
 }
 
 export function isManagedIntelligencePilotConfigured(
@@ -163,6 +189,19 @@ function assistantOutputText(items: z.infer<typeof sessionItemSchema>[]) {
   return chunks.join("\n\n").trim()
 }
 
+function normalizedUsage(turn: z.infer<typeof turnSchema>) {
+  const usage = turn.usage
+  if (!usage) return null
+
+  return {
+    inputTokens: usage.input_tokens,
+    cachedInputTokens: usage.input_tokens_details.cached_tokens,
+    outputTokens: usage.output_tokens,
+    reasoningTokens: usage.output_tokens_details.reasoning_tokens,
+    totalTokens: usage.total_tokens,
+  }
+}
+
 export async function runManagedIntelligencePilot(
   research: LiveResearchResult,
   env: NodeJS.ProcessEnv = process.env,
@@ -181,6 +220,7 @@ export async function runManagedIntelligencePilot(
   const apiKey = env.OPENAI_API_KEY!.trim()
   const model = configuredModel(env)
   const multiAgent = configuredMultiAgent(env)
+  const startedAt = Date.now()
 
   const createBody = {
     agent: {
@@ -261,6 +301,8 @@ export async function runManagedIntelligencePilot(
       turnId: turn.id,
       model,
       outputText,
+      latencyMs: Date.now() - startedAt,
+      usage: normalizedUsage(turn),
     }
   }
 

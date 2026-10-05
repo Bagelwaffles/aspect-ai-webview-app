@@ -58,7 +58,20 @@ test("managed intelligence pilot creates a synthesis-only Agents API session and
     if (call === 2) {
       return new Response(
         JSON.stringify({
-          data: [{ id: "turn_123", status: "completed", error: null }],
+          data: [
+            {
+              id: "turn_123",
+              status: "completed",
+              error: null,
+              usage: {
+                input_tokens: 420,
+                input_tokens_details: { cached_tokens: 100 },
+                output_tokens: 210,
+                output_tokens_details: { reasoning_tokens: 80 },
+                total_tokens: 630,
+              },
+            },
+          ],
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       )
@@ -103,6 +116,14 @@ test("managed intelligence pilot creates a synthesis-only Agents API session and
   assert.equal(result.turnId, "turn_123")
   assert.equal(result.model, "gpt-6.1-sol")
   assert.match(result.outputText, /managed capability launched/)
+  assert.ok(result.latencyMs >= 0)
+  assert.deepEqual(result.usage, {
+    inputTokens: 420,
+    cachedInputTokens: 100,
+    outputTokens: 210,
+    reasoningTokens: 80,
+    totalTokens: 630,
+  })
 
   const createBody = seen[0]?.body as {
     environment?: { type?: string }
