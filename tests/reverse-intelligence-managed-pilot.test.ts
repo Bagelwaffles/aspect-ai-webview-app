@@ -58,20 +58,25 @@ test("managed intelligence pilot creates a synthesis-only Agents API session and
     if (call === 2) {
       return new Response(
         JSON.stringify({
-          data: [
-            {
-              id: "turn_123",
-              status: "completed",
-              error: null,
-              usage: {
-                input_tokens: 420,
-                input_tokens_details: { cached_tokens: 100 },
-                output_tokens: 210,
-                output_tokens_details: { reasoning_tokens: 80 },
-                total_tokens: 630,
-              },
-            },
-          ],
+          data: [{ id: "turn_123", status: "completed", error: null }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      )
+    }
+
+    if (call === 3) {
+      return new Response(
+        JSON.stringify({
+          id: "turn_123",
+          status: "completed",
+          error: null,
+          usage: {
+            input_tokens: 420,
+            input_tokens_details: { cached_tokens: 100 },
+            output_tokens: 210,
+            output_tokens_details: { reasoning_tokens: 80 },
+            total_tokens: 630,
+          },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       )
@@ -134,6 +139,10 @@ test("managed intelligence pilot creates a synthesis-only Agents API session and
 
   assert.equal(seen[0]?.url, "https://api.openai.com/v1/agents/sessions")
   assert.equal(seen[0]?.method, "POST")
+  assert.equal(
+    seen[2]?.url,
+    "https://api.openai.com/v1/agents/sessions/sess_123/turns/turn_123",
+  )
   assert.equal(createBody.environment?.type, "none")
   assert.equal(createBody.agent?.model, "gpt-6.1-sol")
   assert.equal(createBody.agent?.tools, undefined)
