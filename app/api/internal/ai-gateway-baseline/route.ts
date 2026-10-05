@@ -61,24 +61,18 @@ export async function GET() {
 
   try {
     const result = await generateText({
-      model: "openai/gpt-5.4-mini",
+      model: "poolside/laguna-s-2.1-free",
       output: Output.object({ schema: outputSchema }),
       system,
       prompt,
       temperature: 0.4,
       maxOutputTokens: 1_200,
-      providerOptions: {
-        gateway: {
-          models: ["poolside/laguna-s-2.1-free"],
-        },
-      },
     })
 
     return json({
       ok: true,
-      benchmark: "vercel-ai-gateway-structured-fallback",
-      requestedModel: "openai/gpt-5.4-mini",
-      fallbackModel: "poolside/laguna-s-2.1-free",
+      benchmark: "vercel-ai-gateway-free-structured",
+      requestedModel: "poolside/laguna-s-2.1-free",
       latencyMs: Date.now() - startedAt,
       output: result.output,
       usage: result.usage,
