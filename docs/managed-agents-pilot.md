@@ -47,3 +47,16 @@ The pilot is technically proven only after:
 7. Failure behavior is verified without misreporting success.
 
 Only after that proof should AMS consider a second phase using Vercel Sandbox or broader multi-agent delegation.
+
+## Preview pilot result
+
+Controlled preview proof completed on October 5, 2026 with GPT-6.1 Sol.
+
+- Managed session completed successfully and returned a source-disciplined brief.
+- Measured end-to-end latency: 24,598 ms.
+- Recorded usage after bounded late-telemetry polling: 8,231 input tokens, 496 output tokens, 37 reasoning tokens, 8,727 total tokens, 0 cached input tokens.
+- The measured standard input/output token component is approximately $0.0214 at the then-current GPT-6.1 Sol rates, excluding any separately billed cache-write or infrastructure charges.
+- The temporary acceptance route was removed after proof.
+
+This is enough to prove the managed harness works, but not enough to justify production adoption. The PR remains Draft until AMS runs an apples-to-apples baseline through the existing Vercel AI Gateway path and compares quality, latency, token overhead, and total cost.
+
