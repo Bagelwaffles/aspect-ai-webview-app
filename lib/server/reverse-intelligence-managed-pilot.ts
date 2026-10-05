@@ -202,6 +202,36 @@ function normalizedUsage(turn: z.infer<typeof turnSchema>) {
   }
 }
 
+async function retrieveCompletedTurnWithUsage(
+  sessionId: string,
+  turnId: string,
+  apiKey: string,
+  fetcher: typeof fetch,
+  sleep: (ms: number) => Promise<void>,
+) {
+  let completedTurn: z.infer<typeof turnSchema> | null = null
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    completedTurn = turnSchema.parse(
+      await apiJson(
+        `/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}`,
+        { method: "GET" },
+        apiKey,
+        fetcher,
+      ),
+    )
+
+    if (completedTurn.status !== "completed") {
+      throw new Error("MANAGED_INTELLIGENCE_TURN_STATE_CHANGED")
+    }
+
+    if (completedTurn.usage || attempt === 7) return completedTurn
+    await sleep(500)
+  }
+
+  return completedTurn!
+}
+
 export async function runManagedIntelligencePilot(
   research: LiveResearchResult,
   env: NodeJS.ProcessEnv = process.env,
@@ -282,18 +312,13 @@ export async function runManagedIntelligencePilot(
       continue
     }
 
-    const completedTurn = turnSchema.parse(
-      await apiJson(
-        `/${encodeURIComponent(created.id)}/turns/${encodeURIComponent(turn.id)}`,
-        { method: "GET" },
-        apiKey,
-        fetcher,
-      ),
+    const completedTurn = await retrieveCompletedTurnWithUsage(
+      created.id,
+      turn.id,
+      apiKey,
+      fetcher,
+      sleep,
     )
-
-    if (completedTurn.status !== "completed") {
-      throw new Error("MANAGED_INTELLIGENCE_TURN_STATE_CHANGED")
-    }
 
     const items = sessionItemListSchema.parse(
       await apiJson(
