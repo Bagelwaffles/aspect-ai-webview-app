@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { generateText } from "ai"
+import { generateText, Output } from "ai"
+import { z } from "zod"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -12,11 +13,21 @@ function json(body: Record<string, unknown>, status = 200) {
   })
 }
 
+const outputSchema = z
+  .object({
+    whatChanged: z.string().min(1).max(2_000),
+    whyItMatters: z.string().min(1).max(2_000),
+    recommendedAction: z.enum(["adopt", "test", "monitor", "ignore"]),
+    risks: z.array(z.string().min(1).max(500)).max(8),
+    sources: z.array(z.string().url()).min(1).max(8),
+  })
+  .strict()
+
 const system = [
   "You are the internal Reverse-Engineering Intelligence Agent for Aspect Marketing Solutions.",
   "Your job is to convert supplied public-source evidence into an operator-ready change brief.",
   "Never claim a release, price, capability, benchmark, integration, or competitive implication that is not supported by the supplied evidence.",
-  "Never execute external actions. This pilot is synthesis-only.",
+  "Never execute external actions. This test is synthesis-only.",
   "Prefer practical adoption implications, expected leverage, migration risk, and whether existing working AMS systems should remain untouched.",
 ].join(" ")
 
@@ -27,12 +38,6 @@ const prompt = [
   "Use ONLY the source packets below as factual evidence.",
   "Do not add facts from memory or unsupported assumptions.",
   "If a conclusion is not supported by the packets, say so explicitly.",
-  "Produce a concise AMS intelligence brief with these sections:",
-  "1. What changed",
-  "2. Why it matters to Aspect Marketing Solutions",
-  "3. Recommended action: adopt, test, monitor, or ignore",
-  "4. Risks / unknowns",
-  "5. Sources, preserving the supplied URLs",
   "",
   "SOURCE 1",
   "Title: Introducing the Agents API",
@@ -56,25 +61,32 @@ export async function GET() {
 
   try {
     const result = await generateText({
-      model: "poolside/laguna-s-2.1-free",
+      model: "openai/gpt-5.4-mini",
+      output: Output.object({ schema: outputSchema }),
       system,
       prompt,
       temperature: 0.4,
       maxOutputTokens: 1_200,
+      providerOptions: {
+        gateway: {
+          models: ["poolside/laguna-s-2.1-free"],
+        },
+      },
     })
 
     return json({
       ok: true,
-      benchmark: "vercel-ai-gateway-free-availability",
-      model: "poolside/laguna-s-2.1-free",
+      benchmark: "vercel-ai-gateway-structured-fallback",
+      requestedModel: "openai/gpt-5.4-mini",
+      fallbackModel: "poolside/laguna-s-2.1-free",
       latencyMs: Date.now() - startedAt,
-      text: result.text,
+      output: result.output,
       usage: result.usage,
       finishReason: result.finishReason,
       providerMetadata: result.providerMetadata ?? null,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : "AI_GATEWAY_BASELINE_FAILED"
-    return json({ ok: false, code: "AI_GATEWAY_BASELINE_FAILED", message }, 502)
+    const message = error instanceof Error ? error.message : "AI_GATEWAY_FALLBACK_FAILED"
+    return json({ ok: false, code: "AI_GATEWAY_FALLBACK_FAILED", message }, 502)
   }
 }
