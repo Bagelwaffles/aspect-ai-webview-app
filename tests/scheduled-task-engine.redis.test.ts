@@ -5,7 +5,7 @@ import { Redis } from "@upstash/redis"
 import { createScheduledTaskStore, operateScheduledTask, scheduledTaskDefinitions, scheduledTaskOwner } from "../lib/server/scheduled-task-engine"
 test("isolated Redis preserves results, enforces lease fencing and prevents duplicate scheduled work", { skip: process.env.AMS_SCHEDULED_TASK_REDIS_TEST !== "true" }, async () => {
   const runKey = randomUUID()
-  const env = { ...process.env, AMS_OWNER_EMAIL: `scheduled-test-${runKey}@example.invalid` }
+  const env: NodeJS.ProcessEnv = { ...process.env, AMS_OWNER_EMAIL: `scheduled-test-${runKey}@example.invalid` }
   const store = createScheduledTaskStore(env)
   const owner = scheduledTaskOwner(env)
   const definition = { ...scheduledTaskDefinitions[0], id: `redis-acceptance-${runKey}` }
