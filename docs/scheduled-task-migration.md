@@ -259,3 +259,27 @@ results/dashboard controls, real primary inbox receipt, recovery from revoked
 consent/provider failure, and unchanged production login. Required pre-cutover:
 exact production deployment and later independent scheduled execution. Keep all
 27 ChatGPT records unchanged until individual replacement proof is complete.
+
+### Protected preview notification transport
+
+The AMS Vercel project enables Vercel Authentication on non-custom preview
+domains. A server-side HTTP POST back to the protected preview alias can be
+rejected by Vercel SSO before reaching the signed receiver, even if AMS owner
+authentication is correct. No global protection bypass or temporary public
+preview access was enabled.
+
+To preserve preview protection, the internal scheduler and authenticated owner
+test endpoint now invoke the same Gmail delivery implementation *in-process*
+**only in Vercel preview** and **only when** the configured receiver exactly
+matches the trusted app origin and
+`/api/internal/monitoring/email`, with no URL query/hash. Both still require
+the approved Gmail sender opt-in, encrypted vault and real provider receipt.
+Other targets and production use the original HMAC-signed HTTPS receiver. The
+public receiver's HMAC check stays enforced. Regression tests verify this
+origin restriction and prohibit unapproved local dispatch. A real owner test
+and actual inbox delivery are still required; passing a mock is insufficient.
+
+The preview owner test will remain nonfunctional until Google Cloud registers
+all relevant callbacks, the dedicated Gmail client credentials and isolated
+vault key are supplied, both grants are given, and a server-side HMAC secret
+and sender opt-in are configured. These prerequisites must not be faked.
