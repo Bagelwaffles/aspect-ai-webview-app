@@ -104,10 +104,70 @@ publishing or customer communication side effects.
 6. Disable the corresponding original ChatGPT tasks one at a time only after each
    replacement passes all gates. Paused tasks remain paused. Never bulk-disable.
 
-Current preview dependency gate: the preview deployment built successfully but
-`/api/health` returned HTTP 503 with Redis configured/unavailable. Production
-Redis remains healthy. Configure an authorized isolated preview Redis connection;
-do not copy production persistence credentials into an unverified preview.
-Protected task API inspection also reaches a Vercel authentication wall.
-Keep this change in Draft and the original enabled tasks running until persistence,
-owner session, actual notification delivery and independent scheduling pass.
+The preview Redis gate is now resolved; the remaining gates are preview owner
+OAuth, Gmail/alert receiver delivery, real workload tests and independent
+scheduled production proof. Keep the PR Draft and all original enabled tasks.
+
+## Two-account Gmail monitoring: authorized scope and privacy gates (2026-10-06)
+
+The owner requested **two separately monitored Gmail accounts**: one AMS business
+inbox and one secondary inbox. Both identity/profile calls succeed using existing
+ChatGPT Gmail connectors. **Those connector grants are NOT AMS backend OAuth grants**;
+no backend monitoring, inbox read, or backend email delivery has been proven.
+Do not include the owner's personal account address, message bodies, provider
+refresh tokens, or mailbox contents in the public repository or PR logs.
+
+Implement Gmail as an *additional, gated workstream*, not a silent expansion of
+the currently disabled AI intelligence / creator jobs:
+
+1. Use a separate explicit owner OAuth consent flow for **each** Gmail account,
+   reusing the existing encrypted AMS connection vault and owner auth patterns.
+   Require the expected email identity to match before persisting a grant. Offer
+   independent connect/disconnect and status; never reuse YouTube/Google sign-in
+   tokens for mailbox access.
+2. Request the minimum scopes for the enabled feature: read-only access for
+   owner-approved inbox monitoring, and `gmail.send` only for an explicitly
+   authorized sender account. Do not request modify/forward/delete scopes.
+   Consent verification may require Google OAuth verification and owner action.
+3. Limit **secondary inbox** ingestion to narrowly defined business-operational
+   signals and security/Google Play notifications; discard unrelated personal
+   content. Allow the owner to adjust allowed categories/senders privately.
+4. Use Gmail History/watch with renewal and reconciliation **if operationally
+   supported**, otherwise bounded incremental polling with per-account cursors.
+   Account-scoped dedup keys and encrypted state must prevent cross-account
+   collisions; never assume one email equals two separate actionable events.
+5. Persist only minimal metadata needed for categorization and audit, with
+   redacted summaries and retention limits. Never write raw messages, snippets,
+   attachment bytes, credentials or account IDs into public source or logs.
+6. Enforce approval-first response and no automatic sends, labeling, archiving,
+   deletions, or forwarding from either inbox. Dedicated notification sending is
+   limited to opted-in owner alerts.
+7. Verify each account with a real authorized backend read and independently
+   persisted cursor, then verify primary sender -> intended recipient with a
+   provider receipt and owner-confirmed delivery. Mock tests and ChatGPT connector
+   access are not backend acceptance evidence.
+8. Historical paused Gmail-related watches must remain paused unless approved,
+   and their complete functionality must not be inferred from monitoring queues.
+
+The accurate ChatGPT inventory was subsequently reconciled against the Personal
+account to **27 tasks: 3 enabled, 17 paused, 7 completed**. The initial connector
+listing omitted two task records. Do not retire or migrate private tasks by
+inferring their presence from outdated service counters.
+
+## 2026-10-06 dependency follow-up
+
+- The original preview Redis 503 was repaired on an isolated Free-plan database;
+  the verified READY preview runs commit `308b1c43a264bc0dcde2d2f5e4f75076c816616e`.
+- Vercel project access works with the **corrected full** team ID
+  `team_tyt9FpAEguBeBOiFqBMO3ZCg`. The direct create-deployment endpoint
+  still rejects with 403; Git-backed previews or approved owner browser
+  redeployment are the available release paths.
+- Branch-only preview `NEXTAUTH_URL` and `PUBLIC_APP_URL` environment variables
+  are now saved for the approved preview alias. A **fresh preview deployment**
+  is required before they take effect. Production origin variables are untouched.
+- Google Cloud must independently register the exact authorized preview Google
+  OAuth callback, preserving production callbacks. Owner sign-in remains
+  unverified until that registry update and a real browser test pass.
+- The notification receiver and Gmail sender still require implementation and
+  real delivery proof. Do not activate replacements, merge, or disable original
+  ChatGPT tasks before independently scheduled production success.
