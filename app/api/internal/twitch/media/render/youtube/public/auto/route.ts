@@ -107,7 +107,9 @@ export async function POST(request: NextRequest) {
         ? 503
         : code === "YOUTUBE_PUBLIC_EDIT_SCOPE_REQUIRED" ||
             code === "YOUTUBE_PUBLIC_PRIVATE_VERIFICATION_REQUIRED" ||
-            code === "YOUTUBE_PUBLIC_STREAM_CAP_REACHED"
+            code === "YOUTUBE_PUBLIC_STREAM_CAP_REACHED" ||
+            code === "YOUTUBE_PUBLIC_RECONCILIATION_REQUIRED" ||
+            code === "YOUTUBE_PUBLIC_ATTEMPT_LIMIT_REACHED"
           ? 409
           : 500
     return json({ ok: false, code }, status)
