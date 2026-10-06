@@ -58,22 +58,6 @@ export async function POST(request: NextRequest) {
       const existing = await getYouTubePublicPromotionRecord(job.jobId)
       if (existing?.status === "succeeded") continue
 
-      if (existing?.status === "promoting" || existing?.status === "reconciliation") {
-        return json({
-          ok: false,
-          attempted: false,
-          renderJobId: job.jobId,
-          clipId: job.clipId,
-          sourceVideoId: job.autoPublish?.sourceVideoId ?? null,
-          rank: job.autoPublish?.rank ?? null,
-          status: existing.status,
-          videoId: existing.youtubeVideoId,
-          attempts: existing.attempts,
-          reused: true,
-          code: "YOUTUBE_PUBLIC_RECONCILIATION_REQUIRED",
-        }, 409)
-      }
-
       if ((existing?.attempts ?? 0) >= MAX_PUBLIC_PROMOTION_ATTEMPTS) {
         continue
       }
@@ -84,6 +68,8 @@ export async function POST(request: NextRequest) {
       const proof = await getYouTubePrivateVerificationProof(job.jobId)
       if (proof?.videoId !== privateUpload.youtubeVideoId || proof.metadataVerified !== true) continue
 
+      // The promoter verifies ambiguous prior PUTs against YouTube before any retry.
+      // A 409 still fails closed if the original video cannot be safely reconciled.
       const result = await promoteRenderedTwitchShortPublic({
         renderJobId: job.jobId,
         approved: true,
