@@ -5,7 +5,7 @@ export function verifyMonitorSignature(body: string, signature: string | null, s
   if (!secret || !signature || !/^[a-f0-9]{64}$/u.test(signature)) return false
   return timingSafeEqual(Buffer.from(signature, "hex"), createHmac("sha256", secret).update(body).digest())
 }
-const eventSchema = z.object({ source: z.literal("ams-scheduled-tasks"), id: z.string().uuid(), task: z.string().max(200), severity: z.enum(["critical", "actionable"]), createdAt: z.string().nullable(), summary: z.string().nullable(), details: z.unknown() })
+const eventSchema = z.object({ source: z.literal("ams-scheduled-tasks"), id: z.union([z.string().uuid(), z.string().regex(/^[a-f0-9]{64}$/u)]), task: z.string().max(200), severity: z.enum(["critical", "actionable"]), createdAt: z.string().nullable(), summary: z.string().nullable(), details: z.unknown() })
 const receiptSchema = z.object({ status: z.enum(["uncertain", "delivered"]), messageId: z.string(), deliveryId: z.string().optional() })
 export async function deliverGmailAlert(raw: unknown, idempotency: string | null, input: GmailContext = {}) {
   const event = eventSchema.parse(raw)
