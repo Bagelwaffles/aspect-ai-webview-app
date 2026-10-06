@@ -1,0 +1,37 @@
+name: AMS Scheduled Tasks Worker
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '5 * * * *'
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: ams-scheduled-tasks
+  cancel-in-progress: false
+jobs:
+  tick:
+    if: vars.AMS_SCHEDULED_TASKS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    environment: production
+    steps:
+      - name: Require exact deployed production commit, then run due tasks
+        shell: bash
+        run: |
+          set -euo pipefail
+          health="$(curl --fail --silent --show-error --max-time 20 https://www.aspectmarketingsolutions.app/api/health)"
+          actual="$(printf '%s' "$health" | jq -r '.commit')"
+          test "$actual" = "${GITHUB_SHA:0:12}"
+          # Keep the credential out of argv and never print task output.
+          header_file="$(mktemp)"
+          result_file="$(mktemp)"
+          token_file="$(mktemp)"
+          trap 'rm -f "$header_file" "$result_file" "$token_file"' EXIT
+          chmod 600 "$header_file" "$result_file" "$token_file"
+          printf 'Authorization: Bearer %s\n' "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" > "$header_file"
+          curl --fail --silent --show-error --max-time 20 --header "@$header_file" --output "$token_file" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ams-scheduled-tasks"
+          jq -er '"Authorization: Bearer " + .value' "$token_file" > "$header_file"
+          curl --fail --silent --show-error --max-time 65 --header "@$header_file" --output "$result_file" https://www.aspectmarketingsolutions.app/api/internal/scheduled-tasks/run
+          jq -e '.ok == true' "$result_file" >/dev/null
+          jq '{ok, executionVerified, results}' "$result_file"

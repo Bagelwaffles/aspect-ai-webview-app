@@ -178,6 +178,7 @@ export default async function DashboardPage() {
         <nav className={styles.nav} aria-label="Command center navigation">
           <p>CORE</p>
           <Link className={styles.active} href="/dashboard"><Gauge size={18} /> Dashboard</Link>
+          <Link href="/owner/scheduled-tasks"><Workflow size={18} /> Scheduled Tasks</Link>
           <Link href="/agents"><Bot size={18} /> Agent Network</Link>
           <Link href="/workflows"><Workflow size={18} /> Workflows</Link>
           <Link href="/deployments"><Boxes size={18} /> Deployments</Link>

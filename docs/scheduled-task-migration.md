@@ -1,0 +1,106 @@
+# AMS scheduled task migration — production cutover gates
+
+Tracking: https://github.com/Bagelwaffles/aspect-ai-webview-app/issues/261
+
+This change extends the existing Next.js / Redis / GitHub Actions backend.
+It does not rebuild agents or change billing, fulfillment, publishing approval,
+OAuth, Android billing, or Windows workers. **Implementation is not production proof.**
+
+## New replacements
+
+| Original workload | Replacement | Desired schedule | Activation |
+| --- | --- | --- | --- |
+| Two overlapping AI platform intelligence watches | `ai-platform-intelligence` | Daily, 08:00 America/Chicago | Disabled until verified |
+| SmokyBanana03 weekly producer brief | `smokybanana03-weekly-brief` | Sunday, 19:00 America/Chicago | Disabled until verified |
+
+The weekly brief preserves Once Human sibling co-op, PS5-direct production,
+titles/hooks/Shorts ideas, rituals, safety/licensed music, collaboration watchlist,
+vault, branding, growth experiments and evidence-conditioned monetization.
+It reads the existing Twitch archive, Stream Intelligence package, and render
+queue. Missing YouTube analytics, follower/subscriber metrics and other unavailable
+measurements are explicit; queue state is not external publishing verification.
+No media is uploaded, edited, or made public by either new worker.
+
+The intelligence watch uses reviewed official origins for v0, Manus, Anthropic,
+Vercel, OpenAI, agent frameworks, automation and an emerging builder. Primary
+publisher URLs, exact short text evidence and matching publication-date evidence
+are required for each alert. New snapshots and publisher/day discoveries are
+durable; unchanged snapshots do not call the model. Costs absent in sources are
+unavailable. The fixed source list is a bounded watchlist, not exhaustive web search.
+Source access and current HTML/date parsing must pass real production proof.
+
+## Existing monitoring coverage and remaining external gaps
+
+| Area | Existing actual data source | Coverage limitation / remaining proof |
+| --- | --- | --- |
+| Revenue / Quick Audit | Stripe Checkout + failure events; Redis fulfillment receipts | Six-hour lookback versus daily cron can miss sales/failures; bounded first page is not exhaustive; no first-sale draft parity proven |
+| Fulfillment duplicates | Existing fulfillment idempotency and durable receipt paths | Must verify unchanged production behavior; monitor is not a replacement fulfillment engine |
+| Infrastructure | Redis readiness and runtime configuration checks | Runtime log, deployment API, and third-party outage coverage are not equivalent to configuration checks |
+| Workflows | Redis Overmind queue | Stalled stored records; not every external workflow |
+| Social | Stored campaign/delivery records | Does not fetch all external platform analytics |
+| Twitch | Media queue and render job store | Does not prove full external YouTube analytics / follower growth |
+| Fiverr | Existing operations queue | Does not prove ingestion of current inbox, buyer messages, revisions or deadlines |
+| Google Play | Runtime readiness / release configuration | Does not read Google Play review state or newly received official notifications |
+| Visibility / catalog | Live website and canonical catalog | Does not query search indexing, backlinks or SERP snippets |
+| Notifications | Existing signed alert webhook | Existing monitor HTTP acknowledgment lacks durable owner-delivery proof and retries |
+
+Historical paused tasks remain disabled. One-time deployment/notification checks
+and expired campaigns must never be replayed automatically. Personal finance and
+private mailbox task contents are deliberately excluded from the public repository.
+Do not claim these external monitoring gaps are complete based on queue checks.
+
+## Configuration and scheduling
+
+- Keep `vercel.json` and its existing daily monitoring cron unchanged.
+- Confirm the intended Vercel team `team_tyt9FpAEguBeBOiFqBMO3Z`, project
+  `prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ` (`aspect-ai-overlord`) and actual plan.
+  Vercel scope authorization currently blocks that verification.
+- The gated GitHub Actions workflow ticks hourly at minute 5, using the existing
+  `production` environment and short-lived GitHub OIDC. This is independent of Windows and
+  does not depend on Vercel's cron frequency allowance. GitHub schedule delivery
+  is best effort, not an exact-minute guarantee. Due jobs run on the next tick.
+- The worker validates the signed issuer, audience, repository ID, main ref,
+  exact workflow, production environment and hosted runner. Only a signed
+  `schedule` event records independent scheduled proof; workflow dispatch and
+  owner/cron-secret requests cannot masquerade as that proof. No additional
+  long-lived secret is needed. Set GitHub Actions variable
+  `AMS_SCHEDULED_TASKS_ENABLED=true` only after the intended commit is deployed.
+- Set production `AMS_SCHEDULED_TASKS_ENABLED=true`. Preserve owner/Redis/auth
+  configuration. Explicitly configure `AMS_SCHEDULED_TASK_MODEL` to an approved
+  model available in the existing AI Gateway; there is no silent paid fallback.
+- Reuse `AMS_MONITOR_ALERT_WEBHOOK_URL` / `AMS_MONITOR_ALERT_WEBHOOK_SECRET`.
+  The receiver must authenticate the signature, deduplicate `Idempotency-Key`,
+  and return `{ "delivered": true, "deliveryId": "provider-receipt" }` only
+  after actual owner-channel delivery. HTTP 200 alone leaves delivery pending.
+  Receiver compatibility and a real received test alert are still required.
+
+Owner controls: `/owner/scheduled-tasks`; API: `/api/internal/scheduled-tasks`.
+Scheduler API: `/api/internal/scheduled-tasks/run`, protected by workflow-scoped
+GitHub OIDC, with existing CRON_SECRET retained for controlled manual probes.
+Owner mutations require both the owner session and trusted origin. Run-now calls
+carry a UUID request key; repeated requests reuse the durable result.
+
+Redis state is namespaced by an owner hash; it contains enabled state, next due,
+attempt/success, separate scheduled proof, errors, backoff, discovery identifiers,
+bounded execution history and notification receipts. Lease-protected writes and
+compare-and-delete release prevent stale workers from overwriting newer state.
+Missed schedules coalesce into one recovery run. Retries are bounded to four
+worker attempts; notification retries to five. Owner retry can reopen exhausted
+delivery. Worker execution is bounded; reading/generation alone has no financial,
+publishing or customer communication side effects.
+
+## Release and cutover evidence checklist
+
+1. Required CI, secret scan, dependency audit, build and preview authentication /
+   persistence / failure / retry checks pass on the exact head.
+2. Confirm the tested merged commit reaches the intended project with READY status.
+3. Verify source access, identity, data quality, notification receiver idempotency
+   and actual owner-channel delivery. Verify the dashboard's durable result.
+4. Resume each replacement after configuration checks, run a controlled real job,
+   and prove a later **independent scheduled** run. Manual success is insufficient.
+5. Check runtime logs and current workflows; do not alter public publishing flags.
+6. Disable the corresponding original ChatGPT tasks one at a time only after each
+   replacement passes all gates. Paused tasks remain paused. Never bulk-disable.
+
+If Vercel scope authorization remains 403, keep this change in Draft and keep
+the original enabled tasks running. No production or cutover claim is permitted.
