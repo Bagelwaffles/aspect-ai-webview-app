@@ -3,8 +3,8 @@ import assert from "node:assert/strict"
 import { beginGmailConnection, completeGmailConnection, gmailAccessToken, gmailConnectionStatus, gmailConfig, READ_SCOPE, SEND_SCOPE, type GmailRedis } from "../lib/server/owner-gmail"
 import { classifyGmailMetadata, runGmailMonitor } from "../lib/server/owner-gmail-monitor"
 import { deliverGmailAlert, verifyMonitorSignature } from "../lib/server/owner-gmail-delivery"
-import { createHmac } from "node:crypto"
-import { initialTaskState, scheduledTaskDefinitions } from "../lib/server/scheduled-task-engine"
+import { createHmac, createHash } from "node:crypto"
+import { createTaskDelivery, initialTaskState, scheduledTaskDefinitions, type TaskRun } from "../lib/server/scheduled-task-engine"
 const env: NodeJS.ProcessEnv = { NODE_ENV: "test", AMS_OWNER_EMAIL: "owner@example.com", AMS_GMAIL_PRIMARY_EMAIL: "business@example.com", AMS_GMAIL_SECONDARY_EMAIL: "second@example.com", AMS_GMAIL_CLIENT_ID: "client", AMS_GMAIL_CLIENT_SECRET: "secret", AMS_CONNECTION_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString("base64"), PUBLIC_APP_URL: "https://ams.example.com", AMS_GMAIL_CONSENT_MODE: "testing", AMS_GMAIL_SEND_ENABLED: "true" }
 function setup() {
   const data = new Map<string, string>()
@@ -123,4 +123,41 @@ test("personal Stripe receipt is discarded unless owner explicitly opts in a bus
   const headers = [{ name: "Subject", value: "Stripe personal purchase receipt" }]
   assert.equal(classifyGmailMetadata(headers), null)
   assert.equal(classifyGmailMetadata([{ name: "Subject", value: "Example Business customer inquiry" }], ["Example Business"]), "customer")
+})
+
+test("scheduled SHA-256 execution identifiers are accepted through the signed delivery transport", async () => {
+  const c = setup()
+  await connect("primary", c)
+  const runId = createHash("sha256").update("owner:ai-platform-intelligence:2026-10-07:1").digest("hex")
+  let sends = 0
+  const gmailFetcher = (async (url: string | URL | Request) => {
+    if (String(url).endsWith("/send")) {
+      sends++
+      return Response.json({ id: "sent1" })
+    }
+    return Response.json({ messages: [{ id: "inbox1" }] })
+  }) as typeof fetch
+  const webhookFetcher = (async (url: string | URL | Request, options?: RequestInit) => {
+    assert.equal(String(url), "https://ams.example.com/api/internal/monitoring/email")
+    const body = String(options?.body)
+    assert.equal(verifyMonitorSignature(body, new Headers(options?.headers).get("X-AMS-Monitor-Signature"), "signed-secret"), true)
+    const event = JSON.parse(body)
+    assert.equal(event.id, runId)
+    const delivered = await deliverGmailAlert(event, new Headers(options?.headers).get("Idempotency-Key"), { ...c, fetcher: gmailFetcher })
+    return Response.json(delivered)
+  }) as typeof fetch
+  const deliver = createTaskDelivery({
+    AMS_MONITOR_ALERT_WEBHOOK_URL: "https://ams.example.com/api/internal/monitoring/email",
+    AMS_MONITOR_ALERT_WEBHOOK_SECRET: "signed-secret",
+  }, webhookFetcher)
+  const run: TaskRun = {
+    id: runId, trigger: "scheduled", scheduledFor: "2026-10-07T13:00:00.000Z",
+    startedAt: "2026-10-07T13:00:00.000Z", finishedAt: "2026-10-07T13:00:01.000Z",
+    status: "succeeded", attempt: 1, error: null,
+    result: { summary: "One new finding", details: {}, alert: true, dataQuality: "verified" },
+    notification: "pending", deliveryAttempts: 0, nextDeliveryAt: null, deliveryReceipt: null,
+  }
+  assert.equal(await deliver(run, scheduledTaskDefinitions[0]), "gmail:inbox1")
+  assert.equal(await deliver(run, scheduledTaskDefinitions[0]), "gmail:inbox1")
+  assert.equal(sends, 1)
 })
