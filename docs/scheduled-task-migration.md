@@ -54,7 +54,9 @@ Do not claim these external monitoring gaps are complete based on queue checks.
 - Keep `vercel.json` and its existing daily monitoring cron unchanged.
 - Confirm the intended Vercel team `team_tyt9FpAEguBeBOiFqBMO3Z`, project
   `prj_ovsfsfElhC0eywpVlk3dHSBi4qFZ` (`aspect-ai-overlord`) and actual plan.
-  Vercel scope authorization currently blocks that verification.
+  The supplied team ID omitted its final `Cg`; the verified account ID is
+  `team_tyt9FpAEguBeBOiFqBMO3ZCg`. This is the same AMS project and domains,
+  not a substitute deployment target. The actual plan is Hobby.
 - The gated GitHub Actions workflow ticks hourly at minute 5, using the existing
   `production` environment and short-lived GitHub OIDC. This is independent of Windows and
   does not depend on Vercel's cron frequency allowance. GitHub schedule delivery
@@ -102,5 +104,10 @@ publishing or customer communication side effects.
 6. Disable the corresponding original ChatGPT tasks one at a time only after each
    replacement passes all gates. Paused tasks remain paused. Never bulk-disable.
 
-If Vercel scope authorization remains 403, keep this change in Draft and keep
-the original enabled tasks running. No production or cutover claim is permitted.
+Current preview dependency gate: the preview deployment built successfully but
+`/api/health` returned HTTP 503 with Redis configured/unavailable. Production
+Redis remains healthy. Configure an authorized isolated preview Redis connection;
+do not copy production persistence credentials into an unverified preview.
+Protected task API inspection also reaches a Vercel authentication wall.
+Keep this change in Draft and the original enabled tasks running until persistence,
+owner session, actual notification delivery and independent scheduling pass.
