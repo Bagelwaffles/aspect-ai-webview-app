@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomUUID } from "node:crypto"
 import { Redis } from "@upstash/redis"
+import { deliverGmailAlert } from "./owner-gmail-delivery"
 
 export type TaskSchedule = { frequency: "hourly" | "daily" | "weekly"; timezone: string; hour: number; minute: number; weekday?: number }
 export type TaskDefinition = { id: string; name: string; category: string; schedule: TaskSchedule }
@@ -82,7 +83,7 @@ export function taskErrorCode(error: unknown) {
 }
 export function retryDelay(attempt: number) { return Math.min(60 * 60_000, 5 * 60_000 * 2 ** Math.max(0, attempt - 1)) }
 
-export function createTaskDelivery(env: NodeJS.ProcessEnv = process.env, fetcher: typeof fetch = fetch): TaskDelivery {
+export function createTaskDelivery(env: NodeJS.ProcessEnv = process.env, fetcher: typeof fetch = fetch, localDeliver: typeof deliverGmailAlert = deliverGmailAlert): TaskDelivery {
   return async (run, definition) => {
     const raw = env.AMS_MONITOR_ALERT_WEBHOOK_URL?.trim()
     const secret = env.AMS_MONITOR_ALERT_WEBHOOK_SECRET?.trim()
@@ -90,10 +91,30 @@ export function createTaskDelivery(env: NodeJS.ProcessEnv = process.env, fetcher
     const url = new URL(raw)
     if (url.protocol !== "https:" || url.username || url.password) return null
     const body = JSON.stringify({ source: "ams-scheduled-tasks", id: run.id, task: definition.name, createdAt: run.finishedAt, severity: run.status === "failed" ? "critical" : "actionable", summary: run.result?.summary ?? run.error, details: run.result?.details ?? null })
-    const response = await fetcher(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(8_000), headers: { "Content-Type": "application/json", "X-AMS-Monitor-Signature": createHmac("sha256", secret).update(body).digest("hex"), "Idempotency-Key": run.id }, body })
-    if (!response.ok) return null
-    // An HTTP acknowledgment is not evidence that an owner received a message.
-    const receipt = await response.json().catch(() => null) as { delivered?: boolean; deliveryId?: string } | null
+    // Vercel Authentication protects preview deployments, including same-origin
+    // server-to-server fetches. Deliver only to the exact reviewed local receiver
+    // inside a preview; preserve signed HTTPS transport in all other cases.
+    const origin = env.PUBLIC_APP_URL || env.NEXTAUTH_URL
+    let previewOwnReceiver = false
+    if (env.VERCEL_ENV === "preview" && origin && env.AMS_GMAIL_SEND_ENABLED === "true") {
+      try {
+        const configured = new URL(origin)
+        previewOwnReceiver = configured.origin === url.origin &&
+          url.pathname === "/api/internal/monitoring/email" &&
+          url.search === "" && url.hash === ""
+      } catch { /* An invalid owner origin never permits local delivery. */ }
+    }
+    let receipt: { delivered?: boolean; deliveryId?: string } | null = null
+    if (previewOwnReceiver) {
+      // No Vercel SSO bypass token is created or deployed. The existing
+      // encrypted Gmail vault and send opt-in still enforce the sender grant.
+      receipt = await localDeliver(JSON.parse(body), run.id, { env })
+    } else {
+      const response = await fetcher(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(8_000), headers: { "Content-Type": "application/json", "X-AMS-Monitor-Signature": createHmac("sha256", secret).update(body).digest("hex"), "Idempotency-Key": run.id }, body })
+      if (!response.ok) return null
+      receipt = await response.json().catch(() => null) as { delivered?: boolean; deliveryId?: string } | null
+    }
+    // An HTTP acknowledgment or Gmail send response is not inbox delivery.
     return receipt?.delivered === true && typeof receipt.deliveryId === "string" && /^[A-Za-z0-9:_-]{1,160}$/u.test(receipt.deliveryId) ? receipt.deliveryId : null
   }
 }
