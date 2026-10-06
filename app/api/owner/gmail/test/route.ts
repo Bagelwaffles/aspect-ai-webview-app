@@ -3,6 +3,7 @@ import { z } from "zod"
 import { NextRequest, NextResponse } from "next/server"
 import { authorizeOwnerApiRequest } from "@/lib/server/owner-api-auth"
 import { ownerGmailContext } from "@/lib/server/owner-gmail"
+import { deliverGmailAlert } from "@/lib/server/owner-gmail-delivery"
 import { taskErrorCode } from "@/lib/server/scheduled-task-engine"
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -23,9 +24,19 @@ export async function POST(request: NextRequest) {
     const body = JSON.stringify({ source: "ams-scheduled-tasks", id, task: "Owner notification test", severity: "actionable", createdAt: at, summary: "Owner-authorized notification delivery test", details: null })
     await c.redis.set(`${c.prefix}test:${id}`, JSON.stringify({ id, at, status: "attempted" }), { ex: 30 * 86400 })
     try {
-      const response = await fetch(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(25_000), headers: { "Content-Type": "application/json", "Idempotency-Key": id, "X-AMS-Monitor-Signature": createHmac("sha256", secret).update(body).digest("hex") }, body })
-      const receipt = await response.json()
-      const delivered = response.ok && receipt.delivered === true && /^gmail:[A-Za-z0-9_-]+$/u.test(receipt.deliveryId ?? "")
+      // Same-origin HTTP calls to protected Vercel previews are blocked by SSO.
+      // This path requires an authenticated owner and a trusted origin. Only
+      // the exact configured preview receiver may be handled in-process.
+      let receipt: { delivered?: boolean; deliveryId?: string }
+      let acknowledged = true
+      if (process.env.VERCEL_ENV === "preview") {
+        receipt = await deliverGmailAlert(JSON.parse(body), id)
+      } else {
+        const response = await fetch(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(25_000), headers: { "Content-Type": "application/json", "Idempotency-Key": id, "X-AMS-Monitor-Signature": createHmac("sha256", secret).update(body).digest("hex") }, body })
+        acknowledged = response.ok
+        receipt = await response.json()
+      }
+      const delivered = acknowledged && receipt.delivered === true && /^gmail:[A-Za-z0-9_-]+$/u.test(receipt.deliveryId ?? "")
       await c.redis.set(`${c.prefix}test:${id}`, JSON.stringify({ id, at, status: delivered ? "delivered" : "unconfirmed", deliveryId: delivered ? receipt.deliveryId : null }), { ex: 30 * 86400 })
       return NextResponse.json({ ok: delivered, id, status: delivered ? "delivered" : "unconfirmed" }, { headers: { "Cache-Control": "no-store" } })
     } catch {
