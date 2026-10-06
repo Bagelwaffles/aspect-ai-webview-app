@@ -49,7 +49,7 @@ export async function GET() {
 
   try {
     const result = await generateText({
-      model: "openai/gpt-5.4-mini",
+      model: "google/gemini-2.5-flash-lite",
       output: Output.object({ schema: outputSchema }),
       system,
       prompt,
