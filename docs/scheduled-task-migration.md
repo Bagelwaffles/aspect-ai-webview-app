@@ -171,3 +171,91 @@ inferring their presence from outdated service counters.
 - The notification receiver and Gmail sender still require implementation and
   real delivery proof. Do not activate replacements, merge, or disable original
   ChatGPT tasks before independently scheduled production success.
+
+## Implemented owner Gmail backend (disabled pending acceptance)
+
+Separate owner-only OAuth routes bind `primary` and `secondary` to private
+expected-account environment variables. OAuth attempts have encrypted PKCE
+verifiers, 10-minute Redis TTL, single-use state, owner binding and HTTP-only
+same-site cookies. The Google verified email must exactly match its slot.
+Primary requests `openid email gmail.readonly gmail.send`; secondary requests
+`openid email gmail.readonly`. Unexpected Gmail scopes are rejected. Existing
+login, Drive and YouTube credentials are never repurposed.
+
+The existing AES-256-GCM vault encryption functions are reused, with a private
+owner/slot namespace. No credential is returned in connection status. Refresh
+failure, identity changes, missing grants and expired Testing consent fail closed.
+Testing grants are tracked conservatively at seven days and are prohibited in
+Vercel production. `approved-owner-use` requires a separately recorded policy
+approval; this flag must not be set as a workaround for verification.
+
+### Exact additional Gmail redirect URIs
+
+Register both slot callbacks on the existing dedicated Gmail-capable web client:
+
+- Preview primary: `https://aspect-ai-overlord-git-81b2cf-kimberleyaversbiz-4131s-projects.vercel.app/api/owner/gmail/primary/callback`
+- Preview secondary: `https://aspect-ai-overlord-git-81b2cf-kimberleyaversbiz-4131s-projects.vercel.app/api/owner/gmail/secondary/callback`
+- Production primary: `https://www.aspectmarketingsolutions.app/api/owner/gmail/primary/callback`
+- Production secondary: `https://www.aspectmarketingsolutions.app/api/owner/gmail/secondary/callback`
+
+These are additional to the existing login `/api/auth/callback/google` redirect.
+Preserve every existing production callback. Never register wildcards.
+
+### Private configuration
+
+Set server-side `AMS_GMAIL_CLIENT_ID`, `AMS_GMAIL_CLIENT_SECRET`,
+`AMS_GMAIL_PRIMARY_EMAIL`, `AMS_GMAIL_SECONDARY_EMAIL`, existing
+`AMS_CONNECTION_ENCRYPTION_KEY`, Redis and `AMS_OWNER_EMAIL`. Configure
+`AMS_GMAIL_CONSENT_MODE=testing` for isolated preview acceptance. Production
+needs `approved-owner-use` and `AMS_GMAIL_POLICY_APPROVED=true` only after the
+owner verifies a valid no-assessment exception or approves any required review.
+Do not purchase or initiate paid verification/security assessment.
+
+Google classifies readonly as restricted and send as sensitive:
+https://developers.google.com/workspace/gmail/api/auth/scopes . External Testing
+refresh tokens expire in seven days for Gmail scopes:
+https://developers.google.com/identity/protocols/oauth2 . Restricted server data
+can require annual assessments; Google documents exceptions, including small
+personal-use applications, but eligibility for this business-owner-only use
+must be established rather than assumed:
+https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification .
+This implementation does not open Gmail access to customers or the public.
+
+The two paused hourly workers share the existing scheduler, locks, histories,
+retries and durable outbox. Polling uses fixed relevant search terms, optional
+private `AMS_GMAIL_PRIMARY_BUSINESS_TERMS` and
+`AMS_GMAIL_SECONDARY_BUSINESS_TERMS` (comma-separated, max 20). The default
+business gate requires AMS/Quick Audit/Play context; broad personal Stripe or
+Fiverr messages are discarded. Explicit business terms must be configured and
+accepted to cover customer/order/payment subjects without AMS text. The Gmail
+API still grants mailbox-wide readonly access: application filters limit
+processing, not Google's underlying permissions. Matching metadata is untrusted
+and does not authorize payments, replies or fulfillment.
+
+Only From/Subject metadata is inspected transiently; no body, snippet,
+attachment, raw subject or sender is stored or sent to a model. Results retain
+message ID, category and received time in the protected owner dashboard. Each
+account has its own message dedup hashes and bounded pagination checkpoint;
+incomplete pages do not advance the completed time window. Histories are bounded
+by the existing task engine. No Gmail modify/delete/archive/forward/reply API is
+called. Pause/resume/history/retry controls apply independently to each worker.
+
+Set `AMS_GMAIL_SEND_ENABLED=true` only after sender authorization. Point the
+existing signed monitor webhook to the same environment's
+`/api/internal/monitoring/email` receiver and configure its server-side signing
+secret. Only signed scheduled-task envelopes are accepted. Generic owner-only
+email contains dashboard navigation and severity, never message content or
+private task results. Persistent send claims prevent concurrent or ambiguous
+retries from sending duplicates; retries reconcile a matching RFC Message-ID in
+the primary inbox. Send HTTP success alone does not count as delivery. An
+uncertain pre-send crash may need owner reconciliation; automatic resend is
+intentionally prohibited. Owner test controls use a stable request UUID and
+record attempts/results in Redis with 30-day TTL. The inbox receipt must also
+be independently confirmed by the owner during acceptance.
+
+Required pre-merge gates: each real OAuth grant, wrong-account denial, each real
+monitor run, business-filter coverage and personal-message exclusion, persisted
+results/dashboard controls, real primary inbox receipt, recovery from revoked
+consent/provider failure, and unchanged production login. Required pre-cutover:
+exact production deployment and later independent scheduled execution. Keep all
+27 ChatGPT records unchanged until individual replacement proof is complete.

@@ -1,3 +1,4 @@
+import { runGmailMonitor } from "./owner-gmail-monitor"
 import { createHash } from "node:crypto"
 import { z } from "zod"
 import { runStructuredAgent } from "@/lib/server/agent-runtime"
@@ -107,6 +108,8 @@ export async function runCreatorBrief(now: Date, env = process.env, fetcher: typ
   return { summary: "Weekly SmokyBanana03 producer brief prepared for owner review; incomplete analytics are marked unavailable.", details: { evidence: data, strategy: output.strategy, publishingPerformed: false }, alert: true, dataQuality: "partial" }
 }
 export const scheduledTaskWorker: TaskWorker = async (definition, state, now) => {
+  if (definition.id === "gmail-primary-monitor") return runGmailMonitor("primary", state, now)
+  if (definition.id === "gmail-secondary-monitor") return runGmailMonitor("secondary", state, now)
   if (definition.id === "ai-platform-intelligence") return runIntelligence(state, now)
   if (definition.id === "smokybanana03-weekly-brief") return runCreatorBrief(now)
   throw new Error("TASK_WORKER_NOT_FOUND")

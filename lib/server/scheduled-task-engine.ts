@@ -6,6 +6,7 @@ export type TaskDefinition = { id: string; name: string; category: string; sched
 export const scheduledTaskDefinitions: TaskDefinition[] = [
   { id: "ai-platform-intelligence", name: "AMS AI Platform Intelligence", category: "Business intelligence", schedule: { frequency: "daily", timezone: "America/Chicago", hour: 8, minute: 0 } },
   { id: "smokybanana03-weekly-brief", name: "SmokyBanana03 Weekly Brief", category: "Creator operations", schedule: { frequency: "weekly", timezone: "America/Chicago", weekday: 0, hour: 19, minute: 0 } },
+  ...["primary", "secondary"].map(slot => ({ id: `gmail-${slot}-monitor`, name: `AMS ${slot} Gmail monitoring`, category: "Owner email", schedule: { frequency: "hourly" as const, timezone: "America/Chicago", hour: 0, minute: 0 } })),
 ]
 
 // Iterate real UTC instants through an IANA zone. DST gaps are skipped and a
