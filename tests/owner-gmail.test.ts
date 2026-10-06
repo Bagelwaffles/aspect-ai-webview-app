@@ -147,6 +147,7 @@ test("scheduled SHA-256 execution identifiers are accepted through the signed de
     return Response.json(delivered)
   }) as typeof fetch
   const deliver = createTaskDelivery({
+    ...env,
     AMS_MONITOR_ALERT_WEBHOOK_URL: "https://ams.example.com/api/internal/monitoring/email",
     AMS_MONITOR_ALERT_WEBHOOK_SECRET: "signed-secret",
   }, webhookFetcher)
