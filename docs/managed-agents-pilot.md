@@ -60,3 +60,46 @@ Controlled preview proof completed on October 5, 2026 with GPT-6.1 Sol.
 
 This is enough to prove the managed harness works, but not enough to justify production adoption. The PR remains Draft until AMS runs an apples-to-apples baseline through the existing Vercel AI Gateway path and compares quality, latency, token overhead, and total cost.
 
+
+## Gateway comparison and decision
+
+A controlled comparison was run against AMS's existing Vercel AI Gateway path using the same evidence packets and the same synthesis objective.
+
+### Managed Agents API
+
+- Model: `gpt-6.1-sol`
+- End-to-end latency: 24.598 seconds
+- Input tokens: 8,231
+- Output tokens: 496
+- Reasoning tokens: 37
+- Total tokens: 8,727
+- Approximate standard model-token cost at the measured rates: $0.0214
+- Result: successful, source-disciplined synthesis
+
+### Vercel AI Gateway
+
+The current Vercel free tier rejected both `openai/gpt-6.1-sol` and AMS's default `openai/gpt-5.4-mini` because those models require paid Gateway credits.
+
+AMS's existing structured fallback path then succeeded with `google/gemini-2.5-flash-lite` through Vertex:
+
+- End-to-end latency: 1.832 seconds
+- Input tokens: 234
+- Output tokens: 276
+- Total tokens: 510
+- Gateway-reported inference cost: $0.0001338
+- Result: successful structured synthesis with preserved source URLs
+- Gateway routing proof: blocked OpenAI primary → Gemini fallback → Vertex provider
+
+### Decision
+
+Do not adopt the managed Agents API for this Reverse-Engineering Intelligence synthesis workload.
+
+For this task, the existing Vercel AI Gateway structured-agent path is approximately:
+
+- 13x faster
+- 17x lower in token volume
+- 160x lower in measured inference cost
+
+The managed harness remains technically validated and may be reconsidered later for genuinely long-running, stateful, tool-heavy, or multi-agent workloads where its managed session features provide measurable operational value.
+
+PR #260 should be closed unmerged after the temporary benchmark endpoint is removed. This preserves the experiment and measurements in Git history without adding unused runtime surface to production.
