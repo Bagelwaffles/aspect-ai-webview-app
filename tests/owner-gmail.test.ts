@@ -162,3 +162,49 @@ test("scheduled SHA-256 execution identifiers are accepted through the signed de
   assert.equal(await deliver(run, scheduledTaskDefinitions[0]), "gmail:inbox1")
   assert.equal(sends, 1)
 })
+
+test("protected preview uses strictly same-origin Gmail delivery without calling Vercel authentication", async () => {
+  const id = createHash("sha256").update("ams-preview-alert-id").digest("hex")
+  const run: TaskRun = {
+    id, trigger: "scheduled", scheduledFor: "2026-10-07T13:00:00.000Z",
+    startedAt: "2026-10-07T13:00:00.000Z", finishedAt: "2026-10-07T13:00:01.000Z",
+    status: "succeeded", attempt: 1, error: null,
+    result: { summary: "Owner review required", details: null, alert: true, dataQuality: "verified" },
+    notification: "pending", deliveryAttempts: 0, nextDeliveryAt: null, deliveryReceipt: null,
+  }
+  let directCalls = 0, httpCalls = 0
+  const fetcher = (async () => { httpCalls++; throw new Error("Protected preview HTTP must not be requested") }) as typeof fetch
+  const localDeliver = async (event: unknown, key: string | null) => {
+    directCalls++
+    assert.equal((event as { id: string }).id, id)
+    assert.equal(key, id)
+    return { delivered: true, deliveryId: "gmail:preview-inbox" }
+  }
+  const sameOrigin = createTaskDelivery({
+    ...env, VERCEL_ENV: "preview",
+    AMS_MONITOR_ALERT_WEBHOOK_URL: "https://ams.example.com/api/internal/monitoring/email",
+    AMS_MONITOR_ALERT_WEBHOOK_SECRET: "signature-secret",
+    AMS_GMAIL_SEND_ENABLED: "true",
+  }, fetcher, localDeliver)
+  assert.equal(await sameOrigin(run, scheduledTaskDefinitions[0]), "gmail:preview-inbox")
+  assert.equal(directCalls, 1)
+  assert.equal(httpCalls, 0)
+
+  const unsafeTarget = createTaskDelivery({
+    ...env, VERCEL_ENV: "preview",
+    AMS_MONITOR_ALERT_WEBHOOK_URL: "https://ams.example.com/api/internal/monitoring/email?different=1",
+    AMS_MONITOR_ALERT_WEBHOOK_SECRET: "signature-secret",
+    AMS_GMAIL_SEND_ENABLED: "true",
+  }, fetcher, localDeliver)
+  await assert.rejects(unsafeTarget(run, scheduledTaskDefinitions[0]), /Protected preview HTTP/)
+  assert.equal(directCalls, 1)
+
+  const notOptedIn = createTaskDelivery({
+    ...env, VERCEL_ENV: "preview",
+    AMS_MONITOR_ALERT_WEBHOOK_URL: "https://ams.example.com/api/internal/monitoring/email",
+    AMS_MONITOR_ALERT_WEBHOOK_SECRET: "signature-secret",
+    AMS_GMAIL_SEND_ENABLED: "false",
+  }, fetcher, localDeliver)
+  await assert.rejects(notOptedIn(run, scheduledTaskDefinitions[0]), /Protected preview HTTP/)
+  assert.equal(directCalls, 1)
+})
