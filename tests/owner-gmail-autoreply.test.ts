@@ -68,7 +68,7 @@ function replyContext() {
 }
 test("only an initial, directly addressed AMS human inquiry qualifies", () => {
   assert.equal(eligibleBusinessInquiry(headers(), "business@example.com", "secondary@example.com")?.recipient, "prospect@example.net")
-  const rejected = [
+  const rejected: Record<string, string>[] = [
     { Subject: "Weekend family dinner" }, { Subject: "Google Play account alert" },
     { Subject: "Aspect Marketing Solutions refund question" },
     { Subject: "Quick Marketing Audit billing question" },
