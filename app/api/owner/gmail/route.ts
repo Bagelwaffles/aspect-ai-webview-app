@@ -8,5 +8,5 @@ export async function GET(request: NextRequest) {
   const accounts = await Promise.all(gmailSlots.map(async slot => {
     try { return await gmailConnectionStatus(slot) } catch { return { slot, connected: false, status: "configuration-required" } }
   }))
-  return NextResponse.json({ ok: true, accounts }, { headers: { "Cache-Control": "no-store" } })
+  return NextResponse.json({ ok: true, accounts, autoReply: { armed: process.env.AMS_GMAIL_AUTOREPLY_ENABLED === "true" && process.env.AMS_GMAIL_SEND_ENABLED === "true", mode: "first-contact-acknowledgements-only", liveSendingVerified: false } }, { headers: { "Cache-Control": "no-store" } })
 }
