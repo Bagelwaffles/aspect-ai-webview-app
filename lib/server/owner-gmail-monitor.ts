@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto"
 import { z } from "zod"
 import { gmailAccessToken, type GmailContext, type GmailSlot } from "./owner-gmail"
+import { maybeAutoReplyToBusinessInquiry, type AutoReplyDecision } from "./owner-gmail-autoreply"
 import type { TaskResult, TaskState } from "./scheduled-task-engine"
 const BUSINESS = /aspect marketing|ams[_ -]quick|quick marketing audit|aspectmarketingsolutions|google play|play console/iu
 const categories = ["order", "payment", "customer", "google-play", "security", "account"] as const
-const messageSchema = z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,200}$/u), internalDate: z.string(), payload: z.object({ headers: z.array(z.object({ name: z.string(), value: z.string() })) }) })
+const messageSchema = z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,200}$/u), threadId: z.string().optional(), internalDate: z.string(), payload: z.object({ headers: z.array(z.object({ name: z.string(), value: z.string() })) }) })
 export function classifyGmailMetadata(headers: { name: string; value: string }[], terms: string[] = []): typeof categories[number] | null {
   const header = (name: string) => headers.find(item => item.name.toLowerCase() === name)?.value ?? ""
   const subject = header("subject"), from = header("from")
@@ -29,7 +30,7 @@ export async function runGmailMonitor(slot: GmailSlot, state: TaskState, now: Da
   const checkpoint = previous.success ? previous.data.checkpoint : now.getTime() - 86400_000
   const windowStart = continuing ? previous.data.windowStart : Math.max(0, checkpoint - 300_000)
   const windowEnd = continuing ? previous.data.windowEnd : now.getTime()
-  const query = `in:anywhere -in:spam -in:trash after:${Math.floor(windowStart / 1000)} before:${Math.ceil(windowEnd / 1000)} {"aspect marketing" "quick marketing audit" "aspectmarketingsolutions" "fiverr" "google play" "play console" "stripe" from:accounts.google.com subject:"security alert" ${terms.map(term => `"${term}"`).join(" ")}}`
+  const query = `in:anywhere -in:spam -in:trash -in:sent -in:drafts after:${Math.floor(windowStart / 1000)} before:${Math.ceil(windowEnd / 1000)} {"aspect marketing" "quick marketing audit" "aspectmarketingsolutions" "fiverr" "google play" "play console" "stripe" from:accounts.google.com subject:"security alert" ${terms.map(term => `"${term}"`).join(" ")}}`
   const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages")
   url.searchParams.set("q", query); url.searchParams.set("maxResults", "25")
   if (continuing && previous.success) url.searchParams.set("pageToken", previous.data.nextPageToken!)
@@ -40,6 +41,7 @@ export async function runGmailMonitor(slot: GmailSlot, state: TaskState, now: Da
   }
   const page = z.object({ messages: z.array(z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,200}$/u) })).max(25).default([]), nextPageToken: z.string().max(2048).optional() }).parse(await read(url.toString()))
   const alerts: z.infer<typeof continuationSchema>["alerts"] = [], discoveries: string[] = []
+  const autoReplyCounts = { accepted: 0, reviewRequired: 0, duplicate: 0 }
   // Five bounded reads at a time; no bodies, snippets, attachments or AI ingestion.
   for (let start = 0; start < page.messages.length; start += 5) {
     const batch = await Promise.all(page.messages.slice(start, start + 5).map(async ({ id }) => {
@@ -47,15 +49,27 @@ export async function runGmailMonitor(slot: GmailSlot, state: TaskState, now: Da
       if (state.findings.includes(discovery)) return null
       const messageUrl = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}`)
       messageUrl.searchParams.set("format", "metadata")
-      for (const name of ["From", "Subject"]) messageUrl.searchParams.append("metadataHeaders", name)
+      for (const name of ["From", "Subject", "To", "Reply-To", "Message-ID", "Auto-Submitted", "Precedence", "List-Id", "List-Unsubscribe", "List-Post", "In-Reply-To", "References", "X-Auto-Response-Suppress"]) messageUrl.searchParams.append("metadataHeaders", name)
       const message = messageSchema.parse(await read(messageUrl.toString()))
       if (message.id !== id) throw new Error("GMAIL_MESSAGE_ID_INVALID")
       const timestamp = Number(message.internalDate)
       if (!Number.isFinite(timestamp) || timestamp < windowStart || timestamp > windowEnd) return null
       const category = classifyGmailMetadata(message.payload.headers, terms)
-      return { discovery, alert: category ? { id, category, receivedAt: new Date(timestamp).toISOString() } : null }
+      let autoReply: AutoReplyDecision | null = null
+      if (slot === "primary" && category === "customer" && env.AMS_GMAIL_AUTOREPLY_ENABLED === "true") {
+        try {
+          autoReply = await maybeAutoReplyToBusinessInquiry({ slot, messageId: id, threadId: message.threadId, internalDate: timestamp, headers: message.payload.headers, token }, input)
+        } catch { autoReply = "unconfirmed" }
+      }
+      return { discovery, alert: category ? { id, category, receivedAt: new Date(timestamp).toISOString() } : null, autoReply }
     }))
-    for (const item of batch) if (item) { discoveries.push(item.discovery); if (item.alert) alerts.push(item.alert) }
+    for (const item of batch) if (item) {
+      discoveries.push(item.discovery)
+      if (item.alert) alerts.push(item.alert)
+      if (item.autoReply === "accepted") autoReplyCounts.accepted++
+      if (item.autoReply === "duplicate") autoReplyCounts.duplicate++
+      if (item.autoReply === "unconfirmed" || item.autoReply === "rate-limited") autoReplyCounts.reviewRequired++
+    }
   }
-  return { summary: alerts.length ? `${alerts.length} relevant ${slot} Gmail notification(s) require owner review.` : `No new relevant ${slot} Gmail notifications.`, details: { windowStart, windowEnd, nextPageToken: page.nextPageToken ?? null, checkpoint: page.nextPageToken ? checkpoint : windowEnd, alerts }, discoveries, alert: alerts.length > 0, dataQuality: page.nextPageToken ? "partial" : "verified" }
+  return { summary: alerts.length ? `${alerts.length} relevant ${slot} Gmail notification(s) require owner review.` : `No new relevant ${slot} Gmail notifications.`, details: { windowStart, windowEnd, nextPageToken: page.nextPageToken ?? null, checkpoint: page.nextPageToken ? checkpoint : windowEnd, alerts, autoReply: { ...autoReplyCounts, enabled: slot === "primary" && env.AMS_GMAIL_AUTOREPLY_ENABLED === "true" } }, discoveries, alert: alerts.length > 0, dataQuality: page.nextPageToken ? "partial" : "verified" }
 }
