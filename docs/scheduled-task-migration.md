@@ -283,3 +283,58 @@ The preview owner test will remain nonfunctional until Google Cloud registers
 all relevant callbacks, the dedicated Gmail client credentials and isolated
 vault key are supplied, both grants are given, and a server-side HMAC secret
 and sender opt-in are configured. These prerequisites must not be faked.
+
+
+### AMS automated business acknowledgements — owner-approved, staged OFF
+
+The owner authorized automatic sending for **AMS business emails** on 2026-10-06.
+The first implementation handles only high-confidence, **first-contact inquiry
+acknowledgements** from the **primary** mailbox. It does not send general AI
+answers, sales campaigns, personal email replies, refunds, invoice confirmations,
+or messages claiming fulfillment. Secondary Gmail remains read-only.
+
+Source: `lib/server/owner-gmail-autoreply.ts`, integrated into the existing
+primary `runGmailMonitor` job; no new scheduler, mailbox connections or
+credentials. An inbound message must be newly received (within two hours), in
+the primary account and explicitly addressed to the primary account, have a
+single non-owner sender, a safe RFC Message-ID/thread ID, a concise ASCII subject
+clearly identifying AMS and a routine inquiry. Established threads, personal
+mail, billing/refunds/disputes, Google Play/security warnings, automated senders,
+mailing lists, bulk mail and mismatched Reply-To are ineligible.
+
+The outgoing message is a fixed, truthful receipt only: it indicates that AMS
+received the inquiry; it does not promise a completed action or response time.
+Sending uses `gmail.send` only from the primary OAuth grant and Gmail's
+thread context. Subjects/headers are sanitized. No inbound message body,
+attachment or personal customer details are exposed to an AI model.
+
+Feature is **disabled by default**. The operator must explicitly set both
+`AMS_GMAIL_SEND_ENABLED=true` and `AMS_GMAIL_AUTOREPLY_ENABLED=true`
+on the intended environment **after** successful independent Gmail consent,
+trusted Google Cloud OAuth setup, policy approval where required, and successful
+controlled live sender/recipient tests. The separate owner dashboard shows the
+policy state; there is no implicit enablement by enabling the Gmail monitor.
+
+An atomic Redis first-send claim is stored before Gmail API submission. Each
+inbound message has only one attempt, using a 90-day durable dedup claim.
+A bounded Redis quota limits the primary account to 20 auto replies per UTC
+day. Ambiguous send results and quota exclusions are recorded for operator
+review; ambiguous email sends are never retried automatically. Gmail HTTP send
+acceptance is **not** proof of recipient mailbox delivery. Monitoring excludes
+Sent and Drafts so AMS-generated replies do not trigger self-alert loops.
+
+**Additional acceptance gates** before enabling:
+1. Real provider-authorized primary and secondary Gmail grants (each account).
+2. Confirm direct-contact inquiry gets exactly one generic acknowledgement
+   in the same email thread, and owner verifies the recipient copy.
+3. Confirm security, billing, refund, automated mail, secondary account,
+   bounced replies, loops and unrelated personal messages get no auto reply.
+4. Test repeated scans and simulated ambiguous Gmail send without duplicates,
+   and rate-cap, disabled-mode and emergency-disable behavior.
+5. Confirm provider terms, Gmail OAuth scope verification eligibility, privacy
+   notices, and any applicable transactional/marketing email requirements. Do
+   not start unsolicited promotional campaigns without explicit approval.
+
+Further AMS automation may be added using trusted signed order/customer events,
+but real payments, order fulfillment, account changes and substantive customer
+commitments must never be inferred solely from untrusted email subject lines.
