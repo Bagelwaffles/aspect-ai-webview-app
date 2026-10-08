@@ -37,6 +37,25 @@ test("encrypted records are independent, secrets never appear in status, testing
   await assert.rejects(gmailAccessToken("primary", { ...c, now: c.now + 7 * 86400_000 }), /REAUTHORIZE/)
   assert.equal((await gmailConnectionStatus("secondary", c)).status, "connected")
 })
+test("expired OAuth grants explicitly require reauthorization without conflating configuration changes", async () => {
+  const c = setup()
+  await connect("primary", c)
+  const before = await gmailConnectionStatus("primary", c)
+  assert.equal(before.status, "connected")
+  assert.equal(before.connected, true)
+
+  const afterExpiry = await gmailConnectionStatus("primary", { ...c, now: c.now + 7 * 86400_000 })
+  assert.equal(afterExpiry.status, "reauthorize")
+  assert.equal(afterExpiry.connected, false)
+  assert.equal(afterExpiry.testing, true)
+
+  const changed = await gmailConnectionStatus("primary", {
+    ...c, env: { ...env, AMS_GMAIL_PRIMARY_EMAIL: "changed@example.com" },
+  })
+  assert.equal(changed.status, "configuration-changed")
+  assert.equal(changed.connected, false)
+})
+
 test("state is bound to owner/account/cookie, expires and cannot replay", async () => {
   const c = setup(), attempt = await connect("primary", c)
   await assert.rejects(completeGmailConnection("primary", "google:owner", attempt.state, "code", attempt.state, c), /STATE_INVALID/)
