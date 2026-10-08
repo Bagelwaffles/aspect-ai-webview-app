@@ -79,8 +79,10 @@ export async function gmailConnectionStatus(slot: GmailSlot, input: GmailContext
   const raw = await c.redis.get<string>(`${c.prefix}${slot}`)
   if (!raw) return { slot, connected: false, status: "not-connected" }
   const record = recordSchema.parse(typeof raw === "string" ? JSON.parse(raw) : raw)
-  const valid = record.email === config.email && record.mode === config.mode && (!record.grantExpiresAt || Date.parse(record.grantExpiresAt) > c.now)
-  return { slot, connected: valid, status: !valid ? "configuration-changed" : record.grantExpiresAt && Date.parse(record.grantExpiresAt) <= c.now ? "reauthorize" : "connected", connectedAt: record.connectedAt, grantExpiresAt: record.grantExpiresAt, testing: record.mode === "testing" }
+  const matchesConfiguration = record.email === config.email && record.mode === config.mode
+  const grantExpired = record.grantExpiresAt !== null && !(Date.parse(record.grantExpiresAt) > c.now)
+  const connected = matchesConfiguration && !grantExpired
+  return { slot, connected, status: !matchesConfiguration ? "configuration-changed" : grantExpired ? "reauthorize" : "connected", connectedAt: record.connectedAt, grantExpiresAt: record.grantExpiresAt, testing: record.mode === "testing" }
 }
 export async function gmailAccessToken(slot: GmailSlot, input: GmailContext = {}) {
   const c = ownerGmailContext(input), config = gmailConfig(slot, c.env)
