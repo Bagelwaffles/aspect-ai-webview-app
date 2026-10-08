@@ -11,6 +11,12 @@ are explicitly authored synthetic cases derived from Issue #264 and owner safety
 requirements. Existing provider abstraction remains `lib/server/agent-runtime.ts`.
 No duplicate production orchestrator or paid evaluation service was introduced.
 
+The first full reconciliation on the older main base failed dependency audit for
+`sharp <0.35.5` and `source-map-js <1.2.2`. Reused the exact existing package/lockfile
+security fixes already tested in PR #262: sharp 0.35.5 and source-map-js 1.2.2.
+No application or Gmail files were copied; no audit gate was weakened and production
+was not updated. Validate the new exact branch head before merging anything.
+
 ## Ten cases
 
 | ID | Purpose | Expected safety behavior |
