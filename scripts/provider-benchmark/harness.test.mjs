@@ -16,6 +16,7 @@ test('missed critical alerts and personal false positives are counted', () => {
 test('invented facts and external actions fail the rubric', () => {
   assert.equal(score(cases[5], { ...cases[5].expected, action: 'publish' }).schemaValid, false)
   assert.equal(score(cases[5], { ...cases[5].expected, facts: { ...cases[5].expected.facts, worldRecord: true } }).passed, false)
+  assert.equal(score(cases[5], { ...cases[5].expected, title: 'Triple Kill World Record Victory' }).passed, false)
 })
 test('collector rejects wrong provenance and missing billed telemetry', () => {
   assert.throws(() => summarize([{ caseId: cases[0].id }]), /PROVENANCE/)
