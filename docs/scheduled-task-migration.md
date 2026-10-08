@@ -1,5 +1,53 @@
 # AMS scheduled task migration — production cutover gates
 
+## 2026-10-08 verification checkpoint
+
+Resumed from `ca0145d0d16eea0068194a830fdbda76f28ca51f`. That exact
+head passed Secret scan, AMS Reconciliation CI (including isolated Redis and
+runtime security probes), and both Git-backed Vercel previews. Main preview
+deployment: `dpl_2Sk7TbkLCQ6pbcNZoJnMj94disY2`, READY, no alias error.
+These are build/security checks, not Gmail integration proof.
+
+Follow-up repairs persist `invalid_grant` refresh rejection for only the affected
+slot so the dashboard requests reauthorization. `invalid_client` is a configuration
+error; transient provider failures preserve existing grants. Callback feedback
+uses a fixed allowlist and never renders Google error bodies, codes or tokens.
+Date-only intelligence evidence is parsed in UTC to avoid host-timezone drift.
+
+External blockers observed in this session:
+
+- Google Cloud `https://console.cloud.google.com/auth/clients` rendered
+  **Site Unavailable** in the provided cloud browser. No client registration,
+  audience setting, Gmail API enablement, or owner consent was verified.
+- Vercel protected-preview fetch reported `deployment_authentication_required`.
+  It did not establish an authenticated AMS owner session or Gmail grant status.
+- The returned Vercel environment metadata did not show preview
+  `AMS_GMAIL_CLIENT_ID`, `AMS_GMAIL_CLIENT_SECRET`, `AMS_CONNECTION_ENCRYPTION_KEY`,
+  `AMS_MONITOR_ALERT_WEBHOOK_SECRET`, `AMS_GMAIL_SEND_ENABLED`, or `AMS_OWNER_EMAIL`.
+  The encryption key shown was production-only. Confirm missing configuration
+  using the existing private settings; never paste secrets into chat or this repo.
+- Neither live inbox scan nor received owner alert is proven. No receipt ID exists
+  from this session. Automatic replies and all original 27 ChatGPT tasks remain
+  unchanged; no production configuration or deployment was modified.
+
+Owner continuation: open the existing Cloud project, enable Gmail API if needed,
+preserve login redirects and add the exact callbacks below to the appropriate web
+client. Add both authorized accounts to External Testing's test-user list. Supply
+the missing preview-only configuration securely in Vercel, redeploy that reviewed
+branch, sign into the owner dashboard, authorize each slot independently, then run
+each Gmail monitor and the owner-alert test. Do not activate production at this step.
+
+Policy review: Google's restricted-scope guidance permits an exception for a
+single owner or a small group of personally known users, but it is **not automatic
+approval of this project's combined public SaaS and owner-only OAuth client**.
+The project audience, other clients/users and actual use must be checked. Testing
+mail-scope grants last seven days. Non-exempt restricted data processed on a
+third-party server requires verification/security assessment. Keep
+`AMS_GMAIL_POLICY_APPROVED` unset until eligibility is established; no paid process
+was initiated. Sources checked 2026-10-08:
+https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification
+and https://support.google.com/cloud/answer/15549945.
+
 Tracking: https://github.com/Bagelwaffles/aspect-ai-webview-app/issues/261
 
 This change extends the existing Next.js / Redis / GitHub Actions backend.

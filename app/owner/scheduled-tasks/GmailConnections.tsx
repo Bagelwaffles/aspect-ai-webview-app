@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
+import { gmailConnectionFeedback } from "@/lib/gmail-connection-feedback"
 type Account = { slot: "primary" | "secondary"; status: string; testing?: boolean; grantExpiresAt?: string | null }
 type AutoReply = { armed: boolean; mode: string; liveSendingVerified: boolean }
 export default function GmailConnections() {
@@ -7,6 +8,10 @@ export default function GmailConnections() {
   const [autoReply, setAutoReply] = useState<AutoReply | null>(null)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    const status = new URLSearchParams(window.location.search).get("gmail")
+    if (status && Object.hasOwn(gmailConnectionFeedback, status)) setError(gmailConnectionFeedback[status as keyof typeof gmailConnectionFeedback])
+  }, [])
   useEffect(() => { void fetch("/api/owner/gmail", { cache: "no-store" }).then(async response => { if (!response.ok) throw new Error("Gmail status unavailable"); const data = await response.json(); setAccounts(data.accounts); setAutoReply(data.autoReply ?? null) }).catch(() => setError("Gmail status unavailable")) }, [])
   async function connect(slot: Account["slot"]) {
     setBusy(true); setError("")

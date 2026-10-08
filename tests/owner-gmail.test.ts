@@ -5,6 +5,7 @@ import { classifyGmailMetadata, runGmailMonitor } from "../lib/server/owner-gmai
 import { deliverGmailAlert, verifyMonitorSignature } from "../lib/server/owner-gmail-delivery"
 import { createHmac, createHash } from "node:crypto"
 import { createTaskDelivery, initialTaskState, scheduledTaskDefinitions, type TaskRun } from "../lib/server/scheduled-task-engine"
+import { gmailCallbackFailure, gmailConnectionFeedback } from "../lib/gmail-connection-feedback"
 const env: NodeJS.ProcessEnv = { NODE_ENV: "test", AMS_OWNER_EMAIL: "owner@example.com", AMS_GMAIL_PRIMARY_EMAIL: "business@example.com", AMS_GMAIL_SECONDARY_EMAIL: "second@example.com", AMS_GMAIL_CLIENT_ID: "client", AMS_GMAIL_CLIENT_SECRET: "secret", AMS_CONNECTION_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString("base64"), PUBLIC_APP_URL: "https://ams.example.com", AMS_GMAIL_CONSENT_MODE: "testing", AMS_GMAIL_SEND_ENABLED: "true" }
 function setup() {
   const data = new Map<string, string>()
@@ -126,7 +127,41 @@ test("testing is prohibited on production and owner-use requires explicit policy
 test("refresh rejection and configuration identity changes fail closed", async () => {
   const c = setup(); await connect("primary", c)
   await assert.rejects(gmailAccessToken("primary", { ...c, env: { ...env, AMS_GMAIL_PRIMARY_EMAIL: "changed@example.com" } }), /REAUTHORIZE/)
-  await assert.rejects(gmailAccessToken("primary", { ...c, now: c.now + 3_600_000, fetcher: (async () => new Response(null, { status: 400 })) as typeof fetch }), /REAUTHORIZE/)
+  await assert.rejects(gmailAccessToken("primary", { ...c, now: c.now + 3_600_000, fetcher: (async () => Response.json({ error: "invalid_grant" }, { status: 400 })) as typeof fetch }), /REAUTHORIZE/)
+})
+test("revoked refresh grant persists reauthorization only for that account", async () => {
+  const c = setup(); await connect("primary", c); await connect("secondary", c)
+  const later = { ...c, now: c.now + 3_600_000, fetcher: (async () => Response.json({ error: "invalid_grant", error_description: "PRIVATE" }, { status: 400 })) as typeof fetch }
+  await assert.rejects(gmailAccessToken("primary", later), /GMAIL_REAUTHORIZE_REQUIRED/)
+  assert.equal((await gmailConnectionStatus("primary", later)).status, "reauthorize")
+  assert.equal((await gmailConnectionStatus("secondary", later)).status, "connected")
+  assert.ok(!JSON.stringify([...c.data.values()]).includes("PRIVATE"))
+})
+test("configuration and temporary refresh failures leave grants intact", async () => {
+  for (const [providerError, code] of [["invalid_client", "GMAIL_CONFIG_REQUIRED"], ["temporarily_unavailable", "GMAIL_TOKEN_UNAVAILABLE"]]) {
+    const c = setup(); await connect("primary", c)
+    const later = { ...c, now: c.now + 3_600_000, fetcher: (async () => Response.json({ error: providerError, error_description: "PRIVATE" }, { status: 400 })) as typeof fetch }
+    await assert.rejects(gmailAccessToken("primary", later), { message: code })
+    assert.equal((await gmailConnectionStatus("primary", later)).status, "connected")
+  }
+})
+test("refresh preserves offline token and accepts independently rotated access tokens", async () => {
+  const c = setup(); await connect("secondary", c)
+  let refreshes = 0
+  const later = { ...c, now: c.now + 3_600_000, fetcher: (async (_url, options) => {
+    refreshes++
+    assert.equal((options?.body as URLSearchParams).get("refresh_token"), "private-refresh")
+    return Response.json({ access_token: `rotated-${refreshes}`, expires_in: 3600, scope: READ_SCOPE })
+  }) as typeof fetch }
+  assert.equal(await gmailAccessToken("secondary", later), "rotated-1")
+  assert.equal(await gmailAccessToken("secondary", { ...later, now: later.now + 3_600_000 }), "rotated-2")
+})
+test("callback feedback allowlist never exposes provider text or secrets", () => {
+  assert.equal(gmailCallbackFailure(new Error("GMAIL_ACCOUNT_MISMATCH")), "account-mismatch")
+  assert.equal(gmailCallbackFailure(new Error("GMAIL_STATE_INVALID")), "state-invalid")
+  assert.equal(gmailCallbackFailure(new Error("GMAIL_OFFLINE_GRANT_REQUIRED")), "offline-grant-required")
+  assert.equal(gmailCallbackFailure(new Error("PRIVATE token=secret")), "connection-failed")
+  assert.ok(!JSON.stringify(gmailConnectionFeedback).includes("PRIVATE"))
 })
 test("ambiguous send does not resend on retry; sender opt-in and idempotency are enforced", async () => {
   const c = setup(); await connect("primary", c)

@@ -56,7 +56,9 @@ export function validateIntelligenceFindings(findings: z.infer<typeof findingSch
     const normalized = (text: string) => text.replace(/\s+/gu, " ").trim().toLowerCase()
     if (!source || !Number.isFinite(date) || date > now.getTime() || now.getTime() - date > 14 * 24 * 60 * 60_000 ||
       !normalized(source.text).includes(normalized(finding.evidence)) || !normalized(source.text).includes(normalized(finding.dateEvidence))) throw new Error("TASK_INTELLIGENCE_EVIDENCE_INVALID")
-    const evidencedDate = Date.parse(finding.dateEvidence)
+    // Date-only publisher evidence must not shift a day with the host timezone.
+    const explicitZone = /\b(?:GMT|UTC)\b|(?:Z|[+-]\d{2}:\d{2})$/iu.test(finding.dateEvidence)
+    const evidencedDate = Date.parse(explicitZone ? finding.dateEvidence : `${finding.dateEvidence} UTC`)
     if (!Number.isFinite(evidencedDate) || new Date(evidencedDate).toISOString().slice(0, 10) !== finding.publicationDate) throw new Error("TASK_INTELLIGENCE_DATE_INVALID")
     // Stable publisher/day identity prevents rewritten AI prose from re-alerting.
     const discoveryId = `finding:${source.id}:${finding.publicationDate}`

@@ -46,7 +46,14 @@ export async function beginGmailConnection(slot: GmailSlot, subject: string, inp
   return { url: url.toString(), state }
 }
 async function tokenResponse(response: Response) {
-  if (!response.ok) throw new Error(response.status === 400 ? "GMAIL_REAUTHORIZE_REQUIRED" : "GMAIL_TOKEN_UNAVAILABLE")
+  if (!response.ok) {
+    // Only invalid_grant means consent must be renewed. Configuration and
+    // transient provider errors must not invalidate a working stored grant.
+    const body = await response.json().catch(() => null)
+    if (body?.error === "invalid_grant") throw new Error("GMAIL_REAUTHORIZE_REQUIRED")
+    if (body?.error === "invalid_client" || body?.error === "unauthorized_client") throw new Error("GMAIL_CONFIG_REQUIRED")
+    throw new Error("GMAIL_TOKEN_UNAVAILABLE")
+  }
   return tokenSchema.parse(await response.json())
 }
 async function request(c: ReturnType<typeof ownerGmailContext>, url: string, init: RequestInit = {}) {
@@ -93,7 +100,15 @@ export async function gmailAccessToken(slot: GmailSlot, input: GmailContext = {}
   const secret = decryptConnectionPayload(record, c.key)
   if (secret.expiresAt && Date.parse(secret.expiresAt) > c.now + 60_000) return secret.accessToken
   if (!secret.refreshToken) throw new Error("GMAIL_REAUTHORIZE_REQUIRED")
-  const token = await tokenResponse(await request(c, "https://oauth2.googleapis.com/token", { method: "POST", body: new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, refresh_token: secret.refreshToken, grant_type: "refresh_token" }) }))
+  let token: z.infer<typeof tokenSchema>
+  try {
+    token = await tokenResponse(await request(c, "https://oauth2.googleapis.com/token", { method: "POST", body: new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, refresh_token: secret.refreshToken, grant_type: "refresh_token" }) }))
+  } catch (error) {
+    if (error instanceof Error && error.message === "GMAIL_REAUTHORIZE_REQUIRED") {
+      await save(slot, { ...record, updatedAt: new Date(c.now).toISOString(), grantExpiresAt: new Date(c.now).toISOString() }, secret, c)
+    }
+    throw error
+  }
   if (token.scope && (token.scope.split(/\s+/u).some(scope => !record.scopes.includes(scope)) || !token.scope.split(/\s+/u).includes(READ_SCOPE) || slot === "primary" && !token.scope.split(/\s+/u).includes(SEND_SCOPE))) throw new Error("GMAIL_SCOPE_INVALID")
   await save(slot, { ...record, updatedAt: new Date(c.now).toISOString() }, { accessToken: token.access_token, refreshToken: token.refresh_token ?? secret.refreshToken, expiresAt: new Date(c.now + token.expires_in * 1000).toISOString() }, c)
   return token.access_token

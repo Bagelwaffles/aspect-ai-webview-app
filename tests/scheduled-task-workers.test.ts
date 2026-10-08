@@ -17,6 +17,14 @@ test("rewording the same publisher/day cannot generate repeated alerts", () => {
   const prior = { ...state, findings: ["finding:v0:2026-10-05"] }
   assert.deepEqual(validateIntelligenceFindings([{ ...finding, whatChanged: "Same change, different generated prose" }], [source], prior, now), [])
 })
+test("date-only publication evidence is independent of a positive-offset host timezone", () => {
+  const previous = process.env.TZ
+  try {
+    process.env.TZ = "Pacific/Port_Moresby"
+    assert.equal(validateIntelligenceFindings([finding], [source], state, now)[0].publicationDate, "2026-10-05")
+    assert.equal(validateIntelligenceFindings([{ ...finding, dateEvidence: "2026-10-05" }], [{ ...source, text: `${source.text} 2026-10-05` }], state, now)[0].publicationDate, "2026-10-05")
+  } finally { if (previous === undefined) delete process.env.TZ; else process.env.TZ = previous }
+})
 test("future or stale discoveries are rejected", () => {
   assert.throws(() => validateIntelligenceFindings([{ ...finding, publicationDate: "2026-10-07" }], [source], state, now), /EVIDENCE_INVALID/u)
   assert.throws(() => validateIntelligenceFindings([{ ...finding, publicationDate: "2026-09-01" }], [source], state, now), /EVIDENCE_INVALID/u)
