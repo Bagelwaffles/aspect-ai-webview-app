@@ -262,10 +262,6 @@ export async function promoteRenderedTwitchShortPublic(
     redis,
   })
   if (existing?.status === "succeeded") return { record: existing, reused: true }
-  if (existing?.status === "promoting" || existing?.status === "reconciliation") {
-    throw new Error("YOUTUBE_PUBLIC_RECONCILIATION_REQUIRED")
-  }
-
   const job = await (options.getRenderJob ?? ((jobId) => getTwitchShortRenderJob(jobId)))(
     input.renderJobId,
   )
@@ -304,6 +300,50 @@ export async function promoteRenderedTwitchShortPublic(
   const auth = await accessToken({ ...options, env }, redis)
   if (auth.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID) {
     throw new Error("YOUTUBE_CHANNEL_MISMATCH")
+  }
+
+  // An interrupted status update is reconciled against the same verified video.
+  // Never upload a replacement or retry while a recent update may still be in flight.
+  if (existing?.status === "promoting" || existing?.status === "reconciliation") {
+    if (
+      existing.youtubeVideoId !== privateUpload.youtubeVideoId ||
+      existing.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID ||
+      existing.clipId !== job.clipId ||
+      existing.sourceVideoId !== job.autoPublish.sourceVideoId
+    ) {
+      throw new Error("YOUTUBE_PUBLIC_RECONCILIATION_REQUIRED")
+    }
+
+    const current = await readVideo(existing.youtubeVideoId, auth.token, fetcher)
+    if (current.channelId !== SMOKYBANANA03_YOUTUBE_CHANNEL_ID) {
+      throw new Error("YOUTUBE_CHANNEL_MISMATCH")
+    }
+    if (current.privacyStatus === "public") {
+      const succeeded = await saveRecord({
+        ...existing,
+        status: "succeeded",
+        updatedAt: nowIso(options),
+        completedAt: nowIso(options),
+        errorCode: null,
+      }, redis)
+      await saveStreamPromotions(
+        job.autoPublish.sourceVideoId,
+        [...streamPromotions, {
+          renderJobId: job.jobId,
+          youtubeVideoId: existing.youtubeVideoId,
+        }],
+        redis,
+      )
+      return { record: succeeded, reused: true }
+    }
+
+    const ageMs = Date.parse(nowIso(options)) - Date.parse(existing.updatedAt)
+    if (current.privacyStatus !== "private" || !Number.isFinite(ageMs) || ageMs < 120_000) {
+      throw new Error("YOUTUBE_PUBLIC_RECONCILIATION_REQUIRED")
+    }
+    if (existing.attempts >= 3) {
+      throw new Error("YOUTUBE_PUBLIC_ATTEMPT_LIMIT_REACHED")
+    }
   }
 
   const timestamp = nowIso(options)
