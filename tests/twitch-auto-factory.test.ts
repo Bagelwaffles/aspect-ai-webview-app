@@ -4,6 +4,9 @@ import test from "node:test"
 import {
   selectAutomaticVodClipCandidates,
   selectDailyVodSampleCandidates,
+  TWITCH_AUTO_FACTORY_LOOKBACK_HOURS,
+  TWITCH_AUTO_FACTORY_MAX_CANDIDATES_PER_VOD,
+  handledTwitchShortClipIds,
 } from "../lib/server/twitch-auto-factory"
 import type {
   TwitchPilotSummary,
@@ -171,4 +174,43 @@ test("daily Twitch sweep reserves pending VOD offsets so async clip requests are
   assert.equal(candidates.length, 1)
   assert.ok(candidates.every((item) => Math.abs(item.positionSeconds - 900) > 5))
   assert.ok(candidates.every((item) => Math.abs(item.positionSeconds - 1800) > 5))
+})
+
+test("unattended Shorts discovery has a bounded VOD recovery window", () => {
+  assert.equal(TWITCH_AUTO_FACTORY_LOOKBACK_HOURS, 72)
+  assert.equal(TWITCH_AUTO_FACTORY_MAX_CANDIDATES_PER_VOD, 6)
+})
+
+test("Shorts can analyze additional samples after the first three weak VOD moments", () => {
+  const vod: TwitchRecentVod = {
+    id: "vod-second-look", streamId: "stream-second-look",
+    title: "A completed co-op stream", url: "https://www.twitch.tv/videos/1234",
+    createdAt: "2026-10-06T22:00:00.000Z", duration: "1h", durationSeconds: 3600,
+  }
+  const firstThree = selectDailyVodSampleCandidates(vod, [])
+  assert.deepEqual(firstThree.map(x => x.positionSeconds), [900, 1800, 2700])
+  const prior: TwitchRecentClip[] = firstThree.map((x, index) => ({
+    id: "already-reviewed-" + index, title: "Previously sampled",
+    url: "https://clips.twitch.tv/already-reviewed-" + index,
+    creatorName: "SmokyBanana03", viewCount: 0,
+    createdAt: "2026-10-06T22:00:00.000Z", videoId: vod.id,
+    vodOffset: x.positionSeconds,
+  }))
+  const secondLook = selectDailyVodSampleCandidates(vod, prior, TWITCH_AUTO_FACTORY_MAX_CANDIDATES_PER_VOD)
+  assert.equal(secondLook.length, 3)
+  assert.ok(secondLook.every(x => firstThree.every(old => Math.abs(x.positionSeconds - old.positionSeconds) > 5)))
+  assert.equal(selectDailyVodSampleCandidates(vod, prior, 100).length, 3)
+})
+
+test("Shorts render jobs dedupe by actual clip across day-specific queue IDs", () => {
+  const handled = handledTwitchShortClipIds([
+    { clipId: "already-private", status: "rendered" },
+    { clipId: "already-public", status: "rendered" },
+    { clipId: "in-flight", status: "pending" },
+    { clipId: "recoverable-failure", status: "failed" },
+  ])
+  assert.equal(handled.has("already-private"), true)
+  assert.equal(handled.has("already-public"), true)
+  assert.equal(handled.has("in-flight"), true)
+  assert.equal(handled.has("recoverable-failure"), false)
 })
