@@ -43,6 +43,12 @@ test("owner test route enforces sender opt-in and preserves private provider dia
     const results = (pipeline ? payload : [payload]).map((command: string[]) => {
       const [operation, key, value] = command
       if (operation.toLowerCase() === "get") return { result: records.get(key) ?? null }
+      if (operation.toLowerCase() === "eval") {
+        const claimKey = command[3]
+        if (records.get(claimKey) !== command[4]) return { result: 0 }
+        records.set(claimKey, command[5])
+        return { result: 1 }
+      }
       assert.equal(operation.toLowerCase(), "set")
       records.set(key, value)
       return { result: "OK" }
@@ -90,6 +96,15 @@ test("owner test route enforces sender opt-in and preserves private provider dia
   assert.equal(process.env.AMS_GMAIL_AUTOREPLY_ENABLED, "false")
   assert.ok(!JSON.stringify(logs).includes("PRIVATE_ACCESS"))
   assert.ok(!JSON.stringify(logs).includes("primary@example.com"))
+  // Reproduce the pre-fix uncertain claim. The owner route must preserve its
+  // prior definitive rejection diagnostic until delivery reads that proof.
+  const deliveryKey = [...records.keys()].find(key => key.includes(":delivery:"))!
+  const delivery = JSON.parse(records.get(deliveryKey)!)
+  records.set(deliveryKey, JSON.stringify({ status: "uncertain", messageId: delivery.messageId }))
+  const retried = await POST(request())
+  assert.deepEqual(await retried.json(), { ok: false, code: "GMAIL_SEND_UNCONFIRMED", diagnostic })
+  assert.equal(gmailCalls, 2)
+  assert.equal(JSON.parse(records.get(deliveryKey)!).status, "failed")
   session = null
   assert.equal((await POST(request())).status, 401)
 })

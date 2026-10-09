@@ -10,7 +10,7 @@ import { gmailFailureDiagnostic } from "../lib/server/owner-gmail-diagnostics"
 const env: NodeJS.ProcessEnv = { NODE_ENV: "test", AMS_OWNER_EMAIL: "owner@example.com", AMS_GMAIL_PRIMARY_EMAIL: "business@example.com", AMS_GMAIL_SECONDARY_EMAIL: "second@example.com", AMS_GMAIL_CLIENT_ID: "client", AMS_GMAIL_CLIENT_SECRET: "secret", AMS_CONNECTION_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString("base64"), PUBLIC_APP_URL: "https://ams.example.com", AMS_GMAIL_CONSENT_MODE: "testing", AMS_GMAIL_SEND_ENABLED: "true" }
 function setup() {
   const data = new Map<string, string>()
-  const redis: GmailRedis = { async get<T>(key: string) { return (data.get(key) ?? null) as T | null }, async set(key, value, opts) { if (opts?.nx && data.has(key)) return null; data.set(key, value); return "OK" }, async eval(_script, keys) { const raw = data.get(keys[0]); data.delete(keys[0]); return raw ?? null } }
+  const redis: GmailRedis = { async get<T>(key: string) { return (data.get(key) ?? null) as T | null }, async set(key, value, opts) { if (opts?.nx && data.has(key)) return null; data.set(key, value); return "OK" }, async eval(script, keys, args) { const raw = data.get(keys[0]); if (script.includes("ARGV[2]")) { if (raw !== args[0]) return 0; data.set(keys[0], args[1]); return 1 } data.delete(keys[0]); return raw ?? null } }
   return { data, redis, env, now: 1_790_000_000_000 }
 }
 function grantFetcher(email: string, scopes: string[], calls: string[] = []) {
@@ -202,7 +202,7 @@ test("expired primary token refresh uses the primary grant and constructs a vali
   assert.deepEqual(operations, ["refresh", "send", "receipt"])
   assert.equal(c.data.get(secondary[0]), secondary[1])
 })
-test("send and receipt failures retain safe diagnostics and do not resend on retry", async t => {
+test("received send rejections retain diagnostics and allow another attempt", async t => {
   t.mock.method(console, "warn", () => {})
   const c = setup(); await connect("primary", c)
   let sends = 0
@@ -219,10 +219,10 @@ test("send and receipt failures retain safe diagnostics and do not resend on ret
     return true
   })
   await assert.rejects(deliverGmailAlert(event, event.id, { ...c, fetcher }), error => {
-    assert.deepEqual(gmailFailureDiagnostic(error), { operation: "receipt", httpStatus: 401, reason: "authError", category: "authentication" })
+    assert.deepEqual(gmailFailureDiagnostic(error), { operation: "send", httpStatus: 403, reason: "insufficientPermissions", category: "permissions" })
     return true
   })
-  assert.equal(sends, 1)
+  assert.equal(sends, 2)
   assert.ok(!JSON.stringify([...c.data.values()]).includes("PRIVATE"))
 })
 test("ambiguous send does not resend on retry; sender opt-in and idempotency are enforced", async () => {
@@ -234,6 +234,125 @@ test("ambiguous send does not resend on retry; sender opt-in and idempotency are
   await assert.rejects(deliverGmailAlert(event, event.id, { ...c, env: { ...env, AMS_GMAIL_SEND_ENABLED: "false" }, fetcher }), /SEND_DISABLED/)
   await assert.rejects(deliverGmailAlert(event, event.id, { ...c, fetcher }))
   assert.equal((await deliverGmailAlert(event, event.id, { ...c, fetcher })).delivered, false); assert.equal(sends, 1)
+})
+test("one concurrent retry wins after a definitive rejection and keeps the same Message-ID", async t => {
+  t.mock.method(console, "warn", () => {})
+  const c = setup(); await connect("primary", c)
+  let sends = 0, inbox = false
+  const messageIds: string[] = []
+  const fetcher = (async (url: string | URL | Request, opts?: RequestInit) => {
+    if (String(url).endsWith("/send")) {
+      sends++
+      const mime = Buffer.from(JSON.parse(String(opts?.body)).raw, "base64url").toString()
+      messageIds.push(mime.match(/Message-ID: <([^>]+)>/u)![1])
+      if (sends === 1) return Response.json({ error: { errors: [{ reason: "accessNotConfigured" }] } }, { status: 403 })
+      inbox = true
+      return Response.json({ id: "sent1" })
+    }
+    return Response.json({ messages: inbox ? [{ id: "inbox1" }] : [] })
+  }) as typeof fetch
+  const event = { source: "ams-scheduled-tasks", id: "f6f25a1b-339c-4802-9692-a3e5aa840499", task: "Test", createdAt: null, severity: "actionable", summary: null, details: null }
+  await assert.rejects(deliverGmailAlert(event, event.id, { ...c, fetcher }), /SEND_UNCONFIRMED/)
+  const key = [...c.data.keys()].find(key => key.includes(":delivery:"))!
+  assert.equal(JSON.parse(c.data.get(key)!).status, "failed")
+  await Promise.all(Array.from({ length: 8 }, () => deliverGmailAlert(event, event.id, { ...c, fetcher })))
+  assert.equal(sends, 2)
+  assert.equal(messageIds[0], messageIds[1])
+  assert.deepEqual(await deliverGmailAlert(event, event.id, { ...c, fetcher }), { delivered: true, deliveryId: "gmail:inbox1" })
+  assert.equal(sends, 2)
+})
+test("network/timeout after rejection recovery stays uncertain and is not retried", async t => {
+  t.mock.method(console, "warn", () => {})
+  for (const failure of [new Error("network failure"), new DOMException("timeout", "TimeoutError")]) {
+    const c = setup(); await connect("primary", c)
+    let sends = 0
+    const fetcher = (async (url: string | URL | Request) => {
+      if (String(url).endsWith("/send")) {
+        if (++sends === 1) return new Response("rejected", { status: 503 })
+        throw failure
+      }
+      return Response.json({ messages: [] })
+    }) as typeof fetch
+    const event = { source: "ams-scheduled-tasks", id: "911738a4-65f2-41d7-9906-1f8751efb323", task: "Test", createdAt: null, severity: "actionable", summary: null, details: null }
+    await assert.rejects(deliverGmailAlert(event, event.id, { ...c, fetcher }), /SEND_UNCONFIRMED/)
+    await assert.rejects(deliverGmailAlert(event, event.id, { ...c, fetcher }), failure)
+    const result = await deliverGmailAlert(event, event.id, { ...c, fetcher })
+    assert.equal(result.delivered, false)
+    assert.equal(sends, 2)
+  }
+})
+test("accepted send with failed receipt lookup and non-HTTP response stay duplicate-protected", async t => {
+  t.mock.method(console, "warn", () => {})
+  for (const sendResponse of [Response.json({ id: "sent1" }), Response.error()]) {
+    const c = setup(); await connect("primary", c)
+    let sends = 0
+    const fetcher = (async (url: string | URL | Request) => {
+      if (String(url).endsWith("/send")) { sends++; return sendResponse.clone() }
+      return Response.json({ error: { errors: [{ reason: "authError" }] } }, { status: 401 })
+    }) as typeof fetch
+    const event = { source: "ams-scheduled-tasks", id: "0b5c819e-a9e7-4c47-a340-35c879c64d32", task: "Test", createdAt: null, severity: "actionable", summary: null, details: null }
+    await assert.rejects(deliverGmailAlert(event, event.id, { ...c, fetcher }))
+    await assert.rejects(deliverGmailAlert(event, event.id, { ...c, fetcher }), error => {
+      assert.equal(gmailFailureDiagnostic(error)?.operation, "receipt")
+      return true
+    })
+    assert.equal(sends, 1)
+  }
+})
+test("legacy uncertain claims reopen only with matching prior definitive send diagnostics", async () => {
+  for (const proof of [
+    { id: "d421db9c-4dcf-4168-b1dd-b9c5c7712250", code: "GMAIL_SEND_UNCONFIRMED", diagnostic: { operation: "send", httpStatus: 403 } },
+    { id: "different", code: "GMAIL_SEND_UNCONFIRMED", diagnostic: { operation: "send", httpStatus: 403 } },
+    { id: "d421db9c-4dcf-4168-b1dd-b9c5c7712250", code: "GMAIL_RECEIPT_UNAVAILABLE", diagnostic: { operation: "receipt", httpStatus: 403 } },
+    { id: "d421db9c-4dcf-4168-b1dd-b9c5c7712250", code: "GMAIL_SEND_UNCONFIRMED", diagnostic: { operation: "send", httpStatus: 0 } },
+    null,
+  ]) {
+    const c = setup(); await connect("primary", c)
+    const prefix = [...c.data.keys()].find(key => key.endsWith(":primary"))!.slice(0, -"primary".length)
+    const event = { source: "ams-scheduled-tasks", id: "d421db9c-4dcf-4168-b1dd-b9c5c7712250", task: "Test", createdAt: null, severity: "actionable", summary: null, details: null }
+    c.data.set(`${prefix}delivery:${event.id}`, JSON.stringify({ status: "uncertain", messageId: `ams-${createHash("sha256").update(event.id).digest("hex")}@aspectmarketingsolutions.app` }))
+    if (proof) c.data.set(`${prefix}test:${event.id}`, JSON.stringify(proof))
+    let sends = 0
+    const fetcher = (async (url: string | URL | Request) => {
+      if (String(url).endsWith("/send")) { sends++; return Response.json({ id: "sent1" }) }
+      return Response.json({ messages: [] })
+    }) as typeof fetch
+    await Promise.all([deliverGmailAlert(event, event.id, { ...c, fetcher }), deliverGmailAlert(event, event.id, { ...c, fetcher })])
+    const allowed = proof?.id === event.id && proof?.diagnostic.operation === "send" && proof.diagnostic.httpStatus === 403
+    assert.equal(sends, allowed ? 1 : 0)
+    // The old diagnostic cannot authorize another send after a new uncertain attempt.
+    await deliverGmailAlert(event, event.id, { ...c, fetcher })
+    assert.equal(sends, allowed ? 1 : 0)
+  }
+})
+test("failed rejection persistence leaves an uncertain claim that cannot resend", async () => {
+  const c = setup(); await connect("primary", c)
+  const redis = { ...c.redis, async eval() { throw new Error("Redis write failed") } }
+  let sends = 0
+  const fetcher = (async (url: string | URL | Request) => {
+    if (String(url).endsWith("/send")) { sends++; return new Response("rejected", { status: 403 }) }
+    return Response.json({ messages: [] })
+  }) as typeof fetch
+  const event = { source: "ams-scheduled-tasks", id: "352f46a8-cdf2-4d65-8e5b-3b3aeafbd8f8", task: "Test", createdAt: null, severity: "actionable", summary: null, details: null }
+  await assert.rejects(deliverGmailAlert(event, event.id, { ...c, redis, fetcher }), /Redis write failed/)
+  assert.equal((await deliverGmailAlert(event, event.id, { ...c, redis, fetcher })).delivered, false)
+  assert.equal(sends, 1)
+})
+test("a late rejection cannot overwrite a newer delivered receipt", async t => {
+  t.mock.method(console, "warn", () => {})
+  const c = setup(); await connect("primary", c)
+  let sends = 0
+  const fetcher = (async () => {
+    sends++
+    const key = [...c.data.keys()].find(key => key.includes(":delivery:"))!
+    const claim = JSON.parse(c.data.get(key)!)
+    c.data.set(key, JSON.stringify({ status: "delivered", messageId: claim.messageId, deliveryId: "gmail:inbox1" }))
+    return new Response("rejected", { status: 403 })
+  }) as typeof fetch
+  const event = { source: "ams-scheduled-tasks", id: "4e59d62b-b40d-41e8-bf5f-6d0f0ab98a99", task: "Test", createdAt: null, severity: "actionable", summary: null, details: null }
+  await assert.rejects(deliverGmailAlert(event, event.id, { ...c, fetcher }), /SEND_UNCONFIRMED/)
+  assert.deepEqual(await deliverGmailAlert(event, event.id, { ...c, fetcher }), { delivered: true, deliveryId: "gmail:inbox1" })
+  assert.equal(sends, 1)
 })
 test("connected Gmail accounts do not enable owner alerts in a sender-disabled preview", async () => {
   const c = setup(); await connect("primary", c); await connect("secondary", c)

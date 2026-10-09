@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
     const previous = await c.redis.get<string>(`${c.prefix}test:${id}`)
     const at = previous ? z.object({ at: z.string().datetime() }).parse(typeof previous === "string" ? JSON.parse(previous) : previous).at : new Date().toISOString()
     const body = JSON.stringify({ source: "ams-scheduled-tasks", id, task: "Owner notification test", severity: "actionable", createdAt: at, summary: "Owner-authorized notification delivery test", details: null })
-    await c.redis.set(`${c.prefix}test:${id}`, JSON.stringify({ id, at, status: "attempted" }), { ex: 30 * 86400 })
+    // Keep prior rejection evidence until delivery reconciles legacy claims.
+    if (!previous) await c.redis.set(`${c.prefix}test:${id}`, JSON.stringify({ id, at, status: "attempted" }), { ex: 30 * 86400 })
     try {
       // Same-origin HTTP calls to protected Vercel previews are blocked by SSO.
       // This path requires an authenticated owner and a trusted origin. Only
