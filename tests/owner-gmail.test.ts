@@ -5,7 +5,7 @@ import { classifyGmailMetadata, runGmailMonitor } from "../lib/server/owner-gmai
 import { deliverGmailAlert, verifyMonitorSignature } from "../lib/server/owner-gmail-delivery"
 import { createHmac, createHash } from "node:crypto"
 import { createTaskDelivery, initialTaskState, scheduledTaskDefinitions, type TaskRun } from "../lib/server/scheduled-task-engine"
-import { gmailCallbackFailure, gmailConnectionFeedback } from "../lib/gmail-connection-feedback"
+import { gmailCallbackFailure, gmailConnectionFeedback, gmailTestFailure, gmailTestDeliveryFeedback } from "../lib/gmail-connection-feedback"
 const env: NodeJS.ProcessEnv = { NODE_ENV: "test", AMS_OWNER_EMAIL: "owner@example.com", AMS_GMAIL_PRIMARY_EMAIL: "business@example.com", AMS_GMAIL_SECONDARY_EMAIL: "second@example.com", AMS_GMAIL_CLIENT_ID: "client", AMS_GMAIL_CLIENT_SECRET: "secret", AMS_CONNECTION_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString("base64"), PUBLIC_APP_URL: "https://ams.example.com", AMS_GMAIL_CONSENT_MODE: "testing", AMS_GMAIL_SEND_ENABLED: "true" }
 function setup() {
   const data = new Map<string, string>()
@@ -172,6 +172,36 @@ test("ambiguous send does not resend on retry; sender opt-in and idempotency are
   await assert.rejects(deliverGmailAlert(event, event.id, { ...c, env: { ...env, AMS_GMAIL_SEND_ENABLED: "false" }, fetcher }), /SEND_DISABLED/)
   await assert.rejects(deliverGmailAlert(event, event.id, { ...c, fetcher }))
   assert.equal((await deliverGmailAlert(event, event.id, { ...c, fetcher })).delivered, false); assert.equal(sends, 1)
+})
+test("connected Gmail accounts do not enable owner alerts in a sender-disabled preview", async () => {
+  const c = setup(); await connect("primary", c); await connect("secondary", c)
+  const disabled = { ...c, env: { ...env, VERCEL_ENV: "preview", AMS_GMAIL_SEND_ENABLED: "false", AMS_GMAIL_AUTOREPLY_ENABLED: "false" } }
+  assert.equal((await gmailConnectionStatus("primary", disabled)).connected, true)
+  assert.equal((await gmailConnectionStatus("secondary", disabled)).connected, true)
+  let calls = 0
+  const event = { source: "ams-scheduled-tasks", id: "a22b4bba-2fc3-4124-a312-1a4e82f8a430", task: "Owner notification test", createdAt: null, severity: "actionable", summary: null, details: null }
+  await assert.rejects(deliverGmailAlert(event, event.id, {
+    ...disabled, now: c.now + 3_600_000,
+    fetcher: (async () => { calls++; throw new Error("No token refresh or Gmail call is allowed") }) as typeof fetch,
+  }), error => {
+    assert.equal(gmailTestFailure(error), "GMAIL_SEND_DISABLED")
+    assert.match(gmailTestDeliveryFeedback(gmailTestFailure(error)), /disabled.*deployment.*READY/u)
+    return true
+  })
+  assert.equal(calls, 0)
+  assert.ok(![...c.data.keys()].some(key => key.includes(":delivery:")))
+})
+test("owner test failures preserve actionable codes without exposing arbitrary exceptions", () => {
+  for (const code of ["GMAIL_REAUTHORIZE_REQUIRED", "GMAIL_CONFIG_REQUIRED", "GMAIL_TOKEN_UNAVAILABLE", "GMAIL_RECEIPT_UNAVAILABLE", "GMAIL_SEND_UNCONFIRMED"]) {
+    assert.equal(gmailTestFailure(new Error(code)), code)
+    assert.notEqual(gmailTestDeliveryFeedback(code), gmailTestDeliveryFeedback(undefined))
+  }
+  for (const error of [new Error("PRIVATE_TOKEN"), new Error("provider error token=PRIVATE"), "GMAIL_SEND_DISABLED", null]) {
+    assert.equal(gmailTestFailure(error), "GMAIL_TEST_UNCONFIRMED")
+  }
+  for (const code of ["PRIVATE_TOKEN", "toString", "__proto__", null, {}]) {
+    assert.equal(gmailTestDeliveryFeedback(code), gmailTestDeliveryFeedback(undefined))
+  }
 })
 test("personal Stripe receipt is discarded unless owner explicitly opts in a business term", () => {
   const headers = [{ name: "Subject", value: "Stripe personal purchase receipt" }]

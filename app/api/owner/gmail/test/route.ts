@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { authorizeOwnerApiRequest } from "@/lib/server/owner-api-auth"
 import { ownerGmailContext } from "@/lib/server/owner-gmail"
 import { deliverGmailAlert } from "@/lib/server/owner-gmail-delivery"
-import { taskErrorCode } from "@/lib/server/scheduled-task-engine"
+import { gmailTestFailure } from "@/lib/gmail-connection-feedback"
 export const runtime = "nodejs"
 export const maxDuration = 60
 export async function POST(request: NextRequest) {
@@ -39,9 +39,10 @@ export async function POST(request: NextRequest) {
       const delivered = acknowledged && receipt.delivered === true && /^gmail:[A-Za-z0-9_-]+$/u.test(receipt.deliveryId ?? "")
       await c.redis.set(`${c.prefix}test:${id}`, JSON.stringify({ id, at, status: delivered ? "delivered" : "unconfirmed", deliveryId: delivered ? receipt.deliveryId : null }), { ex: 30 * 86400 })
       return NextResponse.json({ ok: delivered, id, status: delivered ? "delivered" : "unconfirmed" }, { headers: { "Cache-Control": "no-store" } })
-    } catch {
-      await c.redis.set(`${c.prefix}test:${id}`, JSON.stringify({ id, at, status: "unconfirmed" }), { ex: 30 * 86400 })
-      throw new Error("GMAIL_TEST_UNCONFIRMED")
+    } catch (error) {
+      const code = gmailTestFailure(error)
+      await c.redis.set(`${c.prefix}test:${id}`, JSON.stringify({ id, at, status: "unconfirmed", code }), { ex: 30 * 86400 })
+      throw new Error(code)
     }
-  } catch (error) { return NextResponse.json({ ok: false, code: taskErrorCode(error) }, { status: 503 }) }
+  } catch (error) { return NextResponse.json({ ok: false, code: gmailTestFailure(error) }, { status: 503, headers: { "Cache-Control": "no-store" } }) }
 }

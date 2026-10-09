@@ -23,3 +23,28 @@ export function gmailCallbackFailure(error: unknown): keyof typeof gmailConnecti
     default: return "connection-failed"
   }
 }
+
+// Share an explicit allowlist between the owner test endpoint and its UI.
+// Never return arbitrary exception messages or Google response bodies.
+export const gmailTestFeedback = {
+  GMAIL_SEND_DISABLED: "Owner alert sending is disabled in this deployment. The preview needs a READY deployment with sender opt-in before testing delivery.",
+  GMAIL_CONNECTION_REQUIRED: "Authorize the primary Gmail account before testing owner alerts.",
+  GMAIL_REAUTHORIZE_REQUIRED: "The primary Gmail grant expired or was revoked. Authorize the primary account again.",
+  GMAIL_CONFIG_REQUIRED: "Gmail OAuth configuration requires repair before testing owner alerts.",
+  GMAIL_VAULT_REQUIRED: "The Gmail credential vault configuration requires repair before testing owner alerts.",
+  GMAIL_WEBHOOK_REQUIRED: "The owner alert receiver configuration requires repair before testing delivery.",
+  GMAIL_SCOPE_INVALID: "Required primary Gmail permissions are missing. Authorize the primary account again.",
+  GMAIL_TOKEN_UNAVAILABLE: "Google token refresh is temporarily unavailable. Delivery has not been confirmed.",
+  GMAIL_RECEIPT_UNAVAILABLE: "The primary inbox receipt could not be checked. Delivery has not been confirmed.",
+  GMAIL_SEND_UNCONFIRMED: "Google did not confirm the alert submission. Delivery has not been confirmed.",
+  GMAIL_TEST_UNCONFIRMED: "Delivery is unconfirmed. Review the connection and sender configuration before retrying.",
+} as const
+export function gmailTestFailure(error: unknown): keyof typeof gmailTestFeedback {
+  const code = error instanceof Error ? error.message : ""
+  return Object.hasOwn(gmailTestFeedback, code) ? code as keyof typeof gmailTestFeedback : "GMAIL_TEST_UNCONFIRMED"
+}
+export function gmailTestDeliveryFeedback(code: unknown) {
+  return typeof code === "string" && Object.hasOwn(gmailTestFeedback, code)
+    ? gmailTestFeedback[code as keyof typeof gmailTestFeedback]
+    : gmailTestFeedback.GMAIL_TEST_UNCONFIRMED
+}
