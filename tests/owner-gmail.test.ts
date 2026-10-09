@@ -6,6 +6,7 @@ import { deliverGmailAlert, verifyMonitorSignature } from "../lib/server/owner-g
 import { createHmac, createHash } from "node:crypto"
 import { createTaskDelivery, initialTaskState, scheduledTaskDefinitions, type TaskRun } from "../lib/server/scheduled-task-engine"
 import { gmailCallbackFailure, gmailConnectionFeedback, gmailTestFailure, gmailTestDeliveryFeedback } from "../lib/gmail-connection-feedback"
+import { gmailFailureDiagnostic } from "../lib/server/owner-gmail-diagnostics"
 const env: NodeJS.ProcessEnv = { NODE_ENV: "test", AMS_OWNER_EMAIL: "owner@example.com", AMS_GMAIL_PRIMARY_EMAIL: "business@example.com", AMS_GMAIL_SECONDARY_EMAIL: "second@example.com", AMS_GMAIL_CLIENT_ID: "client", AMS_GMAIL_CLIENT_SECRET: "secret", AMS_CONNECTION_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString("base64"), PUBLIC_APP_URL: "https://ams.example.com", AMS_GMAIL_CONSENT_MODE: "testing", AMS_GMAIL_SEND_ENABLED: "true" }
 function setup() {
   const data = new Map<string, string>()
@@ -162,6 +163,67 @@ test("callback feedback allowlist never exposes provider text or secrets", () =>
   assert.equal(gmailCallbackFailure(new Error("GMAIL_OFFLINE_GRANT_REQUIRED")), "offline-grant-required")
   assert.equal(gmailCallbackFailure(new Error("PRIVATE token=secret")), "connection-failed")
   assert.ok(!JSON.stringify(gmailConnectionFeedback).includes("PRIVATE"))
+})
+test("expired primary token refresh uses the primary grant and constructs a valid Gmail send", async () => {
+  const c = setup(); await connect("primary", c); await connect("secondary", c)
+  const secondary = [...c.data.entries()].find(([key]) => key.endsWith(":secondary"))!
+  const operations: string[] = []
+  const fetcher = (async (url: string | URL | Request, options?: RequestInit) => {
+    if (String(url).endsWith("/token")) {
+      operations.push("refresh")
+      const body = options?.body as URLSearchParams
+      assert.equal(body.get("grant_type"), "refresh_token")
+      assert.equal(body.get("client_id"), env.AMS_GMAIL_CLIENT_ID)
+      assert.equal(body.get("client_secret"), env.AMS_GMAIL_CLIENT_SECRET)
+      assert.equal(body.get("refresh_token"), "private-refresh")
+      return Response.json({ access_token: "refreshed-primary", expires_in: 3600, scope: `${READ_SCOPE} ${SEND_SCOPE}` })
+    }
+    assert.equal(new Headers(options?.headers).get("Authorization"), "Bearer refreshed-primary")
+    if (String(url).endsWith("/messages/send")) {
+      operations.push("send")
+      assert.equal(options?.method, "POST")
+      assert.equal(new Headers(options?.headers).get("Content-Type"), "application/json")
+      const payload = JSON.parse(String(options?.body))
+      assert.deepEqual(Object.keys(payload), ["raw"])
+      assert.match(payload.raw, /^[A-Za-z0-9_-]+$/u)
+      const mime = Buffer.from(payload.raw, "base64url").toString()
+      assert.ok(mime.startsWith(`From: ${env.AMS_GMAIL_PRIMARY_EMAIL}\r\nTo: ${env.AMS_GMAIL_PRIMARY_EMAIL}\r\n`))
+      assert.ok(mime.includes("\r\n\r\n"))
+      assert.ok(!mime.includes(env.AMS_GMAIL_SECONDARY_EMAIL!))
+      return Response.json({ id: "sent1" })
+    }
+    operations.push("receipt")
+    assert.equal(new URL(String(url)).searchParams.get("maxResults"), "1")
+    assert.match(new URL(String(url)).searchParams.get("q")!, /^in:inbox rfc822msgid:ams-/u)
+    return Response.json({ messages: [{ id: "inbox1" }] })
+  }) as typeof fetch
+  const event = { source: "ams-scheduled-tasks", id: "5bbd0a34-bbbb-45b5-8f6b-ad1da7e9e188", task: "Test", createdAt: null, severity: "actionable", summary: null, details: null }
+  assert.deepEqual(await deliverGmailAlert(event, event.id, { ...c, now: c.now + 3_600_000, fetcher }), { delivered: true, deliveryId: "gmail:inbox1" })
+  assert.deepEqual(operations, ["refresh", "send", "receipt"])
+  assert.equal(c.data.get(secondary[0]), secondary[1])
+})
+test("send and receipt failures retain safe diagnostics and do not resend on retry", async t => {
+  t.mock.method(console, "warn", () => {})
+  const c = setup(); await connect("primary", c)
+  let sends = 0
+  const fetcher = (async (url: string | URL | Request) => {
+    if (String(url).endsWith("/send")) {
+      sends++
+      return Response.json({ error: { message: "PRIVATE", errors: [{ reason: "insufficientPermissions" }] } }, { status: 403 })
+    }
+    return Response.json({ error: { errors: [{ reason: "authError" }] } }, { status: 401 })
+  }) as typeof fetch
+  const event = { source: "ams-scheduled-tasks", id: "e9b8e38b-2139-4c86-ae58-932203efcd46", task: "Test", createdAt: null, severity: "actionable", summary: null, details: null }
+  await assert.rejects(deliverGmailAlert(event, event.id, { ...c, fetcher }), error => {
+    assert.deepEqual(gmailFailureDiagnostic(error), { operation: "send", httpStatus: 403, reason: "insufficientPermissions", category: "permissions" })
+    return true
+  })
+  await assert.rejects(deliverGmailAlert(event, event.id, { ...c, fetcher }), error => {
+    assert.deepEqual(gmailFailureDiagnostic(error), { operation: "receipt", httpStatus: 401, reason: "authError", category: "authentication" })
+    return true
+  })
+  assert.equal(sends, 1)
+  assert.ok(!JSON.stringify([...c.data.values()]).includes("PRIVATE"))
 })
 test("ambiguous send does not resend on retry; sender opt-in and idempotency are enforced", async () => {
   const c = setup(); await connect("primary", c)

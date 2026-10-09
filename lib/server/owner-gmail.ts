@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto"
 import { Redis } from "@upstash/redis"
 import { z } from "zod"
 import { encryptConnectionPayload, decryptConnectionPayload, resolveConnectionEncryptionKey } from "./customer-connections"
+import { gmailProviderFailure } from "./owner-gmail-diagnostics"
 
 export const gmailSlots = ["primary", "secondary"] as const
 export type GmailSlot = typeof gmailSlots[number]
@@ -49,10 +50,7 @@ async function tokenResponse(response: Response) {
   if (!response.ok) {
     // Only invalid_grant means consent must be renewed. Configuration and
     // transient provider errors must not invalidate a working stored grant.
-    const body = await response.json().catch(() => null)
-    if (body?.error === "invalid_grant") throw new Error("GMAIL_REAUTHORIZE_REQUIRED")
-    if (body?.error === "invalid_client" || body?.error === "unauthorized_client") throw new Error("GMAIL_CONFIG_REQUIRED")
-    throw new Error("GMAIL_TOKEN_UNAVAILABLE")
+    throw await gmailProviderFailure(response, "token", "GMAIL_TOKEN_UNAVAILABLE")
   }
   return tokenSchema.parse(await response.json())
 }

@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto"
 import { z } from "zod"
 import { gmailAccessToken, gmailConfig, ownerGmailContext, type GmailContext } from "./owner-gmail"
+import { gmailProviderFailure } from "./owner-gmail-diagnostics"
 export function verifyMonitorSignature(body: string, signature: string | null, secret: string | undefined) {
   if (!secret || !signature || !/^[a-f0-9]{64}$/u.test(signature)) return false
   return timingSafeEqual(Buffer.from(signature, "hex"), createHmac("sha256", secret).update(body).digest())
@@ -24,7 +25,7 @@ export async function deliverGmailAlert(raw: unknown, idempotency: string | null
     const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages")
     url.searchParams.set("q", `in:inbox rfc822msgid:${messageId}`); url.searchParams.set("maxResults", "1")
     const response = await c.fetcher(url.toString(), { headers: { Authorization: `Bearer ${token}` }, redirect: "error", cache: "no-store", signal: AbortSignal.timeout(8_000) })
-    if (!response.ok) throw new Error("GMAIL_RECEIPT_UNAVAILABLE")
+    if (!response.ok) throw await gmailProviderFailure(response, "receipt", "GMAIL_RECEIPT_UNAVAILABLE")
     const data = z.object({ messages: z.array(z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/u) })).max(1).default([]) }).parse(await response.json())
     const id = data.messages[0]?.id
     if (!id) return { delivered: false }
@@ -41,7 +42,7 @@ export async function deliverGmailAlert(raw: unknown, idempotency: string | null
   // Never forward email subjects, senders, message bodies, task prompts or private results.
   const mime = [`From: ${config.primary}`, `To: ${config.primary}`, "Subject: AMS owner task alert", `Message-ID: <${messageId}>`, "MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "", content].join("\r\n")
   const response = await c.fetcher("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, redirect: "error", signal: AbortSignal.timeout(8_000), body: JSON.stringify({ raw: Buffer.from(mime).toString("base64url") }) })
-  if (!response.ok) throw new Error("GMAIL_SEND_UNCONFIRMED")
+  if (!response.ok) throw await gmailProviderFailure(response, "send", "GMAIL_SEND_UNCONFIRMED")
   // A successful send HTTP request does not establish delivery to the inbox.
   return findReceipt()
 }

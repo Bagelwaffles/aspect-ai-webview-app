@@ -5,6 +5,7 @@ import { authorizeOwnerApiRequest } from "@/lib/server/owner-api-auth"
 import { ownerGmailContext } from "@/lib/server/owner-gmail"
 import { deliverGmailAlert } from "@/lib/server/owner-gmail-delivery"
 import { gmailTestFailure } from "@/lib/gmail-connection-feedback"
+import { gmailFailureDiagnostic } from "@/lib/server/owner-gmail-diagnostics"
 export const runtime = "nodejs"
 export const maxDuration = 60
 export async function POST(request: NextRequest) {
@@ -41,8 +42,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: delivered, id, status: delivered ? "delivered" : "unconfirmed" }, { headers: { "Cache-Control": "no-store" } })
     } catch (error) {
       const code = gmailTestFailure(error)
-      await c.redis.set(`${c.prefix}test:${id}`, JSON.stringify({ id, at, status: "unconfirmed", code }), { ex: 30 * 86400 })
-      throw new Error(code)
+      await c.redis.set(`${c.prefix}test:${id}`, JSON.stringify({ id, at, status: "unconfirmed", code, diagnostic: gmailFailureDiagnostic(error) }), { ex: 30 * 86400 })
+      throw error
     }
-  } catch (error) { return NextResponse.json({ ok: false, code: gmailTestFailure(error) }, { status: 503, headers: { "Cache-Control": "no-store" } }) }
+  } catch (error) { return NextResponse.json({ ok: false, code: gmailTestFailure(error), diagnostic: gmailFailureDiagnostic(error) }, { status: 503, headers: { "Cache-Control": "no-store" } }) }
 }
