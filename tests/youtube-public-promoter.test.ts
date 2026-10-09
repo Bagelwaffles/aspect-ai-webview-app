@@ -428,6 +428,15 @@ test("public readback must match the exact authorized channel", async () => {
   assert.equal(fixture.updateCount(), 0)
 })
 
+test("already-public ambiguous promotion reconciles at the retry ceiling without another write", async () => {
+  const fixture = reconciliationFixture({ privacy: "public", attempts: 3 })
+  await fixture.setup()
+  const outcome = await fixture.run()
+  assert.equal(outcome.record.status, "succeeded")
+  assert.equal(outcome.record.attempts, 3)
+  assert.equal(fixture.updateCount(), 0)
+})
+
 test("ambiguous private promotion respects the automatic retry limit", async () => {
   const fixture = reconciliationFixture({ privacy: "private", attempts: 3 })
   await fixture.setup()
