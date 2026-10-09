@@ -58,7 +58,10 @@ export async function POST(request: NextRequest) {
       const existing = await getYouTubePublicPromotionRecord(job.jobId)
       if (existing?.status === "succeeded") continue
 
-      if ((existing?.attempts ?? 0) >= MAX_PUBLIC_PROMOTION_ATTEMPTS) {
+      // Even at the retry ceiling, an ambiguous PUT may already have succeeded.
+      // Allow readback-only reconciliation; the promoter forbids further PUTs.
+      const ambiguous = existing?.status === "promoting" || existing?.status === "reconciliation"
+      if ((existing?.attempts ?? 0) >= MAX_PUBLIC_PROMOTION_ATTEMPTS && !ambiguous) {
         continue
       }
 
