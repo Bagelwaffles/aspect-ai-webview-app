@@ -97,9 +97,17 @@ jobs:
             echo "needs_verify=false" >> "$GITHUB_OUTPUT"
           else
             printf '%s' "$response" \
-              | jq '{ok, skipped, windowHours, vodCount, clipCount, created, verified, pending, expired, analyzed, selected, queued, failureCount:(.failures | length), failures:(.failures // [])}'
+              | jq '{ok, skipped, windowHours, vodCount, clipCount, created, verified, pending, expired, analyzed, selected, rejected, selectionBlocked, queued, failureCount:(.failures | length), failures:(.failures // [])}'
             needs_verify="$(printf '%s' "$response" | jq -r 'if ((.created // 0) > 0 or (.pending // 0) > 0) then "true" else "false" end')"
             echo "needs_verify=$needs_verify" >> "$GITHUB_OUTPUT"
+            selection_blocked="$(printf '%s' "$response" | jq -r '.selectionBlocked // empty')"
+            if [ -n "$selection_blocked" ]; then
+              echo "::warning::Shorts found and analyzed, but no clips passed the real-footage quality gate ($selection_blocked). No Shorts were queued; review clip evidence and candidate coverage."
+            fi
+            skip_reason="$(printf '%s' "$response" | jq -r '.skipped // empty')"
+            if [ "$skip_reason" = "TWITCH_RECENT_VODS_NOT_FOUND" ]; then
+              echo "No newly completed Twitch VOD in the bounded Shorts recovery window; this is a normal idle cycle, not a published Short."
+            fi
           fi
 
       - name: Verify asynchronous VOD clips
@@ -123,7 +131,11 @@ jobs:
             -H "Authorization: Bearer $worker_token" \
             "$AMS_APP_URL/api/internal/twitch/media/auto")"
           printf '%s' "$response" \
-            | jq '{ok, skipped, windowHours, vodCount, clipCount, created, verified, pending, expired, analyzed, selected, queued, failureCount:(.failures | length), failures:(.failures // [])}'
+            | jq '{ok, skipped, windowHours, vodCount, clipCount, created, verified, pending, expired, analyzed, selected, rejected, selectionBlocked, queued, failureCount:(.failures | length), failures:(.failures // [])}'
+          selection_blocked="$(printf '%s' "$response" | jq -r '.selectionBlocked // empty')"
+          if [ -n "$selection_blocked" ]; then
+            echo "::warning::Post-clip verification completed with no qualifying Short ($selection_blocked); nothing was queued for YouTube."
+          fi
 
       - name: Reconcile pending private YouTube upload
         shell: bash
