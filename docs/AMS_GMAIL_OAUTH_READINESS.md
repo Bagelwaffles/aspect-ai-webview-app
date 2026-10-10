@@ -1,8 +1,33 @@
 # AMS Gmail OAuth readiness
 
 Date: 2026-10-09
-Candidate: draft PR #262 at `77c9266d283df78e5fb0c08c2317e8c3c645a75b`
+Candidate: Draft PR #262, release-readiness evidence through `863a4fa3aae1937954b3259c250318f5707eeb2b`
 Decision: **HOLD**
+
+## Post-privacy-release checkpoint (2026-10-09)
+
+**Privacy-only release completed; PR #262 remains Draft/HOLD.** PR #270 was squash-merged to main at `e96ec066847ca3fd65b5bae0dda66f7c7f9ccc82`. The owned production website now serves the Gmail-specific Privacy Policy, the Terms page and visible footer legal links; Vercel production health reported the expected commit and Redis ready. This is **not** a production release of Gmail monitoring or cloud scheduled tasks.
+
+**Merge-base reconciliation:** As of this checkpoint, PR #262 is four commits behind `main` with no reported merge conflict. The public files `app/privacy/page.tsx`, `app/page.tsx` and `components/ams-public-footer.tsx` have identical content SHA on `main` and PR #262. The manual deletion runbook `docs/AMS_GMAIL_MANUAL_DELETION.md` and its documentation-consistency test were added to `main` by PR #270; preserve them during any eventual merge. An up-to-date branch check and CI must be performed before a future release.
+
+**Gmail acceptance:** Primary PASS (`2fdce49b-e3e8-46c1-99b4-80754a4a772b`), secondary PASS (`e95d56a4-7146-4cae-9ea6-77837712d46b`), both on protected Preview. These prove real token refresh, secure persistence, monitoring reads, checkpoint preservation and replay deduplication without notifications. They do **not** prove ongoing scheduled delivery or the primary account's independently received owner-alert test. Do not claim end-to-end scheduled-task cutover from these PASS records.
+
+**Consent-mode discrepancy to resolve before a Gmail production release:** The owner's Google Console audit recorded the relevant OAuth project's audience as External and publishing status as **In production**. By contrast, the AMS Preview runtime uses `AMS_GMAIL_CONSENT_MODE=testing`, and its backend deliberately sets a **local seven-day `grantExpiresAt` cutoff** whenever that flag is `testing`. This cutoff is an AMS application policy, **not independently verified evidence that Google's OAuth project is in Testing**, nor proof of the actual Google refresh-token lifetime. Google's documented seven-day expiration applies to OAuth projects whose publishing status is Testing, not merely to application-specific environment flags. Keep production Gmail disabled until the owner-only exception and actual OAuth project/client configuration are confirmed and the application's `approved-owner-use` gates reviewed. Do not extend a grant or change the release flag automatically.
+
+**Manual deletion:** The corrected public policy accurately states there is no in-product Gmail disconnect/delete control. The main-branch operator procedure requires independently authenticated owner identity, per-slot confirmation, leases, reviewed exact keys, other-account isolation and post-deletion evidence. Its two tests check wording/runbook consistency only; **no live deletion rehearsal was performed**. Real deletion of either Gmail account requires a separate explicit request and approval.
+
+**Remaining independent gates before a production-release decision:**
+- Confirm whether this specific Google project, all associated OAuth clients, and all actual Gmail users qualify for the *personal-use / few personally known users* verification exception. The 100-user cap is not automatic approval; no sensitive/restricted scope is verified.
+- Confirm exact Preview and production OAuth redirects and project identity without exposing client secrets. Legacy domain, bare redirect, and unused YouTube client remain unchanged pending individual impact review.
+- Prove, if not already captured in durable evidence, a **real primary owner-alert receipt** and complete fail-closed recovery scenarios separately from token refresh, with manual approval and without unsolicited sending.
+- Review the GitHub scheduled-task worker/production scheduling gates. Keep the original 27 ChatGPT tasks untouched and AMS replacement jobs disabled; merge must not imply activation or cutover.
+- Before merging PR #262, reconcile with the newly merged privacy-only main, rerun relevant tests/CI/Preview verification on the resolved head, and obtain **separate explicit merge and production authorization**. No automatic replies, no customer Gmail access, no paid Google verification or assessment without approval.
+
+Reference policies:
+- https://support.google.com/cloud/answer/13464323?hl=en
+- https://support.google.com/cloud/answer/15549945?hl=en
+- https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification
+- https://developers.google.com/terms/api-services-user-data-policy
 
 ## Current live acceptance decision
 
@@ -42,7 +67,7 @@ After initialization, wait for the primary access token to expire naturally and 
 
 ## Secondary reauthorization sequence
 
-1. Use the existing `AMS PR14 Staging` Google Cloud project and existing AMS Gmail client; do not create a new client or project.
+1. **Historical procedure, already completed:** use the actual verified Gmail OAuth project `aspect-marketing-solutions` (project number `13801315898`) and its existing AMS Gmail client. Do not use the separate `AMS PR14 Staging` project for this flow, and do not create a replacement client or project.
 2. From the authenticated Preview, select **Authorize secondary**.
 3. The owner must select and consent as `whitestarline1@gmail.com`. Confirm the consent screen requests only OpenID/email plus `gmail.readonly`; the secondary account must not request `gmail.send`.
 4. After callback, confirm the secondary connection is `connected`, the expected account identity matches, the offline refresh token is present, and the encrypted vault record was persisted. Do not print credentials.
@@ -70,7 +95,7 @@ Observed under the project-owner account in the actual Gmail OAuth project `aspe
 - [ ] Review and justify or remove the legacy authorized domain `v0-aspect-ai-v0-handoff20250830-bedrv7dkn.vercel.app`; do not change it during this audit.
 - [ ] Review the bare redirect URI `https://aspectmarketingsolutions.app`, which is not an OAuth callback path, before any cleanup. It was not changed during this audit.
 - [ ] Decide whether the separate `YouTube Upload` web client belongs in the same verification request. Google requires the demonstration video to include every OAuth client assigned to the project; the console also warns this client has been unused for five months and may be deleted after 30 more days. Do not delete it without a separate YouTube impact review.
-- [ ] Publish the drafted Gmail-specific privacy disclosure on the configured privacy URL before requesting verification.
+- [x] The corrected Gmail-specific privacy disclosure and Privacy/Terms links were published under the owned domain by privacy-only PR #270; validated against production commit `e96ec066847ca3fd65b5bae0dda66f7c7f9ccc82`.
 - [ ] Prepare a reviewer demonstration showing: owner sign-in; separate primary/secondary consent; the exact scopes; mailbox metadata-only monitoring; encrypted credential storage; disconnection/deletion path; automatic replies off; no unauthorized send; and the user-facing benefit.
 - [ ] Document scope justifications and Limited Use compliance. `gmail.readonly` is restricted and server-side handling may require restricted-scope verification and an annual approved security assessment before public production use.
 - [ ] Keep testing and production projects/clients separated before any public launch.
@@ -89,7 +114,7 @@ Aspect Marketing Solutions requests Gmail send access only for the separately de
 
 ### Restricted-scope feature category
 
-Select the console category that most closely describes **productivity / task automation**. The Gmail data flow is owner-initiated and provides the identifiable benefit of monitoring narrowly defined operational messages and preventing duplicate handling. If the console presents different labels, record the available choices before selecting rather than guessing.
+The Google Console audit records the category already saved as **Email reporting and monitoring**. Do not replace it with the earlier planning suggestion of productivity / task automation without reviewing the actual available categories and scope-review requirements.
 
 ## Reviewer demonstration plan
 
@@ -107,7 +132,7 @@ Create one unlisted English-language video after the public privacy-policy corre
 
 ## Owner-only exception assessment
 
-AMS currently qualifies for Google's optional **personal-use / limited known users** exception only while Gmail access remains restricted to the owner and a few accounts personally known to the owner, stays below Google's lifetime 100-user cap, and users accept the unverified-app warning. The exception does not waive the Google API Services User Data Policy or Limited Use requirements. It is not a basis for customer-facing Gmail connections, removing the unverified warning, exceeding the cap, or representing the restricted scopes as verified. Because the project is marked In production and uses a third-party server to handle restricted Gmail data, public expansion must remain blocked pending Google data-access verification and any required security assessment.
+AMS is **a candidate**, not conclusively confirmed eligible, for Google's **personal-use / few personally known users** exception while Gmail access remains restricted to the owner and personally known users. Validate every OAuth client and actual authorizing user in this shared project; remaining under the lifetime 100-user cap and accepting the unverified-app warning alone does not establish eligibility. The exception does not waive the Google API Services User Data Policy or Limited Use requirements. It is not a basis for customer-facing Gmail connections, removing the unverified warning, exceeding the cap, or representing the restricted scopes as verified. Because the project is marked In production and uses a third-party server to handle restricted Gmail data, public expansion must remain blocked pending Google data-access verification and any required security assessment.
 
 ## Disconnection and deletion implementation finding
 
@@ -115,7 +140,7 @@ Repository review found Gmail connect, callback, status, token refresh, verifica
 
 ## Remaining release gates
 
-- Owner approval to publish the corrected privacy disclosure and homepage/footer Privacy and Terms links on the owned production domain.
+- [COMPLETE] The privacy-only public disclosure and Privacy/Terms links are live from PR #270; publication is not a Gmail feature release.
 - Consent-screen links, declared scopes, domain ownership, contacts, client redirects, and reviewer demonstration complete.
 - Either retain the strictly owner-only limited-user exception or complete applicable Google sensitive/restricted-scope verification and any required security assessment before customer-facing production use.
 - Decide whether verified manual deletion is sufficient for owner-only operation or separately approve a designed and tested in-product disconnect/deletion feature.
