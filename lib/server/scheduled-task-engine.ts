@@ -32,7 +32,7 @@ export function nextTaskExecution(schedule: TaskSchedule, after: Date): string {
 
 export type TaskResult = { summary: string; details: unknown; alert: boolean; discoveries?: string[]; dataQuality: "verified" | "partial" }
 export type TaskRun = {
-  id: string; trigger: "scheduled" | "manual" | "retry"; scheduledFor: string; startedAt: string; finishedAt: string | null;
+  id: string; trigger: "scheduled" | "manual" | "retry" | "initialization"; scheduledFor: string; startedAt: string; finishedAt: string | null;
   status: "running" | "succeeded" | "failed" | "interrupted"; attempt: number; error: string | null; result: TaskResult | null;
   notification: "none" | "pending" | "delivered" | "exhausted"; deliveryAttempts: number; nextDeliveryAt: string | null; deliveryReceipt: string | null;
 }

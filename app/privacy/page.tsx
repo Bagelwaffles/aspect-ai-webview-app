@@ -5,7 +5,7 @@ export const metadata = {
   description: "Privacy policy for Aspect Marketing Solutions web services and the AMS Android companion app.",
 }
 
-const updated = "September 24, 2026"
+const updated = "October 9, 2026"
 
 export default function PrivacyPolicyPage() {
   return (
@@ -71,7 +71,26 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-2xl font-bold">5. AI execution transparency and consent</h2>
+          <h2 className="text-2xl font-bold">5. Google Gmail data</h2>
+          <p className="leading-7 text-muted-foreground">
+            When the AMS owner explicitly connects a Gmail account, AMS uses the Google Gmail API to monitor that account for narrowly defined business, account, payment, security, and Google Play messages. AMS requests read-only Gmail access for monitoring. The designated primary owner account may also grant Gmail send access for owner alerts and separately enabled, owner-controlled acknowledgements. AMS does not use Gmail access for advertising, marketing campaigns, unsolicited mail, credit decisions, or training generalized artificial-intelligence models.
+          </p>
+          <p className="leading-7 text-muted-foreground">
+            Monitoring reads message identifiers and limited metadata needed to classify relevant messages, such as sender, recipient, subject, timestamps, and delivery-related headers. It does not retrieve attachments and is not designed to store message bodies. AMS stores encrypted OAuth credentials, connection status, bounded monitoring checkpoints, privacy-preserving message fingerprints used for deduplication, and limited alert metadata needed to provide and secure the owner-requested monitoring feature. OAuth credentials are not exposed to browsers, logs, or customers.
+          </p>
+          <p className="leading-7 text-muted-foreground">
+            Gmail-derived data is used only to provide, maintain, secure, and improve the connected owner-facing Gmail features that are visible in AMS. AMS does not sell Google user data. AMS does not transfer Google user data except to infrastructure providers acting on our behalf as necessary to provide or secure those features, when the user gives affirmative consent, or when required by law. Human access is limited to security, support, or troubleshooting needs and only when permitted by the user or required for security or legal reasons.
+          </p>
+          <p className="leading-7 text-muted-foreground">
+            Gmail connection records and monitoring state are retained only while needed to operate the connected feature, protect it from duplicate processing, satisfy applicable legal or security obligations, or resolve a support request. The owner may disconnect access in the product or revoke AMS access through the Google Account permissions page. The owner may also request deletion through the privacy contact below. After a verified deletion request or disconnection, AMS deletes eligible stored OAuth credentials and Gmail-derived monitoring data within a reasonable operational period, except for minimal records that must be retained for security, fraud prevention, or legal compliance.
+          </p>
+          <p className="leading-7 text-muted-foreground">
+            AMS&apos;s use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-2xl font-bold">6. AI execution transparency and consent</h2>
           <p className="leading-7 text-muted-foreground">
             AMS distinguishes AI-generated work, automatic validation, human review, and external-provider processing. The protected generation workflows require affirmative customer consent before customer-provided content or relevant saved workspace context is sent to an external AI model provider.
           </p>
@@ -81,14 +100,14 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-2xl font-bold">6. Security</h2>
+          <h2 className="text-2xl font-bold">7. Security</h2>
           <p className="leading-7 text-muted-foreground">
             We use HTTPS in transit, server-side secret storage, authenticated access controls, and operational safeguards designed to limit unauthorized access. The Android tester roster is available only on an internal operator surface. No internet service can guarantee absolute security, so AMS also uses monitoring, rate limits, and incident-response practices where appropriate.
           </p>
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-2xl font-bold">7. Retention and deletion</h2>
+          <h2 className="text-2xl font-bold">8. Retention and deletion</h2>
           <p className="leading-7 text-muted-foreground">
             AMS keeps information only as long as reasonably needed for the purpose it was collected, to operate and secure the service, and to meet legal, tax, accounting, dispute, or fraud-prevention requirements. The current Android beta roster and private feedback records are configured with a maximum 120-day application retention window unless a shorter deletion request or longer lawful retention requirement applies.
           </p>
@@ -98,21 +117,21 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-2xl font-bold">8. Children</h2>
+          <h2 className="text-2xl font-bold">9. Children</h2>
           <p className="leading-7 text-muted-foreground">
             AMS business software and services are not directed to children under 13. We do not knowingly design the Android companion or beta recruitment program to collect personal information from children.
           </p>
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-2xl font-bold">9. Changes to this policy</h2>
+          <h2 className="text-2xl font-bold">10. Changes to this policy</h2>
           <p className="leading-7 text-muted-foreground">
             We may update this policy as AMS features, providers, or legal requirements change. We will update the date at the top of this page when the policy changes materially.
           </p>
         </section>
 
         <section className="space-y-3 rounded-xl border border-border bg-card p-6">
-          <h2 className="text-2xl font-bold">10. Privacy contact</h2>
+          <h2 className="text-2xl font-bold">11. Privacy contact</h2>
           <p className="leading-7 text-muted-foreground">
             Aspect Marketing Solutions<br />
             Privacy and support contact: <a className="text-primary underline underline-offset-4" href="mailto:kimberleyaversbiz@gmail.com">kimberleyaversbiz@gmail.com</a>
