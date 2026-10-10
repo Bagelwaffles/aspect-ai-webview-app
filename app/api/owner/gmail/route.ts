@@ -12,10 +12,11 @@ export async function GET(request: NextRequest) {
   }))
   const primary = accounts.find(account => account.slot === "primary")
   let ownerAlertReceiptVerifiedAt: string | null = null
-  if (primary?.connected && primary.connectedAt) {
+  const primaryConnectedAt = primary && "connectedAt" in primary && typeof primary.connectedAt === "string" ? primary.connectedAt : null
+  if (primary?.connected && primaryConnectedAt) {
     try {
       const c = ownerGmailContext()
-      ownerAlertReceiptVerifiedAt = await readOwnerAlertReceiptProof(c.redis, c.prefix, primary.connectedAt)
+      ownerAlertReceiptVerifiedAt = await readOwnerAlertReceiptProof(c.redis, c.prefix, primaryConnectedAt)
     } catch {
       // A failed evidence read must never be interpreted as successful sending.
     }
