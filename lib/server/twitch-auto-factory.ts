@@ -29,6 +29,10 @@ import {
 } from "@/lib/server/twitch-video-analysis"
 
 export const TWITCH_AUTO_FACTORY_MAX_CLIPS_PER_VOD = 3
+// Review a wider but still bounded set of real moments when the first samples are weak.
+// The upload/selection ceiling remains three Shorts per stream.
+export const TWITCH_AUTO_FACTORY_MAX_CANDIDATES_PER_VOD = 6
+export const TWITCH_AUTO_FACTORY_LOOKBACK_HOURS = 72
 export const TWITCH_AUTO_FACTORY_MAX_DAY_CLIPS = 30
 export const TWITCH_AUTO_FACTORY_MAX_ANALYSES = 30
 export const TWITCH_AUTO_FACTORY_MAX_RENDERS_PER_STREAM = 3
@@ -109,7 +113,7 @@ export function selectDailyVodSampleCandidates(
   maxClips = TWITCH_AUTO_FACTORY_MAX_CLIPS_PER_VOD,
   reserved: Array<Pick<PendingTwitchVodClip, "vodId" | "vodOffset">> = [],
 ) {
-  const limit = Math.max(0, Math.min(TWITCH_AUTO_FACTORY_MAX_CLIPS_PER_VOD, Math.trunc(maxClips)))
+  const limit = Math.max(0, Math.min(TWITCH_AUTO_FACTORY_MAX_CANDIDATES_PER_VOD, Math.trunc(maxClips)))
   if (!vod.id || vod.durationSeconds < 20 || limit === 0) return []
 
   const existing = clips.filter((clip) => clip.videoId === vod.id)
@@ -182,6 +186,12 @@ export function selectBestAnalyzedClipsPerStream(
   return selected
 }
 
+export function handledTwitchShortClipIds(
+  jobs: ReadonlyArray<{ clipId: string; status: string }>,
+): Set<string> {
+  return new Set(jobs.filter((job) => job.status !== "failed").map((job) => job.clipId))
+}
+
 function dailyQueueKey(now = new Date()) {
   return `day-${now.toISOString().slice(0, 10)}`
 }
@@ -214,7 +224,7 @@ export async function runTwitchAutomaticPrivateShorts(input: { vodId?: string; w
 }
 
 async function runTwitchAutomaticPrivateShortsLocked(input: { vodId?: string; windowHours?: number; windowEnd?: string; privateOnly?: boolean }) {
-  const windowHours = input.windowHours ?? 24
+  const windowHours = input.windowHours ?? TWITCH_AUTO_FACTORY_LOOKBACK_HOURS
   const windowEnd = input.windowEnd ? new Date(input.windowEnd) : undefined
   const queueKey = input.vodId ? `backfill-${input.vodId}` : dailyQueueKey()
   const status = await getTwitchPilotStatus()
@@ -232,7 +242,8 @@ async function runTwitchAutomaticPrivateShortsLocked(input: { vodId?: string; wi
   if (!archive.vods.length) {
     return {
       ok: true,
-      skipped: "TWITCH_DAILY_VODS_REQUIRED",
+      skipped: "TWITCH_RECENT_VODS_NOT_FOUND",
+      windowHours,
       vodCount: 0,
       clipCount: archive.clips.length,
       created: 0,
@@ -269,7 +280,7 @@ async function runTwitchAutomaticPrivateShortsLocked(input: { vodId?: string; wi
     const candidates = selectDailyVodSampleCandidates(
       vod,
       knownClips,
-      TWITCH_AUTO_FACTORY_MAX_CLIPS_PER_VOD,
+      TWITCH_AUTO_FACTORY_MAX_CANDIDATES_PER_VOD,
       reservations,
     )
     for (let index = 0; index < candidates.length; index += 1) {
@@ -322,7 +333,7 @@ async function runTwitchAutomaticPrivateShortsLocked(input: { vodId?: string; wi
       combinedClips
         .filter((clip) => clip.videoId === vod.id)
         .sort((left, right) => Date.parse(right.createdAt || "0") - Date.parse(left.createdAt || "0"))
-        .slice(0, TWITCH_AUTO_FACTORY_MAX_CLIPS_PER_VOD),
+        .slice(0, TWITCH_AUTO_FACTORY_MAX_CANDIDATES_PER_VOD),
     )
     .slice(0, TWITCH_AUTO_FACTORY_MAX_DAY_CLIPS)
 
@@ -387,9 +398,9 @@ async function runTwitchAutomaticPrivateShortsLocked(input: { vodId?: string; wi
   const ranked = selectBestAnalyzedClipsPerStream(analyzed)
 
   let queued = 0
-  const previousClipJobs = input.vodId || input.privateOnly
-    ? new Set((await listLatestTwitchShortRenderJobs()).filter(job => job.status !== "failed").map(job => job.clipId))
-    : new Set<string>()
+  // Daily queues have a day-specific ID. Deduplicate by actual Twitch clip ID across
+  // every run/day, so a 72-hour lookback cannot create new render jobs for old clips.
+  const previousClipJobs = handledTwitchShortClipIds(await listLatestTwitchShortRenderJobs())
   for (const candidate of ranked) {
     try {
       if (previousClipJobs.has(candidate.clipId)) continue
@@ -422,6 +433,9 @@ async function runTwitchAutomaticPrivateShortsLocked(input: { vodId?: string; wi
     expired: reconciliation.failed.length,
     analyzed: analyzed.length,
     selected: ranked.length,
+    rejected: analyzed.length - analyzed.filter((item) => isTwitchVideoAnalysisRenderEligible(item.analysis)).length,
+    selectionBlocked: analyzed.length > 0 && ranked.length === 0
+      ? "TWITCH_SHORTS_NO_QUALITY_ELIGIBLE_CLIPS" : null,
     queued,
     repaired,
     failures,

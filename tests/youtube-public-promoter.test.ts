@@ -316,3 +316,130 @@ test("missing YouTube edit scope fails before consuming a promotion attempt", as
     null,
   )
 })
+
+function reconciliationFixture(options: {
+  privacy: "public" | "private"
+  recordStatus?: "promoting" | "reconciliation"
+  minutesOld?: number
+  attempts?: number
+  videoChannelId?: string
+}) {
+  const redis = new MemoryRedis()
+  const now = new Date("2026-10-03T20:05:00.000Z")
+  let privacy = options.privacy
+  let updateCount = 0
+  const updates: Array<{ id: string; status: Record<string, unknown> }> = []
+  const fetcher = (async (input: URL | RequestInfo, init?: RequestInit) => {
+    const url = String(input)
+    if (url.startsWith("https://www.googleapis.com/youtube/v3/channels?")) {
+      return Response.json({ items: [{ id: SMOKYBANANA03_YOUTUBE_CHANNEL_ID, snippet: { title: "SmokyBanana03" } }] })
+    }
+    if (url === "https://oauth2.googleapis.com/token") {
+      return Response.json({ access_token: "reconciliation-access-token" })
+    }
+    if (url.startsWith("https://www.googleapis.com/youtube/v3/videos?part=id%2Csnippet%2Cstatus")) {
+      return Response.json({ items: [{
+        id: "youtube-public-test-123",
+        snippet: { channelId: options.videoChannelId ?? SMOKYBANANA03_YOUTUBE_CHANNEL_ID },
+        status: { privacyStatus: privacy, embeddable: true, selfDeclaredMadeForKids: false },
+      }] })
+    }
+    if (url === "https://www.googleapis.com/youtube/v3/videos?part=status" && init?.method === "PUT") {
+      const update = JSON.parse(String(init.body)) as { id: string; status: Record<string, unknown> }
+      updates.push(update)
+      updateCount++
+      privacy = "public"
+      return Response.json({ id: update.id, status: update.status })
+    }
+    return new Response("not found", { status: 404 })
+  }) as typeof fetch
+
+  async function setup() {
+    await seedVerifiedPrivateUpload(redis)
+    const updatedAt = new Date(now.getTime() - (options.minutesOld ?? 5) * 60_000).toISOString()
+    await redis.set("ams:youtube-public-promotion:v1:job:render-job-public-123", JSON.stringify({
+      version: "youtube-public-promotion-v1",
+      renderJobId: "render-job-public-123",
+      clipId: "clip-public-123",
+      sourceVideoId: "vod-123",
+      selectionRank: 1,
+      youtubeVideoId: "youtube-public-test-123",
+      channelId: SMOKYBANANA03_YOUTUBE_CHANNEL_ID,
+      status: options.recordStatus ?? "reconciliation",
+      attempts: options.attempts ?? 1,
+      createdAt: "2026-10-03T20:00:00.000Z",
+      updatedAt,
+      completedAt: null,
+      errorCode: "YOUTUBE_PUBLIC_UPDATE_AMBIGUOUS",
+    }))
+    await storeYouTubeOwnerConnectionFromGoogle({
+      email: "owner@example.com",
+      refreshToken: "reconciliation-refresh-token-12345678901234567890",
+      accessToken: "initial-owner-access-token",
+      scopes: [YOUTUBE_UPLOAD_SCOPE, YOUTUBE_READONLY_SCOPE, YOUTUBE_FORCE_SSL_SCOPE],
+    }, { env: env(), redis: redis as never, fetcher })
+  }
+
+  return {
+    setup,
+    redis,
+    updates,
+    updateCount: () => updateCount,
+    run: () => promoteRenderedTwitchShortPublic(
+      { renderJobId: "render-job-public-123", approved: true },
+      { env: env(), redis: redis as never, fetcher, now: () => now, getRenderJob: async () => renderedJob() },
+    ),
+  }
+}
+
+test("reconcile already-public Short after interrupted status update without a second PUT", async () => {
+  const fixture = reconciliationFixture({ privacy: "public" })
+  await fixture.setup()
+  const outcome = await fixture.run()
+  assert.equal(outcome.record.status, "succeeded")
+  assert.equal(outcome.reused, true)
+  assert.equal(fixture.updateCount(), 0)
+  const entries = await fixture.redis.get<string>("ams:youtube-public-promotion:v1:stream:vod-123")
+  assert.equal((JSON.parse(entries ?? "[]") as unknown[]).length, 1)
+})
+
+test("stale ambiguous private Short is retried by updating the same verified video only", async () => {
+  const fixture = reconciliationFixture({ privacy: "private" })
+  await fixture.setup()
+  const outcome = await fixture.run()
+  assert.equal(outcome.record.status, "succeeded")
+  assert.equal(outcome.record.attempts, 2)
+  assert.equal(fixture.updateCount(), 1)
+  assert.equal(fixture.updates[0].id, "youtube-public-test-123")
+  assert.equal(fixture.updates[0].status.privacyStatus, "public")
+})
+
+test("recent in-flight promotion remains fenced from automatic retry", async () => {
+  const fixture = reconciliationFixture({ privacy: "private", recordStatus: "promoting", minutesOld: 1 })
+  await fixture.setup()
+  await assert.rejects(fixture.run(), /YOUTUBE_PUBLIC_RECONCILIATION_REQUIRED/u)
+  assert.equal(fixture.updateCount(), 0)
+})
+
+test("public readback must match the exact authorized channel", async () => {
+  const fixture = reconciliationFixture({ privacy: "public", videoChannelId: "UC0000000000000000000000" })
+  await fixture.setup()
+  await assert.rejects(fixture.run(), /YOUTUBE_CHANNEL_MISMATCH/u)
+  assert.equal(fixture.updateCount(), 0)
+})
+
+test("already-public ambiguous promotion reconciles at the retry ceiling without another write", async () => {
+  const fixture = reconciliationFixture({ privacy: "public", attempts: 3 })
+  await fixture.setup()
+  const outcome = await fixture.run()
+  assert.equal(outcome.record.status, "succeeded")
+  assert.equal(outcome.record.attempts, 3)
+  assert.equal(fixture.updateCount(), 0)
+})
+
+test("ambiguous private promotion respects the automatic retry limit", async () => {
+  const fixture = reconciliationFixture({ privacy: "private", attempts: 3 })
+  await fixture.setup()
+  await assert.rejects(fixture.run(), /YOUTUBE_PUBLIC_ATTEMPT_LIMIT_REACHED/u)
+  assert.equal(fixture.updateCount(), 0)
+})
