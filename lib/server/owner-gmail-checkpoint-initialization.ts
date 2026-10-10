@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto"
 import { z } from "zod"
 import { ownerGmailContext, type GmailContext, type GmailSlot } from "./owner-gmail"
 import { runGmailMonitor } from "./owner-gmail-monitor"
-import { createScheduledTaskStore, scheduledTaskDefinitions, type TaskRun, type TaskStore } from "./scheduled-task-engine"
+import { createScheduledTaskStore, initialTaskState, scheduledTaskDefinitions, scheduledTaskOwner, type TaskRun, type TaskStore } from "./scheduled-task-engine"
 import { requirePreviewRefreshVerification } from "./owner-gmail-refresh-verification"
 
 export const checkpointInitializationSchema = z.object({
@@ -22,8 +22,7 @@ export async function initializeOwnerGmailCheckpoint(slot: GmailSlot, id: string
   const lease = randomUUID()
   if (!await store.lock(definition.id, lease)) throw new Error("GMAIL_INITIALIZATION_BUSY")
   try {
-    const state = await store.read(definition.id)
-    if (!state) throw new Error("GMAIL_INITIALIZATION_STATE_REQUIRED")
+    const state = await store.read(definition.id) ?? initialTaskState(definition, scheduledTaskOwner(c.env), new Date(c.now))
     if (state.enabled) throw new Error("GMAIL_INITIALIZATION_TASK_MUST_BE_PAUSED")
     const existing = state.history.find(run => run.status === "succeeded" && continuationSchema.safeParse(run.result?.details).success)
     if (existing) {

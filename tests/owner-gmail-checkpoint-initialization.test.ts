@@ -3,7 +3,7 @@ import test from "node:test"
 import { randomUUID } from "node:crypto"
 import { beginGmailConnection, completeGmailConnection, READ_SCOPE, SEND_SCOPE, type GmailRedis } from "../lib/server/owner-gmail"
 import { initializeOwnerGmailCheckpoint } from "../lib/server/owner-gmail-checkpoint-initialization"
-import { initialTaskState, scheduledTaskDefinitions, scheduledTaskOwner, type TaskState, type TaskStore } from "../lib/server/scheduled-task-engine"
+import { type TaskState, type TaskStore } from "../lib/server/scheduled-task-engine"
 
 const now = 1_790_000_000_000
 test("cold start persists one genuine checkpoint while preserving the paused task and blocking sends", async () => {
@@ -14,9 +14,8 @@ test("cold start persists one genuine checkpoint while preserving the paused tas
     const attempt = await beginGmailConnection(slot, "owner-subject", { env, redis, now })
     await completeGmailConnection(slot, "owner-subject", attempt.state, "code", attempt.state, { env, redis, now, fetcher: (async url => Response.json(String(url).endsWith("/token") ? { access_token: `access-${slot}`, refresh_token: `refresh-${slot}`, expires_in: 3600, scope: [READ_SCOPE, ...(slot === "primary" ? [SEND_SCOPE] : [])].join(" ") } : { email: env[slot === "primary" ? "AMS_GMAIL_PRIMARY_EMAIL" : "AMS_GMAIL_SECONDARY_EMAIL"], email_verified: true })) as typeof fetch })
   }
-  const definition = scheduledTaskDefinitions.find(task => task.id === "gmail-primary-monitor")!
-  let state: TaskState = initialTaskState(definition, scheduledTaskOwner(env), new Date(now))
-  const store: TaskStore = { async read() { return structuredClone(state) }, async lock() { return true }, async write(_id, _lease, next) { state = structuredClone(next) }, async release() {} }
+  let state: TaskState | null = null
+  const store: TaskStore = { async read() { return state ? structuredClone(state) : null }, async lock() { return true }, async write(_id, _lease, next) { state = structuredClone(next) }, async release() {} }
   let providerCalls = 0
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
     providerCalls++
@@ -30,11 +29,11 @@ test("cold start persists one genuine checkpoint while preserving the paused tas
   assert.equal(evidence.status, "initialized")
   assert.equal(evidence.persisted, true)
   assert.equal(evidence.notificationSends, 0)
-  assert.equal(state.enabled, false)
-  assert.equal(state.history[0].trigger, "initialization")
-  assert.equal(state.history[0].notification, "none")
-  assert.equal(state.history[0].result?.alert, false)
-  assert.equal((state.history[0].result?.details as { checkpoint: number }).checkpoint, now)
+  assert.equal(state!.enabled, false)
+  assert.equal(state!.history[0].trigger, "initialization")
+  assert.equal(state!.history[0].notification, "none")
+  assert.equal(state!.history[0].result?.alert, false)
+  assert.equal((state!.history[0].result?.details as { checkpoint: number }).checkpoint, now)
   const calls = providerCalls
   const repeat = await initializeOwnerGmailCheckpoint("primary", randomUUID(), { env, redis, store, now, fetcher })
   assert.equal(repeat.status, "already-initialized")
