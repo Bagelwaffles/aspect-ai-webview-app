@@ -111,6 +111,7 @@ test("notification retries reconcile receipt without duplicate send or private c
   let sends = 0, delivered = false
   const fetcher = (async (url: string | URL | Request, opts?: RequestInit) => {
     if (String(url).endsWith("/send")) { sends++; const content = Buffer.from(JSON.parse(String(opts?.body)).raw, "base64url").toString(); assert.ok(!content.includes("PRIVATE")); assert.ok(content.includes(`To: ${env.AMS_GMAIL_PRIMARY_EMAIL}`)); return Response.json({ id: "sent1" }) }
+    if (String(url).includes("/messages/sent1")) return Response.json({ id: "sent1", labelIds: ["SENT"], payload: { headers: [{ name: "Message-ID", value: "<gmail-real@mail.gmail.com>" }] } })
     return Response.json({ messages: delivered ? [{ id: "inbox1" }] : [] })
   }) as typeof fetch
   const event = { source: "ams-scheduled-tasks", id: "c072b2df-02dd-43a0-97f5-4f8b03d684ab", task: "PRIVATE", createdAt: null, severity: "actionable", summary: "PRIVATE", details: { body: "PRIVATE" } }
@@ -192,14 +193,19 @@ test("expired primary token refresh uses the primary grant and constructs a vali
       assert.ok(!mime.includes(env.AMS_GMAIL_SECONDARY_EMAIL!))
       return Response.json({ id: "sent1" })
     }
-    operations.push("receipt")
+    if (String(url).includes("/messages/sent1")) {
+      operations.push("receipt-metadata")
+      assert.equal(new URL(String(url)).searchParams.get("format"), "metadata")
+      return Response.json({ id: "sent1", labelIds: ["SENT"], payload: { headers: [{ name: "Message-ID", value: "<gmail-real@mail.gmail.com>" }] } })
+    }
+    operations.push("receipt-inbox")
     assert.equal(new URL(String(url)).searchParams.get("maxResults"), "1")
-    assert.match(new URL(String(url)).searchParams.get("q")!, /^in:inbox rfc822msgid:ams-/u)
+    assert.equal(new URL(String(url)).searchParams.get("q"), "in:inbox rfc822msgid:gmail-real@mail.gmail.com")
     return Response.json({ messages: [{ id: "inbox1" }] })
   }) as typeof fetch
   const event = { source: "ams-scheduled-tasks", id: "5bbd0a34-bbbb-45b5-8f6b-ad1da7e9e188", task: "Test", createdAt: null, severity: "actionable", summary: null, details: null }
   assert.deepEqual(await deliverGmailAlert(event, event.id, { ...c, now: c.now + 3_600_000, fetcher }), { delivered: true, deliveryId: "gmail:inbox1" })
-  assert.deepEqual(operations, ["refresh", "send", "receipt"])
+  assert.deepEqual(operations, ["refresh", "send", "receipt-metadata", "receipt-inbox"])
   assert.equal(c.data.get(secondary[0]), secondary[1])
 })
 test("received send rejections retain diagnostics and allow another attempt", async t => {
@@ -249,6 +255,7 @@ test("one concurrent retry wins after a definitive rejection and keeps the same 
       inbox = true
       return Response.json({ id: "sent1" })
     }
+    if (String(url).includes("/messages/sent1")) return Response.json({ id: "sent1", labelIds: ["SENT"], payload: { headers: [{ name: "Message-ID", value: "<gmail-real@mail.gmail.com>" }] } })
     return Response.json({ messages: inbox ? [{ id: "inbox1" }] : [] })
   }) as typeof fetch
   const event = { source: "ams-scheduled-tasks", id: "f6f25a1b-339c-4802-9692-a3e5aa840499", task: "Test", createdAt: null, severity: "actionable", summary: null, details: null }
@@ -315,6 +322,7 @@ test("legacy uncertain claims reopen only with matching prior definitive send di
     let sends = 0
     const fetcher = (async (url: string | URL | Request) => {
       if (String(url).endsWith("/send")) { sends++; return Response.json({ id: "sent1" }) }
+      if (String(url).includes("/messages/sent1")) return Response.json({ id: "sent1", labelIds: ["SENT"], payload: { headers: [{ name: "Message-ID", value: "<gmail-real@mail.gmail.com>" }] } })
       return Response.json({ messages: [] })
     }) as typeof fetch
     await Promise.all([deliverGmailAlert(event, event.id, { ...c, fetcher }), deliverGmailAlert(event, event.id, { ...c, fetcher })])
@@ -400,6 +408,7 @@ test("scheduled SHA-256 execution identifiers are accepted through the signed de
       sends++
       return Response.json({ id: "sent1" })
     }
+    if (String(url).includes("/messages/sent1")) return Response.json({ id: "sent1", labelIds: ["SENT"], payload: { headers: [{ name: "Message-ID", value: "<gmail-real@mail.gmail.com>" }] } })
     return Response.json({ messages: [{ id: "inbox1" }] })
   }) as typeof fetch
   const webhookFetcher = (async (url: string | URL | Request, options?: RequestInit) => {
