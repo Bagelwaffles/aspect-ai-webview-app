@@ -377,6 +377,8 @@ export default function HomePage() {
           <Link href="/pricing">Pricing</Link>
           <Link href="/quick-marketing-audit">$49 Audit</Link>
           <Link href="/contact">Contact</Link>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
         </nav>
         <p>© 2026 Aspect Marketing Solutions</p>
       </footer>
