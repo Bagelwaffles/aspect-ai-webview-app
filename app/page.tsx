@@ -241,6 +241,25 @@ export default function HomePage() {
         Five statuses. Live, Beta, Setup Required, Blocked, and Planned.
       </p>
 
+      <section className={styles.section} aria-labelledby="owner-gmail-data-use">
+        <div className={styles.sectionHeading}>
+          <div>
+            <p className={styles.kicker}>Owner operations · Preview-only</p>
+            <h2 id="owner-gmail-data-use">How AMS uses Gmail for internal business notifications.</h2>
+          </div>
+          <p>
+            In the protected owner workspace, AMS is testing separately authorized Gmail
+            connections that inspect selected message headers for business inquiries,
+            payments, Google Play updates, and account-security alerts. Only the primary
+            owner account may send owner notifications and, after separate activation,
+            a fixed first-contact acknowledgment; the secondary account is read-only.
+            Customer Gmail connections and unrestricted AI-generated email replies are
+            not available. See our <Link href="/privacy">Google data-use, privacy and
+            manual deletion disclosures</Link>.
+          </p>
+        </div>
+      </section>
+
       <section className={styles.section}>
         <div className={styles.sectionHeading}>
           <div>
