@@ -2,7 +2,8 @@ import { createHmac } from "node:crypto"
 import { z } from "zod"
 import { NextRequest, NextResponse } from "next/server"
 import { authorizeOwnerApiRequest } from "@/lib/server/owner-api-auth"
-import { ownerGmailContext } from "@/lib/server/owner-gmail"
+import { gmailConnectionStatus, ownerGmailContext } from "@/lib/server/owner-gmail"
+import { saveOwnerAlertReceiptProof } from "@/lib/server/owner-gmail-send-evidence"
 import { deliverGmailAlert } from "@/lib/server/owner-gmail-delivery"
 import { gmailTestFailure } from "@/lib/gmail-connection-feedback"
 import { gmailFailureDiagnostic } from "@/lib/server/owner-gmail-diagnostics"
@@ -40,6 +41,13 @@ export async function POST(request: NextRequest) {
       }
       const delivered = acknowledged && receipt.delivered === true && /^gmail:[A-Za-z0-9_-]+$/u.test(receipt.deliveryId ?? "")
       await c.redis.set(`${c.prefix}test:${id}`, JSON.stringify({ id, at, status: delivered ? "delivered" : "unconfirmed", deliveryId: delivered ? receipt.deliveryId : null }), { ex: 30 * 86400 })
+      if (delivered) {
+        const primary = await gmailConnectionStatus("primary")
+        if (!primary.connected || !primary.connectedAt) throw new Error("GMAIL_CONNECTION_REQUIRED")
+        // Only a confirmed primary-inbox receipt makes the dashboard's
+        // recorded send-verification state true. Store no Gmail message data.
+        await saveOwnerAlertReceiptProof(c.redis, c.prefix, primary.connectedAt)
+      }
       return NextResponse.json({ ok: delivered, id, status: delivered ? "delivered" : "unconfirmed" }, { headers: { "Cache-Control": "no-store" } })
     } catch (error) {
       const code = gmailTestFailure(error)
