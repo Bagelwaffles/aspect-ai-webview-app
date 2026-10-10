@@ -386,3 +386,34 @@ Sent and Drafts so AMS-generated replies do not trigger self-alert loops.
 Further AMS automation may be added using trusted signed order/customer events,
 but real payments, order fulfillment, account changes and substantive customer
 commitments must never be inferred solely from untrusted email subject lines.
+
+### Preview natural-expiry refresh acceptance (PR #262 remains on HOLD)
+
+The owner dashboard exposes **Verify token refresh** only in Preview. Its
+owner-authenticated, trusted-origin POST `/api/owner/gmail/verify-refresh`
+accepts only `slot` and a UUID `requestId`; production returns 404. It does not
+force expiry or request consent. A valid cached token yields `awaiting-expiry`;
+retry with a new request ID after the reported access-token expiry.
+
+After natural expiry, the existing refresh path exchanges the selected account's
+refresh token and verifies encrypted replacement-token/expiry persistence by
+reading back the sealed record internally. Two bounded metadata monitoring reads
+replay the same checkpoint/cursor on private snapshots, proving deduplication
+when repeated messages exist. The operation holds the existing task lease,
+never writes task states or checkpoints, and blocks provider sends. Replies must
+already be disabled. No owner alert is sent by this operation.
+
+Evidence is stored separately for 30 days and available through the protected
+GET with the same slot/request ID. It contains status, token-exchange HTTP status,
+expiry and boolean/count checks, never credentials, addresses, message IDs,
+content or raw provider responses. `passed` requires refresh, secure persistence,
+replacement token, successful monitoring, a preserved existing checkpoint,
+replay deduplication and an unchanged other account grant. An empty replay is
+`inconclusive`, not a pass. Account-failure isolation is covered by synthetic
+tests; do not deliberately invalidate a live grant.
+
+Run each account independently in the existing connected Preview. Keep all 27
+original tasks and paused states unchanged, owner alerts primary-only and PR #262
+Draft/HOLD until both real refresh records pass and Google policy requirements
+and remaining release checks are satisfied. Local mocked tests do not establish
+real Google refresh acceptance.

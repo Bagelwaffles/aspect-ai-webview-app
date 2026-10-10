@@ -9,7 +9,8 @@ export type GmailSlot = typeof gmailSlots[number]
 export const READ_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 export const SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
 export interface GmailRedis { get<T>(key: string): Promise<T | null>; set(key: string, value: string, options?: { ex?: number; nx?: boolean }): Promise<unknown>; eval(script: string, keys: string[], args: string[]): Promise<unknown> }
-export type GmailContext = { env?: NodeJS.ProcessEnv; redis?: GmailRedis; fetcher?: typeof fetch; now?: number }
+export type GmailTokenEvidence = { refreshed: boolean; exchangeHttpStatus: number | null; persisted: boolean; accessTokenReplaced: boolean; refreshTokenAvailable: boolean; accessTokenExpiresAt: string | null }
+export type GmailContext = { env?: NodeJS.ProcessEnv; redis?: GmailRedis; fetcher?: typeof fetch; now?: number; onTokenUse?: (evidence: GmailTokenEvidence) => void }
 const recordSchema = z.object({ email: z.string().email(), scopes: z.array(z.string()), connectedAt: z.string(), updatedAt: z.string(), grantExpiresAt: z.string().nullable(), mode: z.enum(["testing", "approved-owner-use"]), cipherText: z.string(), iv: z.string(), authTag: z.string() })
 type Record = z.infer<typeof recordSchema>
 const attemptSchema = z.object({ owner: z.string(), slot: z.enum(gmailSlots), verifier: z.string(), expires: z.number() })
@@ -58,7 +59,9 @@ async function request(c: ReturnType<typeof ownerGmailContext>, url: string, ini
   return c.fetcher(url, { ...init, redirect: "error", cache: "no-store", signal: AbortSignal.timeout(10_000) })
 }
 async function save(slot: GmailSlot, record: Omit<Record, "cipherText" | "iv" | "authTag">, secret: Parameters<typeof encryptConnectionPayload>[0], c: ReturnType<typeof ownerGmailContext>) {
-  await c.redis.set(`${c.prefix}${slot}`, JSON.stringify({ ...record, ...encryptConnectionPayload(secret, c.key) }))
+  const stored = { ...record, ...encryptConnectionPayload(secret, c.key) }
+  await c.redis.set(`${c.prefix}${slot}`, JSON.stringify(stored))
+  return stored
 }
 export async function completeGmailConnection(slot: GmailSlot, subject: string, state: string, code: string, cookieState: string | undefined, input: GmailContext = {}) {
   const c = ownerGmailContext(input), config = gmailConfig(slot, c.env)
@@ -96,11 +99,17 @@ export async function gmailAccessToken(slot: GmailSlot, input: GmailContext = {}
   const record = recordSchema.parse(typeof raw === "string" ? JSON.parse(raw) : raw)
   if (record.email !== config.email || record.mode !== config.mode || record.grantExpiresAt && Date.parse(record.grantExpiresAt) <= c.now) throw new Error("GMAIL_REAUTHORIZE_REQUIRED")
   const secret = decryptConnectionPayload(record, c.key)
-  if (secret.expiresAt && Date.parse(secret.expiresAt) > c.now + 60_000) return secret.accessToken
+  if (secret.expiresAt && Date.parse(secret.expiresAt) > c.now + 60_000) {
+    input.onTokenUse?.({ refreshed: false, exchangeHttpStatus: null, persisted: false, accessTokenReplaced: false, refreshTokenAvailable: Boolean(secret.refreshToken), accessTokenExpiresAt: secret.expiresAt })
+    return secret.accessToken
+  }
   if (!secret.refreshToken) throw new Error("GMAIL_REAUTHORIZE_REQUIRED")
   let token: z.infer<typeof tokenSchema>
+  let exchangeHttpStatus: number | null = null
   try {
-    token = await tokenResponse(await request(c, "https://oauth2.googleapis.com/token", { method: "POST", body: new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, refresh_token: secret.refreshToken, grant_type: "refresh_token" }) }))
+    const response = await request(c, "https://oauth2.googleapis.com/token", { method: "POST", body: new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, refresh_token: secret.refreshToken, grant_type: "refresh_token" }) })
+    exchangeHttpStatus = response.status
+    token = await tokenResponse(response)
   } catch (error) {
     if (error instanceof Error && error.message === "GMAIL_REAUTHORIZE_REQUIRED") {
       await save(slot, { ...record, updatedAt: new Date(c.now).toISOString(), grantExpiresAt: new Date(c.now).toISOString() }, secret, c)
@@ -108,6 +117,15 @@ export async function gmailAccessToken(slot: GmailSlot, input: GmailContext = {}
     throw error
   }
   if (token.scope && (token.scope.split(/\s+/u).some(scope => !record.scopes.includes(scope)) || !token.scope.split(/\s+/u).includes(READ_SCOPE) || slot === "primary" && !token.scope.split(/\s+/u).includes(SEND_SCOPE))) throw new Error("GMAIL_SCOPE_INVALID")
-  await save(slot, { ...record, updatedAt: new Date(c.now).toISOString() }, { accessToken: token.access_token, refreshToken: token.refresh_token ?? secret.refreshToken, expiresAt: new Date(c.now + token.expires_in * 1000).toISOString() }, c)
+  const accessTokenExpiresAt = new Date(c.now + token.expires_in * 1000).toISOString()
+  const stored = await save(slot, { ...record, updatedAt: new Date(c.now).toISOString() }, { accessToken: token.access_token, refreshToken: token.refresh_token ?? secret.refreshToken, expiresAt: accessTokenExpiresAt }, c)
+  if (input.onTokenUse) {
+    const readback = await c.redis.get<string>(`${c.prefix}${slot}`)
+    const parsed = recordSchema.safeParse(typeof readback === "string" ? JSON.parse(readback) : readback)
+    // Exact encrypted-payload readback proves the new token and expiry were
+    // persisted together; only booleans and the expiry leave the vault module.
+    const persisted = parsed.success && parsed.data.cipherText === stored.cipherText && parsed.data.iv === stored.iv && parsed.data.authTag === stored.authTag
+    input.onTokenUse({ refreshed: true, exchangeHttpStatus, persisted, accessTokenReplaced: token.access_token !== secret.accessToken, refreshTokenAvailable: Boolean(token.refresh_token ?? secret.refreshToken), accessTokenExpiresAt })
+  }
   return token.access_token
 }
