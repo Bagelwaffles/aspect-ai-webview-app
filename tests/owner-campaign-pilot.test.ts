@@ -8,9 +8,10 @@ import {
   ownerCampaignPilotSendingAllowed,
   readOwnerCampaignPilot,
   validateOwnerCampaignPilot,
+  verifyOwnerCampaignPilotReceipt,
   type OwnerCampaignPilotInput,
 } from "../lib/server/owner-campaign-pilot"
-import type { GmailRedis, GmailContext } from "../lib/server/owner-gmail"
+import { beginGmailConnection, completeGmailConnection, READ_SCOPE, SEND_SCOPE, type GmailRedis, type GmailContext } from "../lib/server/owner-gmail"
 
 const NOW = Date.parse("2026-10-12T18:00:00.000Z")
 const env: NodeJS.ProcessEnv = {
@@ -49,6 +50,11 @@ function setup() {
       return "OK"
     },
     async eval(_script, keys, args) {
+      if (args.length === 0) {
+        const current = values.get(keys[0])
+        values.delete(keys[0])
+        return current ?? null
+      }
       const stored = values.get(keys[0])
       if (!stored) return 0
       const prior = JSON.parse(stored) as { revision: number }
@@ -167,4 +173,70 @@ test("Gmail API acceptance alone cannot unlock the next message", async () => {
     now: Date.parse("2026-10-17T15:00:00.000Z"),
   }
   assert.deepEqual(await dispatchOwnerCampaignPilot(input.id, ready), { status: "receipt_required" })
+})
+
+
+test("owner receipt proof requires matching inbox headers and unlocks only the verified step", async () => {
+  const { ctx, values } = setup()
+  const connect = async (slot: "primary" | "secondary") => {
+    const started = await beginGmailConnection(slot, "google:owner", ctx)
+    const email = slot === "primary" ? "primary@example.com" : "secondary@example.com"
+    const scopes = [READ_SCOPE, ...(slot === "primary" ? [SEND_SCOPE] : [])]
+    const fetcher = (async (url: string | URL | Request) => {
+      return Response.json(String(url).endsWith("/token")
+        ? { access_token: "fixture-access", refresh_token: "fixture-refresh",
+          expires_in: 3600, scope: scopes.join(" ") }
+        : { email, email_verified: true })
+    }) as typeof fetch
+    await completeGmailConnection(slot, "google:owner", started.state, "code",
+      started.state, { ...ctx, fetcher })
+  }
+  await connect("primary")
+  await connect("secondary")
+  await createOwnerCampaignPilot(input, ctx)
+  await changeOwnerCampaignPilot(input.id, "approve", ctx)
+  const key = [...values.keys()].find(x => x.includes("campaign-pilot:v1:") && !x.includes(":step:"))
+  assert.ok(key)
+  const raw = values.get(key)
+  assert.ok(raw)
+  const record = JSON.parse(raw) as {
+    sends: Array<{ step: number; state: string; providerId: string | null; at: string }>
+  }
+  record.sends.push({
+    step: 0, state: "accepted", providerId: "gmailAcceptedOnly", at: new Date(NOW).toISOString(),
+  })
+  values.set(key, JSON.stringify(record))
+  const gmailHeader = (name: string, value: string) => ({ name, value })
+  const fetcher = (async (url: string | URL | Request) => {
+    const parsed = new URL(String(url))
+    if (parsed.pathname.endsWith("/messages/gmailAcceptedOnly")) {
+      return Response.json({
+        id: "gmailAcceptedOnly", labelIds: ["SENT"],
+        payload: { headers: [
+          gmailHeader("Message-ID", "<ams-pilot-proof@example.com>"),
+          gmailHeader("From", "Aspect Marketing Solutions <primary@example.com>"),
+        ] },
+      })
+    }
+    if (parsed.pathname.endsWith("/messages") &&
+        parsed.searchParams.get("q") === "in:inbox rfc822msgid:ams-pilot-proof@example.com") {
+      return Response.json({ messages: [{ id: "inboxCopy1" }] })
+    }
+    if (parsed.pathname.endsWith("/messages/inboxCopy1")) {
+      return Response.json({
+        id: "inboxCopy1", labelIds: ["INBOX"],
+        payload: { headers: [
+          gmailHeader("Message-ID", "<ams-pilot-proof@example.com>"),
+          gmailHeader("From", "Aspect Marketing Solutions <primary@example.com>"),
+          gmailHeader("To", "secondary@example.com"),
+          gmailHeader("Subject", input.steps[0].subject),
+        ] },
+      })
+    }
+    throw new Error("Unexpected mock Gmail URL: " + parsed.pathname)
+  }) as typeof fetch
+  const verified = await verifyOwnerCampaignPilotReceipt(input.id, { ...ctx, fetcher })
+  assert.deepEqual(verified, { status: "delivered", step: 0 })
+  assert.equal((await readOwnerCampaignPilot(input.id, ctx))?.sends[0].state, "delivered")
+  assert.equal((await readOwnerCampaignPilot(input.id, ctx))?.sends[0].receiptId, "inboxCopy1")
 })
