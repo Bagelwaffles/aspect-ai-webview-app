@@ -142,6 +142,26 @@ export default function OwnerCampaignPilotPanel({
     } finally { setBusy(false) }
   }
 
+  async function verifyReceipt() {
+    if (!pilot || busy) return
+    setBusy(true)
+    setMessage("")
+    setError("")
+    try {
+      const response = await fetch("/api/owner/campaigns/pilot/verify-receipt", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: pilot.input.id }),
+      })
+      const result = await response.json().catch(() => ({})) as ApiResult
+      if (!response.ok) throw new Error(result.code || result.status || "No matching inbox receipt confirmed.")
+      setMessage("Verified the test message in the correct owner inbox. Later steps still require separate approval.")
+      await load()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Inbox receipt unverified. Do not resend automatically.")
+    } finally { setBusy(false) }
+  }
+
   async function sendOneTest() {
     if (!pilot || busy || !testEnabled || !sendConfirmed) return
     setBusy(true)
@@ -174,7 +194,7 @@ export default function OwnerCampaignPilotPanel({
         <h1 className="text-3xl font-bold">AMS Owner Campaign Pilot</h1>
         <p className="text-muted-foreground">Build an exact three-email rehearsal using a successful AMS email-generation run.</p>
         <div className="rounded-lg border border-amber-500/40 p-4 text-sm">
-          <strong>Review-only; sending is OFF.</strong> Saving and review never send an email or start a background schedule.
+          <strong>Automatic sending is OFF.</strong> Saving and review never send an email or start a background schedule.
           Only two owner-controlled test inboxes are eligible. A separately enabled Preview test
           requires an additional explicit send confirmation. Customer campaigns are not enabled.
         </div>
@@ -237,7 +257,7 @@ export default function OwnerCampaignPilotPanel({
           <button disabled={busy} onClick={() => void load()} className="rounded border px-4 py-2">Load</button>
         </div>
         {pilot ? <div className="mt-5 space-y-3">
-          <p className="text-sm"><strong>Status:</strong> {pilot.status} · no delivery activated</p>
+          <p className="text-sm"><strong>Status:</strong> {pilot.status} · no automated schedule</p>
           <p className="break-all text-xs">Pilot ID: {pilot.input.id}</p>
           <p className="text-sm">Recipient: {pilot.input.recipient}</p>
           {pilot.input.steps.map((step, index) => <article key={index} className="rounded border p-4">
@@ -245,6 +265,21 @@ export default function OwnerCampaignPilotPanel({
             <p className="mt-1 text-xs text-muted-foreground">Proposed date: {new Date(step.dueAt).toLocaleString()}</p>
             <p className="mt-3 whitespace-pre-wrap break-words text-sm">{step.body}</p>
           </article>)}
+          {pilot.sends.length > 0 ? <div className="rounded border p-3 text-sm">
+            <strong>Test steps:</strong>
+            <ul className="mt-2 space-y-1">
+              {pilot.sends.map(sent => <li key={sent.step}>
+                Message {sent.step + 1}: {sent.state === "delivered" ? "Verified in inbox" :
+                  sent.state === "accepted" ? "Accepted by Gmail, receipt not yet verified" :
+                  "Unconfirmed; later steps blocked"}
+              </li>)}
+            </ul>
+          </div> : null}
+          {pilot.status === "approved" && pilot.sends.some(sent => sent.state === "accepted") ?
+            <button disabled={busy} onClick={() => void verifyReceipt()}
+              className="rounded border px-4 py-2 text-sm disabled:opacity-50">
+              Verify owner inbox receipt
+            </button> : null}
           {pilot.status === "draft" ? <label className="flex items-start gap-3 text-sm">
             <input type="checkbox" checked={reviewConfirmed} onChange={event => setReviewConfirmed(event.target.checked)} />
             I have reviewed all three messages, the test recipient and the planned dates.
