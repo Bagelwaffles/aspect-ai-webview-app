@@ -24,6 +24,6 @@ jobs:
       - name: TypeScript
         run: pnpm exec tsc --noEmit
       - name: Owner campaign tests
-        run: node --import tsx --test tests/owner-campaign-pilot.test.ts
+        run: node --import tsx --test tests/owner-campaign-pilot*.test.ts tests/google-oauth-origin-guard.test.ts
       - name: Focused lint
-        run: pnpm exec eslint lib/server/owner-campaign-pilot.ts app/api/owner/campaigns/pilot/route.ts tests/owner-campaign-pilot.test.ts
+        run: pnpm exec eslint lib/server/owner-campaign-pilot.ts app/api/owner/campaigns/pilot/route.ts app/api/owner/campaigns/pilot/send-test/route.ts app/api/owner/campaigns/pilot/verify-receipt/route.ts tests/owner-campaign-pilot*.test.ts

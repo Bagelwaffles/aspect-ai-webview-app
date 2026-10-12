@@ -147,7 +147,7 @@ test("prior unconfirmed submission fails closed before any subsequent Gmail toke
   values.set(key, JSON.stringify(record))
   const ready: GmailContext = {
     ...ctx,
-    env: { ...ctx.env, AMS_OWNER_CAMPAIGN_PILOT_ENABLED: "true" },
+    env: { ...env, ...ctx.env, AMS_OWNER_CAMPAIGN_PILOT_ENABLED: "true" },
     now: Date.parse("2026-10-17T15:00:00.000Z"),
   }
   assert.deepEqual(await dispatchOwnerCampaignPilot(input.id, ready), { status: "receipt_required" })
@@ -169,7 +169,7 @@ test("Gmail API acceptance alone cannot unlock the next message", async () => {
   values.set(key, JSON.stringify(record))
   const ready: GmailContext = {
     ...ctx,
-    env: { ...ctx.env, AMS_OWNER_CAMPAIGN_PILOT_ENABLED: "true" },
+    env: { ...env, ...ctx.env, AMS_OWNER_CAMPAIGN_PILOT_ENABLED: "true" },
     now: Date.parse("2026-10-17T15:00:00.000Z"),
   }
   assert.deepEqual(await dispatchOwnerCampaignPilot(input.id, ready), { status: "receipt_required" })
