@@ -1,0 +1,29 @@
+name: AMS owner campaign pilot branch checks
+on:
+  push:
+    branches:
+      - feat/ams-owner-campaign-pilot-20261012
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: TypeScript
+        run: pnpm exec tsc --noEmit
+      - name: Owner campaign tests
+        run: node --import tsx --test tests/owner-campaign-pilot*.test.ts tests/google-oauth-origin-guard.test.ts
+      - name: Focused lint
+        run: pnpm exec eslint lib/server/owner-campaign-pilot.ts app/api/owner/campaigns/pilot/route.ts app/api/owner/campaigns/pilot/send-test/route.ts app/api/owner/campaigns/pilot/verify-receipt/route.ts tests/owner-campaign-pilot*.test.ts

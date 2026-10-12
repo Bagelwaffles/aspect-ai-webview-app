@@ -128,11 +128,24 @@ test("non-Google NextAuth endpoints are not blocked by the exchange guard", () =
   )
 })
 
-test("login UI disables preview Google sign-in and directs users to production", () => {
+test("login UI blocks mismatched OAuth and does not carry the draft pilot path to production", () => {
   const source = readFileSync("app/login/page.tsx", "utf8")
   assert.match(source, /originMismatch/u)
   assert.match(source, /Google sign-in is disabled on this preview deployment/u)
-  assert.match(source, /Continue on the production sign-in page/u)
+  assert.match(source, /A login on the production site cannot sign you into this preview/u)
+  assert.match(source, /href=\{`\$\{authOrigin.configuredOrigin\}\/login`\}/u)
+  assert.doesNotMatch(source, /authOrigin\.configuredOrigin\}\/login\?next=/u)
+})
+
+test("stable Preview allows Google exchange only on its configured alias", () => {
+  const origin = "https://aspect-ai-overlord-git-3bef93-kimberleyaversbiz-4131s-projects.vercel.app"
+  const env = { ...productionEnv, NEXTAUTH_URL: origin }
+  for (const path of ["/api/auth/signin/google", "/api/auth/callback/google"]) {
+    const headers = new Headers({ "x-forwarded-host": new URL(origin).host, "x-forwarded-proto": "https" })
+    assert.equal(shouldBlockGoogleNextAuthExchange(path, origin + path, headers, env), false)
+    assert.equal(shouldBlockGoogleNextAuthExchange(path, "https://www.aspectmarketingsolutions.app" + path,
+      new Headers({ "x-forwarded-host": "www.aspectmarketingsolutions.app", "x-forwarded-proto": "https" }), env), true)
+  }
 })
 
 test("NextAuth route returns a dedicated fail-closed origin mismatch error", () => {
