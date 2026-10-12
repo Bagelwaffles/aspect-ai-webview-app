@@ -124,3 +124,47 @@ test("invalid pilot data cannot be created or enabled by an unauthenticated call
     /CAMPAIGN_NOT_FOUND/,
   )
 })
+
+
+test("prior unconfirmed submission fails closed before any subsequent Gmail token request", async () => {
+  const { ctx, values } = setup()
+  await createOwnerCampaignPilot(input, ctx)
+  await changeOwnerCampaignPilot(input.id, "approve", ctx)
+  const key = [...values.keys()].find(x => x.includes("campaign-pilot:v1:") && !x.includes(":step:"))
+  assert.ok(key)
+  const raw = values.get(key)
+  assert.ok(raw)
+  const record = JSON.parse(raw) as {
+    sends: Array<{ step: number; state: string; providerId: string | null; at: string }>
+  }
+  record.sends.push({ step: 0, state: "unconfirmed", providerId: null, at: new Date(NOW).toISOString() })
+  values.set(key, JSON.stringify(record))
+  const ready: GmailContext = {
+    ...ctx,
+    env: { ...ctx.env, AMS_OWNER_CAMPAIGN_PILOT_ENABLED: "true" },
+    now: Date.parse("2026-10-17T15:00:00.000Z"),
+  }
+  assert.deepEqual(await dispatchOwnerCampaignPilot(input.id, ready), { status: "receipt_required" })
+  assert.equal((await readOwnerCampaignPilot(input.id, ready))?.sends[0].state, "unconfirmed")
+})
+
+test("Gmail API acceptance alone cannot unlock the next message", async () => {
+  const { ctx, values } = setup()
+  await createOwnerCampaignPilot(input, ctx)
+  await changeOwnerCampaignPilot(input.id, "approve", ctx)
+  const key = [...values.keys()].find(x => x.includes("campaign-pilot:v1:") && !x.includes(":step:"))
+  assert.ok(key)
+  const raw = values.get(key)
+  assert.ok(raw)
+  const record = JSON.parse(raw) as {
+    sends: Array<{ step: number; state: string; providerId: string | null; at: string }>
+  }
+  record.sends.push({ step: 0, state: "accepted", providerId: "gmailAcceptedOnly", at: new Date(NOW).toISOString() })
+  values.set(key, JSON.stringify(record))
+  const ready: GmailContext = {
+    ...ctx,
+    env: { ...ctx.env, AMS_OWNER_CAMPAIGN_PILOT_ENABLED: "true" },
+    now: Date.parse("2026-10-17T15:00:00.000Z"),
+  }
+  assert.deepEqual(await dispatchOwnerCampaignPilot(input.id, ready), { status: "receipt_required" })
+})
