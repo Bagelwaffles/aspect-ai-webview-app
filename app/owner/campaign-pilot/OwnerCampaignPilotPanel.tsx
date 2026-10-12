@@ -25,6 +25,8 @@ type ApiResult = {
   code?: string
   runs?: Run[]
   record?: Pilot
+  enabled?: boolean
+  status?: string
 }
 
 export default function OwnerCampaignPilotPanel({
@@ -36,6 +38,9 @@ export default function OwnerCampaignPilotPanel({
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   const [reviewConfirmed, setReviewConfirmed] = useState(false)
+  const [sendConfirmed, setSendConfirmed] = useState(false)
+  const [testEnabled, setTestEnabled] = useState(false)
+  const [message, setMessage] = useState("")
   const idRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -82,6 +87,7 @@ export default function OwnerCampaignPilotPanel({
       if (!response.ok || !result.record) throw new Error(result.code || "Could not save pilot")
       setPilot(result.record)
       setLookup(result.record.input.id)
+      setMessage("Private review plan saved. No test message has been sent.")
       idRef.current = null
       setReviewConfirmed(false)
     } catch (reason) {
@@ -101,6 +107,7 @@ export default function OwnerCampaignPilotPanel({
       const result = await response.json().catch(() => ({})) as ApiResult
       if (!response.ok || !result.record) throw new Error(result.code || "Pilot not found")
       setPilot(result.record)
+      setTestEnabled(result.enabled === true)
       setReviewConfirmed(false)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not load pilot")
@@ -129,8 +136,34 @@ export default function OwnerCampaignPilotPanel({
       if (!response.ok || !result.record) throw new Error(result.code || "Could not update pilot")
       setPilot(result.record)
       setReviewConfirmed(false)
+      setMessage(action === "approve" ? "Plan reviewed. Sending remains OFF unless enabled separately in Preview." : "Pilot stopped.")
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not update pilot")
+    } finally { setBusy(false) }
+  }
+
+  async function sendOneTest() {
+    if (!pilot || busy || !testEnabled || !sendConfirmed) return
+    setBusy(true)
+    setError("")
+    setMessage("")
+    try {
+      const response = await fetch("/api/owner/campaigns/pilot/send-test", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: pilot.input.id,
+          confirmation: "AUTHORIZE_SINGLE_OWNER_PREVIEW_TEST",
+        }),
+      })
+      const result = await response.json().catch(() => ({})) as ApiResult
+      if (!response.ok) throw new Error(result.code || result.status || "Test delivery not confirmed")
+      setMessage("Gmail accepted one pilot step. Independent inbox receipt still needs verification.")
+      setSendConfirmed(false)
+      // Avoid another implicit send. Load only the persisted record state.
+      await load()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Delivery uncertain. Do not resend automatically.")
     } finally { setBusy(false) }
   }
 
@@ -141,13 +174,14 @@ export default function OwnerCampaignPilotPanel({
         <h1 className="text-3xl font-bold">AMS Owner Campaign Pilot</h1>
         <p className="text-muted-foreground">Build an exact three-email rehearsal using a successful AMS email-generation run.</p>
         <div className="rounded-lg border border-amber-500/40 p-4 text-sm">
-          <strong>Review-only; sending is OFF.</strong> This page never sends an email or starts a background schedule.
-          Only the two owner-controlled test inboxes are eligible. Approval means the copy was reviewed,
-          not that sending has been activated. Customer campaigns are not enabled.
+          <strong>Review-only; sending is OFF.</strong> Saving and review never send an email or start a background schedule.
+          Only two owner-controlled test inboxes are eligible. A separately enabled Preview test
+          requires an additional explicit send confirmation. Customer campaigns are not enabled.
         </div>
       </header>
 
       {error ? <div role="alert" className="rounded border p-3 text-sm">{error}</div> : null}
+      {message ? <div role="status" className="rounded border p-3 text-sm">{message}</div> : null}
       <section className="rounded-lg border p-5">
         <h2 className="mb-4 text-xl font-semibold">Prepare the campaign</h2>
         <form className="space-y-4" onSubmit={save} onChange={() => { idRef.current = null }}>
@@ -215,6 +249,19 @@ export default function OwnerCampaignPilotPanel({
             <input type="checkbox" checked={reviewConfirmed} onChange={event => setReviewConfirmed(event.target.checked)} />
             I have reviewed all three messages, the test recipient and the planned dates.
           </label> : null}
+          {pilot.status === "approved" && testEnabled ? (
+            <div className="space-y-2 rounded border border-amber-500/40 p-3">
+              <label className="flex items-start gap-3 text-sm">
+                <input type="checkbox" checked={sendConfirmed} onChange={e => setSendConfirmed(e.target.checked)} />
+                I explicitly authorize sending only the next due test email to our owner-controlled inbox.
+              </label>
+              <button disabled={busy || !sendConfirmed} onClick={() => void sendOneTest()}
+                className="rounded border px-4 py-2 text-sm disabled:opacity-50">
+                Send one approved owner-mailbox test
+              </button>
+              <p className="text-xs">Gmail API acceptance is not proof of inbox delivery. Unconfirmed sends are not automatically retried.</p>
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             {pilot.status === "draft" ?
               <button disabled={busy || !reviewConfirmed} onClick={() => void change("approve")} className="rounded border px-4 py-2 disabled:opacity-50">Mark reviewed</button> : null}
