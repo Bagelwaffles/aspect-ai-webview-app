@@ -23,3 +23,16 @@ Reuse the already-tested **primary Gmail sender** in existing Draft PR #262. Do 
 
 ## Boundaries
 Leave PR #262 Draft/HOLD and do not cherry-pick it. This PR is STACKED with base branch feat/scheduled-task-migration, and should never merge ahead of PR #262. PR #274 remains separate customer review-only planning work; PR #273 remains separate checkout-safety work. Stripe, Quick Audit, paid credits, Android, n8n, Twitch, Shopify, production, the two owner Gmail grants and 27 existing task states are unchanged.
+
+
+## October 12 — owner-preview login diagnosis and remediation
+
+An owner-provided phone screen recording shows that Preview /login?next=/owner/campaign-pilot blocks Google sign-in because its NEXTAUTH_URL pointed to the production site. The page previously offered a production login link with the draft-only path as its next route, which produced a production 404 for a signed-in owner. This is not evidence of a failed Gmail connection.
+
+- Stable Preview branch alias: https://aspect-ai-overlord-git-3bef93-kimberleyaversbiz-4131s-projects.vercel.app
+- Scoped only to feat/ams-owner-campaign-pilot-20261012: NEXTAUTH_URL and PUBLIC_APP_URL set to the exact stable alias. Production settings and PR #262 stay unchanged.
+- The login fallback no longer carries a preview-only path into production. Production login alone cannot authenticate the Preview.
+- Exact Google Cloud Web OAuth authorized redirect URI requiring owner approval (preserve all others): https://aspect-ai-overlord-git-3bef93-kimberleyaversbiz-4131s-projects.vercel.app/api/auth/callback/google
+- This is AMS NextAuth login, not a Gmail monitoring grant/callback. No external OAuth redirect registration, successful Preview owner session or inbox receipt is yet confirmed.
+- Check the next Git-backed Preview deployment after branch variables apply, then complete exact owner browser login, owner campaign protected-route acceptance and isolated grant/storage checks.
+- Never expose or clone production/PR #262 Gmail grant secrets. Do not enable automatic replies, campaign sender flags, or a scheduled worker. Keep both PR #262 and PR #275 Draft/HOLD and leave all 27 tasks unchanged.
