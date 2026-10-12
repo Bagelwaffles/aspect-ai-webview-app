@@ -222,3 +222,100 @@ export async function dispatchOwnerCampaignPilot(id: string, input: GmailContext
   }
   return result
 }
+
+
+const gmailMetadataSchema = z.object({
+  id: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/u),
+  labelIds: z.array(z.string()).default([]),
+  payload: z.object({
+    headers: z.array(z.object({ name: z.string(), value: z.string() })).default([]),
+  }).optional(),
+})
+const gmailSearchSchema = z.object({
+  messages: z.array(z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/u) })).max(2).default([]),
+})
+function mailHeader(message: z.infer<typeof gmailMetadataSchema>, key: string) {
+  return message.payload?.headers.find(h => h.name.toLowerCase() === key.toLowerCase())?.value?.trim() ?? ""
+}
+function matchesOneAddress(raw: string, email: string) {
+  const matches = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/giu) ?? []
+  return matches.length === 1 && matches[0].toLowerCase() === email
+}
+
+/**
+ * Independently verify an owner-inbox copy before advancing a campaign step.
+ * A Gmail send HTTP 200 or provider message ID is insufficient evidence.
+ * A failed/ambiguous lookup never marks delivery, unlocks the next step,
+ * or retries the original send.
+ */
+export async function verifyOwnerCampaignPilotReceipt(id: string, input: GmailContext = {}) {
+  const c = ownerGmailContext(input)
+  if (c.env.VERCEL_ENV !== "preview") return { status: "disabled" as const }
+  const record = await readOwnerCampaignPilot(id, input)
+  if (!record) return { status: "not_found" as const }
+  const awaiting = record.sends.find(sent => sent.state === "accepted")
+  if (!awaiting?.providerId) return { status: "no_accepted_send" as const }
+  const primaryConfig = gmailConfig("primary", c.env)
+  const primaryToken = await gmailAccessToken("primary", input)
+  const readMetadata = async (token: string, messageId: string) => {
+    const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages/" + messageId)
+    url.searchParams.set("format", "metadata")
+    for (const name of ["Message-ID", "From", "To", "Subject"]) url.searchParams.append("metadataHeaders", name)
+    const response = await c.fetcher(url.toString(), {
+      method: "GET",
+      headers: { Authorization: "Bearer " + token },
+      redirect: "error", cache: "no-store", signal: AbortSignal.timeout(8_000),
+    })
+    if (!response.ok) throw new Error("CAMPAIGN_RECEIPT_UNAVAILABLE")
+    return gmailMetadataSchema.parse(await response.json())
+  }
+  // Google may change a sender-supplied RFC Message-ID. Trust the exact
+  // header of the actual provider-accepted message instead.
+  const submitted = await readMetadata(primaryToken, awaiting.providerId)
+  if (submitted.id !== awaiting.providerId ||
+      !matchesOneAddress(mailHeader(submitted, "From"), primaryConfig.primary)) {
+    throw new Error("CAMPAIGN_SENT_MESSAGE_MISMATCH")
+  }
+  const rfcId = mailHeader(submitted, "Message-ID")
+  if (!/^<[A-Za-z0-9._%+=-]{1,180}@[A-Za-z0-9.-]{1,120}>$/u.test(rfcId)) {
+    return { status: "unconfirmed" as const, step: awaiting.step }
+  }
+  const slot = record.input.recipient === primaryConfig.primary ? "primary" : "secondary"
+  const token = slot === "primary" ? primaryToken : await gmailAccessToken("secondary", input)
+  const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages")
+  url.searchParams.set("q", "in:inbox rfc822msgid:" + rfcId.slice(1, -1))
+  url.searchParams.set("maxResults", "2")
+  const response = await c.fetcher(url.toString(), {
+    method: "GET",
+    headers: { Authorization: "Bearer " + token },
+    redirect: "error", cache: "no-store", signal: AbortSignal.timeout(8_000),
+  })
+  if (!response.ok) throw new Error("CAMPAIGN_RECEIPT_UNAVAILABLE")
+  const results = gmailSearchSchema.parse(await response.json())
+  let receiptId: string | null = null
+  for (const item of results.messages) {
+    const inbox = await readMetadata(token, item.id)
+    if (inbox.id === item.id && inbox.labelIds.includes("INBOX") &&
+        mailHeader(inbox, "Message-ID") === rfcId &&
+        matchesOneAddress(mailHeader(inbox, "From"), primaryConfig.primary) &&
+        matchesOneAddress(mailHeader(inbox, "To"), record.input.recipient) &&
+        mailHeader(inbox, "Subject") === record.input.steps[awaiting.step].subject) {
+      receiptId = inbox.id
+      break
+    }
+  }
+  if (!receiptId) return { status: "unconfirmed" as const, step: awaiting.step }
+  const latest = await readOwnerCampaignPilot(id, input)
+  if (!latest || latest.status !== "approved") return { status: "stopped" as const }
+  const matching = latest.sends.find(sent =>
+    sent.step === awaiting.step && sent.state === "accepted" && sent.providerId === awaiting.providerId)
+  if (!matching) return { status: "stale" as const }
+  const now = new Date(c.now).toISOString()
+  const next: OwnerCampaignPilotRecord = {
+    ...latest, revision: latest.revision + 1, updatedAt: now,
+    sends: latest.sends.map(sent =>
+      sent.step === awaiting.step ? { ...sent, state: "delivered" as const, receiptId } : sent),
+  }
+  await compareSet(c, latest, ownerCampaignPilotRecordSchema.parse(next))
+  return { status: "delivered" as const, step: awaiting.step }
+}
