@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     const source = (await d.runStore().listForOwner(principal.subject, 20))
       .find((run) => run.id === parsed.data.sourceRunId)
     if (!source || source.status !== "succeeded" ||
-        source.creditState !== "committed" || !source.output) {
+        source.creditState !== "committed" || source.input.channel !== "email" || !source.output) {
       return respond({ ok: false, code: "SUCCESSFUL_OWNED_RUN_REQUIRED" }, 404)
     }
     const saved = await d.create(principal.subject, parsed.data, source.updatedAt)
