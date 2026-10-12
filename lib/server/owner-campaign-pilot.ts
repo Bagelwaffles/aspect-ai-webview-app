@@ -30,14 +30,15 @@ export const ownerCampaignPilotRecordSchema = z.object({
   updatedAt: z.string().datetime(),
   sends: z.array(z.object({
     step: z.number().int().min(0).max(2),
-    state: z.enum(["accepted", "unconfirmed"]),
+    state: z.enum(["accepted", "unconfirmed", "delivered"]),
     providerId: z.string().max(100).nullable(),
+    receiptId: z.string().max(100).nullable().optional(),
     at: z.string().datetime(),
   }).strict()).max(3),
 }).strict()
 export type OwnerCampaignPilotRecord = z.infer<typeof ownerCampaignPilotRecordSchema>
 export type PilotDispatchResult =
-  | { status: "disabled" | "not_due" | "stopped" | "duplicate" | "unconfirmed"; step?: number }
+  | { status: "disabled" | "not_due" | "stopped" | "duplicate" | "unconfirmed" | "receipt_required"; step?: number }
   | { status: "accepted"; step: number; providerId: string }
 
 const RECORD_TTL_SECONDS = 90 * 86400
@@ -159,6 +160,11 @@ export async function dispatchOwnerCampaignPilot(id: string, input: GmailContext
   if (!ownerCampaignPilotSendingAllowed(c.env)) return { status: "disabled" }
   const record = await readOwnerCampaignPilot(id, input)
   if (!record || record.status !== "approved") return { status: "stopped" }
+  // Never move past a Gmail API acceptance without an independently verified
+  // owner-inbox receipt. Unconfirmed sends are blocked for reconciliation.
+  if (record.sends.some(sent => sent.state !== "delivered")) {
+    return { status: "receipt_required" }
+  }
   const nextStep = Array.from({ length: SEND_LIMIT }, (_, i) => i)
     .find(i => !record.sends.some(sent => sent.step === i))
   if (nextStep === undefined) return { status: "stopped" }
@@ -207,7 +213,8 @@ export async function dispatchOwnerCampaignPilot(id: string, input: GmailContext
       sends: [...fresh.sends, {
         step: nextStep,
         state: result.status === "accepted" ? "accepted" : "unconfirmed",
-        providerId: result.status === "accepted" ? result.providerId : null, at: timestamp,
+        providerId: result.status === "accepted" ? result.providerId : null,
+        receiptId: null, at: timestamp,
       }],
     })
   } catch {
