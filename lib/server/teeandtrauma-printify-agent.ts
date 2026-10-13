@@ -133,7 +133,7 @@ export class TeeAndTraumaPrintifyAgent {
       blueprint,
       provider,
       blackVariants: blackVariants.map(v => ({
-        id: v.id, title: v.title, costCents: v.cost ?? v.price ?? null,
+        id: v.id, title: v.title, costCents: v.cost ?? null,
       })),
       shipping,
       existingProducts: existingProducts.map(p => ({ id: p.id, title: p.title })),
