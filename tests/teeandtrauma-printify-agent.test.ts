@@ -127,7 +127,8 @@ test("draft creation requires a durable Redis lock and never publishes", async (
 
 test("existing Printify draft prevents any create request", async () => {
   const mock = harness([{ id: "already-there", title: "Laugh Through the Trauma — Black Graphic Tee" }])
-  const agent = new TeeAndTraumaPrintifyAgent({ env, fetch: mock.fetcher })
+  const redis = { get: async () => null, set: async () => "OK" } as never
+  const agent = new TeeAndTraumaPrintifyAgent({ env, fetch: mock.fetcher, redis })
   await assert.rejects(
     () => agent.createDraft({ providerId: 12, variantIds: [123], retailPriceCents: 2999, imageId: "approvedart12345" }),
     /PRINTIFY_PRODUCT_ALREADY_EXISTS/u,
