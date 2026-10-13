@@ -84,6 +84,7 @@ export class TeeAndTraumaPrintifyAgent {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
+        "User-Agent": "AMS-TeeAndTrauma-Printify-Agent/1.0",
         ...(body ? { "Content-Type": "application/json" } : {}),
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
