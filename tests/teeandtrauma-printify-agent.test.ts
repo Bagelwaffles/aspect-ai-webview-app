@@ -109,7 +109,7 @@ test("draft creation requires a durable Redis lock and never publishes", async (
   const redis = {
     get: async () => null,
     set: async () => "OK",
-  } as unknown as ConstructorParameters<typeof TeeAndTraumaPrintifyAgent>[0]["redis"]
+  } as never
   const agent = new TeeAndTraumaPrintifyAgent({ env, fetch: mock.fetcher, redis })
   const result = await agent.createDraft({
     providerId: 12, variantIds: [123, 124], retailPriceCents: 2999, imageId: "approvedart12345",
