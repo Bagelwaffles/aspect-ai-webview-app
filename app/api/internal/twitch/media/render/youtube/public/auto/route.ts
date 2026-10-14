@@ -9,6 +9,7 @@ import {
   isYouTubePublicAutopublishEnabled,
   promoteRenderedTwitchShortPublic,
 } from "@/lib/server/youtube-public-promoter"
+import { reconcileNextEligiblePublicPromotion } from "@/lib/server/youtube-public-auto-queue"
 import {
   getYouTubePrivateUploadRecord,
   getYouTubePrivateVerificationProof,
@@ -17,8 +18,6 @@ import {
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
-
-const MAX_PUBLIC_PROMOTION_ATTEMPTS = 3
 
 function json(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, {
@@ -54,32 +53,20 @@ export async function POST(request: NextRequest) {
         return (left.autoPublish?.rank ?? 3) - (right.autoPublish?.rank ?? 3)
       })
 
-    for (const job of jobs) {
-      const existing = await getYouTubePublicPromotionRecord(job.jobId)
-      if (existing?.status === "succeeded") continue
-
-      // Even at the retry ceiling, an ambiguous PUT may already have succeeded.
-      // Allow readback-only reconciliation; the promoter forbids further PUTs.
-      const ambiguous = existing?.status === "promoting" || existing?.status === "reconciliation"
-      if ((existing?.attempts ?? 0) >= MAX_PUBLIC_PROMOTION_ATTEMPTS && !ambiguous) {
-        continue
-      }
-
-      const privateUpload = await getYouTubePrivateUploadRecord(job.jobId)
-      if (privateUpload?.status !== "succeeded" || !privateUpload.youtubeVideoId) continue
-
-      const proof = await getYouTubePrivateVerificationProof(job.jobId)
-      if (proof?.videoId !== privateUpload.youtubeVideoId || proof.metadataVerified !== true) continue
-
-      // The promoter verifies ambiguous prior PUTs against YouTube before any retry.
-      // A 409 still fails closed if the original video cannot be safely reconciled.
-      const result = await promoteRenderedTwitchShortPublic({
-        renderJobId: job.jobId,
+    const scan = await reconcileNextEligiblePublicPromotion(jobs, {
+      getPromotionRecord: getYouTubePublicPromotionRecord,
+      getPrivateUpload: getYouTubePrivateUploadRecord,
+      getVerificationProof: getYouTubePrivateVerificationProof,
+      promote: (renderJobId) => promoteRenderedTwitchShortPublic({
+        renderJobId,
         approved: true,
-      })
+      }),
+    })
+
+    if (scan.outcome) {
+      const result = scan.outcome
       const record = result.record
       const ok = record.status === "succeeded"
-
       return json({
         ok,
         attempted: true,
@@ -94,13 +81,20 @@ export async function POST(request: NextRequest) {
         attempts: record.attempts,
         reused: result.reused,
         code: record.errorCode,
+        cappedSourceVideoIds: scan.cappedSourceVideoIds,
       }, ok ? 200 : record.status === "reconciliation" ? 409 : 502)
     }
 
+    // Already-full streams are normal terminal work, not HTTP 409 failures.
+    // Return diagnostic stream IDs so the worker can distinguish a true idle
+    // cycle from a safely skipped, capped stream.
     return json({
       ok: true,
       attempted: false,
-      skipped: "NO_VERIFIED_PUBLIC_PROMOTION_READY",
+      skipped: scan.cappedSourceVideoIds.length > 0
+        ? "YOUTUBE_PUBLIC_STREAM_CAP_REACHED"
+        : "NO_VERIFIED_PUBLIC_PROMOTION_READY",
+      cappedSourceVideoIds: scan.cappedSourceVideoIds,
     })
   } catch (error) {
     const code = error instanceof Error ? error.message : "YOUTUBE_PUBLIC_AUTO_PROMOTION_FAILED"
