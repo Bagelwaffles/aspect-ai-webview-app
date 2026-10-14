@@ -8,6 +8,7 @@ import {
   SOURCE_SHOPIFY_PRODUCT_ID,
   TeeAndTraumaPrintifyAgent,
   isApprovedPrintifyArtwork,
+  isPrintifyTokenConfigured,
   isBlackTargetSize,
   isMatchingPrintifyProduct,
   resolvePrintifyDraftConfig,
@@ -157,4 +158,16 @@ test("artwork reuses the approved Printify Media entry via the correct paginated
   assert.equal(artwork.imageId, "approvedart12345")
   assert.equal(mock.seen.filter(s => s.method === "POST").length, 0)
   assert.ok(mock.seen.some(s => s.path === "/v1/uploads.json?page=1&limit=100"))
+})
+
+test("discover shops requires only a private token and returns numeric IDs without writes", async () => {
+  const mock = harness()
+  const noShopId = { ...env, AMS_PRINTIFY_SHOP_ID: "" }
+  assert.equal(isPrintifyTokenConfigured(noShopId), true)
+  assert.equal(resolvePrintifyDraftConfig(noShopId), null)
+  const agent = new TeeAndTraumaPrintifyAgent({ env: noShopId, fetch: mock.fetcher })
+  assert.equal(agent.configured(), false)
+  const shops = await agent.discoverShops()
+  assert.deepEqual(shops, [{ id: 4321, title: "My Shopify Store", sales_channel: "shopify" }])
+  assert.deepEqual(mock.seen.map(x => [x.method,x.path]), [["GET","/v1/shops.json"]])
 })
