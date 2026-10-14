@@ -157,14 +157,27 @@ export class TeeAndTraumaPrintifyAgent {
     fail("PRINTIFY_PRODUCT_SCAN_INCOMPLETE")
   }
   private async printifyImage(): Promise<PrintifyImage | null> {
-    const payload = await this.request<PrintifyImage[] | { data: PrintifyImage[] }>("/uploads/images.json")
-    const list = Array.isArray(payload) ? payload : payload?.data
-    if (!Array.isArray(list)) fail("PRINTIFY_MEDIA_LIST_INVALID")
-    const matches = list.filter(x => x.file_name === APPROVED_ART_FILENAME)
-    if (matches.length > 1) fail("PRINTIFY_ARTWORK_AMBIGUOUS")
-    const found = matches[0]
-    if (found && (found.width !== 4500 || found.height !== 5400)) fail("PRINTIFY_ARTWORK_DIMENSIONS_MISMATCH")
-    return found ?? null
+    // Printify documents GET /uploads.json for listing, not /uploads/images.json
+    // (the latter is the POST upload endpoint). Scan every page before writing.
+    const matches: PrintifyImage[] = []
+    for (let page = 1; page <= 50; page++) {
+      const payload = await this.request<{ data: PrintifyImage[]; last_page: number }>(
+        `/uploads.json?page=${page}&limit=100`)
+      if (!Array.isArray(payload?.data) || !Number.isSafeInteger(payload.last_page) ||
+          payload.last_page < page || payload.last_page > 50) fail("PRINTIFY_MEDIA_LIST_INVALID")
+      for (const file of payload.data) {
+        if (file.file_name === APPROVED_ART_FILENAME) matches.push(file)
+      }
+      if (page === payload.last_page) {
+        if (matches.length > 1) fail("PRINTIFY_ARTWORK_AMBIGUOUS")
+        const found = matches[0]
+        if (found && (found.width !== 4500 || found.height !== 5400)) {
+          fail("PRINTIFY_ARTWORK_DIMENSIONS_MISMATCH")
+        }
+        return found ?? null
+      }
+    }
+    fail("PRINTIFY_MEDIA_SCAN_INCOMPLETE")
   }
   async uploadApprovedArtwork() {
     await this.connectedShop()
