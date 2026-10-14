@@ -4,6 +4,7 @@ import { z } from "zod"
 import {
   APPROVED_ART_FILENAME,
   SOURCE_SHOPIFY_PRODUCT_ID,
+  isPrintifyTokenConfigured,
   TeeAndTraumaPrintifyAgent,
 } from "@/lib/server/teeandtrauma-printify-agent"
 import {
@@ -17,6 +18,7 @@ export const dynamic = "force-dynamic"
 // Do not add a publish/order/sync operation here. Existing Shopify product is
 // preserved in DRAFT until Printify costs, fulfillment and migration are verified.
 const actions = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("discover-shops") }).strict(),
   z.object({ action: z.literal("list-garments") }).strict(),
   z.object({ action: z.literal("provider-plan"), providerId: z.number().int().positive() }).strict(),
   z.object({
@@ -58,7 +60,8 @@ export async function GET(request: NextRequest) {
   const agent = new TeeAndTraumaPrintifyAgent()
   if (!agent.configured()) {
     return result({
-      ok: true, configured: false, mode: "draft-only", publishEnabled: false,
+      ok: true, configured: false, tokenConfigured: isPrintifyTokenConfigured(),
+      requiresShopId: isPrintifyTokenConfigured(), mode: "draft-only", publishEnabled: false,
       sourceShopifyProductId: SOURCE_SHOPIFY_PRODUCT_ID,
     })
   }
@@ -77,6 +80,8 @@ export async function POST(request: NextRequest) {
   const agent = new TeeAndTraumaPrintifyAgent()
   try {
     switch (parsed.data.action) {
+      case "discover-shops":
+        return result({ ok: true, shops: await agent.discoverShops(), published: false })
       case "list-garments":
         return result({ ok: true, ...(await agent.listEligibleGarments()) })
       case "provider-plan":
