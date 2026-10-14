@@ -79,6 +79,9 @@ test("only the exact approved Shopify CDN asset is permitted", () => {
 test("black sizes are narrowly matched and inactive colors ignored", () => {
   assert.equal(isBlackTargetSize("Black / S"), true)
   assert.equal(isBlackTargetSize("Black / 3XL"), true)
+  assert.equal(isBlackTargetSize("Solid Black / S"), true)
+  assert.equal(isBlackTargetSize("Solid Black / XL"), true)
+  assert.equal(isBlackTargetSize("Heather Black / M"), false)
   assert.equal(isBlackTargetSize("White / S"), false)
   assert.equal(isBlackTargetSize("Black / Kids S"), false)
 })
