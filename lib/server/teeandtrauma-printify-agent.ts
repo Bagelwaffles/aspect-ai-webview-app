@@ -40,6 +40,9 @@ function fail(code: string): never { throw new Error(code) }
 function validToken(value: string | undefined): value is string {
   return !!value && value.length >= 12 && !/replace|placeholder|change.?me|<|>/iu.test(value)
 }
+export function isPrintifyTokenConfigured(env: Environment = process.env): boolean {
+  return validToken(env.PRINTIFY_API_KEY)
+}
 export function resolvePrintifyDraftConfig(env: Environment = process.env) {
   const token = env.PRINTIFY_API_KEY
   const shopId = Number(env.AMS_PRINTIFY_SHOP_ID)
@@ -77,7 +80,8 @@ export class TeeAndTraumaPrintifyAgent {
     return resolvePrintifyDraftConfig(this.env) ?? fail("PRINTIFY_NOT_CONFIGURED")
   }
   private async request<T>(path: string, body?: object): Promise<T> {
-    const { token } = this.config()
+    const token = this.env.PRINTIFY_API_KEY
+    if (!validToken(token)) fail("PRINTIFY_NOT_CONFIGURED")
     if (!path.startsWith("/") || path.includes("..") || /https?:/iu.test(path)) fail("PRINTIFY_PATH_INVALID")
     const response = await this.fetcher(`${PRINTIFY_ROOT}${path}`, {
       method: body ? "POST" : "GET",
@@ -94,10 +98,17 @@ export class TeeAndTraumaPrintifyAgent {
     if (!response.ok) fail(`PRINTIFY_HTTP_${response.status}`)
     return (await response.json().catch(() => fail("PRINTIFY_RESPONSE_INVALID"))) as T
   }
+  async discoverShops(): Promise<PrintifyShop[]> {
+    const shops = await this.request<PrintifyShop[]>("/shops.json")
+    if (!Array.isArray(shops) || shops.some(shop =>
+      !Number.isSafeInteger(shop.id) || !shop.title || !shop.sales_channel)) {
+      fail("PRINTIFY_SHOPS_INVALID")
+    }
+    return shops.map(shop => ({ id: shop.id, title: shop.title, sales_channel: shop.sales_channel }))
+  }
   async connectedShop(): Promise<PrintifyShop> {
     const { shopId } = this.config()
-    const shops = await this.request<PrintifyShop[]>("/shops.json")
-    if (!Array.isArray(shops)) fail("PRINTIFY_SHOPS_INVALID")
+    const shops = await this.discoverShops()
     const selected = shops.find(s => s.id === shopId)
     if (!selected || !/shopify/iu.test(selected.sales_channel)) fail("PRINTIFY_SHOP_MISMATCH")
     return selected
