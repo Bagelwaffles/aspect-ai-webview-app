@@ -32,9 +32,21 @@ Configure server-side environment variables **for Preview first**:
 
 ```dotenv
 PRINTIFY_API_KEY=<authorized Printify personal-access token>
-AMS_PRINTIFY_SHOP_ID=<numeric ID of the existing Printify Shopify store>
+# Initially leave the shop ID unset and discover it with the protected action below
+AMS_PRINTIFY_SHOP_ID=
 AMS_PRINTIFY_DRAFT_WRITES_ENABLED=false
 ```
+
+For the dedicated merchant-account token, select only these Printify scopes:
+`shops.read`, `catalog.read`, `print_providers.read`, `products.read`,
+`products.write`, `uploads.read`, `uploads.write`. Do **not** grant
+`orders.write`, `orders.read`, `webhooks.write`, or unrelated scopes.
+Printify's official docs list the token scopes. Keep the key in a Vercel
+**Secret**, not GitHub, frontend variables, logs or chat.
+
+After Preview deployment, call protected `discover-shops` with the token
+set and no shop ID. Copy the ID corresponding to the **existing Shopify**
+sales channel into `AMS_PRINTIFY_SHOP_ID` and redeploy Preview.
 
 The existing AMS internal bearer key must already be configured as
 `AMS_INTERNAL_API_KEY`.
@@ -56,6 +68,8 @@ production until a separately authorized launch.
 
 `POST /api/internal/agents/printify` with a private internal bearer token:
 
+- `{"action":"discover-shops"}`: read-only list of accessible shop IDs, titles and
+  sales channels; works with the token before `AMS_PRINTIFY_SHOP_ID` is set.
 - `{"action":"list-garments"}`: read-only Gildan 5000 blueprint/provider lookup
 - `{"action":"provider-plan","providerId":123}`: read-only black size,
   fulfillment-cost and shipping inspection. Use provider ID returned by
