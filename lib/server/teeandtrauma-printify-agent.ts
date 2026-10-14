@@ -58,7 +58,7 @@ export function isMatchingPrintifyProduct(product: PrintifyProduct): boolean {
     (product.description?.includes(SOURCE_MARKER) ?? false)
 }
 export function isBlackTargetSize(title: string): boolean {
-  return /^black\s*\/\s*(?:s|m|l|xl|2xl|3xl|xxl|xxxl)$/iu.test(title.trim())
+  return /^(?:solid\s+)?black\s*\/\s*(?:s|m|l|xl|2xl|3xl|xxl|xxxl)$/iu.test(title.trim())
 }
 export function verifiedRetailPriceCents(costCents: unknown, retailCents: number): boolean {
   return typeof costCents === "number" && Number.isSafeInteger(costCents) &&
