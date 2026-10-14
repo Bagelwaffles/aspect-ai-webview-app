@@ -38,9 +38,10 @@ function harness(products: Array<Record<string, unknown>> = [], catalogCost = 90
     },
     "/v1/catalog/blueprints/6/print_providers/12/shipping.json": { standard: { price: 499 } },
     "/v1/shops/4321/products.json?page=1&limit=50": { data: products, last_page: 1 },
-    "/v1/uploads/images.json": [{
-      id: "approvedart12345", file_name: APPROVED_ART_FILENAME, width: 4500, height: 5400,
-    }],
+    "/v1/uploads.json?page=1&limit=100": {
+      data: [{ id: "approvedart12345", file_name: APPROVED_ART_FILENAME, width: 4500, height: 5400 }],
+      last_page: 1,
+    },
   }
   const fetcher = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input))
@@ -146,4 +147,14 @@ test("explicit draft-write switch prevents accidental writes", async () => {
     /PRINTIFY_DRAFT_WRITES_DISABLED/u,
   )
   assert.equal(mock.seen.length, 0)
+})
+
+test("artwork reuses the approved Printify Media entry via the correct paginated GET endpoint", async () => {
+  const mock = harness()
+  const agent = new TeeAndTraumaPrintifyAgent({ env, fetch: mock.fetcher })
+  const artwork = await agent.uploadApprovedArtwork()
+  assert.equal(artwork.reused, true)
+  assert.equal(artwork.imageId, "approvedart12345")
+  assert.equal(mock.seen.filter(s => s.method === "POST").length, 0)
+  assert.ok(mock.seen.some(s => s.path === "/v1/uploads.json?page=1&limit=100"))
 })
