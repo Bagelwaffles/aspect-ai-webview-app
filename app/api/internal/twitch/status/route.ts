@@ -9,6 +9,7 @@ import {
 } from "@/lib/server/twitch-short-render-jobs"
 import { getTwitchPilotStatus } from "@/lib/server/twitch-pilot"
 import { getYouTubePrivateUploadRecord } from "@/lib/server/youtube-private-uploader"
+import { getYouTubePublicPromotionRecord } from "@/lib/server/youtube-public-promoter"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -39,6 +40,10 @@ export async function GET(request: NextRequest) {
       shortRenderJobs.map(async (job) => ({
         ...job,
         youtubeUpload: await getYouTubePrivateUploadRecord(job.jobId),
+        // Read-only publication history: only automatic selections are relevant.
+        youtubePublicPromotion: job.autoPublish
+          ? await getYouTubePublicPromotionRecord(job.jobId)
+          : null,
       })),
     )
     return json({

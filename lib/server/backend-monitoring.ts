@@ -15,6 +15,16 @@ import {
   isTwitchShortRenderConfigured,
   listLatestTwitchShortRenderJobs,
 } from "@/lib/server/twitch-short-render-jobs"
+import {
+  getYouTubePrivateUploadRecord,
+  getYouTubePrivateVerificationProof,
+} from "@/lib/server/youtube-private-uploader"
+import {
+  getYouTubePublicPromotionRecord,
+  isYouTubePublicAutopublishEnabled,
+} from "@/lib/server/youtube-public-promoter"
+import { SMOKYBANANA03_YOUTUBE_CHANNEL_ID } from "@/lib/server/youtube-owner-connection"
+import { summarizeTwitchShortPublicationHealth } from "@/lib/server/twitch-short-publication-health"
 import { isR2AssetStorageConfigured } from "@/lib/server/r2-presign"
 import { checkRedisReadiness } from "@/lib/server/redis-readiness"
 import { isInternalApiConfigured } from "@/lib/server/internal-api-auth"
@@ -544,6 +554,96 @@ async function monitorTwitchMedia(context: MonitorContext) {
   }
 }
 
+async function monitorTwitchShortsPublication(context: MonitorContext) {
+  const checkedAt = context.now.toISOString()
+  if (!isYouTubePublicAutopublishEnabled(context.env)) {
+    return result(
+      "twitch-shorts-publication",
+      "Twitch Shorts Public Publishing",
+      "info",
+      "Automatic Public Shorts publishing is disabled.",
+      checkedAt,
+      [],
+      { publicPublishingEnabled: false },
+    )
+  }
+
+  try {
+    // Only the owner's explicitly auto-selected rendered Shorts. Manual Private
+    // review uploads and other broadcasters must never be treated as auto-public.
+    const selected = (await listLatestTwitchShortRenderJobs())
+      .filter((job) =>
+        job.broadcasterId === "155477801" &&
+        job.status === "rendered" &&
+        Boolean(job.autoPublish),
+      )
+      .slice(0, 25)
+
+    const states = await Promise.all(selected.map(async (job) => {
+      const [privateUpload, privateProof, publicPromotion] = await Promise.all([
+        getYouTubePrivateUploadRecord(job.jobId),
+        getYouTubePrivateVerificationProof(job.jobId),
+        getYouTubePublicPromotionRecord(job.jobId),
+      ])
+      const verified = privateUpload?.status === "succeeded" &&
+        Boolean(privateUpload.youtubeVideoId) &&
+        privateUpload.channelId === SMOKYBANANA03_YOUTUBE_CHANNEL_ID &&
+        privateProof?.videoId === privateUpload.youtubeVideoId &&
+        privateProof.channelId === SMOKYBANANA03_YOUTUBE_CHANNEL_ID &&
+        privateProof.metadataVerified === true
+      return {
+        jobId: job.jobId,
+        selectedAt: job.autoPublish!.selectedAt,
+        renderedAt: job.completedAt,
+        privateStatus: privateUpload?.status ?? null,
+        privateCompletedAt: privateUpload?.completedAt ?? null,
+        privateVerified: verified,
+        publicStatus: publicPromotion?.status ?? null,
+        publicUpdatedAt: publicPromotion?.updatedAt ?? null,
+      }
+    }))
+    const health = summarizeTwitchShortPublicationHealth(states, context.now)
+    const issues = health.failed + health.uploadOverdue +
+      health.verifiedPrivateOverdue + health.reconciliationStalled
+    const details: string[] = []
+    if (health.failed) details.push(`${health.failed} selected Short upload/publication operation(s) failed.`)
+    if (health.uploadOverdue) details.push(`${health.uploadOverdue} selected Short(s) have no completed private upload after three hours.`)
+    if (health.verifiedPrivateOverdue) details.push(`${health.verifiedPrivateOverdue} verified Private Short(s) have awaited Public promotion for over three hours.`)
+    if (health.reconciliationStalled) details.push(`${health.reconciliationStalled} Short upload/publication attempt(s) have been in reconciliation for over three hours.`)
+    if (issues) details.push(`Affected render jobs (up to five): ${health.affectedJobIds.slice(0, 5).join(", ")}`)
+
+    return result(
+      "twitch-shorts-publication",
+      "Twitch Shorts Public Publishing",
+      issues ? "warning" : "ok",
+      issues
+        ? details[0]
+        : "No failed or overdue auto-selected Shorts in the latest 25 rendered jobs.",
+      checkedAt,
+      details,
+      {
+        publicPublishingEnabled: true,
+        autoSelectedRenderedJobs: health.selected,
+        published: health.published,
+        waiting: health.waiting,
+        failed: health.failed,
+        uploadOverdue: health.uploadOverdue,
+        verifiedPrivateOverdue: health.verifiedPrivateOverdue,
+        reconciliationStalled: health.reconciliationStalled,
+      },
+    )
+  } catch {
+    return result(
+      "twitch-shorts-publication",
+      "Twitch Shorts Public Publishing",
+      "warning",
+      "Twitch Shorts publication state could not be verified.",
+      checkedAt,
+      ["The monitor could not read the latest owner-channel upload and promotion records."],
+    )
+  }
+}
+
 async function monitorFiverr(context: MonitorContext) {
   const checkedAt = context.now.toISOString()
   const operations = await listRecentFiverrOperations(25)
@@ -926,6 +1026,7 @@ export async function runBackendMonitoring(
     runMonitorSafely("overmind-tasks", "Overmind Task Queue", checkedAt, () => monitorOvermindTasks(context)),
     runMonitorSafely("social-publishing", "Social Publishing", checkedAt, () => monitorSocialPublishing(context)),
     runMonitorSafely("twitch-media", "Twitch Media & Rendering", checkedAt, () => monitorTwitchMedia(context)),
+    runMonitorSafely("twitch-shorts-publication", "Twitch Shorts Public Publishing", checkedAt, () => monitorTwitchShortsPublication(context)),
     runMonitorSafely("fiverr-operations", "Fiverr Operations", checkedAt, () => monitorFiverr(context)),
     runMonitorSafely("android-play", "Google Play Release", checkedAt, () => monitorAndroidPlay(context)),
     runMonitorSafely("visibility-catalog", "Visibility & Catalog Truth", checkedAt, () => monitorVisibility(context)),

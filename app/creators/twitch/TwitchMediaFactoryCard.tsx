@@ -14,6 +14,14 @@ export type TwitchShortRendererStatus = {
     clipId: string
     status: "pending" | "rendering" | "rendered" | "failed"
     errorCode: string | null
+    autoPublish?: { sourceVideoId: string; rank: number; selectedAt: string }
+    youtubePublicPromotion?: {
+      status: "pending" | "promoting" | "succeeded" | "failed" | "reconciliation"
+      youtubeVideoId: string
+      attempts: number
+      updatedAt: string
+      errorCode: string | null
+    } | null
     youtubeUpload?: {
       status: "pending" | "uploading" | "succeeded" | "failed" | "reconciliation"
       privacyStatus: "private"
@@ -261,6 +269,45 @@ export default function TwitchMediaFactoryCard({
 
         {message ? <div className="rounded-lg border p-3 text-foreground">{message}</div> : null}
 
+        {(shortRenderer?.jobs.some(job => job.autoPublish) ?? false) ? (
+          <div className="rounded-lg border p-4">
+            <div className="mb-2 font-semibold text-foreground">Recent automatically selected Shorts</div>
+            <p className="mb-3 text-xs">Read-only publication history for the existing SmokyBanana03 channel. A Private upload is not evidence of a Public post.</p>
+            <div className="space-y-2">
+              {shortRenderer!.jobs.filter(job => job.autoPublish).slice(0, 20).map(job => (
+                <div key={job.jobId} className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-xs">
+                  <span className="min-w-0 break-all">{job.clipId} · selection #{job.autoPublish?.rank}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">
+                      {job.youtubePublicPromotion?.status === "succeeded"
+                        ? "Public verified"
+                        : job.youtubePublicPromotion?.status === "failed"
+                          ? "Public promotion failed"
+                          : job.youtubePublicPromotion?.status === "reconciliation"
+                            ? "Public verification pending"
+                            : job.youtubeUpload?.status === "succeeded"
+                              ? "Uploaded Private; awaiting Public"
+                              : job.youtubeUpload?.status === "failed"
+                                ? "Private upload failed"
+                                : "Awaiting render/upload"}
+                    </Badge>
+                    {job.youtubePublicPromotion?.status === "succeeded" && job.youtubePublicPromotion.youtubeVideoId ? (
+                      <a className="underline underline-offset-2" target="_blank" rel="noreferrer"
+                        href={`https://www.youtube.com/watch?v=${encodeURIComponent(job.youtubePublicPromotion.youtubeVideoId)}`}>
+                        Watch Public Short
+                      </a>
+                    ) : null}
+                    {job.youtubePublicPromotion?.errorCode && job.youtubePublicPromotion.status !== "succeeded" ? (
+                      <span className="text-amber-600">{job.youtubePublicPromotion.errorCode}</span>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+
         {summary?.vod?.id && (summary.markers?.length ?? 0) > 0 ? (
           <div className="rounded-lg border p-4">
             <div className="mb-2 font-semibold text-foreground">Create Twitch clips from creator markers</div>
@@ -389,7 +436,7 @@ export default function TwitchMediaFactoryCard({
                               target="_blank"
                               rel="noreferrer"
                             >
-                              Review private upload
+                              {job.youtubePublicPromotion?.status === "succeeded" ? "View published Short" : "Review private upload"}
                             </a>
                           </Button>
                         ) : null}
