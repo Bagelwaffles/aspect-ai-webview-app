@@ -177,6 +177,13 @@ jobs:
           test "$(curl --silent --output /tmp/content-agent-run.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"businessName":"CI Test","audience":"CI audience","goal":"CI test goal","channel":"social","tone":"professional"}' http://127.0.0.1:3000/api/content-agent/runs)" = "401"
           test "$(curl --silent --output /tmp/agent-deploy.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{}' http://127.0.0.1:3000/api/agents/deploy)" = "401"
           test "$(curl --silent --output /tmp/relevance-run.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{}' http://127.0.0.1:3000/api/relevance/agents/ci-agent/run)" = "401"
+          # Maintenance queue must be private, and owner mutation must reject untrusted origins.
+          test "$(curl --silent --output /tmp/maintenance-guest.json --write-out '%{http_code}' http://127.0.0.1:3000/api/internal/maintenance)" = "401"
+          node -e 'const v=require("/tmp/maintenance-guest.json"); if(v.code!=="OWNER_SESSION_REQUIRED") process.exit(1)'
+          test "$(curl --silent --output /tmp/maintenance-origin.json --write-out '%{http_code}' --request POST --header 'origin: https://untrusted.invalid' --header 'content-type: application/json' --data '{"action":"record_research"}' http://127.0.0.1:3000/api/internal/maintenance)" = "403"
+          node -e 'const v=require("/tmp/maintenance-origin.json"); if(v.code!=="UNTRUSTED_ORIGIN") process.exit(1)'
+          test "$(curl --silent --output /tmp/maintenance-owner.json --write-out '%{http_code}' --request POST --header 'origin: http://127.0.0.1:3000' --header 'content-type: application/json' --data '{"action":"record_research"}' http://127.0.0.1:3000/api/internal/maintenance)" = "401"
+          node -e 'const v=require("/tmp/maintenance-owner.json"); if(v.code!=="OWNER_SESSION_REQUIRED") process.exit(1)'
           test "$(curl --silent --output /tmp/one-time-checkout.json --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/ethical-agent-farm/checkout)" = "410"
           node -e 'const value=require("/tmp/one-time-checkout.json"); if(value.code!=="ONE_TIME_CHECKOUT_DISABLED") process.exit(1)'
           test "$(curl --silent --output /tmp/session.json --write-out '%{http_code}' http://127.0.0.1:3000/api/auth/session)" = "200"
