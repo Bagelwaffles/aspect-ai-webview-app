@@ -60,5 +60,5 @@ No action can approve or deploy production.
 
 - Automatic arbitrary PR generation by a Vercel cron is **not supported**. GitHub's Dependabot and the separately configured ChatGPT scheduled coding watches provide the current draft-PR producers, with their own execution limits and permissions.
 - Production Redis coverage and actual cron freshness remain to be verified with authorized production access. Preview records do not prove production status.
-- This bounded state store records observation and checked draft PR only. Post-release promotion/recovery and owner-facing GUI are future separately gated work.
+- This bounded state store records observation and checked draft PR only. Post-release promotion/recovery is future separately gated work. A read-only internal-admin queue is available at `/dashboard/maintenance`.
 - A source claiming capability, price, or a fix does not justify adopting it without reproducible API/license/cost and security evidence.
