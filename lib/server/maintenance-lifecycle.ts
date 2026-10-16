@@ -105,7 +105,7 @@ export function maintenanceActionPolicy(
     return { eligible: false, ownerApprovalRequired: true, reason: "Cost is unknown or nonzero." }
   }
   if (action === "read" || action === "research" || action === "draft_pr") {
-    return { eligible: true, ownerApprovalRequired: action === "draft_pr", reason: "Restricted to read or isolated Draft PR; no release." }
+    return { eligible: true, ownerApprovalRequired: false, reason: "Restricted to read or isolated Draft PR; no release." }
   }
   const ownerOnly = new Set([
     "production_deploy", "pr_merge", "payment", "billing", "credentials",
