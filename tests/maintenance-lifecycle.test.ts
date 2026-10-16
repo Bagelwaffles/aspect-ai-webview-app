@@ -161,9 +161,9 @@ test("GitHub PR verification refuses non-drafts, other heads, and wrong targets"
       head: { sha, repo: { full_name: "Bagelwaffles/aspect-ai-webview-app" } },
       base: { ref: "main" }, ...overrides,
     }), { status: 200 })) as typeof fetch
-  assert.match(await verifyMaintenanceDraftPr(280, sha, {}, makeFetch({})), /pull\/280/u)
-  await assert.rejects(verifyMaintenanceDraftPr(280, sha, {}, makeFetch({ draft: false })), /PR_PROOF_INVALID/u)
-  await assert.rejects(verifyMaintenanceDraftPr(280, sha, {}, makeFetch({ base: { ref: "other" } })), /PR_PROOF_INVALID/u)
+  assert.match(await verifyMaintenanceDraftPr(280, sha, { NODE_ENV: "test" }, makeFetch({})), /pull\/280/u)
+  await assert.rejects(verifyMaintenanceDraftPr(280, sha, { NODE_ENV: "test" }, makeFetch({ draft: false })), /PR_PROOF_INVALID/u)
+  await assert.rejects(verifyMaintenanceDraftPr(280, sha, { NODE_ENV: "test" }, makeFetch({ base: { ref: "other" } })), /PR_PROOF_INVALID/u)
 })
 
 test("GitHub checks require both exact workflows to pass on the same commit", async () => {
@@ -173,18 +173,18 @@ test("GitHub checks require both exact workflows to pass on the same commit", as
   })
   const mock = (workflow_runs: unknown[]) =>
     (async () => new Response(JSON.stringify({ workflow_runs }), { status: 200 })) as typeof fetch
-  await verifyMaintenanceChecks(sha, {}, mock([run("AMS Reconciliation CI", "success"), run("Secret scan", "success")]))
+  await verifyMaintenanceChecks(sha, { NODE_ENV: "test" }, mock([run("AMS Reconciliation CI", "success"), run("Secret scan", "success")]))
   await assert.rejects(
-    verifyMaintenanceChecks(sha, {}, mock([run("AMS Reconciliation CI", "success")])),
+    verifyMaintenanceChecks(sha, { NODE_ENV: "test" }, mock([run("AMS Reconciliation CI", "success")])),
     /REQUIRED_CHECKS_NOT_PASSED/u,
   )
   await assert.rejects(
-    verifyMaintenanceChecks(sha, {}, mock([run("AMS Reconciliation CI", "failure"), run("Secret scan", "success")])),
+    verifyMaintenanceChecks(sha, { NODE_ENV: "test" }, mock([run("AMS Reconciliation CI", "failure"), run("Secret scan", "success")])),
     /REQUIRED_CHECKS_NOT_PASSED/u,
   )
   const wrongSha = { ...run("Secret scan", "success"), head_sha: "c".repeat(40) }
   await assert.rejects(
-    verifyMaintenanceChecks(sha, {}, mock([run("AMS Reconciliation CI", "success"), wrongSha])),
+    verifyMaintenanceChecks(sha, { NODE_ENV: "test" }, mock([run("AMS Reconciliation CI", "success"), wrongSha])),
     /REQUIRED_CHECKS_NOT_PASSED/u,
   )
 })
