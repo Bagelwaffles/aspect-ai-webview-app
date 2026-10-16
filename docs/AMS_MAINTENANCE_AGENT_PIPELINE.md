@@ -56,6 +56,16 @@ No action can approve or deploy production.
 5. Obtain distinct owner-approved merge/release, verify Vercel READY exact commit, observe recovery on a later monitor run, and record the deployment evidence. This release/post-deploy executor is intentionally **not** implemented in this PR.
 6. Prove actual external monitor-to-native ingestion or explicitly keep external watches as a separate producer path. Without that proof, call the native Update/Repair Agents **setup-required**, not Live.
 
+## Preview Redis incident and recovery evidence (October 15–16, 2026)
+
+- GitHub PR #280 full reconciliation CI and secret scan both passed on commit \`1eb7041a84409aa7bd5152ebe9811fdfb702583b\`. That CI used an **isolated disposable Redis container**, not the Vercel Preview datastore.
+- The corresponding Vercel Preview build was READY, but **runtime** \`GET /api/health\` reported HTTP 503 (\`environment=preview\`, Redis \`configured=true\`, \`status=unavailable\`). READY is not the same as application readiness.
+- The existing connected Upstash database \`ams-scheduled-tasks-preview\` was verified active, and a direct \`PING\` returned \`PONG\`. This alone does not prove the Vercel Preview app was configured with valid credentials.
+- Vercel listed no Redis environment-variable overrides for this feature branch. A **preview-branch-scoped** REST URL and sensitive REST token were added to \`aspect-ai-overlord\` for this branch only, pointing to the *existing* Upstash Preview database. Token values were never committed, printed, or added to logs; Production variables were not changed.
+- Vercel's connected direct-create-deployment API returned HTTP 403 (\`forbidden\`), so new preview deployment must be triggered via the pre-existing GitHub integration. Do not change permissions or switch to Production.
+- **Required next acceptance:** On the new exact-commit Preview deployment, recheck \`/api/health\` (must return HTTP 200 and Redis ready), then verify app owner-only access. Only after that should a **Preview-only** \`AMS_MAINTENANCE_ENABLED=true\` gate be considered for a controlled warning/dedup scenario. Namespace all new keys with \`ams:maintenance:v1:\`; do not read or modify any older scheduled tasks in this shared Preview database.
+- If Preview health still reports unavailable, hold release, diagnose the actual Vercel Preview variable resolution without copying Production tokens or suppressing readiness checks.
+
 ## Known limitations
 
 - Automatic arbitrary PR generation by a Vercel cron is **not supported**. GitHub's Dependabot and the separately configured ChatGPT scheduled coding watches provide the current draft-PR producers, with their own execution limits and permissions.
