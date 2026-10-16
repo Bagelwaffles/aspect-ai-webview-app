@@ -49,7 +49,7 @@ No action can approve or deploy production.
 
 ## Acceptance steps before declaring the repair agent Live
 
-1. Draft PR CI and secret scan pass for this feature; preview build reaches READY.
+1. Draft PR CI and secret scan pass for this feature; the CI-only Redis acceptance (persistent write, dedup, readback and cleanup) passes against the isolated container; preview build reaches READY.
 2. On an isolated Preview with the correct **Preview Redis**, enable collection intentionally, trigger a controlled non-billing monitor warning, and verify one persisted finding and no duplicate on replay.
 3. Verify owner-only 401/403 responses and test bad evidence, stale events, Redis down, failed provider checks, and GitHub rate limits.
 4. Use a *real* low-risk GitHub defect or security update as input to the **external** scheduled coding workflow: create an isolated actual patch PR with regression tests, attach exact PR head, and verify CI through this API. No simulated patch may qualify.
