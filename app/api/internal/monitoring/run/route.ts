@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { ingestBackendMonitorEvents } from "@/lib/server/maintenance-lifecycle"
+
 import {
   authorizeMonitoringCron,
   runBackendMonitoring,
@@ -18,6 +20,17 @@ export async function GET(request: NextRequest) {
   }
 
   const snapshot = await runBackendMonitoring()
+  const maintenanceEnabled = process.env.AMS_MAINTENANCE_ENABLED === "true"
+  let maintenance = { enabled: maintenanceEnabled, ingested: 0, duplicates: 0, ignored: 0, failed: false }
+  if (maintenanceEnabled && snapshot.newEvents.length) {
+    try {
+      const outcome = await ingestBackendMonitorEvents(snapshot.newEvents)
+      maintenance = { enabled: true, ...outcome, failed: false }
+    } catch {
+      // Monitoring continues; no implicit repair or unsafe fallback when persistence fails.
+      maintenance.failed = true
+    }
+  }
   return NextResponse.json(
     {
       ok: true,
@@ -26,6 +39,7 @@ export async function GET(request: NextRequest) {
       monitors: snapshot.results.length,
       newEvents: snapshot.newEvents.length,
       alertDelivery: snapshot.alertDelivery,
+      maintenance,
       customerFacing: false,
     },
     { headers: { "Cache-Control": "no-store" } },
