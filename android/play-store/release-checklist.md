@@ -6,7 +6,7 @@ Status legend: `[x]` verified in code/CI or prior Play evidence; `[ ]` still req
 
 The Android codebase is in `main`. The old `android/play-v1` branch is historical and is more than 200 commits behind `main`; do not build a release from that branch.
 
-Google Play requires new Android phone/tablet apps and updates submitted after August 31, 2026 to target Android 16 / API 36 or higher. AMS already targets API 36.
+Google Play requires new Android phone/tablet apps and updates submitted after August 31, 2026 to target Android 16 / API 36 or higher. AMS already targets API 36. Play Console shows version code `20000` already active, so the next upload uses `20001`.
 
 For personal Play developer accounts created after November 13, 2023, production access requires a closed test with at least 12 testers continuously opted in for at least 14 days. Play Console is authoritative for whether this requirement applies to the AMS account and whether the testing threshold has been met.
 
@@ -15,7 +15,7 @@ For personal Play developer accounts created after November 13, 2023, production
 - [x] Google Play application ID: `com.aspectmarketingsolutions.app`
 - [x] App name: Aspect Marketing Solutions
 - [x] Version name: `2.0.0`
-- [x] Version code: `20000`
+- [x] Version code: `20001`
 - [x] compileSdk 36
 - [x] targetSdk 36
 - [x] minSdk 24
