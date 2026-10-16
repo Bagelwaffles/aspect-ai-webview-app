@@ -11,7 +11,7 @@ Every AMS agent must fit the same operating contract before it is promoted throu
 - **Context:** customer input, workspace profile, private assets, connected accounts, and/or public web sources.
 - **Permissions:** every read, draft, write, publish, or billing capability must be declared.
 - **Connections:** provider dependencies must be named; missing credentials fail closed.
-- **Approval:** action-native work requires human approval; owner-level billing/control mutations require owner approval.
+- **Approval:** action-native work uses the shared event → proposed action → approval → execution → audit log lifecycle; publishing/messaging require human approval, while spending, billing, credential/permission changes, production configuration, deletion, and destructive mutations require owner approval.
 - **Isolation:** authorization and ownership use the stable signed customer subject, never email.
 - **Untrusted data:** customer files, websites, account content, research results and model output never become system/tool instructions.
 - **Idempotency:** external mutations require an idempotency key or equivalent provider-safe replay boundary.
@@ -26,7 +26,7 @@ Every AMS agent must fit the same operating contract before it is promoted throu
 3. Never interpret a plan as proof that work happened.
 4. Never let one customer subject read or mutate another customer's state.
 5. Never place provider secrets in browser-visible state, logs, prompts, or model context.
-6. Keep consequential actions approval-first until that exact action path is production-proven.
+6. Keep consequential actions approval-first until that exact action path is production-proven; unknown action kinds fail closed.
 7. Prefer least-privilege scopes and reversible mutations.
 8. Preserve a kill switch for executor families and a provider-specific disconnect/revoke path.
 9. Use canary/beta proof before widening availability.
