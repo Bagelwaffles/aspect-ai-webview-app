@@ -10,7 +10,7 @@ This adds a source-controlled maintenance evidence lane to the **existing** AMS 
 | --- | --- | --- | --- |
 | Backend monitoring | \`lib/server/backend-monitoring.ts\`: 10 checks, change events, Redis persistence | Existing Vercel cron and Upstash production credentials; existing service calls may have cost | New warning/critical events only, gated by \`AMS_MAINTENANCE_ENABLED=true\` |
 | Dependabot | npm daily, Gradle and Actions weekly | GitHub-hosted; no new third-party charge | Already opens PRs; no duplicate native package upgrader |
-| GitHub Actions | Reconciliation CI and secret scan on PRs | GitHub checks read API, optional read token for rate limits | Exact-head PR/check proof on owner request |
+| GitHub Actions | CI/security and scheduled creator workers on main | GitHub REST API public/read-only, optional read token for rate limits; at most one read per monitoring cron | Failed Secret scan or scheduled Twitch workers become deduplicated **escalation-only observations** under `AMS_MAINTENANCE_ENABLED=true`. Exact-head PR/check proof remains owner-only |
 | AMS AI Platform Watch / Builder Update Agent | ChatGPT scheduled external intelligence evaluations | ChatGPT scheduled tasks and connected GitHub tools | **Not** wired to this Vercel endpoint; can independently prepare draft PRs |
 | SmokyBanana03 Shorts Repair Watch | ChatGPT hourly diagnostic watch | Existing connected GitHub data | **Not** wired to this Vercel endpoint; independently proposes draft PRs |
 | Twitch media monitor | Existing backend Twitch/render health | Existing provider configuration | Yes, when its backend monitor emits warning/critical events |
@@ -19,11 +19,12 @@ This adds a source-controlled maintenance evidence lane to the **existing** AMS 
 
 1. Existing cron runs backend checks and persists changed warning/critical events.
 2. If \`AMS_MAINTENANCE_ENABLED=true\`, ingest those events into \`ams:maintenance:v1\` in **that environment's configured Redis**. Never substitute the preview database for an unverified production datastore.
-3. Normalize source, timestamp, fingerprint, severity, probable impact, confidence, estimated cost, and policy. Reject stale/future events; deduplicate repeated observations; retain up to 250 indexed findings for 90 days.
-4. Classify signals as **observed**, not verified defects. Billing, core infrastructure and Play release signals are escalation-only. Other backend events are candidates for an *isolated draft investigation*; a source observation is never code proof.
-5. Owner-only, trusted-origin \`/api/internal/maintenance\` accepts external research as **unverified**, or attaches an actual **open draft PR** after independent GitHub head SHA / repository / branch / draft checks.
-6. Owner can request verification of two required GitHub workflows against the **exact** PR head SHA: \`AMS Reconciliation CI\` and \`Secret scan\`. Both must be successfully completed. A failure or unavailable GitHub API fails closed.
-7. There is **no merge, production deployment, live-write, payment, public publication, permission/credential update, or Android release API** in this pipeline. Those require the existing separately approved release controls and post-release evidence. \`checks_passed\` is not \`deployed\`.
+3. On the same guarded cron, inspect recent **main-branch** GitHub Actions for allowlisted genuine completed failures (not cancelled/idle). Validate exact own-repo run URL, SHA, date and attempt; ignore stale signals and store no arbitrary third-party instructions. GitHub API or Redis errors flag a failed source check without pretending there are zero defects.
+4. Normalize source, timestamp, fingerprint, severity, probable impact, confidence, estimated cost, and policy. Reject stale/future events; deduplicate repeated observations; retain up to 250 indexed findings for 90 days.
+5. Classify signals as **observed**, not verified defects. Billing, core infrastructure and Play release signals are escalation-only. Other backend events are candidates for an *isolated draft investigation*; a source observation is never code proof.
+6. Owner-only, trusted-origin \`/api/internal/maintenance\` accepts external research as **unverified**, or attaches an actual **open draft PR** after independent GitHub head SHA / repository / branch / draft checks.
+7. Owner can request verification of two required GitHub workflows against the **exact** PR head SHA: \`AMS Reconciliation CI\` and \`Secret scan\`. Both must be successfully completed. A failure or unavailable GitHub API fails closed.
+8. There is **no merge, production deployment, live-write, payment, public publication, permission/credential update, or Android release API** in this pipeline. Those require the existing separately approved release controls and post-release evidence. \`checks_passed\` is not \`deployed\`.
 
 ## Controls
 
@@ -72,3 +73,7 @@ No action can approve or deploy production.
 - Production Redis coverage and actual cron freshness remain to be verified with authorized production access. Preview records do not prove production status.
 - This bounded state store records observation and checked draft PR only. Post-release promotion/recovery is future separately gated work. A read-only internal-admin queue is available at `/dashboard/maintenance`.
 - A source claiming capability, price, or a fix does not justify adopting it without reproducible API/license/cost and security evidence.
+
+## GitHub source acceptance boundary
+
+The GitHub workflow source performs a read-only, 24-hour lookback for completed failed or timed-out `Secret scan`, `Twitch Short Render Worker`, and `Twitch VOD Catch-up Worker` runs on `main`. It does not infer a code defect from a failure, never retries publishing/payment/creators, and cannot open a Draft PR itself. A failed or rate-limited GitHub API is reported as `githubMonitoring.failed: true` on the cron response and must not be treated as no incidents. Automatic patch creation remains delegated to an authorized separately connected GitHub execution task, followed by independent CI/PR proof. Production ingestion remains OFF pending release authorization and correct production Redis verification.

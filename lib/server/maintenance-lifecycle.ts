@@ -142,7 +142,7 @@ export function normalizeMaintenanceInput(
     throw new Error("MAINTENANCE_INVALID_COST")
   }
   const policy = input.origin === "backend" &&
-    !["revenue-fulfillment", "android-play", "core-health"].includes(area) ? "draft_only" : "escalate"
+    !["revenue-fulfillment", "android-play", "core-health", "github-security", "github-operations"].includes(area) ? "draft_only" : "escalate"
   const createdAt = now.toISOString()
   // Stable across repeats and re-emitted monitor events, with no private data in the key.
   const id = hash([input.origin, input.category, area, fingerprint, input.severity].join("\u0000")).slice(0, 40)

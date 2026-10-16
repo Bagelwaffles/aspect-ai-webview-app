@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { ingestBackendMonitorEvents } from "@/lib/server/maintenance-lifecycle"
+import { ingestGithubActionFailures } from "@/lib/server/maintenance-github-source"
 
 import {
   authorizeMonitoringCron,
@@ -31,6 +32,16 @@ export async function GET(request: NextRequest) {
       maintenance.failed = true
     }
   }
+  let githubMonitoring = { enabled: maintenanceEnabled, seen: 0, ingested: 0, duplicates: 0, failed: false }
+  if (maintenanceEnabled) {
+    try {
+      const outcome = await ingestGithubActionFailures()
+      githubMonitoring = { enabled: true, ...outcome, failed: false }
+    } catch {
+      // GitHub API or Redis outage is never interpreted as "no findings".
+      githubMonitoring.failed = true
+    }
+  }
   return NextResponse.json(
     {
       ok: true,
@@ -40,6 +51,7 @@ export async function GET(request: NextRequest) {
       newEvents: snapshot.newEvents.length,
       alertDelivery: snapshot.alertDelivery,
       maintenance,
+      githubMonitoring,
       customerFacing: false,
     },
     { headers: { "Cache-Control": "no-store" } },
