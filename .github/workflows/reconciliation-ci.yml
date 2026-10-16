@@ -89,6 +89,12 @@ jobs:
       - name: Application tests
         run: pnpm test
 
+      - name: Maintenance isolated Redis integration
+        env:
+          UPSTASH_REDIS_REST_URL: http://127.0.0.1:8079
+          UPSTASH_REDIS_REST_TOKEN: ci-only-redis-rest-token
+        run: pnpm exec tsx scripts/ops/probe-maintenance-redis.ts
+
       - name: Production build
         run: pnpm run build
 
