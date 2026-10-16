@@ -155,6 +155,7 @@ jobs:
           done
 
           node -e 'const value=require("/tmp/health.json"); if(value.ok!==true||value.status!=="ready"||value.persistence?.redis?.status!=="ready") process.exit(1)'
+          AMS_SCHEDULED_TASK_REDIS_TEST=true node --import tsx --test tests/scheduled-task-engine.redis.test.ts
           test "$(curl --silent --output /tmp/agents.json --write-out '%{http_code}' http://127.0.0.1:3000/api/agents)" = "401"
           node -e 'const value=require("/tmp/agents.json"); if(value.code!=="INTERNAL_API_AUTH_REQUIRED") process.exit(1)'
           test "$(curl --silent --output /tmp/deployments.json --write-out '%{http_code}' http://127.0.0.1:3000/api/deployments)" = "401"
