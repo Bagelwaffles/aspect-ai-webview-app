@@ -204,6 +204,20 @@ export async function recordMaintenanceFinding(
   }
   const existing = parsed(await redis.get<unknown>(key(finding.id)))
   if (!existing) throw new Error("MAINTENANCE_FINDING_CONFLICT")
+  // Redis can persist the NX record and then fail before updating the index.
+  // A replay must repair that orphan; otherwise the finding remains invisible
+  // for its full 90-day retention even though every retry reports a duplicate.
+  // Restrict repair to recent events so historical/evicted findings stay evicted.
+  const observedAt = Date.parse(existing.sourceObservedAt)
+  const nowMs = (options.now ?? new Date()).getTime()
+  if (Number.isFinite(observedAt) && observedAt <= nowMs + 5 * 60_000 &&
+      nowMs - observedAt <= MAX_AGE_MS) {
+    const indexed = await redis.lrange<string>(INDEX, 0, MAX_FINDINGS - 1)
+    if (!indexed.includes(existing.id)) {
+      await redis.lpush(INDEX, existing.id)
+      await redis.ltrim(INDEX, 0, MAX_FINDINGS - 1)
+    }
+  }
   return { finding: existing, new: false }
 }
 
