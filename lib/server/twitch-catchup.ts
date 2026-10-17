@@ -208,7 +208,8 @@ export async function claimTwitchVod(options: Options = {}) {
     if (!await redis.set(prefix + job.vodId + ":lock", lease, { nx: true, ex: 6 * 3600 })) continue
     const current = await read<TwitchVodJob>(redis, prefix + job.vodId)
     if (!current || !["pending", "rendering", "blocked"].includes(current.status) && !(current.status === "failed" && current.errorCode === "YOUTUBE_CONNECTION_VAULT_UNAVAILABLE" && !current.youtubeVideoId)) continue
-    return save({ ...current, status: "rendering", lease, errorCode: null }, redis)
+    return save({ ...current, status: "rendering", lease, errorCode: null,
+      metadata: vodMetadata({ id: current.vodId, title: current.title, createdAt: current.createdAt }) }, redis)
   }
   return null
 }
