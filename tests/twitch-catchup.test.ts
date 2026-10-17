@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { startTwitchCatchup, claimTwitchVod, completeTwitchVod, beginTwitchVodUpload, getTwitchCatchupStatus, publishVerifiedTwitchVods, retryRemovedTwitchVod, retryCancelledTwitchVod, validateYouTubeSessionUrl, vodMetadata } from "../lib/server/twitch-catchup"
+import { startTwitchCatchup, claimTwitchVod, completeTwitchVod, beginTwitchVodUpload, getTwitchCatchupStatus, publishVerifiedTwitchVods, retryRemovedTwitchVod, retryCancelledTwitchVod, validateYouTubeSessionUrl, vodMetadata, retryRejectedTwitchVod } from "../lib/server/twitch-catchup"
 
 function store() {
   const data = new Map<string, unknown>()
@@ -260,4 +260,47 @@ test("production upload initiation resolves the configured Redis vault when no s
     })
     assert.match(result.uploadUrl, /upload_id=test/)
   } finally { globalThis.fetch = originalFetch }
+})
+
+
+test("explicit session rejection records only a machine reason; server failures remain fenced", async () => {
+  for (const httpStatus of [400, 500]) {
+    const options = await publisher()
+    const key = "ams:twitch-catchup:v1:vod:123"
+    const initial = JSON.parse(options.data.get(key) as string)
+    options.data.set(key, JSON.stringify({ ...initial, status: "pending", youtubeVideoId: null }))
+    const claimed = (await claimTwitchVod(options))!
+    const fetcher: typeof fetch = async (input, init) => String(input).includes("/upload/")
+      ? Response.json({ error: { errors: [{ reason: "invalidTitle" }] } }, { status: httpStatus })
+      : options.fetcher(input, init)
+    await assert.rejects(beginTwitchVodUpload({ vodId: "123", lease: claimed.lease!, bytes: 1234 }, { ...options, fetcher }), new RegExp(`INIT_HTTP_${httpStatus}`))
+    const job = (await getTwitchCatchupStatus(options)).jobs[0]
+    assert.equal(job.status, httpStatus === 400 ? "failed" : "uploading")
+    assert.equal(job.uploadErrorReason, httpStatus === 400 ? "invalidTitle" : undefined)
+    assert.equal(options.data.has(key + ":lock"), httpStatus !== 400)
+  }
+})
+test("rejected-init recovery rejects active locks, missing sources and ambiguous outcomes", async () => {
+  const options = await publisher()
+  options.allowLong()
+  const key = "ams:twitch-catchup:v1:vod:123"
+  const original = JSON.parse(options.data.get(key) as string)
+  const rejected = { ...original, status: "reconciliation", youtubeVideoId: null, errorCode: "YOUTUBE_VOD_INIT_HTTP_400" }
+  options.data.set(key, JSON.stringify(rejected))
+  const getArchive = async () => ({ vods: [{ id: "123" }] }) as never
+  await assert.rejects(retryRejectedTwitchVod({ vodId: "123", approved: false }, { ...options, getArchive }), /APPROVAL_REQUIRED/)
+  options.data.set(key + ":lock", "active")
+  await assert.rejects(retryRejectedTwitchVod({ vodId: "123", approved: true }, { ...options, getArchive }), /BUSY/)
+  options.data.delete(key + ":lock")
+  await assert.rejects(retryRejectedTwitchVod({ vodId: "123", approved: true }, { ...options, getArchive: async () => ({ vods: [] }) as never }), /SOURCE_UNAVAILABLE/)
+  for (const errorCode of ["NETWORK_FAILED", "YOUTUBE_VOD_INIT_HTTP_500", "YOUTUBE_VOD_SESSION_MISSING"]) {
+    options.data.set(key, JSON.stringify({ ...rejected, errorCode }))
+    await assert.rejects(retryRejectedTwitchVod({ vodId: "123", approved: true }, { ...options, getArchive }), /REJECTED_RETRY_NOT_ALLOWED/)
+  }
+  options.data.set(key, JSON.stringify({ ...rejected, youtubeVideoId: "abcdefghijk" }))
+  await assert.rejects(retryRejectedTwitchVod({ vodId: "123", approved: true }, { ...options, getArchive }), /REJECTED_RETRY_NOT_ALLOWED/)
+  options.data.set(key, JSON.stringify(rejected))
+  await retryRejectedTwitchVod({ vodId: "123", approved: true }, { ...options, getArchive })
+  assert.equal((await getTwitchCatchupStatus(options)).jobs[0].status, "pending")
+  assert.equal(options.updates(), 0)
 })

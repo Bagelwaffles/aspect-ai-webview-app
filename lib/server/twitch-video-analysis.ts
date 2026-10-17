@@ -120,8 +120,9 @@ export function buildTwitchPublishMetadata(input: {
   const evidence = input.evidence
   const observedLead = evidence.observedMoments[0] || evidence.hook
   const titleBase = truncate(observedLead || evidence.hook || "Gameplay highlight", 105)
-  const canonicalTitle = truncate(`${titleBase} | ${creator}`, 140)
-  const youtubeTitle = truncate(canonicalTitle, 100)
+  const suffix = ` | ${creator}`
+  const canonicalTitle = `${truncate(titleBase, 140 - suffix.length)}${suffix}`
+  const youtubeTitle = `${truncate(titleBase, 100 - suffix.length)}${suffix}`
   const description = truncate(
     `${evidence.caption}\n\nActual Twitch footage from ${creator}. ${evidence.evidenceBoundary}`,
     5000,
@@ -175,7 +176,7 @@ export function buildTwitchPublishMetadata(input: {
     hashtags,
     keywords,
     categoryLabel: "Gaming",
-    twitchClipTitle: truncate(canonicalTitle, 100),
+    twitchClipTitle: youtubeTitle,
     youtube: {
       title: youtubeTitle,
       description,

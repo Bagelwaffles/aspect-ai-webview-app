@@ -8,6 +8,7 @@ import {
   listLatestTwitchShortRenderJobs,
 } from "@/lib/server/twitch-short-render-jobs"
 import { getTwitchPilotStatus } from "@/lib/server/twitch-pilot"
+import { getYouTubePublicPromotionRecord, isYouTubePublicAutopublishEnabled } from "@/lib/server/youtube-public-promoter"
 import { getYouTubePrivateUploadRecord } from "@/lib/server/youtube-private-uploader"
 
 export const runtime = "nodejs"
@@ -36,10 +37,13 @@ export async function GET(request: NextRequest) {
       twitch.connection?.scopes,
     )
     const shortRenderJobsWithUploads = await Promise.all(
-      shortRenderJobs.map(async (job) => ({
-        ...job,
-        youtubeUpload: await getYouTubePrivateUploadRecord(job.jobId),
-      })),
+      shortRenderJobs.map(async (job) => {
+        const [youtubeUpload, publicPromotion] = await Promise.all([
+          getYouTubePrivateUploadRecord(job.jobId),
+          getYouTubePublicPromotionRecord(job.jobId),
+        ])
+        return { ...job, youtubeUpload, publicPromotion }
+      }),
     )
     return json({
       ok: true,
@@ -48,6 +52,7 @@ export async function GET(request: NextRequest) {
       mediaFactory: currentMediaFactory,
       shortRenderer: {
         configured: isTwitchShortRenderConfigured(),
+        publicAutopublishEnabled: isYouTubePublicAutopublishEnabled(),
         jobs: shortRenderJobsWithUploads,
       },
     })
