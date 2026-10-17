@@ -13,6 +13,7 @@ import {
   normalizeMaintenanceInput,
   recordDraftPr,
   recordMaintenanceFinding,
+  replayableBackendMonitorEvents,
 } from "../lib/server/maintenance-lifecycle"
 import {
   verifyMaintenanceChecks,
@@ -96,7 +97,11 @@ test("a partial Redis index write is recovered on replay without duplicate findi
     /SIMULATED_REDIS_INDEX_OUTAGE/u,
   )
   assert.deepEqual(await listMaintenanceFindings(10, { redis }), [])
-  const second = await ingestBackendMonitorEvents([signal()], { redis, now })
+  // The next cron can recover this from the existing durable monitor event index,
+  // even if the monitor detects no new transition on its second run.
+  const replay = replayableBackendMonitorEvents([], [signal(), signal()], now)
+  assert.equal(replay.length, 1)
+  const second = await ingestBackendMonitorEvents(replay, { redis, now })
   assert.deepEqual(second, { ingested: 0, duplicates: 1, ignored: 0 })
   const findings = await listMaintenanceFindings(10, { redis })
   assert.equal(findings.length, 1)
@@ -105,6 +110,23 @@ test("a partial Redis index write is recovered on replay without duplicate findi
   const third = await ingestBackendMonitorEvents([signal()], { redis, now })
   assert.equal(third.duplicates, 1)
   assert.equal((await listMaintenanceFindings(10, { redis })).length, 1)
+})
+
+test("durable monitor replay excludes stale, future, recovered and repeated events", () => {
+  const chosen = replayableBackendMonitorEvents(
+    [signal()],
+    [
+      signal({ id: "newer-id" }),
+      signal({ createdAt: "2026-10-10T14:00:00.000Z", fingerprint: "stale" }),
+      signal({ createdAt: "2026-10-16T14:00:00.000Z", fingerprint: "future" }),
+      signal({ recovery: true, toStatus: "ok", fingerprint: "recovered" }),
+      signal({ toStatus: "critical", fingerprint: "new-critical" }),
+    ],
+    now,
+  )
+  assert.equal(chosen.length, 2)
+  assert.equal(chosen[0].fingerprint, signal().fingerprint)
+  assert.equal(chosen[1].fingerprint, "new-critical")
 })
 
 test("recovery is ignored and a billing failure escalates instead of proposing a blind repair", () => {

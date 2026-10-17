@@ -221,6 +221,31 @@ export async function recordMaintenanceFinding(
   return { finding: existing, new: false }
 }
 
+// Reuse the monitor's already-persisted event history after transient queue/index failures.
+// Bounded to a recent window and source fingerprint so retries remain safe and cheap.
+export function replayableBackendMonitorEvents(
+  newEvents: BackendMonitorEvent[],
+  history: BackendMonitorEvent[],
+  now = new Date(),
+): BackendMonitorEvent[] {
+  const seen = new Set<string>()
+  const out: BackendMonitorEvent[] = []
+  for (const event of [...newEvents, ...history]) {
+    if (!event || typeof event.createdAt !== "string" || typeof event.monitorKey !== "string" ||
+        typeof event.fingerprint !== "string" || !event.monitorKey || !event.fingerprint ||
+        event.recovery || (event.toStatus !== "warning" && event.toStatus !== "critical")) continue
+    const observed = Date.parse(event.createdAt)
+    if (!Number.isFinite(observed) || observed > now.getTime() + 5 * 60_000 ||
+        now.getTime() - observed > MAX_AGE_MS) continue
+    const fingerprint = [event.monitorKey, event.fingerprint, event.toStatus].join("\\u0000")
+    if (seen.has(fingerprint)) continue
+    seen.add(fingerprint)
+    out.push(event)
+    if (out.length === 100) break
+  }
+  return out
+}
+
 export async function ingestBackendMonitorEvents(
   events: BackendMonitorEvent[],
   options: MaintenanceOptions = {},
