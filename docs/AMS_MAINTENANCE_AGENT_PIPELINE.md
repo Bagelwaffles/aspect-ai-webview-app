@@ -77,3 +77,7 @@ No action can approve or deploy production.
 ## GitHub source acceptance boundary
 
 The GitHub workflow source performs a read-only, 24-hour lookback for completed failed or timed-out `Secret scan`, `Twitch Short Render Worker`, and `Twitch VOD Catch-up Worker` runs on `main`. It does not infer a code defect from a failure, never retries publishing/payment/creators, and cannot open a Draft PR itself. A failed or rate-limited GitHub API is reported as `githubMonitoring.failed: true` on the cron response and must not be treated as no incidents. Automatic patch creation remains delegated to an authorized separately connected GitHub execution task, followed by independent CI/PR proof. Production ingestion remains OFF pending release authorization and correct production Redis verification.
+
+## Repair-queue partial-write recovery
+
+A live Redis command can succeed for the finding record and fail before its separate list index is updated. This is an operationally meaningful partial-write failure, not a simulated GitHub incident. On a deduplicated recent-event replay, the pipeline now checks for a missing index entry and safely restores it; long-expired or evicted historical findings are not reintroduced. Isolated tests simulate the index failure and verify recovery, idempotent rereads, and no false code execution. The queue still needs a genuinely owner-authenticated live Preview finding/replay test before an autonomous-release claim.
