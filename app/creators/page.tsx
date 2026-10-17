@@ -18,23 +18,23 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export const metadata: Metadata = {
-  title: "AMS Creator OS | Streaming & Gaming Operations Platform",
+  title: "AMS Creator Autopilot Pilot | Branded Twitch Clips & VODs",
   description:
-    "Explore the AMS Creator OS roadmap for stream planning, clip operations, gaming intelligence, analytics, publishing, community, collaboration, monetization, safety, and professional creator workflows. The Streamer Agent remains a controlled pilot until its customer execution path is verified end to end.",
+    "Explore the controlled AMS Creator Autopilot pilot for branded Twitch clips and VODs, verified YouTube-ready uploads, and approval-first channel operations. Multi-creator self-service remains unverified.",
   alternates: {
     canonical: "https://www.aspectmarketingsolutions.app/creators",
   },
   openGraph: {
-    title: "AMS Creator OS | Streaming & Gaming Operations Platform",
+    title: "AMS Creator Autopilot Pilot | Branded Twitch Clips & VODs",
     description:
-      "A professional creator operating system for planning streams, finding clips, packaging content, learning from performance, and coordinating the systems behind a growing gaming channel.",
+      "From authorized Twitch streams to branded clips and VODs: a controlled creator pilot with private-first YouTube verification and clear operational status.",
     url: "https://www.aspectmarketingsolutions.app/creators",
     siteName: "Aspect Marketing Solutions",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "AMS Creator OS | Streaming & Gaming Operations Platform",
+    title: "AMS Creator Autopilot Pilot | Branded Twitch Clips & VODs",
     description:
       "A professional creator operating system for streaming, clips, analytics, publishing, community, collaborations, monetization, and creator safety.",
   },
@@ -102,7 +102,7 @@ const creatorModules: CreatorModule[] = [
       "Uploaded clip review for hook, action, reaction, humor, payoff, and replay value",
       "Moment ranking, timestamp notes, clip naming, and best-of vault decisions",
       "Vertical-short concepts, opening hooks, titles, captions, and series packaging",
-      "Direct Twitch/YouTube VOD ingestion and automated moment detection remain roadmap work",
+      "Owner-scoped Twitch VOD discovery and bounded clip selection exist; customer self-service is not verified",
     ],
   },
   {
@@ -237,17 +237,17 @@ export default function CreatorsPage() {
           <div className="space-y-6">
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">AMS Creator OS</Badge>
-              <Badge variant="outline">Gaming first</Badge>
+              <Badge variant="outline">Twitch-to-YouTube pilot</Badge>
               <Badge variant="outline">Controlled pilot</Badge>
             </div>
 
             <div className="space-y-4">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Streaming + gaming operations platform</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Stream → Branded Shorts &amp; VODs → Verified uploads</p>
               <h1 className="max-w-5xl text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl">
-                Run the channel like a <span className="text-primary">creator business</span> without killing the fun.
+                Turn a stream into <span className="text-primary">branded clips and VODs</span>.
               </h1>
               <p className="max-w-3xl text-lg leading-8 text-muted-foreground">
-                AMS Creator OS is the professional operating layer behind a streamer: planning, gaming intelligence, VOD and clip operations, editing, publishing, analytics, community, collaborations, monetization, production tech, safety, and the infrastructure required to make those systems reliable.
+                AMS Creator Autopilot is being tested on one owner-authorized Twitch and YouTube channel: selecting moments, preparing Shorts and branded VODs, generating metadata and thumbnails, and verifying private-first uploads. Unattended post-live results, multi-creator onboarding, and general availability still require proof.
               </p>
             </div>
 
@@ -263,16 +263,16 @@ export default function CreatorsPage() {
 
           <Card className="border-primary/25 bg-primary/5 shadow-xl">
             <CardHeader>
-              <CardDescription>Commercial boundary</CardDescription>
-              <CardTitle className="text-3xl sm:text-4xl">Build the full platform. Sell only proven execution.</CardTitle>
+              <CardDescription>Current pilot boundaries</CardDescription>
+              <CardTitle className="text-3xl sm:text-4xl">Real streaming workflows. Verified evidence. No empty promises.</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5 text-sm leading-6 text-muted-foreground">
               <p>
-                The Creator OS roadmap is intentionally broader than what is customer-executable today. Every module below is labeled Pilot, Integration required, or Roadmap so a future buyer can see the difference between a tested workflow and a planned capability.
+                The existing SmokyBanana03 integration is our internal proving ground, not a self-service product. AMS is validating automatic post-live execution, exact-channel safeguards, publishing receipts, and recoverable failures before expanding access. Modules below still distinguish Pilot, Integration required, and Roadmap.
               </p>
               <div className="border-t border-border/70 pt-5">
                 <p className="font-semibold text-foreground">Current objective</p>
-                <p className="mt-2">Prove intake, planning, clip operations, real analytics, persistence, approvals, and creator-safe integrations before attaching a paid Creator subscription or automatic publishing promise.</p>
+                <p className="mt-2">Apply for a controlled pilot; no paid subscription is created. Customer-channel connections and automatic public posting require separately verified authorization, isolation, and production safeguards.</p>
               </div>
             </CardContent>
           </Card>
