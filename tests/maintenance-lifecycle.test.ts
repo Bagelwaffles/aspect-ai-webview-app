@@ -79,6 +79,34 @@ test("backend signal is deduplicated and remains an observation, never an execut
   assert.equal(findings[0].confidence, "monitor_signal")
 })
 
+test("a partial Redis index write is recovered on replay without duplicate findings", async () => {
+  class OneTimeIndexFailure extends FakeRedis {
+    private failOnce = true
+    override async lpush(key: string, ...values: string[]) {
+      if (this.failOnce) {
+        this.failOnce = false
+        throw new Error("SIMULATED_REDIS_INDEX_OUTAGE")
+      }
+      return super.lpush(key, ...values)
+    }
+  }
+  const redis = new OneTimeIndexFailure()
+  await assert.rejects(
+    ingestBackendMonitorEvents([signal()], { redis, now }),
+    /SIMULATED_REDIS_INDEX_OUTAGE/u,
+  )
+  assert.deepEqual(await listMaintenanceFindings(10, { redis }), [])
+  const second = await ingestBackendMonitorEvents([signal()], { redis, now })
+  assert.deepEqual(second, { ingested: 0, duplicates: 1, ignored: 0 })
+  const findings = await listMaintenanceFindings(10, { redis })
+  assert.equal(findings.length, 1)
+  assert.equal(findings[0].sourceFingerprint, signal().fingerprint)
+  assert.equal(findings[0].state, "observed")
+  const third = await ingestBackendMonitorEvents([signal()], { redis, now })
+  assert.equal(third.duplicates, 1)
+  assert.equal((await listMaintenanceFindings(10, { redis })).length, 1)
+})
+
 test("recovery is ignored and a billing failure escalates instead of proposing a blind repair", () => {
   assert.equal(fromBackendMonitorEvent(signal({ recovery: true, toStatus: "ok" }), now), null)
   const sensitive = fromBackendMonitorEvent(signal({ monitorKey: "revenue-fulfillment" }), now)
