@@ -34,6 +34,7 @@ export async function GET() {
       service: "ams-web",
       environment,
       commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? "unknown",
+      runtime: environment === "preview" ? { node: process.version } : undefined,
       persistence: {
         redis: {
           required: true,

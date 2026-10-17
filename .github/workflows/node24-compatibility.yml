@@ -1,0 +1,38 @@
+name: Node 24 Compatibility
+
+on:
+  pull_request:
+    paths:
+      - package.json
+      - .nvmrc
+      - tools/vercel-browser-worker/package.json
+      - tools/vercel-browser-worker/api/runtime.js
+      - deploy/web.Dockerfile
+      - .github/workflows/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vercel-affected-project-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Confirm CI Node runtime
+        run: node -p process.version
+
+      - name: Run Vercel affected-project check
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          test -n "$VERCEL_TOKEN"
+          npx --yes vercel@latest project ls --update-required \
+            --scope=kimberleyaversbiz-4131s-projects \
+            --token="$VERCEL_TOKEN"

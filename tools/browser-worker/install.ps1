@@ -16,13 +16,13 @@ Write-Host "AMS Browser Worker installer" -ForegroundColor Cyan
 Write-Host "Control plane: $ControlUrl"
 
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-  throw "Node.js is required. Install Node.js 20 or newer, then run this installer again."
+  throw "Node.js is required. Install Node.js 24 or newer, then run this installer again."
 }
 
 $NodeVersion = (& node -p "process.versions.node").Trim()
 $NodeMajor = [int]($NodeVersion.Split('.')[0])
-if ($NodeMajor -lt 20) {
-  throw "Node.js 20 or newer is required. Found $NodeVersion."
+if ($NodeMajor -lt 24) {
+  throw "Node.js 24 or newer is required. Found $NodeVersion."
 }
 
 Set-Location $WorkerRoot
