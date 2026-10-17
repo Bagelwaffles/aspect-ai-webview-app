@@ -51,10 +51,16 @@ test("automatic discovery queues newly completed VODs once, excludes a live reco
 })
 test("full VOD metadata identifies the streamer, recording date, source and AMS", () => {
   const metadata = vodMetadata({ id: "123", title: "x".repeat(1000), createdAt: "2026-10-03T20:00:00.000Z" })
-  assert.ok(metadata.title.startsWith("SmokyBanana03 | 2026-10-03 | Full Stream"))
+  assert.ok(metadata.title.startsWith("xxx"))
+  assert.ok(metadata.title.endsWith(" | SmokyBanana03 | 2026-10-03"))
   assert.equal(metadata.title.length, 100)
   assert.ok(metadata.description.includes("Created by Aspect Marketing Solutions (AMS)"))
   assert.ok(metadata.description.includes("https://www.twitch.tv/videos/123"))
+})
+test("VOD title leads with content, preserves identity when truncated and handles blank titles", () => {
+  const vod = { id: "123", title: "  Late night   Call of Duty  ", createdAt: "2026-10-17T20:00:00.000Z" }
+  assert.equal(vodMetadata(vod).title, "Late night Call of Duty | SmokyBanana03 | 2026-10-17")
+  assert.equal(vodMetadata({ ...vod, title: "   " }).title, "Gaming stream | SmokyBanana03 | 2026-10-17")
 })
 test("upload session URL is constrained to Google's YouTube upload endpoint", () => {
   const valid = "https://www.googleapis.com/upload/youtube/v3/videos?upload_id=test"

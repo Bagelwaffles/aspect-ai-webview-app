@@ -35,7 +35,7 @@ def wrap_overlay_text(text: str, *, width: int, max_lines: int) -> str:
 
 def write_ass(path: Path, hook: str, caption: str) -> None:
     hook = wrap_overlay_text(hook[:180], width=28, max_lines=3)
-    caption = wrap_overlay_text(caption[:500], width=42, max_lines=3)
+    caption = wrap_overlay_text(caption[:180], width=28, max_lines=2)
     content = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -45,7 +45,7 @@ WrapStyle: 2
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Hook,DejaVu Sans,62,&H00FFFFFF,&H00FFFFFF,&H00000000,&H90000000,-1,0,0,0,100,100,0,0,3,4,0,8,96,96,190,1
-Style: Caption,DejaVu Sans,38,&H00FFFFFF,&H00FFFFFF,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,3,3,0,2,96,96,220,1
+Style: Caption,DejaVu Sans,52,&H00FFFFFF,&H00FFFFFF,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,3,3,0,2,96,180,360,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

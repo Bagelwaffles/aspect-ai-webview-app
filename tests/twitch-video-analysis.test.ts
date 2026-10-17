@@ -108,8 +108,8 @@ test("Twitch publish metadata is built from verified video evidence without anot
   })
 
   assert.match(metadata.title, /escapes pressure/i)
-  assert.ok(metadata.title.startsWith("SmokyBanana03 | "))
-  assert.ok(metadata.youtube.title.startsWith("SmokyBanana03 | "))
+  assert.ok(metadata.title.endsWith(" | SmokyBanana03"))
+  assert.ok(metadata.youtube.title.startsWith("Player escapes pressure"))
   assert.equal(metadata.youtube.title.length <= 100, true)
   assert.equal(metadata.tags.length >= 3, true)
   assert.equal(metadata.hashtags.length >= 3, true)

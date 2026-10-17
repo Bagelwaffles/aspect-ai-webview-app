@@ -51,8 +51,12 @@ async function save(job: TwitchVodJob & { stalled?: boolean; staleForSeconds?: n
 }
 export function vodMetadata(vod: Pick<TwitchRecentVod, "id" | "title" | "createdAt">) {
   const date = vod.createdAt.slice(0, 10)
+  const sourceTitle = vod.title.replace(/\s+/g, " ").trim() || "Gaming stream"
+  const suffix = ` | SmokyBanana03 | ${date}`
+  const available = 100 - suffix.length
+  const lead = sourceTitle.length > available ? sourceTitle.slice(0, available - 1).trimEnd() + "…" : sourceTitle
   return {
-    title: `SmokyBanana03 | ${date} | Full Stream | ${vod.title}`.slice(0, 100),
+    title: `${lead}${suffix}`,
     description: `Full Twitch stream from SmokyBanana03, recorded ${date}.\n\n${vod.title.slice(0, 1000)}\n\nStreamer: SmokyBanana03\nSource: https://www.twitch.tv/videos/${vod.id}\nFollow: https://www.twitch.tv/smokybanana03\n\nCreated by Aspect Marketing Solutions (AMS)\nhttps://www.aspectmarketingsolutions.app\n\nIncludes a 5-second introduction and a 7-second outro. Original stream footage is preserved.\n#SmokyBanana03 #TwitchVOD #Gaming`,
   }
 }
