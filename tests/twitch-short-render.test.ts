@@ -107,7 +107,7 @@ test("render job schema keeps drafts private and bounded", () => {
 test("renderer wraps overlay copy inside vertical-video safe margins", () => {
   const renderer = readFileSync("scripts/render_twitch_short.py", "utf8")
   assert.match(renderer, /width=28, max_lines=3/)
-  assert.match(renderer, /width=42, max_lines=3/)
+  assert.match(renderer, /width=28, max_lines=2/)
   assert.match(renderer, /Style: Hook[^\n]*,96,96,190,1/)
-  assert.match(renderer, /Style: Caption[^\n]*,96,96,220,1/)
+  assert.match(renderer, /Style: Caption[^\n]*,96,180,360,1/)
 })

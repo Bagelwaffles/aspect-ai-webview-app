@@ -108,8 +108,8 @@ test("Twitch publish metadata is built from verified video evidence without anot
   })
 
   assert.match(metadata.title, /escapes pressure/i)
-  assert.ok(metadata.title.startsWith("SmokyBanana03 | "))
-  assert.ok(metadata.youtube.title.startsWith("SmokyBanana03 | "))
+  assert.ok(metadata.title.endsWith(" | SmokyBanana03"))
+  assert.ok(metadata.youtube.title.startsWith("Player escapes pressure"))
   assert.equal(metadata.youtube.title.length <= 100, true)
   assert.equal(metadata.tags.length >= 3, true)
   assert.equal(metadata.hashtags.length >= 3, true)
@@ -132,4 +132,18 @@ test("Twitch creator copy replaces generic streamer wording with the channel nam
     ),
     "Watch SmokyBanana03’s epic reaction after securing multiple eliminations.",
   )
+})
+
+
+test("long content-first headlines retain complete creator branding on each platform", () => {
+  const evidence = parseTwitchVideoEvidenceText(JSON.stringify({
+    score: 80, recommendation: "render", reason: "Visible action", observedMoments: ["A".repeat(240)],
+    hook: "Action", caption: "Action", evidenceBoundary: "Visible footage only",
+  }))
+  const metadata = buildTwitchPublishMetadata({ creatorName: "SmokyBanana03", sourceTitle: "Source", evidence })
+  for (const title of [metadata.title, metadata.youtube.title, metadata.twitchClipTitle]) {
+    assert.ok(title.endsWith(" | SmokyBanana03"))
+  }
+  assert.ok(metadata.youtube.title.length <= 100)
+  assert.ok(metadata.twitchClipTitle.length <= 100)
 })

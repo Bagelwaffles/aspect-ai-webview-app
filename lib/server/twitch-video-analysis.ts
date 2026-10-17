@@ -120,8 +120,9 @@ export function buildTwitchPublishMetadata(input: {
   const evidence = input.evidence
   const observedLead = evidence.observedMoments[0] || evidence.hook
   const titleBase = truncate(observedLead || evidence.hook || "Gameplay highlight", 105)
-  const canonicalTitle = truncate(`${creator} | ${titleBase}`, 140)
-  const youtubeTitle = truncate(canonicalTitle, 100)
+  const suffix = ` | ${creator}`
+  const canonicalTitle = `${truncate(titleBase, 140 - suffix.length)}${suffix}`
+  const youtubeTitle = `${truncate(titleBase, 100 - suffix.length)}${suffix}`
   const description = truncate(
     `${evidence.caption}\n\nActual Twitch footage from ${creator}. ${evidence.evidenceBoundary}`,
     5000,
@@ -175,7 +176,7 @@ export function buildTwitchPublishMetadata(input: {
     hashtags,
     keywords,
     categoryLabel: "Gaming",
-    twitchClipTitle: truncate(canonicalTitle, 100),
+    twitchClipTitle: youtubeTitle,
     youtube: {
       title: youtubeTitle,
       description,
@@ -248,6 +249,8 @@ async function requestVideoEvidence(input: {
     "observedMoments must contain 1-6 short statements describing only visible or audible evidence.",
     "bestStartSeconds/bestEndSeconds should identify the strongest window when useful, otherwise null.",
     "hook and caption must stay factual and grounded in the footage.",
+    "Write the hook as a concise, natural viewer-facing headline, at most 8 words. Lead with the specific visible action or tension; avoid generic labels such as intense combat or quick eliminations when a concrete detail is visible.",
+    "Write caption as one short sentence, at most 12 words. Do not repeat the hook. Do not copy sampling labels or technical analysis language into either field.",
     input.retry
       ? "Previous structured parsing failed. Keep this response especially short and syntactically valid JSON."
       : "Do not add any fields beyond those shown.",

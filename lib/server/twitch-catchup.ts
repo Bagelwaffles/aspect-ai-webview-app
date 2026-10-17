@@ -21,6 +21,7 @@ const jobSchema = z.object({
   status: z.enum(["pending", "rendering", "uploading", "verified", "published", "blocked", "failed", "reconciliation"]),
   lease: z.string().nullable(), youtubeVideoId: z.string().nullable(), errorCode: z.string().nullable(),
   previousYoutubeVideoIds: z.array(z.string()).max(10).optional(),
+  uploadErrorReason: z.string().regex(/^[A-Za-z0-9_]{1,80}$/).nullable().optional(),
   updatedAt: z.string().datetime().optional(),
   thumbnailStatus: z.enum(["pending", "uploaded", "failed"]).optional(),
   thumbnailUpdatedAt: z.string().datetime().optional(),
@@ -51,8 +52,12 @@ async function save(job: TwitchVodJob & { stalled?: boolean; staleForSeconds?: n
 }
 export function vodMetadata(vod: Pick<TwitchRecentVod, "id" | "title" | "createdAt">) {
   const date = vod.createdAt.slice(0, 10)
+  const sourceTitle = vod.title.replace(/\s+/g, " ").trim() || "Gaming stream"
+  const suffix = ` | SmokyBanana03 | ${date}`
+  const available = 100 - suffix.length
+  const lead = sourceTitle.length > available ? sourceTitle.slice(0, available - 1).trimEnd() + "…" : sourceTitle
   return {
-    title: `SmokyBanana03 | ${date} | Full Stream | ${vod.title}`.slice(0, 100),
+    title: `${lead}${suffix}`,
     description: `Full Twitch stream from SmokyBanana03, recorded ${date}.\n\n${vod.title.slice(0, 1000)}\n\nStreamer: SmokyBanana03\nSource: https://www.twitch.tv/videos/${vod.id}\nFollow: https://www.twitch.tv/smokybanana03\n\nCreated by Aspect Marketing Solutions (AMS)\nhttps://www.aspectmarketingsolutions.app\n\nIncludes a 5-second introduction and a 7-second outro. Original stream footage is preserved.\n#SmokyBanana03 #TwitchVOD #Gaming`,
   }
 }
@@ -203,7 +208,8 @@ export async function claimTwitchVod(options: Options = {}) {
     if (!await redis.set(prefix + job.vodId + ":lock", lease, { nx: true, ex: 6 * 3600 })) continue
     const current = await read<TwitchVodJob>(redis, prefix + job.vodId)
     if (!current || !["pending", "rendering", "blocked"].includes(current.status) && !(current.status === "failed" && current.errorCode === "YOUTUBE_CONNECTION_VAULT_UNAVAILABLE" && !current.youtubeVideoId)) continue
-    return save({ ...current, status: "rendering", lease, errorCode: null }, redis)
+    return save({ ...current, status: "rendering", lease, errorCode: null,
+      metadata: vodMetadata({ id: current.vodId, title: current.title, createdAt: current.createdAt }) }, redis)
   }
   return null
 }
@@ -291,7 +297,18 @@ export async function beginTwitchVodUpload(input: { vodId: string; lease: string
       status: { privacyStatus: "private", embeddable: true, selfDeclaredMadeForKids: false } }),
     signal: AbortSignal.timeout(20_000),
   })
-  if (!response.ok) throw new Error(`YOUTUBE_VOD_INIT_HTTP_${response.status}`)
+  if (!response.ok) {
+    if (response.status === 400) {
+      const body = await response.json().catch(() => null) as { error?: { errors?: Array<{ reason?: string }> } } | null
+      const reason = body?.error?.errors?.[0]?.reason
+      // An explicit 400 rejected session creation. No media has been sent and
+      // no resumable session was returned; preserve other failures as ambiguous.
+      await save({ ...job, status: "failed", lease: null, errorCode: "YOUTUBE_VOD_INIT_HTTP_400",
+        uploadErrorReason: reason && /^[A-Za-z0-9_]{1,80}$/.test(reason) ? reason : null }, redis)
+      await redis.del(prefix + job.vodId + ":lock")
+    }
+    throw new Error(`YOUTUBE_VOD_INIT_HTTP_${response.status}`)
+  }
   const location = response.headers.get("location")
   if (!location) throw new Error("YOUTUBE_VOD_SESSION_MISSING")
   // Session URL is returned solely to the authenticated, repository-pinned media worker, never owner UI.
@@ -412,4 +429,24 @@ export async function retryCancelledTwitchVod(input: { vodId: string; approved: 
   await save({ ...job, status: "pending", lease: null, errorCode: null }, redis)
   await redis.del(prefix + job.vodId + ":lock")
   return getTwitchCatchupStatus({ ...options, redis })
+}
+
+export async function retryRejectedTwitchVod(input: { vodId: string; approved: boolean }, options: Options = {}) {
+  if (!input.approved) throw new Error("TWITCH_CATCHUP_APPROVAL_REQUIRED")
+  const redis = db(options)
+  const recoveryLock = prefix + input.vodId + ":rejected-retry-lock"
+  if (!await redis.set(recoveryLock, "locked", { nx: true, ex: 120 })) throw new Error("TWITCH_CATCHUP_BUSY")
+  try {
+  const job = await read<TwitchVodJob>(redis, prefix + input.vodId)
+  if (!job || job.youtubeVideoId || !["failed", "reconciliation"].includes(job.status) ||
+    job.errorCode !== "YOUTUBE_VOD_INIT_HTTP_400") throw new Error("YOUTUBE_VOD_REJECTED_RETRY_NOT_ALLOWED")
+  if (await redis.get(prefix + job.vodId + ":lock")) throw new Error("TWITCH_CATCHUP_BUSY")
+  // Verify the authorized channel and current length eligibility before retry.
+  await youtubeToken({ ...options, redis }, false, job.durationSeconds + 12 > 900)
+  const archive = await (options.getArchive ?? getTwitchRecentArchive)(31 * 24, { ...options, redis: redis as never }, undefined, false)
+  if (!archive.vods.some(vod => vod.id === job.vodId)) throw new Error("TWITCH_VOD_SOURCE_UNAVAILABLE")
+  await save({ ...job, status: "pending", lease: null, errorCode: null, uploadErrorReason: null,
+    metadata: vodMetadata({ id: job.vodId, title: job.title, createdAt: job.createdAt }) }, redis)
+  return getTwitchCatchupStatus({ ...options, redis })
+  } finally { await redis.del(recoveryLock) }
 }

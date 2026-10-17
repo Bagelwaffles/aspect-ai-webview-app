@@ -6,7 +6,7 @@ type State = { plan: { clipCursor: number; clipVodIds: string[]; clipFailures?: 
   discovery: { checkedAt: string; newlyQueued: number; completedVodCount: number } | null;
   monitoring?: { worker: { lastScheduledSucceededAt: string | null; lastErrorCode: string | null } | null; scheduledStale: boolean; stalledVodIds: string[] };
   jobs: Array<{ vodId: string; createdAt: string; updatedAt?: string; title: string; status: string; youtubeVideoId: string | null;
-    errorCode: string | null; stalled?: boolean; staleForSeconds?: number; thumbnailStatus?: "pending" | "uploaded" | "failed";
+    errorCode: string | null; uploadErrorReason?: string | null; stalled?: boolean; staleForSeconds?: number; thumbnailStatus?: "pending" | "uploaded" | "failed";
     thumbnailErrorCode?: string | null }> }
 const jobStatusLabel = (status: string, stalled?: boolean) => stalled ? "Stalled — needs attention" : ({
   pending: "Queued", rendering: "Rendering", uploading: "Uploading to YouTube", verified: "YouTube verified",
@@ -37,6 +37,17 @@ export default function TwitchCatchupCard() {
       setState(body)
       setMessage("Catch-up queued. Available recordings are processed individually; successful uploads are linked below.")
     } catch { setMessage("Catch-up could not start. Refresh to check its status before retrying.") }
+    finally { setBusy(false) }
+  }
+  async function retryRejected(vodId: string) {
+    setBusy(true)
+    try {
+      const response = await fetch("/api/internal/twitch/catchup", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "retry-rejected", approved: true, vodId }) })
+      const body = await response.json()
+      if (response.ok) { setState(body); setMessage("Rejected upload requeued after source and channel checks.") }
+      else setMessage(body.code ?? "Could not requeue the rejected upload.")
+    } catch { setMessage("Refresh to check its status before retrying.") }
     finally { setBusy(false) }
   }
   async function retryCancelled(vodId: string) {
@@ -82,6 +93,8 @@ export default function TwitchCatchupCard() {
         {job.thumbnailStatus === "failed" && <p className="text-xs text-amber-600">Branded thumbnail needs attention{job.thumbnailErrorCode ? `: ${job.thumbnailErrorCode}` : "."}</p>}
         {job.status === "rendering" && <Button disabled={busy} variant="outline" onClick={() => void retryCancelled(job.vodId)}>Requeue confirmed cancelled renderer</Button>}
         {job.youtubeVideoId && ["YOUTUBE_VOD_PUBLIC_PROOF_FAILED", "YOUTUBE_VOD_REMOVED_OR_UNAVAILABLE"].includes(job.errorCode ?? "") && <Button disabled={busy} variant="outline" onClick={() => void retryRemoved(job)}>Requeue confirmed removed upload</Button>}
+        {!job.youtubeVideoId && ["failed", "reconciliation"].includes(job.status) && job.errorCode === "YOUTUBE_VOD_INIT_HTTP_400" && <Button disabled={busy} variant="outline" onClick={() => void retryRejected(job.vodId)}>Retry rejected upload</Button>}
+        {job.uploadErrorReason && <p className="text-amber-600">YouTube rejection: {job.uploadErrorReason}</p>}
         {job.errorCode && <p className="text-amber-600">{job.errorCode}</p>}
         {["verified", "published"].includes(job.status) && job.youtubeVideoId && <a className="underline" target="_blank" rel="noreferrer" href={`https://www.youtube.com/watch?v=${encodeURIComponent(job.youtubeVideoId)}`}>{job.status === "published" ? "View public full VOD" : "Review full VOD awaiting publication"}</a>}
       </div>)}</div>
