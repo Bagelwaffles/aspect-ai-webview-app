@@ -1,0 +1,18 @@
+name: AMS Provider Benchmark Fixture CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/provider-benchmark/**'
+      - '.github/workflows/provider-benchmark-ci.yml'
+permissions:
+  contents: read
+jobs:
+  fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test scripts/provider-benchmark/harness.test.mjs
