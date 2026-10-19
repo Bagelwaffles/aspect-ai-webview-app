@@ -310,6 +310,7 @@ export async function processQuickAuditCheckout(input: {
   evidenceCollector?: (url: string) => Promise<QuickAuditEvidence>
   expectedPriceId: string
   expectedLivemode: boolean
+  onFulfilled?: (record: { auditId: string; requestId: string; checkoutSessionId: string; recipient: string }) => Promise<void>
 }): Promise<QuickAuditProcessingResult> {
   const eventSession = input.event.data.object as Stripe.Checkout.Session
   if (eventSession.mode !== "payment") return { processed: false, applied: false, reason: "NON_PAYMENT_CHECKOUT_IGNORED" }
@@ -342,6 +343,13 @@ export async function processQuickAuditCheckout(input: {
       evidence: await (input.evidenceCollector ?? collectQuickAuditEvidence)(websiteUrl),
     })
     await input.store.complete({ status: "completed", checkoutSessionId: session.id, stripeEventId: input.event.id, requestId, n8nAuditId: result.auditId, completedAt: new Date().toISOString(), token: reservation.token })
+    // This runs only AFTER the native result and paid fulfillment record are durable.
+    // Outbox failures must not reverse a completed payment or cause a second fulfillment.
+    if (input.onFulfilled && session.customer_details?.email) {
+      await input.onFulfilled({auditId:result.auditId,requestId,checkoutSessionId:session.id,recipient:session.customer_details.email}).catch(() => {
+        console.warn("[QuickAudit] Delivery outbox unavailable; paid result retained")
+      })
+    }
     return { processed: true, applied: true, reason: "QUICK_AUDIT_COMPLETED", requestId, n8nAuditId: result.auditId }
   } catch (error) {
     await input.store.release({ checkoutSessionId: session.id, token: reservation.token }).catch(() => undefined)
