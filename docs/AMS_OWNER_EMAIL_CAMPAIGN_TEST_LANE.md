@@ -36,3 +36,8 @@ An owner-provided phone screen recording shows that Preview /login?next=/owner/c
 - This is AMS NextAuth login, not a Gmail monitoring grant/callback. No external OAuth redirect registration, successful Preview owner session or inbox receipt is yet confirmed.
 - Check the next Git-backed Preview deployment after branch variables apply, then complete exact owner browser login, owner campaign protected-route acceptance and isolated grant/storage checks.
 - Never expose or clone production/PR #262 Gmail grant secrets. Do not enable automatic replies, campaign sender flags, or a scheduled worker. Keep both PR #262 and PR #275 Draft/HOLD and leave all 27 tasks unchanged.
+
+
+## October 19 — preview-only unattended owner scheduler
+
+A separately gated bounded worker now exists at `POST /api/internal/owner-campaign-pilot/tick` (see `docs/AMS_OWNER_CAMPAIGN_AUTOSEND_PREVIEW.md`). It scans only the owner pilot namespace, sends approved due steps, verifies the exact recipient inbox before advancing and holds ambiguous sends. It is default OFF and not yet invoked by any active Cron/Actions schedule. The Preview authorization and exact receipt test must pass before any activation. Customer-facing mail remains disabled.
