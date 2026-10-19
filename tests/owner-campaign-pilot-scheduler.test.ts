@@ -110,3 +110,50 @@ test("scheduled route is disabled by default, rejects bad bearer, and does not t
   assert.equal((await POST(req("Bearer "+env.AMS_OWNER_CAMPAIGN_WORKER_SECRET))).status,404)
   assert.equal(called,0)
 })
+
+test("reviewed campaigns need a separate per-campaign autosend grant before the worker can act",async()=>{
+  const {createHash}=await import("node:crypto")
+  const {createOwnerCampaignPilot,changeOwnerCampaignPilot}=await import("../lib/server/owner-campaign-pilot")
+  const {authorizeOwnerPilotAutosend,tickOwnerCampaignPilot}=await import("../lib/server/owner-campaign-pilot-scheduler")
+  const now=Date.parse("2026-10-19T22:00:00Z")
+  const owner="owner@example.com"
+  const p="ams:owner-gmail:v1:"+createHash("sha256").update(owner).digest("hex")+":"
+  const env2:NodeJS.ProcessEnv={...env,AMS_OWNER_EMAIL:owner,
+    AMS_GMAIL_PRIMARY_EMAIL:"primary@example.com",AMS_GMAIL_SECONDARY_EMAIL:"secondary@example.com",
+    AMS_CONNECTION_ENCRYPTION_KEY:Buffer.alloc(32,4).toString("base64"),
+    AMS_GMAIL_CLIENT_ID:"client",AMS_GMAIL_CLIENT_SECRET:"secret",PUBLIC_APP_URL:"https://preview.example.com"}
+  const records=new Map<string,string>()
+  let oauthCalls=0
+  const redis={
+    async get<T>(key:string){return (records.get(key)??null) as T|null},
+    async set(key:string,value:string,opts?:{nx?:boolean;ex?:number}){if(opts?.nx&&records.has(key))return null;records.set(key,value);return "OK"},
+    async eval(script:string,keys:string[],args:string[]){
+      if(script.includes("SCAN")) return ["0",[...records.keys()].filter(k=>k.startsWith(p+"campaign-pilot:v1:"))]
+      const v=records.get(keys[0]);if(!v)return 0
+      if(JSON.parse(v).revision!==Number(args[0]))return 0
+      records.set(keys[0],args[1]);return 1
+    },
+  }
+  const ctx={env:env2,redis,now,fetcher:(async()=>{oauthCalls++;throw new Error("NO_GMAIL")}) as typeof fetch}
+  const id="33333333-3333-4333-8333-333333333333"
+  const input={id,sourceRunId:"content-run-22222222-2222-4222-8222-222222222222",
+    recipient:"primary@example.com",steps:[1,2,3].map(n=>({
+      subject:"Step "+n+" owner only",body:"No user mailing list authorized.",
+      dueAt:new Date(now+n*86400000).toISOString(),
+    })) as [never,never,never]}
+  await createOwnerCampaignPilot(input,ctx)
+  await assert.rejects(authorizeOwnerPilotAutosend(id,ctx),/REVIEW_REQUIRED/)
+  await changeOwnerCampaignPilot(id,"approve",ctx)
+  assert.equal((await tickOwnerCampaignPilot(ctx)).checked,1)
+  assert.equal((await tickOwnerCampaignPilot(ctx)).processed,0)
+  assert.equal(oauthCalls,0)
+  assert.deepEqual(await authorizeOwnerPilotAutosend(id,ctx),{authorized:true})
+  assert.deepEqual(await authorizeOwnerPilotAutosend(id,ctx),{authorized:true})
+  // This schedule is still in the future. No unsolicited email is sent.
+  assert.equal((await tickOwnerCampaignPilot(ctx)).processed,0)
+  await changeOwnerCampaignPilot(id,"stop",ctx)
+  await assert.rejects(authorizeOwnerPilotAutosend(id,ctx),/REVIEW_REQUIRED/)
+  assert.equal((await tickOwnerCampaignPilot(ctx)).processed,0)
+  assert.equal(oauthCalls,0)
+})
+

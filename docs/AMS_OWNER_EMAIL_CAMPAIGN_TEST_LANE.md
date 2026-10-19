@@ -41,3 +41,5 @@ An owner-provided phone screen recording shows that Preview /login?next=/owner/c
 ## October 19 — preview-only unattended owner scheduler
 
 A separately gated bounded worker now exists at `POST /api/internal/owner-campaign-pilot/tick` (see `docs/AMS_OWNER_CAMPAIGN_AUTOSEND_PREVIEW.md`). It scans only the owner pilot namespace, sends approved due steps, verifies the exact recipient inbox before advancing and holds ambiguous sends. It is default OFF and not yet invoked by any active Cron/Actions schedule. The Preview authorization and exact receipt test must pass before any activation. Customer-facing mail remains disabled.
+
+Review-only approval is **not** sending authorization. Scheduled sending additionally requires owner-authenticated `POST /api/owner/campaigns/pilot/authorize-autosend` with a literal confirmation, tied to that reviewed campaign fingerprint. The existing Stop action prevents further steps. Both the per-campaign grant and default-off Preview worker flags are required.

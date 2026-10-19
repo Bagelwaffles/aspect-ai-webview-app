@@ -80,6 +80,7 @@ export async function tickOwnerCampaignPilot(input: GmailContext = {}) {
       if (!ID.safeParse(id).success || visited.has(id)) continue
       visited.add(id)
       const record = await readOwnerCampaignPilot(id, input)
+      if (!record || !await isOwnerPilotAutosendAuthorized(record, c)) continue
       const action = ownerCampaignDueAction(record, c.now)
       if (action === "send") {
         const outcome = await dispatchOwnerCampaignPilot(id, input)
@@ -101,4 +102,46 @@ export async function tickOwnerCampaignPilot(input: GmailContext = {}) {
     // Deliberately avoid recipient, subject, campaign content and provider IDs.
     outcomes: results.map(r => r.status),
   }
+}
+
+// Separate owner approval is required before review-only plans can be scheduled.
+// A global feature flag NEVER enrolls all previously reviewed campaigns.
+const AUTO_GRANT_TTL = 90 * 86400
+const AUTO_GRANT_SCHEMA = z.object({
+  fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  approvedAt: z.string().datetime(),
+}).strict()
+function autoGrantKey(prefix: string, id: string) {
+  return prefix + "campaign-pilot:autosend:v1:" + id
+}
+export async function authorizeOwnerPilotAutosend(id: string, input: GmailContext = {}) {
+  const c = ownerGmailContext(input)
+  if (c.env.VERCEL_ENV !== "preview") throw new Error("OWNER_AUTOSEND_PREVIEW_ONLY")
+  const record = await readOwnerCampaignPilot(id, input)
+  if (!record || record.status !== "approved" || !record.reviewedAt || record.sends.length) {
+    throw new Error("OWNER_AUTOSEND_REVIEW_REQUIRED")
+  }
+  const primary = c.env.AMS_GMAIL_PRIMARY_EMAIL?.trim().toLowerCase()
+  const secondary = c.env.AMS_GMAIL_SECONDARY_EMAIL?.trim().toLowerCase()
+  if (!primary || !secondary || primary === secondary ||
+      ![primary, secondary].includes(record.input.recipient)) {
+    throw new Error("OWNER_AUTOSEND_RECIPIENT_INVALID")
+  }
+  const grant = {fingerprint: record.fingerprint, approvedAt: new Date(c.now).toISOString()}
+  const key = autoGrantKey(c.prefix, id)
+  const inserted = await c.redis.set(key, JSON.stringify(grant), {nx: true, ex: AUTO_GRANT_TTL})
+  if (inserted !== "OK") {
+    const raw = await c.redis.get<unknown>(key)
+    const old = AUTO_GRANT_SCHEMA.safeParse(typeof raw === "string" ? JSON.parse(raw) : raw)
+    if (!old.success || old.data.fingerprint !== record.fingerprint) {
+      throw new Error("OWNER_AUTOSEND_APPROVAL_CONFLICT")
+    }
+  }
+  return {authorized: true}
+}
+async function isOwnerPilotAutosendAuthorized(record: OwnerCampaignPilotRecord, c: ReturnType<typeof ownerGmailContext>) {
+  const raw = await c.redis.get<unknown>(autoGrantKey(c.prefix, record.input.id))
+  if (!raw) return false
+  const grant = AUTO_GRANT_SCHEMA.safeParse(typeof raw === "string" ? JSON.parse(raw) : raw)
+  return grant.success && grant.data.fingerprint === record.fingerprint && record.status === "approved"
 }

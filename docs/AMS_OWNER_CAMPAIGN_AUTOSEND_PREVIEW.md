@@ -18,7 +18,7 @@ It requires all existing sender gates plus a distinct
 No credentials or recipient content are in logs or response.
 The worker uses bounded owner-namespace Redis scanning with a persistent cursor;
 at most three already approved owner-inbox campaigns are processed per tick.
-An approved due step is sent through the existing Gmail dispatch only once.
+An approved due step is sent through the existing Gmail dispatch only once, **only after** the owner also authorizes that specific campaign through the session-authenticated trusted-origin `POST /api/owner/campaigns/pilot/authorize-autosend` with `confirmation: AUTHORIZE_OWNER_ONLY_PREVIEW_SCHEDULE`. Merely approving a draft does not authorize automated sends.
 A previously accepted step triggers independent receipt verification instead
 of sending the next message. An ambiguous outcome is held for manual review.
 Stopped or draft campaigns are never sent. No marketing customer addresses are
