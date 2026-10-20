@@ -20,8 +20,13 @@ const campaignFields = z.object({
 // Legacy generated inputs remain valid; manual provenance is explicit and cannot
 // carry a generation ID or a claimed billing/credit state.
 export const ownerCampaignPilotInputSchema = z.union([
-  campaignFields.extend({
+  // Preserve legacy field order because existing idempotency fingerprints
+  // hash the serialized input.
+  z.object({
+    id: ID,
     sourceRunId: z.string().regex(/^content-run-[A-Za-z0-9-]{8,80}$/u),
+    recipient: campaignFields.shape.recipient,
+    steps: campaignFields.shape.steps,
   }).strict(),
   campaignFields.extend({
     source: z.object({

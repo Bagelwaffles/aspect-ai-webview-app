@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { createHash } from "node:crypto"
 import test from "node:test"
 
 import {
@@ -101,6 +102,8 @@ test("plan persists idempotently, approval remains review only and stop is termi
   const { ctx } = setup()
   const first = await createOwnerCampaignPilot(input, ctx)
   assert.equal(first.created, true)
+  assert.equal(first.record.fingerprint,
+    createHash("sha256").update(JSON.stringify(input)).digest("hex"))
   assert.equal(first.record.status, "draft")
   assert.equal(first.record.sends.length, 0)
   assert.equal((await createOwnerCampaignPilot(input, ctx)).created, false)
