@@ -2,16 +2,33 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { randomUUID } from "node:crypto"
 import IORedis from "ioredis"
+import { connect as tlsConnect } from "node:tls"
 import { adaptOwnerValkey, aivenPreviewOptions } from "../lib/server/owner-preview-redis"
 
 // Opt in only against the new Aiven endpoint. No Google APIs or real grants.
 test("Aiven TLS: atomic claims, fencing, expiry and cross-connection persistence", { skip: process.env.AMS_AIVEN_SYNTHETIC_TEST !== "true" }, async () => {
   const options = aivenPreviewOptions(process.env)
+  assert.equal(options.host, "ams-owner-gmail-preview-ams-owner-preview.b.aivencloud.com")
+  assert.equal(options.port, 23873)
+  for (const name of ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_URL", "KV_REST_API_TOKEN", "AMS_GMAIL_CLIENT_SECRET"]) assert.equal(Boolean(process.env[name]), false)
   const a = new IORedis(options), b = new IORedis(options)
+  let reopened: IORedis | undefined
   const first = adaptOwnerValkey(a), second = adaptOwnerValkey(b)
   const root = `ams:synthetic:${randomUUID()}:`
   const keys = [root + "lock", root + "state", root + "oauth", root + "count", root + "expiring"]
   try {
+    // A bad TLS identity must fail before any AUTH or datastore operation.
+    await new Promise<void>((resolve, reject) => {
+      const socket = tlsConnect({ ...options.tls, host: options.host, port: options.port, servername: "invalid.example" })
+      socket.setTimeout(8000)
+      socket.once("secureConnect", () => { socket.destroy(); reject(new Error("TLS_IDENTITY_NOT_REJECTED")) })
+      socket.once("timeout", () => { socket.destroy(); reject(new Error("TLS_NEGATIVE_TEST_TIMEOUT")) })
+      socket.once("error", (error: NodeJS.ErrnoException) => {
+        socket.destroy()
+        if (error.code === "ERR_TLS_CERT_ALTNAME_INVALID") resolve()
+        else reject(new Error("TLS_NEGATIVE_TEST_INCONCLUSIVE"))
+      })
+    })
     const claims = await Promise.all([first.set(keys[0], "a", { nx: true, ex: 10 }), second.set(keys[0], "b", { nx: true, ex: 10 })])
     assert.equal(claims.filter(x => x === "OK").length, 1)
     const lease = claims[0] === "OK" ? "a" : "b"
@@ -20,6 +37,8 @@ test("Aiven TLS: atomic claims, fencing, expiry and cross-connection persistence
     const state = { enabled: false, history: [{ status: "succeeded", checkpoint: 123 }], findings: ["synthetic"] }
     assert.equal(await first.eval(fence, keys.slice(0, 2), [lease, JSON.stringify(state)]), 1)
     assert.deepEqual(await second.get(keys[1]), state)
+    reopened = new IORedis(options)
+    assert.deepEqual(await adaptOwnerValkey(reopened).get(keys[1]), state)
     const release = "if redis.call('get',KEYS[1]) == ARGV[1] then return redis.call('del',KEYS[1]) end return 0"
     assert.equal(await first.eval(release, [keys[0]], ["wrong"]), 0)
     assert.equal(await first.eval(release, [keys[0]], [lease]), 1)
@@ -30,12 +49,15 @@ test("Aiven TLS: atomic claims, fencing, expiry and cross-connection persistence
     const limit = "local n=tonumber(redis.call('get',KEYS[1]) or '0'); if n>=tonumber(ARGV[1]) then return 0 end redis.call('incr',KEYS[1]); redis.call('expire',KEYS[1],ARGV[2]); return 1"
     assert.equal(await first.eval(limit, [keys[3]], ["1", "10"]), 1)
     assert.equal(await second.eval(limit, [keys[3]], ["1", "10"]), 0)
+    const contention = await Promise.all(Array.from({ length: 20 }, (_, i) => (i % 2 ? first : second).eval(limit, [keys[3]], ["6", "10"])))
+    assert.equal(contention.filter(value => value === 1).length, 5)
+    assert.equal(await first.get(keys[3]), 6)
     await first.set(keys[4], "temporary", { ex: 1 })
     await new Promise(resolve => setTimeout(resolve, 1100))
     assert.equal(await second.get(keys[4]), null)
   } finally {
     // Only this test's randomly generated keys; never scan/delete app records.
     if (a.status === "ready") await a.del(...keys)
-    a.disconnect(); b.disconnect()
+    a.disconnect(); b.disconnect(); reopened?.disconnect()
   }
 })
