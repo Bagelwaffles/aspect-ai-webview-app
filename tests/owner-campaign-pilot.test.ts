@@ -240,3 +240,29 @@ test("owner receipt proof requires matching inbox headers and unlocks only the v
   assert.equal((await readOwnerCampaignPilot(input.id, ctx))?.sends[0].state, "delivered")
   assert.equal((await readOwnerCampaignPilot(input.id, ctx))?.sends[0].receiptId, "inboxCopy1")
 })
+
+test("owner-authored source is explicitly no-credit, Preview-only and label-validated", async () => {
+  const { ctx } = setup()
+  const { sourceRunId: _generated, ...fields } = input
+  const manual = {
+    ...fields,
+    source: { kind: "owner-authored-preview-test", creditUsage: "none" },
+    steps: input.steps.map(step => ({ ...step,
+      subject: "[AMS PREVIEW TEST] " + step.subject,
+      body: "Owner-authored Preview test. No AI generation or credits used.\n\n" + step.body,
+    })),
+  }
+  const saved = await createOwnerCampaignPilot(manual, ctx)
+  assert.equal(saved.record.status, "draft")
+  assert.ok("source" in saved.record.input)
+  assert.deepEqual(saved.record.input.source, manual.source)
+  assert.equal("sourceRunId" in saved.record.input, false)
+  assert.equal(saved.record.sends.length, 0)
+  assert.equal((await createOwnerCampaignPilot(manual, ctx)).created, false)
+  assert.throws(() => validateOwnerCampaignPilot(manual, { ...env, VERCEL_ENV: "production" }, NOW), /PREVIEW_ONLY/)
+  assert.throws(() => validateOwnerCampaignPilot(manual, { ...env, AMS_GMAIL_CONSENT_MODE: "production" }, NOW), /PREVIEW_ONLY/)
+  assert.throws(() => validateOwnerCampaignPilot({ ...manual, sourceRunId: _generated }, env, NOW))
+  assert.throws(() => validateOwnerCampaignPilot({ ...manual, source: { ...manual.source, creditUsage: "committed" } }, env, NOW))
+  assert.throws(() => validateOwnerCampaignPilot({ ...manual, steps: input.steps }, env, NOW), /LABEL_REQUIRED/)
+  assert.throws(() => validateOwnerCampaignPilot({ ...manual, recipient: "customer@example.org" }, env, NOW), /TEST_RECIPIENT_REQUIRED/)
+})

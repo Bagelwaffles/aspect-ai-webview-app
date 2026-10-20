@@ -59,5 +59,24 @@ test("campaign routes require primary owner, trusted origin and explicit Preview
   process.env.VERCEL_ENV = "production"
   assert.equal((await send.POST(request("POST", {}))).status, 404)
   assert.equal((await receipt.POST(request("POST", {}))).status, 404)
+  const manual = {
+    id, recipient: "secondary@example.com",
+    source: { kind: "owner-authored-preview-test", creditUsage: "none" },
+    steps: [0, 1, 2].map(i => ({
+      subject: "[AMS PREVIEW TEST] Message " + i,
+      body: "Owner-authored Preview test. No AI generation or credits used.",
+      dueAt: new Date(Date.now() + (i + 1) * 86400000).toISOString(),
+    })),
+  }
+  const productionManual = await pilot.POST(request("POST", manual))
+  assert.equal(productionManual.status, 404)
+  assert.equal((await productionManual.json()).code, "CAMPAIGN_MANUAL_SOURCE_PREVIEW_ONLY")
+  process.env.VERCEL_ENV = "preview"
+  for (const email of [null, "secondary@example.com", "customer@example.com"]) {
+    session = email ? { user: { email, customerSubject: `customer:google:${"a".repeat(64)}` } } : null
+    assert.equal((await pilot.POST(request("POST", manual))).status, 401)
+  }
+  session = { user: { email: env.AMS_OWNER_EMAIL, customerSubject: `customer:google:${"a".repeat(64)}` } }
+  assert.equal((await pilot.POST(request("POST", manual, "https://attacker.example"))).status, 403)
   assert.equal(externalCalls, 0)
 })

@@ -14,6 +14,7 @@ type Pilot = {
   input: {
     id: string
     recipient: string
+    source?: { kind: "owner-authored-preview-test"; creditUsage: "none" }
     steps: { subject: string; body: string; dueAt: string }[]
   }
   status: "draft" | "approved" | "stopped"
@@ -79,7 +80,9 @@ export default function OwnerCampaignPilotPanel({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           id,
-          sourceRunId: String(form.get("sourceRunId") || ""),
+          ...(form.get("sourceRunId") === "owner-authored-preview-test"
+            ? { source: { kind: "owner-authored-preview-test", creditUsage: "none" } }
+            : { sourceRunId: String(form.get("sourceRunId") || "") }),
           recipient: String(form.get("recipient") || ""),
           steps,
         }),
@@ -220,7 +223,7 @@ export default function OwnerCampaignPilotPanel({
       <Link className="text-sm underline" href="/owner/scheduled-tasks">Back to owner tasks</Link>
       <header className="space-y-2">
         <h1 className="text-3xl font-bold">AMS Owner Campaign Pilot</h1>
-        <p className="text-muted-foreground">Build an exact three-email rehearsal using a successful AMS email-generation run.</p>
+        <p className="text-muted-foreground">Build an exact three-email rehearsal using a saved generation or an owner-authored Preview test.</p>
         <div className="rounded-lg border border-amber-500/40 p-4 text-sm">
           <strong>Automatic sending is OFF.</strong> Saving and review never send an email or start a background schedule.
           Only two owner-controlled test inboxes are eligible. A separately enabled Preview test
@@ -233,15 +236,17 @@ export default function OwnerCampaignPilotPanel({
       <section className="rounded-lg border p-5">
         <h2 className="mb-4 text-xl font-semibold">Prepare the campaign</h2>
         <form className="space-y-4" onSubmit={save} onChange={() => { idRef.current = null }}>
-          <label className="block space-y-1 text-sm">Use an existing completed email draft
+          <label className="block space-y-1 text-sm">Campaign source
             <select className="w-full rounded border bg-background p-3" name="sourceRunId" required>
-              <option value="">Select saved generation</option>
+              <option value="">Select campaign source</option>
+              {previewMode ? <option value="owner-authored-preview-test">Owner-authored Preview test — no generation or credits</option> : null}
               {runs.map(run => <option key={run.id} value={run.id}>
                 {run.output?.headline || run.id} ({run.id.slice(-8)})
               </option>)}
             </select>
           </label>
-          {!runs.length ? <p className="text-sm">Generate an email draft first through the <Link href="/email-campaign-agent" className="underline">Email Campaign Agent</Link> or <Link href="/nurture-agent" className="underline">Nurture Agent</Link>.</p> : null}
+          {!runs.length ? <p className="text-sm">Use the owner-authored Preview test source without credits, or generate an email draft through the <Link href="/email-campaign-agent" className="underline">Email Campaign Agent</Link> or <Link href="/nurture-agent" className="underline">Nurture Agent</Link>.</p> : null}
+          {previewMode ? <p className="text-sm">Owner-authored tests require each subject to start with [AMS PREVIEW TEST] and each body to start with: Owner-authored Preview test. No AI generation or credits used.</p> : null}
           <label className="block space-y-1 text-sm">Owner-controlled test inbox
             <select required name="recipient" className="w-full rounded border bg-background p-3">
               <option value="">Choose a test recipient</option>
@@ -270,7 +275,7 @@ export default function OwnerCampaignPilotPanel({
               </label>
             </fieldset>
           ))}
-          <button type="submit" disabled={busy || runs.length === 0}
+          <button type="submit" disabled={busy || (!previewMode && runs.length === 0)}
             className="rounded-md bg-primary px-5 py-3 font-semibold text-primary-foreground disabled:opacity-50">
             Save private campaign preview
           </button>
@@ -288,9 +293,12 @@ export default function OwnerCampaignPilotPanel({
           <p className="text-sm"><strong>Status:</strong> {pilot.status} · no automated schedule</p>
           <p className="break-all text-xs">Pilot ID: {pilot.input.id}</p>
           <p className="text-sm">Recipient: {pilot.input.recipient}</p>
+          <p className="text-sm">Source: {pilot.input.source?.kind === "owner-authored-preview-test"
+            ? "Owner-authored Preview test — no AI generation or credits used"
+            : "Saved successful email generation"}</p>
           {pilot.input.steps.map((step, index) => <article key={index} className="rounded border p-4">
             <h3 className="font-semibold">Step {index + 1}: {step.subject}</h3>
-            <p className="mt-1 text-xs text-muted-foreground">Proposed date: {new Date(step.dueAt).toLocaleString()}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Proposed date: {new Date(step.dueAt).toLocaleString()} · {step.dueAt}</p>
             <p className="mt-3 whitespace-pre-wrap break-words text-sm">{step.body}</p>
           </article>)}
           {pilot.sends.length > 0 ? <div className="rounded border p-3 text-sm">

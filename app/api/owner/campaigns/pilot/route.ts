@@ -34,11 +34,16 @@ export async function POST(request: NextRequest) {
   const parsed = ownerCampaignPilotInputSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return json({ ok: false, code: "CAMPAIGN_INPUT_INVALID" }, 400)
   try {
-    const runs = await getContentAgentRunStore().listForOwner(auth.principal.subject, 20)
-    const source = runs.find(run => run.id === parsed.data.sourceRunId)
-    if (!source || source.status !== "succeeded" || source.creditState !== "committed" ||
-      source.input.channel !== "email" || !source.output) {
-      return json({ ok: false, code: "OWNED_EMAIL_GENERATION_REQUIRED" }, 404)
+    if ("sourceRunId" in parsed.data) {
+      const sourceRunId = parsed.data.sourceRunId
+      const runs = await getContentAgentRunStore().listForOwner(auth.principal.subject, 20)
+      const source = runs.find(run => run.id === sourceRunId)
+      if (!source || source.status !== "succeeded" || source.creditState !== "committed" ||
+        source.input.channel !== "email" || !source.output) {
+        return json({ ok: false, code: "OWNED_EMAIL_GENERATION_REQUIRED" }, 404)
+      }
+    } else if (process.env.VERCEL_ENV !== "preview" || process.env.AMS_GMAIL_CONSENT_MODE !== "testing") {
+      return json({ ok: false, code: "CAMPAIGN_MANUAL_SOURCE_PREVIEW_ONLY" }, 404)
     }
     const saved = await createOwnerCampaignPilot(parsed.data)
     return json({ ok: true, created: saved.created, record: saved.record }, saved.created ? 201 : 200)

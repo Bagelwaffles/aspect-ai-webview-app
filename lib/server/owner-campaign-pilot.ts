@@ -12,12 +12,24 @@ const STEP = z.object({
   dueAt: z.string().datetime({ offset: true }),
 }).strict()
 
-export const ownerCampaignPilotInputSchema = z.object({
+const campaignFields = z.object({
   id: ID,
-  sourceRunId: z.string().regex(/^content-run-[A-Za-z0-9-]{8,80}$/u),
   recipient: z.string().trim().email().max(254),
   steps: z.tuple([STEP, STEP, STEP]),
 }).strict()
+// Legacy generated inputs remain valid; manual provenance is explicit and cannot
+// carry a generation ID or a claimed billing/credit state.
+export const ownerCampaignPilotInputSchema = z.union([
+  campaignFields.extend({
+    sourceRunId: z.string().regex(/^content-run-[A-Za-z0-9-]{8,80}$/u),
+  }).strict(),
+  campaignFields.extend({
+    source: z.object({
+      kind: z.literal("owner-authored-preview-test"),
+      creditUsage: z.literal("none"),
+    }).strict(),
+  }).strict(),
+])
 export type OwnerCampaignPilotInput = z.infer<typeof ownerCampaignPilotInputSchema>
 
 export const ownerCampaignPilotRecordSchema = z.object({
@@ -64,6 +76,15 @@ function parseRecord(raw: unknown): OwnerCampaignPilotRecord | null {
 
 export function validateOwnerCampaignPilot(input: unknown, env: NodeJS.ProcessEnv, now: number) {
   const data = ownerCampaignPilotInputSchema.parse(input)
+  if ("source" in data) {
+    if (env.VERCEL_ENV !== "preview" || env.AMS_GMAIL_CONSENT_MODE !== "testing") {
+      throw new Error("CAMPAIGN_MANUAL_SOURCE_PREVIEW_ONLY")
+    }
+    if (data.steps.some(step => !step.subject.startsWith("[AMS PREVIEW TEST] ") ||
+        !step.body.startsWith("Owner-authored Preview test. No AI generation or credits used."))) {
+      throw new Error("CAMPAIGN_MANUAL_SOURCE_LABEL_REQUIRED")
+    }
+  }
   const primary = env.AMS_GMAIL_PRIMARY_EMAIL?.trim().toLowerCase()
   const secondary = env.AMS_GMAIL_SECONDARY_EMAIL?.trim().toLowerCase()
   // Owner-controlled test inboxes only. No mailing lists or customer addresses.

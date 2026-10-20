@@ -76,3 +76,25 @@ separate unresolved owner-approval/deployment dependency.
 - Only after a validated encrypted Gmail grant and refresh may the owner approve one three-step campaign, separately authorize its Preview-only schedule, and temporarily enable the three sending gates and independent worker secret for one real owner-inbox send, receipt and duplicate-replay verification. No scheduled job or customer send is active.
 - Cloudflare routing was independently verified using one email from the secondary owner Gmail account to `kimberley@aspectmarketingsolutions.app`; it appeared in the primary Gmail INBOX with a Cloudflare Received header. Inbound forwarding **does not** establish an outbound send-as identity or AMS sender readiness.
 - Vercel direct deployment creation was forbidden by the active Vercel connection (403); ordinary Git branch pushes still create authorized Preview deployments automatically. Leave production untouched.
+
+
+## Owner-authored Preview test source (no credits)
+
+When no qualifying generated email exists, the primary owner may save a manual
+Preview rehearsal through the same authenticated, trusted-origin campaign API.
+Use `source: {"kind":"owner-authored-preview-test","creditUsage":"none"}`
+instead of `sourceRunId`. The strict union rejects mixed provenance and billing
+claims. No Content Agent run is created, read or committed by this path. It is
+restricted to `VERCEL_ENV=preview` and `AMS_GMAIL_CONSENT_MODE=testing`.
+Every subject must begin `[AMS PREVIEW TEST] ` and every body must begin
+`Owner-authored Preview test. No AI generation or credits used.`
+The two owner-inbox restriction, exactly three steps, future dates and minimum
+one-day cadence remain enforced. Generated sources retain their existing
+owner-owned succeeded/committed/email validation.
+
+Saving remains draft-only. Present the persisted recipient, exact subjects,
+bodies and ISO timestamps for owner copy approval; then obtain separate
+campaign-specific Preview schedule authorization. Neither provenance nor a
+global feature flag grants permission to send. Keep all sending flags off until
+these gates pass. The existing worker, receipt checks, durable duplicate claims,
+ambiguous-send hold and stop controls are reused unchanged.
