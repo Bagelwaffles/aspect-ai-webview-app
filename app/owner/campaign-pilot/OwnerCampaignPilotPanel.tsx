@@ -30,8 +30,8 @@ type ApiResult = {
 }
 
 export default function OwnerCampaignPilotPanel({
-  primary, secondary,
-}: { primary: string; secondary: string }) {
+  primary, secondary, previewMode,
+}: { primary: string; secondary: string; previewMode: boolean }) {
   const [runs, setRuns] = useState<Run[]>([])
   const [pilot, setPilot] = useState<Pilot | null>(null)
   const [lookup, setLookup] = useState("")
@@ -39,6 +39,7 @@ export default function OwnerCampaignPilotPanel({
   const [busy, setBusy] = useState(false)
   const [reviewConfirmed, setReviewConfirmed] = useState(false)
   const [sendConfirmed, setSendConfirmed] = useState(false)
+  const [autoScheduleConfirmed, setAutoScheduleConfirmed] = useState(false)
   const [testEnabled, setTestEnabled] = useState(false)
   const [message, setMessage] = useState("")
   const idRef = useRef<string | null>(null)
@@ -109,6 +110,7 @@ export default function OwnerCampaignPilotPanel({
       setPilot(result.record)
       setTestEnabled(result.enabled === true)
       setReviewConfirmed(false)
+      setAutoScheduleConfirmed(false)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not load pilot")
     } finally { setBusy(false) }
@@ -139,6 +141,32 @@ export default function OwnerCampaignPilotPanel({
       setMessage(action === "approve" ? "Plan reviewed. Sending remains OFF unless enabled separately in Preview." : "Pilot stopped.")
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not update pilot")
+    } finally { setBusy(false) }
+  }
+
+  async function authorizeAutoSchedule() {
+    if (!pilot || busy || !previewMode || !autoScheduleConfirmed ||
+        pilot.status !== "approved" || pilot.sends.length) return
+    setBusy(true)
+    setError("")
+    setMessage("")
+    try {
+      const response = await fetch("/api/owner/campaigns/pilot/authorize-autosend", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: pilot.input.id,
+          confirmation: "AUTHORIZE_OWNER_ONLY_PREVIEW_SCHEDULE",
+        }),
+      })
+      const result = await response.json().catch(() => ({})) as ApiResult
+      if (!response.ok || result.ok !== true) {
+        throw new Error(result.code || "Owner-only schedule authorization unavailable")
+      }
+      setAutoScheduleConfirmed(false)
+      setMessage("Owner-only Preview schedule authorized. This did not send mail or start a worker. Only separately enabled, due Preview jobs may send.")
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Owner-only schedule authorization unavailable")
     } finally { setBusy(false) }
   }
 
@@ -295,6 +323,21 @@ export default function OwnerCampaignPilotPanel({
                 Send one approved owner-mailbox test
               </button>
               <p className="text-xs">Gmail API acceptance is not proof of inbox delivery. Unconfirmed sends are not automatically retried.</p>
+            </div>
+          ) : null}
+          {pilot.status === "approved" && pilot.sends.length === 0 && previewMode ? (
+            <div className="space-y-2 rounded border border-amber-500/40 p-3">
+              <p className="text-sm font-semibold">Optional unattended owner-only Preview test</p>
+              <p className="text-xs">Review-only approval does not authorize sending. This requires a second campaign-specific approval, valid Gmail OAuth, and a separately enabled Preview worker. No customer emails.</p>
+              <label className="flex items-start gap-3 text-sm">
+                <input type="checkbox" checked={autoScheduleConfirmed}
+                  onChange={event => setAutoScheduleConfirmed(event.target.checked)} />
+                I authorize only this reviewed three-email schedule to our selected owner-controlled test inbox, at the displayed dates.
+              </label>
+              <button disabled={busy || !autoScheduleConfirmed} onClick={() => void authorizeAutoSchedule()}
+                className="rounded border px-4 py-2 text-sm disabled:opacity-50">
+                Authorize this Preview schedule
+              </button>
             </div>
           ) : null}
           <div className="flex flex-wrap gap-2">
