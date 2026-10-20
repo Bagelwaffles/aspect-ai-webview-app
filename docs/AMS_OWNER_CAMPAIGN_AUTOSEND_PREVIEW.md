@@ -46,3 +46,22 @@ accepted by PR #275's existing validation.
 
 No existing 27 scheduled tasks, production mail, customer data, or payment
 systems are modified.
+
+
+## Redis Preview isolation and credentials
+
+Use the **existing free Upstash Preview** database, not production.
+Set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` scoped only to
+`feat/ams-owner-campaign-pilot-20261012`. Set
+`AMS_OWNER_GMAIL_PREVIEW_NAMESPACE=ams-campaign` on the same Preview branch
+so campaign drafts, OAuth records and receipts cannot collide with PR #262
+monitoring data. A namespace cannot be enabled in Production.
+Generate a fresh Preview-only `AMS_CONNECTION_ENCRYPTION_KEY` for this
+namespace; never copy PR #262 or production keys. A new namespace requires an
+independent owner-approved Gmail consent/authorization and exact authorized
+redirect URI. Keep `AMS_GMAIL_SEND_ENABLED`,
+`AMS_OWNER_CAMPAIGN_PILOT_ENABLED`, and
+`AMS_OWNER_CAMPAIGN_AUTOSEND_ENABLED` unset or false until the controlled
+owner-login, refresh and send/receipt gates all pass. No settings grant an
+email sender permission automatically. Missing OAuth client credentials are a
+separate unresolved owner-approval/deployment dependency.

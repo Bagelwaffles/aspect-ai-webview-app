@@ -482,3 +482,21 @@ test("protected preview uses strictly same-origin Gmail delivery without calling
   await assert.rejects(notOptedIn(run, scheduledTaskDefinitions[0]), /Protected preview HTTP/)
   assert.equal(directCalls, 1)
 })
+
+
+test("Preview Gmail namespaces isolate connected mailboxes, claims and campaign cursors", async () => {
+  const {ownerGmailContext}=await import("../lib/server/owner-gmail")
+  const fixture=setup()
+  const a=ownerGmailContext({...fixture,env:{...fixture.env,VERCEL_ENV:"preview",
+    AMS_OWNER_GMAIL_PREVIEW_NAMESPACE:"ams-campaign"}})
+  const b=ownerGmailContext({...fixture,env:{...fixture.env,VERCEL_ENV:"preview",
+    AMS_OWNER_GMAIL_PREVIEW_NAMESPACE:"ams-monitoring"}})
+  const original=ownerGmailContext(fixture)
+  assert.notEqual(a.prefix,b.prefix)
+  assert.notEqual(a.prefix,original.prefix)
+  assert.ok(a.prefix.includes("preview:ams-campaign:"))
+  assert.throws(()=>ownerGmailContext({...fixture,env:{...fixture.env,VERCEL_ENV:"production",
+    AMS_OWNER_GMAIL_PREVIEW_NAMESPACE:"ams-campaign"}}),/GMAIL_PREVIEW_NAMESPACE_INVALID/)
+  assert.throws(()=>ownerGmailContext({...fixture,env:{...fixture.env,VERCEL_ENV:"preview",
+    AMS_OWNER_GMAIL_PREVIEW_NAMESPACE:"../invalid"}}),/GMAIL_PREVIEW_NAMESPACE_INVALID/)
+})
