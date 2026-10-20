@@ -4,8 +4,10 @@ import { gmailConnectionFeedback, gmailTestDeliveryFeedback } from "@/lib/gmail-
 import type { RefreshVerification } from "@/lib/server/owner-gmail-refresh-verification"
 type Account = { slot: "primary" | "secondary"; status: string; testing?: boolean; grantExpiresAt?: string | null }
 type AutoReply = { armed: boolean; mode: string; ownerAlertReceiptVerified: boolean; ownerAlertReceiptVerifiedAt: string | null; firstContactAcknowledgementVerified: boolean }
+type Readiness = { preview: boolean; readyForOwnerAuthorization: boolean; ownerGrantConnected: boolean; automatedPilotEnabled: boolean; missing: string[]; primaryCallback: string | null }
 export default function GmailConnections() {
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [readiness, setReadiness] = useState<Readiness | null>(null)
   const [autoReply, setAutoReply] = useState<AutoReply | null>(null)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
@@ -15,7 +17,7 @@ export default function GmailConnections() {
     const status = new URLSearchParams(window.location.search).get("gmail")
     if (status && Object.hasOwn(gmailConnectionFeedback, status)) setError(gmailConnectionFeedback[status as keyof typeof gmailConnectionFeedback])
   }, [])
-  useEffect(() => { void fetch("/api/owner/gmail", { cache: "no-store" }).then(async response => { if (!response.ok) throw new Error("Gmail status unavailable"); const data = await response.json(); setAccounts(data.accounts); setAutoReply(data.autoReply ?? null); setRefreshVerificationAvailable(data.refreshVerificationAvailable === true) }).catch(() => setError("Gmail status unavailable")) }, [])
+  useEffect(() => { void fetch("/api/owner/gmail", { cache: "no-store" }).then(async response => { if (!response.ok) throw new Error("Gmail status unavailable"); const data = await response.json(); setAccounts(data.accounts); setReadiness(data.readiness ?? null); setAutoReply(data.autoReply ?? null); setRefreshVerificationAvailable(data.refreshVerificationAvailable === true) }).catch(() => setError("Gmail status unavailable")) }, [])
   async function verifyRefresh(slot: Account["slot"]) {
     setBusy(true); setError("")
     try {
@@ -54,7 +56,18 @@ export default function GmailConnections() {
       setError(response.ok && data.ok ? "Test message confirmed in the primary inbox." : gmailTestDeliveryFeedback(data.code))
     } catch { setError("Test delivery is unconfirmed.") } finally { setBusy(false) }
   }
-  return <section className="my-6 rounded border p-4"><h2 className="text-lg font-semibold">Owner Gmail connections</h2><p className="my-2 text-sm">Authorize each account separately. Monitoring reads relevant metadata and never modifies your mailbox. Only the primary account can send owner alerts and, when separately enabled, first-contact acknowledgements to clearly identified AMS inquiries. No automatic refunds, marketing campaigns, account changes or sensitive replies.</p>{autoReply && <div className="my-2 space-y-1 text-sm" role="status">
+  return <section className="my-6 rounded border p-4"><h2 className="text-lg font-semibold">Owner Gmail connections</h2><p className="my-2 text-sm">Authorize each account separately. Monitoring reads relevant metadata and never modifies your mailbox. Only the primary account can send owner alerts and, when separately enabled, first-contact acknowledgements to clearly identified AMS inquiries. No automatic refunds, marketing campaigns, account changes or sensitive replies.</p>{readiness?.preview ? <div className="my-3 space-y-2 rounded border p-3 text-sm" role="status">
+  <h3 className="font-semibold">AMS Preview Gmail readiness</h3>
+  {readiness.missing.length ? <>
+    <p>Owner-only Preview setup is incomplete. Configure the following variable names for this campaign branch in Vercel, without pasting secret values into chat:</p>
+    <p className="break-words font-mono text-xs">{readiness.missing.join(", ")}</p>
+    <p><a href="https://vercel.com/kimberleyaversbiz-4131s-projects/aspect-ai-overlord/settings/environment-variables" target="_blank" rel="noopener noreferrer" className="underline">Open Vercel environment settings</a></p>
+  </> : <p>Required server settings are present. This does not prove Gmail authorization or delivery.</p>}
+  {readiness.primaryCallback ? <p className="break-all text-xs">Existing Google OAuth primary callback: <code>{readiness.primaryCallback}</code></p> : null}
+  <p><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="underline">Review existing Google OAuth callback</a></p>
+  <p>AMS primary Gmail grant: {readiness.ownerGrantConnected ? "connected" : "not verified in this Preview namespace"}. Scheduled sends: {readiness.automatedPilotEnabled ? "gates configured; per-campaign approval and worker proof still required" : "OFF"}.</p>
+  <p>Google OAuth Testing grants may expire after seven days. Long-term automatic delivery needs the separately approved production authorization.</p>
+</div> : null}{autoReply && <div className="my-2 space-y-1 text-sm" role="status">
   <p>Primary Gmail owner-alert sending: {autoReply.ownerAlertReceiptVerified ? `Gmail inbox receipt recorded at ${autoReply.ownerAlertReceiptVerifiedAt}. This verifies a past alert receipt, not continuous delivery.` : "No current-grant provider receipt recorded by the owner test. Use the owner test to verify before activating automation."}</p>
   <p>First-contact acknowledgements: {autoReply.armed ? "Enabled by configuration; real customer-thread delivery still requires separate acceptance." : "Off. Can be enabled after a controlled recipient-thread test."}</p>
   <p>Customer question answering: manual approval required; no autonomous AI replies or order/payment commitments are enabled.</p>
