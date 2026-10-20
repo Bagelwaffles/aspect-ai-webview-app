@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto"
-import { Redis } from "@upstash/redis"
+import { createOwnerRedis } from "./owner-preview-redis"
 import { z } from "zod"
 import { encryptConnectionPayload, decryptConnectionPayload, resolveConnectionEncryptionKey } from "./customer-connections"
 import { gmailProviderFailure } from "./owner-gmail-diagnostics"
@@ -29,9 +29,7 @@ export function gmailConfig(slot: GmailSlot, env = process.env) {
 export function ownerGmailContext(input: GmailContext = {}) {
   const env = input.env ?? process.env
   const key = resolveConnectionEncryptionKey(env)
-  const url = env.UPSTASH_REDIS_REST_URL || env.KV_REST_API_URL
-  const token = env.UPSTASH_REDIS_REST_TOKEN || env.KV_REST_API_TOKEN
-  const redis = input.redis ?? (url && token ? new Redis({ url, token }) : null)
+  const redis = input.redis ?? createOwnerRedis(env)
   if (!key || !redis || !env.AMS_OWNER_EMAIL) throw new Error("GMAIL_VAULT_REQUIRED")
   const owner = createHash("sha256").update(env.AMS_OWNER_EMAIL.trim().toLowerCase()).digest("hex")
   return { env, key, redis, owner, prefix: `ams:owner-gmail:v1:${owner}:`, fetcher: input.fetcher ?? fetch, now: input.now ?? Date.now() }

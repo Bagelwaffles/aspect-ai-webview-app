@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomUUID } from "node:crypto"
-import { Redis } from "@upstash/redis"
+import { createOwnerRedis } from "./owner-preview-redis"
 import { deliverGmailAlert } from "./owner-gmail-delivery"
 
 export type TaskSchedule = { frequency: "hourly" | "daily" | "weekly"; timezone: string; hour: number; minute: number; weekday?: number }
@@ -50,10 +50,8 @@ export interface TaskStore {
 const PREFIX = "ams:scheduled-tasks:v1"
 const LEASE_SECONDS = 180
 export function createScheduledTaskStore(env: NodeJS.ProcessEnv = process.env): TaskStore {
-  const url = env.UPSTASH_REDIS_REST_URL?.trim() || env.KV_REST_API_URL?.trim()
-  const token = env.UPSTASH_REDIS_REST_TOKEN?.trim() || env.KV_REST_API_TOKEN?.trim()
-  if (!url || !token || !env.AMS_OWNER_EMAIL?.trim()) throw new Error("TASK_STORE_UNAVAILABLE")
-  const redis = new Redis({ url, token })
+  const redis = createOwnerRedis(env)
+  if (!redis || !env.AMS_OWNER_EMAIL?.trim()) throw new Error("TASK_STORE_UNAVAILABLE")
   const owner = createHash("sha256").update(env.AMS_OWNER_EMAIL.trim().toLowerCase()).digest("hex")
   const key = (id: string) => `${PREFIX}:${owner}:${id}`
   return {

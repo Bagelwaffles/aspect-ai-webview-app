@@ -1,0 +1,47 @@
+name: Aiven Preview isolation
+on:
+  push:
+    branches: [feat/owner-gmail-aiven-actions-20261020]
+    paths: [.github/workflows/aiven-preview-isolation.yml, scripts/aiven/**, tests/owner-preview-redis.integration.test.ts]
+permissions:
+  contents: read
+concurrency:
+  group: aiven-preview-isolation
+  cancel-in-progress: false
+jobs:
+  synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: DNS and TCP without credentials
+        run: node scripts/aiven/connectivity.mjs
+      - name: Check test credential availability
+        env:
+          TEST_URL: ${{ secrets.AMS_AIVEN_SYNTHETIC_URL }}
+        run: |
+          if [ -z "$TEST_URL" ]; then
+            echo 'BLOCKED: test-only Aiven secret is not configured; DNS/TCP results remain valid.'
+            exit 1
+          fi
+      - name: Install test dependencies without lifecycle scripts
+        run: |
+          mkdir -p "$RUNNER_TEMP/aiven-deps"
+          npm install --prefix "$RUNNER_TEMP/aiven-deps" --ignore-scripts --no-audit --no-fund ioredis@5.8.2 @upstash/redis@1.36.0 tsx@4.20.6
+          ln -s "$RUNNER_TEMP/aiven-deps/node_modules" node_modules
+      - name: Synthetic adapter acceptance only
+        env:
+          AMS_OWNER_VALKEY_URL: ${{ secrets.AMS_AIVEN_SYNTHETIC_URL }}
+          AMS_OWNER_VALKEY_CA: ${{ secrets.AMS_AIVEN_SYNTHETIC_CA }}
+          AMS_OWNER_PREVIEW_STORE: aiven
+          AMS_AIVEN_SYNTHETIC_TEST: 'true'
+          VERCEL_ENV: preview
+          AMS_GMAIL_SEND_ENABLED: 'false'
+          AMS_GMAIL_AUTOREPLY_ENABLED: 'false'
+          AMS_SCHEDULED_TASKS_ENABLED: 'false'
+        run: node --import tsx --test tests/owner-preview-redis.integration.test.ts
