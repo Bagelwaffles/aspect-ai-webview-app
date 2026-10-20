@@ -10,13 +10,16 @@ concurrency:
   cancel-in-progress: false
 jobs:
   synthetic:
-    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.repository == 'Bagelwaffles/aspect-ai-webview-app' && github.ref == 'refs/heads/feat/owner-gmail-aiven-actions-20261020'
+    environment: ams-aiven-synthetic
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
       - name: DNS and TCP without credentials

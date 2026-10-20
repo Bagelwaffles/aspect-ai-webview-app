@@ -32,7 +32,7 @@ test("Aiven TLS: atomic claims, fencing, expiry and cross-connection persistence
     const claims = await Promise.all([first.set(keys[0], "a", { nx: true, ex: 10 }), second.set(keys[0], "b", { nx: true, ex: 10 })])
     assert.equal(claims.filter(x => x === "OK").length, 1)
     const lease = claims[0] === "OK" ? "a" : "b"
-    const fence = "if redis.call('get',KEYS[1]) ~= ARGV[1] then return 0 end redis.call('set',KEYS[2],ARGV[2]); return 1"
+    const fence = "if redis.call('get',KEYS[1]) ~= ARGV[1] then return 0 end redis.call('set',KEYS[2],ARGV[2],'EX',300); return 1"
     assert.equal(await first.eval(fence, keys.slice(0, 2), ["wrong", "bad"]), 0)
     const state = { enabled: false, history: [{ status: "succeeded", checkpoint: 123 }], findings: ["synthetic"] }
     assert.equal(await first.eval(fence, keys.slice(0, 2), [lease, JSON.stringify(state)]), 1)
@@ -57,7 +57,9 @@ test("Aiven TLS: atomic claims, fencing, expiry and cross-connection persistence
     assert.equal(await second.get(keys[4]), null)
   } finally {
     // Only this test's randomly generated keys; never scan/delete app records.
-    if (a.status === "ready") await a.del(...keys)
-    a.disconnect(); b.disconnect(); reopened?.disconnect()
+    try {
+      if (a.status === "ready") await a.del(...keys)
+    } catch { throw new Error("SYNTHETIC_CLEANUP_FAILED_KEYS_EXPIRE_WITHIN_300_SECONDS") }
+    finally { a.disconnect(); b.disconnect(); reopened?.disconnect() }
   }
 })
