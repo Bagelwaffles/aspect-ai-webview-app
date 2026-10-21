@@ -475,6 +475,34 @@ test("private video verification accepts provider-normalized text and a stored t
   assert.equal(durable?.tagVerification, "stored-subset")
 })
 
+test("a tag-only 202 can recover by readback on the exact existing video without reuploading", async () => {
+  const fixture = await verificationFixture()
+  const expectedTags = fixture.job.publishMetadata!.youtube.tags
+  const proofKey = "ams:youtube-private-upload:v1:verification:render-job-123"
+
+  // YouTube's first readback may temporarily retain fewer than three tags.
+  fixture.video.snippet.tags = expectedTags.slice(0, 2)
+  await assert.rejects(
+    verifyRenderedTwitchShortPrivate("render-job-123", fixture.options),
+    /YOUTUBE_UPLOAD_METADATA_TAGS_MISMATCH/u,
+  )
+  assert.equal(await fixture.redis.get(proofKey), null)
+
+  // A subsequent readback of the *same video* contains enough expected tags.
+  // Only then may a durable proof be stored and downstream public promotion begin.
+  fixture.video.snippet.tags = expectedTags.slice(0, 3)
+  const verified = await verifyRenderedTwitchShortPrivate("render-job-123", fixture.options)
+  assert.equal(verified.metadataVerified, true)
+  assert.equal(verified.videoId, "verified-video-123")
+  assert.equal(verified.channelId, SMOKYBANANA03_YOUTUBE_CHANNEL_ID)
+  assert.equal((await getYouTubePrivateVerificationProof("render-job-123", fixture.options))?.videoId, verified.videoId)
+
+  // Two OAuth refreshes and two videos.list reads; neither upload nor update.
+  assert.equal(fixture.calls.filter(url => url.includes("oauth2.googleapis.com/token")).length, 2)
+  assert.equal(fixture.calls.filter(url => url.includes("/youtube/v3/videos?")).length, 2)
+  assert.equal(fixture.calls.some(url => url.includes("/upload/") || url.includes("r2.example")), false)
+})
+
 test("private video verification fails closed on altered metadata, wrong channel or public privacy", async () => {
   for (const change of ["title", "description", "tags", "category", "channel", "privacy"] as const) {
     const fixture = await verificationFixture()
