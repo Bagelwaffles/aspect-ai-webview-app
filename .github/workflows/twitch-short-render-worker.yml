@@ -316,6 +316,7 @@ jobs:
 
       - name: Upload completed Short privately to YouTube
         if: steps.claim.outputs.has_job == 'true' && steps.complete.outcome == 'success'
+        id: private_upload
         shell: bash
         run: |
           set -euo pipefail
@@ -356,11 +357,107 @@ jobs:
 
           if [ "$http_code" -eq 202 ]; then
             printf '%s' "$response" | jq -e '.pendingVerification == true and .status == "succeeded" and .privacyStatus == "private" and .channelId == "UCPbMNjvwKOtuFX-1rAtCJSg" and .channelVerified == true and .code == "YOUTUBE_UPLOAD_METADATA_TAGS_MISMATCH" and (.videoId | type == "string" and length > 0)' >/dev/null
-            echo "::warning::Private YouTube upload succeeded; tag readback is still pending and will be re-verified without re-uploading."
+            echo "verification_pending=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Private YouTube upload is verified Private, but tags need readback; retry the same video without re-uploading."
             exit 0
           fi
 
           printf '%s' "$response" | jq -e '.ok == true and .status == "succeeded" and .privacyStatus == "private" and .channelId == "UCPbMNjvwKOtuFX-1rAtCJSg" and .channelVerified == true and .metadataVerified == true and .categoryId == "20" and .notifySubscribers == false and .verificationSource == "youtube-data-api" and (.videoId | type == "string" and length > 0)' >/dev/null
+          echo "verified=true" >> "$GITHUB_OUTPUT"
+
+      # Bounded same-run follow-up after a successful-but-not-yet-proven
+      # private upload. The endpoint is verification-only: no videos.insert,
+      # metadata update, privacy change, or new publish selection.
+      - name: Retry private metadata verification without upload
+        id: verify_retry
+        if: steps.private_upload.outputs.verification_pending == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          token_response="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AMS_WORKER_AUDIENCE")"
+          worker_token="$(printf '%s' "$token_response" | jq -r '.value // empty')"
+          if [ -z "$worker_token" ]; then
+            echo "::error::GitHub OIDC token missing for read-only YouTube verification."
+            exit 1
+          fi
+          echo "::add-mask::$worker_token"
+
+          # The initial HTTP 202 was accepted only after validating identity,
+          # success state, exact channel, and known tag-only pending code.
+          initial_video_id="$(jq -r '.videoId // empty' "$RUNNER_TEMP/youtube-response.json")"
+          if [ -z "$initial_video_id" ]; then
+            echo "::error::Verified private video ID missing."
+            exit 1
+          fi
+          jq '{renderJobId}' "$RUNNER_TEMP/youtube-upload.json" > "$RUNNER_TEMP/youtube-verify-request.json"
+
+          for delay in 10 20 30; do
+            sleep "$delay"
+            set +e
+            http_code="$(curl --silent --show-error \
+              --output "$RUNNER_TEMP/youtube-verify-response.json" \
+              --write-out "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer $worker_token" \
+              -H "Content-Type: application/json" \
+              --data-binary @"$RUNNER_TEMP/youtube-verify-request.json" \
+              "$AMS_APP_URL/api/internal/twitch/media/render/youtube/verify")"
+            curl_status=$?
+            set -e
+            response="$(cat "$RUNNER_TEMP/youtube-verify-response.json" 2>/dev/null || true)"
+            printf '%s' "$response" | jq '{ok,pendingVerification,privacyStatus,videoId,channelId,metadataVerified,tagVerification,code}' || true
+
+            if [ "$curl_status" -ne 0 ]; then
+              echo "::warning::Read-only metadata verification request failed; next scheduled worker can reconcile the existing upload."
+              exit 0
+            fi
+            if [ "$http_code" = "202" ]; then
+              printf '%s' "$response" | jq -e --arg videoId "$initial_video_id" \
+                '.ok == false and .pendingVerification == true and .status == "succeeded" and .privacyStatus == "private" and .channelId == "UCPbMNjvwKOtuFX-1rAtCJSg" and .videoId == $videoId and .code == "YOUTUBE_UPLOAD_METADATA_TAGS_MISMATCH"' >/dev/null
+              continue
+            fi
+            if [ "$http_code" = "200" ]; then
+              printf '%s' "$response" | jq -e --arg videoId "$initial_video_id" \
+                '.ok == true and .pendingVerification == false and .status == "succeeded" and .privacyStatus == "private" and .channelId == "UCPbMNjvwKOtuFX-1rAtCJSg" and .channelVerified == true and .videoId == $videoId and .metadataVerified == true and .categoryId == "20" and .notifySubscribers == false and .verificationSource == "youtube-data-api"' >/dev/null
+              echo "verified=true" >> "$GITHUB_OUTPUT"
+              echo "Existing Private Short metadata verified through read-only retry."
+              exit 0
+            fi
+            echo "::warning::Read-only video verification returned HTTP $http_code; no public promotion attempted for this Short."
+            exit 0
+          done
+          echo "::warning::YouTube tags still pending after bounded readback; preserve Private and retry during scheduled reconciliation."
+
+      # Existing auto-publisher independently enforces selected clips, channel
+      # match, verified Private proof, idempotency and 3-per-stream cap.
+      - name: Attempt same-run guarded Public promotion
+        if: steps.private_upload.outputs.verified == 'true' || steps.verify_retry.outputs.verified == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          token_response="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AMS_WORKER_AUDIENCE")"
+          worker_token="$(printf '%s' "$token_response" | jq -r '.value // empty')"
+          [ -n "$worker_token" ] || exit 1
+          echo "::add-mask::$worker_token"
+
+          set +e
+          http_code="$(curl --silent --show-error \
+            --output "$RUNNER_TEMP/youtube-public-after-upload.json" \
+            --write-out "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $worker_token" \
+            "$AMS_APP_URL/api/internal/twitch/media/render/youtube/public/auto")"
+          curl_status=$?
+          set -e
+          response="$(cat "$RUNNER_TEMP/youtube-public-after-upload.json" 2>/dev/null || true)"
+          printf '%s' "$response" | jq '{ok,attempted,skipped,renderJobId,sourceVideoId,rank,status,privacyStatus,videoId,code}' || true
+          if [ "$curl_status" -ne 0 ] || [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::warning::Guarded Public promotion returned HTTP $http_code; the verified Private video remains for the next scheduled reconciliation."
+          fi
 
       - name: Record failed render
         if: failure() && steps.claim.outputs.has_job == 'true' && steps.complete.outcome != 'success'
