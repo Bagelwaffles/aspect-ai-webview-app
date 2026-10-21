@@ -444,6 +444,13 @@ jobs:
           [ -n "$worker_token" ] || exit 1
           echo "::add-mask::$worker_token"
 
+          # Restrict same-cycle publishing to the already auto-selected render.
+          # The server independently enforces all selection and stream-cap gates.
+          if ! jq -e '.job.autoPublish != null' "$RUNNER_TEMP/claim.json" >/dev/null; then
+            echo "No automatic publication selection for this render; preserve Private."
+            exit 0
+          fi
+
           set +e
           http_code="$(curl --silent --show-error \
             --output "$RUNNER_TEMP/youtube-public-after-upload.json" \
