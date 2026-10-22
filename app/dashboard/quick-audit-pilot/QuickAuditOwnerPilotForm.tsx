@@ -40,7 +40,7 @@ export function QuickAuditOwnerPilotForm() {
 
   return (
     <form onSubmit={submit} className="space-y-5 rounded-2xl border p-5 sm:p-7">
-      <div><h2 className="text-xl font-bold">AMS self-audit intake</h2><p className="mt-1 text-sm text-muted-foreground">Edit the goals as needed. Only test data will be sent to Stripe's sandbox Checkout.</p></div>
+      <div><h2 className="text-xl font-bold">AMS self-audit intake</h2><p className="mt-1 text-sm text-muted-foreground">Edit the goals as needed. Only test data will be sent to Stripe&apos;s sandbox Checkout.</p></div>
       <label className="block space-y-1 text-sm font-medium">Business name
         <input className="w-full rounded-lg border bg-background px-3 py-3" name="businessName" maxLength={200} defaultValue="Aspect Marketing Solutions" required />
       </label>
