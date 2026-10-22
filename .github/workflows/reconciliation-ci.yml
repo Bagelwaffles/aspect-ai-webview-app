@@ -130,6 +130,13 @@ jobs:
       - name: Application tests
         run: pnpm test
 
+      - name: Signed AMS audit → ephemeral Redis acceptance
+        env:
+          AMS_AUDIT_EPHEMERAL_REDIS_TEST: "true"
+          UPSTASH_REDIS_REST_URL: "http://127.0.0.1:8079"
+          UPSTASH_REDIS_REST_TOKEN: "ci-only-redis-rest-token"
+        run: node --import tsx --test tests/quick-audit-signed-redis-e2e.test.ts
+
       - name: Production build
         run: pnpm run build
 
