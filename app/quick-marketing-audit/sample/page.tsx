@@ -196,7 +196,7 @@ export default function QuickAuditSamplePage() {
 
           <section id="sample-implementation" className="rounded-2xl border border-primary/30 bg-primary/5 p-5 sm:p-8">
             <h2 className="text-2xl font-bold">You have the plan. Want help implementing it?</h2>
-            <p className="mt-3 max-w-3xl text-muted-foreground">A future paid report can let customers select one or more verified findings to request a separate, no-obligation implementation quote. Submitting a request will never trigger a charge or modify a customer's website. This demonstration has no live implementation checkout.</p>
+            <p className="mt-3 max-w-3xl text-muted-foreground">A future paid report can let customers select one or more verified findings to request a separate, no-obligation implementation quote. Submitting a request will never trigger a charge or modify a customer&apos;s website. This demonstration has no live implementation checkout.</p>
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               {["Quick Fix · quoted per task", "Growth Sprint · quoted scope", "Full Implementation · quoted scope"].map((offer) => <div className="rounded-xl border bg-background p-4 text-sm font-semibold" key={offer}><CheckCircle2 className="mb-3 h-5 w-5 text-primary" />{offer}</div>)}
             </div>
