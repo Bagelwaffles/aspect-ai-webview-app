@@ -98,9 +98,10 @@ test("AMS-on-AMS $5 simulated checkout produces one verifiable five-finding repo
   assert.equal(res.status, 200)
   const checkoutBody = await res.json()
   assert.equal(checkoutBody.expectedTotalCents, 500)
-  assert.equal(createdCheckout?.line_items?.[0]?.price, testPrice)
-  assert.equal(createdCheckout?.discounts?.[0]?.coupon, "coupon_mock_once")
-  assert.equal(createdCheckout?.metadata?.ams_request_id, orderId)
+  const checkedCheckout = createdCheckout as Stripe.Checkout.SessionCreateParams | null
+  assert.equal(checkedCheckout?.line_items?.[0]?.price, testPrice)
+  assert.equal(checkedCheckout?.discounts?.[0]?.coupon, "coupon_mock_once")
+  assert.equal(checkedCheckout?.metadata?.ams_request_id, orderId)
 
   const paidTestSession = {
     id: sessionId,
@@ -110,7 +111,7 @@ test("AMS-on-AMS $5 simulated checkout produces one verifiable five-finding repo
     status: "complete",
     payment_status: "paid",
     expires_at: Math.floor(Date.now() / 1000) + 3600,
-    metadata: createdCheckout?.metadata,
+    metadata: checkedCheckout?.metadata,
   } as unknown as Stripe.Checkout.Session
   const lineItems = {
     object: "list",
