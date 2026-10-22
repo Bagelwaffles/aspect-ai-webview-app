@@ -5,6 +5,7 @@ import { ShieldCheck, LockKeyhole, CreditCard } from "lucide-react"
 import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie"
 import { inspectAuditOwnerPilotConfiguration } from "@/lib/server/quick-audit-owner-readiness"
 import { QuickAuditOwnerPilotForm } from "./QuickAuditOwnerPilotForm"
+import { QuickAuditOwnerDryRun } from "./QuickAuditOwnerDryRun"
 
 export const dynamic = "force-dynamic"
 
@@ -26,6 +27,8 @@ export default async function OwnerAuditPilotPage() {
   }
   const gates = inspectAuditOwnerPilotConfiguration(process.env)
   const enabled = gates.every(gate => gate.configured)
+  const dryRunEnabled = process.env.VERCEL_ENV === "preview" &&
+    process.env.AMS_QUICK_AUDIT_OWNER_DRY_RUN_ENABLED === "true"
 
   return (
     <main className="min-h-screen bg-background px-4 py-12">
@@ -62,6 +65,13 @@ export default async function OwnerAuditPilotPage() {
             ))}
           </ul>
         </section>
+        {dryRunEnabled ? (
+          <QuickAuditOwnerDryRun />
+        ) : (
+          <p className="rounded-lg border px-4 py-3 text-sm text-muted-foreground">
+            The no-charge AMS self-audit is disabled on this Preview until owner access and its dry-run gate are explicitly configured.
+          </p>
+        )}
         {enabled ? (
           <QuickAuditOwnerPilotForm />
         ) : (
