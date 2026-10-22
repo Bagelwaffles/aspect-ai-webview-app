@@ -120,13 +120,13 @@ test("pilot cannot create a Checkout Session when test webhook, owner OAuth or R
 
 test("pilot denies invalid admin identity and missing allowlist before Stripe", async () => {
   for (const options of [
-    { email: "not-owner@example.com" },
-    { email: null },
-    { env: { ...env, AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL: "" } },
+    { email: "not-owner@example.com", status: 403 },
+    { email: null, status: 403 },
+    { env: { ...env, AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL: "" }, status: 404 },
   ]) {
     const f = fixture(options)
     const response = await f.handler(request())
-    assert.equal(response.status, 403)
+    assert.equal(response.status, options.status)
     assert.equal(f.calls(), 0)
   }
 })
