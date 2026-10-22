@@ -22,6 +22,14 @@ const env: NodeJS.ProcessEnv = {
   AMS_QUICK_AUDIT_OWNER_PILOT_ENABLED: "true",
   AMS_QUICK_AUDIT_FULFILLMENT_READY: "true",
   AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL: "owner@example.com",
+  AMS_OWNER_EMAIL: "owner@example.com",
+  INTERNAL_ADMIN_SECRET: "test-internal-admin-secret-with-32-chars",
+  GOOGLE_CLIENT_ID: "test-google-client-id",
+  GOOGLE_CLIENT_SECRET: "test-google-client-secret",
+  NEXTAUTH_SECRET: "test-nextauth-secret",
+  UPSTASH_REDIS_REST_URL: "https://redis-mock.example.com",
+  UPSTASH_REDIS_REST_TOKEN: "redis-mock-token",
+  AMS_STRIPE_QUICK_AUDIT_WEBHOOK_SECRET: "whsec_mock",
   AMS_STRIPE_QUICK_AUDIT_SECRET_KEY: "sk_test_private_fixture",
   AMS_STRIPE_QUICK_AUDIT_PRICE_ID: "price_audit_test_fixture",
   AMS_QUICK_AUDIT_OWNER_PILOT_COUPON_ID: "coupon_owner_only_fixture",
@@ -93,6 +101,20 @@ test("owner pilot fails closed on main, disabled flag or missing ready gate", as
     assert.equal(response.status, 404)
     assert.equal(f.calls(), 0)
     assert.equal(response.headers.get("cache-control"), "no-store")
+  }
+})
+
+test("pilot cannot create a Checkout Session when test webhook, owner OAuth or Redis are absent", async () => {
+  for (const override of [
+    { AMS_STRIPE_QUICK_AUDIT_WEBHOOK_SECRET: "" },
+    { UPSTASH_REDIS_REST_TOKEN: "" },
+    { GOOGLE_CLIENT_SECRET: "" },
+    { AMS_OWNER_EMAIL: "mismatched@example.com" },
+  ]) {
+    const f = fixture({ env: { ...env, ...override } })
+    const response = await f.handler(request())
+    assert.equal(response.status, 404)
+    assert.equal(f.calls(), 0)
   }
 })
 
