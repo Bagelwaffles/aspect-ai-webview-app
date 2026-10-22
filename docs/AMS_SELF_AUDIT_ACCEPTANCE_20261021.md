@@ -57,13 +57,25 @@ Prepared 2026-10-21. **INITIAL DESK REVIEW; NOT A COMPLETED PAID AUDIT, NOT A PR
 ## Private test-mode pilot steps
 1. Build and inspect sample in Vercel Preview. Run typed/lint/test/build/secret scan checks.
 2. Obtain owner-verified preview admin login. Configure distinct private preview Redis, test Stripe secret/test $49 audit price, and signed **test-mode** webhook routing only to the preview. Prevent production data writes or notifications.
-3. Create one **test-mode coupon** for $44 off the existing $49 one-time audit price (duration once, currency USD, `max_redemptions=1`). Keep its ID server-side. Check actual discount math and coupon eligibility. Do not create or activate in live mode.
+3. **ALREADY CREATED in the original AMS account TEST mode:** one $44 off coupon for the original $49 test audit price, duration once, USD, max redemptions=1, ID `coupon_ams_owner_audit_pilot_20261021`. Coupon is not redeemed. **This does not establish safe webhook routing; do not use it to open a real hosted test session yet.**
 4. Set `AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL` to the existing verified owner identity, `AMS_QUICK_AUDIT_OWNER_PILOT_COUPON_ID` to the test coupon, and only then `AMS_QUICK_AUDIT_OWNER_PILOT_ENABLED=true` plus `AMS_QUICK_AUDIT_FULFILLMENT_READY=true` in the isolated Preview. Do not set public-sales flag or live keys.
 5. Open protected `/dashboard/quick-audit-pilot`; submit prepared AMS intake. Confirm Stripe Checkout explicitly says **test mode**, amount $5. Use only Stripe's **test card** data, never a real card.
 6. Verify exactly one paid TEST Checkout Session, matching original $49 audit price line item + $44 coupon, valid signed webhook, one native audit result in PREVIEW Redis, correct result view, print/PDF, no PII leaks, one duplicate replay without second fulfillment.
 7. Have the owner inspect the five recommendations against the actual public pages, explicitly recording true vs hypothetical findings. Mark acceptance PASS only when useful, accurate and attractive.
 8. Verify mock implementation CTA cannot charge or mutate external platforms. Keep the pilot gate and all external sends OFF when not actively testing.
 9. Only after all gates pass, independently consider a **legitimate external live-customer purchase** as live acceptance, using the normal $49 public price or a separately approved customer promotion. Do **not** use the business owner's real card to stage self-payment testing.
+
+## 2026-10-21 controlled continuation — current safety gates
+
+- Existing main-account **test-mode** Stripe webhook points to `www.aspectmarketingsolutions.app` (production domain).
+- A *separate* AMS Stripe sandbox account is available but has **two enabled webhook destinations**, including the production-domain AMS endpoint and an existing worker. This is **not** an isolated sandbox payment path.
+- The connected Upstash account contains only `ams-scheduled-tasks-preview`, already used by another Preview workflow. Pricing confirms one free database per free tier. **No second potentially charged database was provisioned, no shared preview credentials copied.**
+- Current branch-specific Preview environment variables: test price ID and one-use coupon ID present; `AMS_QUICK_AUDIT_OWNER_PILOT_ENABLED=false` and `AMS_QUICK_AUDIT_FULFILLMENT_READY=false`. Google owner login, signed test webhook, test key and private Redis are not yet configured for this specific branch.
+- Signed webhook validation and secure result lookup are covered by existing fixtures; a new explicit AMS-on-AMS synthetic test also checks Checkout intent → one native result → duplicate suppression → private lookup. Mock tests are **not** evidence of a hosted Stripe delivery.
+- Prior exact commit built in both Vercel projects and passed secret scans. GitHub reconciliation on later commits encountered **registry transport failures** during Corepack and dependency audit; the feature branch now includes fail-closed network-only retries. The most recent exact-head verification status must be rechecked.
+- **The paid test is on HOLD.** Isolate a fresh Stripe sandbox with no production-domain webhook subscriptions (or explicitly verify all event listeners have no side effects, with evidence and owner approval), plus an isolated no-charge Redis fixture, owner OAuth and signing secret, before enabling Preview flags.
+- Never point Stripe test events at the live AMS audit webhook, change production Stripe subscriptions, or reuse the other task Preview Redis merely to make a test pass.
+- The report currently includes five actionable findings with automated-signal vs. strategic labels, source URL + timestamp where applicable, and the existing HTML/print report. Dedicated video narration, slides and polished dedicated PDF generation remain **future work**.
 
 ## Critical warning
 Stripe's official testing documentation warns that real payment method data must not be used to test in live mode. The separate owner preview flow is **sandbox-only** and deliberately will not issue a real charge. This cannot prove a live production acquiring/payout event, but it can verify payment/webhook/application behavior without prohibited card testing.
@@ -73,11 +85,11 @@ Documentation: https://docs.stripe.com/testing
 | Gate | Status | Notes |
 | --- | --- | --- |
 | Public-site preflight | LIMITED REVIEW | Rendered pages and code inspected, not runtime or metrics |
-| Fictional sample asset | BRANCH CODED | Verify preview & accessibility |
-| Owner preview test screen + API | BRANCH CODED | Disabled by default |
+| Fictional sample asset | BRANCH CODED, VERCEL PREVIEW BUILDS READY | Browser accessibility review and actual route confirmation pending |
+| Owner preview test screen + API | BRANCH CODED | Disabled; now includes read-only seven-gate owner diagnostic |
 | Unit tests | CODED / NOT YET VERIFIED | Exact-head GitHub CI needed |
 | Production/webhook isolation | NOT VERIFIED | Must be proven with private Preview data |
-| $44 TEST coupon | NOT CREATED | Wait for code and preview checks |
+| $44 TEST coupon | CREATED AND UNREDEEMED | Existing main account test mode only; one redemption; **do not use until webhook isolation** |
 | Test paid Checkout | NOT RUN | Owner must complete sandbox test interactively |
 | Audit generated automatically | NOT PROVEN IN PILOT | Needs signed test webhook result |
 | Premium PDF/video/slides | NOT VERIFIED | Future milestones |
