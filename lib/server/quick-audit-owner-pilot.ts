@@ -5,6 +5,7 @@ import Stripe from "stripe"
 import { z } from "zod"
 
 import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie"
+import { inspectAuditOwnerPilotConfiguration } from "./quick-audit-owner-readiness"
 
 const ownerPilotSchema = z.object({
   businessName: z.string().trim().min(1).max(200),
@@ -50,9 +51,7 @@ function noStore(body: Record<string, unknown>, status: number) {
 }
 
 function ready(env: NodeJS.ProcessEnv) {
-  return env.VERCEL_ENV === "preview" &&
-    env.AMS_QUICK_AUDIT_OWNER_PILOT_ENABLED?.trim() === "true" &&
-    env.AMS_QUICK_AUDIT_FULFILLMENT_READY?.trim() === "true"
+  return inspectAuditOwnerPilotConfiguration(env).every(gate => gate.configured)
 }
 
 /** In preview only; never modifies the public $49 audit checkout or the live Stripe product. */
