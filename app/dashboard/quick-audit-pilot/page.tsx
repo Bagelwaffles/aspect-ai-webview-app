@@ -1,0 +1,60 @@
+import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
+import { ShieldCheck, LockKeyhole, CreditCard } from "lucide-react"
+
+import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie"
+import { QuickAuditOwnerPilotForm } from "./QuickAuditOwnerPilotForm"
+
+export const dynamic = "force-dynamic"
+
+export const metadata = {
+  title: "AMS Audit Owner Pilot | Preview only",
+  robots: { index: false, follow: false },
+}
+
+export default async function OwnerAuditPilotPage() {
+  const cookieStore = await cookies()
+  const cookie = cookieStore.get("ams_internal_admin_access")?.value
+  const adminSecret = process.env.INTERNAL_ADMIN_SECRET?.trim()
+  const admin = adminSecret && cookie ? await verifyInternalAdminCookie(cookie, adminSecret) : null
+  if (!admin?.email) redirect("/admin/login?next=/dashboard/quick-audit-pilot")
+
+  const owner = process.env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim().toLowerCase()
+  if (!owner || admin.email.trim().toLowerCase() !== owner) {
+    return <main className="mx-auto max-w-xl px-4 py-12"><h1 className="text-2xl font-bold">Not authorized</h1><p>This preview is for the authorized AMS owner only.</p></main>
+  }
+  const enabled = process.env.VERCEL_ENV === "preview" &&
+    process.env.AMS_QUICK_AUDIT_OWNER_PILOT_ENABLED?.trim() === "true" &&
+    process.env.AMS_QUICK_AUDIT_FULFILLMENT_READY?.trim() === "true"
+
+  return (
+    <main className="min-h-screen bg-background px-4 py-12">
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-primary">
+          <ShieldCheck className="h-5 w-5" /> Internal AMS owner acceptance test
+        </div>
+        <h1 className="text-3xl font-bold">Audit Aspect Marketing Solutions</h1>
+        <p className="text-muted-foreground">Run the same five-findings audit on the AMS website using the existing Quick Audit test-mode product and fulfillment pipeline. This pilot is not a public sale.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex items-start gap-3 rounded-xl border p-4">
+            <CreditCard className="mt-1 h-5 w-5 text-primary" />
+            <div><p className="font-semibold">$5 simulated checkout</p><p className="text-sm text-muted-foreground">Discounted from the existing $49 TEST price. No real funds move.</p></div>
+          </div>
+          <div className="flex items-start gap-3 rounded-xl border p-4">
+            <LockKeyhole className="mt-1 h-5 w-5 text-primary" />
+            <div><p className="font-semibold">Preview only</p><p className="text-sm text-muted-foreground">Requires owner session, preview flag, test keys and ready fulfillment.</p></div>
+          </div>
+        </div>
+        {enabled ? (
+          <QuickAuditOwnerPilotForm />
+        ) : (
+          <section className="rounded-xl border p-5" aria-live="polite">
+            <h2 className="font-semibold">Pilot checkout is disabled</h2>
+            <p className="mt-2 text-sm text-muted-foreground">That is the safe default. Complete CI, verified webhook routing, preview result storage, delivery and security tests first. Enable the owner pilot only after those checks are approved.</p>
+          </section>
+        )}
+        <p className="text-sm text-muted-foreground">Test acceptance requires exactly one completed Checkout Session, one signed webhook fulfillment, one stored audit result, correct report rendering, and a safe duplicate replay. Manual review of the findings is required before claiming autonomous professional quality.</p>
+      </div>
+    </main>
+  )
+}
