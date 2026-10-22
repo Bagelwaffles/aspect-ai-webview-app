@@ -61,7 +61,27 @@ jobs:
         run: corepack enable
 
       - name: Install pnpm
-        run: corepack prepare pnpm@10.28.0 --activate
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if corepack prepare pnpm@10.28.0 --activate > /tmp/ams-corepack-log.txt 2>&1; then
+              cat /tmp/ams-corepack-log.txt
+              exit 0
+            else
+              status=$?
+            fi
+            cat /tmp/ams-corepack-log.txt
+            # Only retry upstream npm/network outages. Do not change versions.
+            if ! grep -Eqi 'HTTP 503|ERR_SOCKET_TIMEOUT|ECONNRESET|ETIMEDOUT|EAI_AGAIN|fetch failed|Socket timeout' /tmp/ams-corepack-log.txt; then
+              exit "$status"
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Pinned pnpm install failed: fail closed after three attempts"
+              exit "$status"
+            fi
+            sleep "$((attempt * 10))"
+          done
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
