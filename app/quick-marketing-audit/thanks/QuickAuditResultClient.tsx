@@ -198,7 +198,7 @@ export function QuickAuditResultClient() {
                     "Legacy finding — review evidence"}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">{finding.observation}</p>
-              {finding.sourceUrl && /^https?:\\/\\//i.test(finding.sourceUrl) ? (
+              {finding.sourceUrl && (finding.sourceUrl.startsWith("https://") || finding.sourceUrl.startsWith("http://")) ? (
                 <p className="mt-2 text-xs text-muted-foreground">
                   Source: <a href={finding.sourceUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">Audited public website</a>
                   {finding.reviewedAt ? ` · Checked ${new Date(finding.reviewedAt).toLocaleDateString()}` : ""}
