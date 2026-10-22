@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { ShieldCheck, LockKeyhole, CreditCard } from "lucide-react"
 
 import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie"
+import { inspectAuditOwnerPilotConfiguration } from "@/lib/server/quick-audit-owner-readiness"
 import { QuickAuditOwnerPilotForm } from "./QuickAuditOwnerPilotForm"
 
 export const dynamic = "force-dynamic"
@@ -23,9 +24,8 @@ export default async function OwnerAuditPilotPage() {
   if (!owner || admin.email.trim().toLowerCase() !== owner) {
     return <main className="mx-auto max-w-xl px-4 py-12"><h1 className="text-2xl font-bold">Not authorized</h1><p>This preview is for the authorized AMS owner only.</p></main>
   }
-  const enabled = process.env.VERCEL_ENV === "preview" &&
-    process.env.AMS_QUICK_AUDIT_OWNER_PILOT_ENABLED?.trim() === "true" &&
-    process.env.AMS_QUICK_AUDIT_FULFILLMENT_READY?.trim() === "true"
+  const gates = inspectAuditOwnerPilotConfiguration(process.env)
+  const enabled = gates.every(gate => gate.configured)
 
   return (
     <main className="min-h-screen bg-background px-4 py-12">
@@ -45,6 +45,23 @@ export default async function OwnerAuditPilotPage() {
             <div><p className="font-semibold">Preview only</p><p className="text-sm text-muted-foreground">Requires owner session, preview flag, test keys and ready fulfillment.</p></div>
           </div>
         </div>
+        <section className="rounded-2xl border p-5 sm:p-6" aria-labelledby="pilot-gates-heading">
+          <h2 id="pilot-gates-heading" className="text-lg font-semibold">Private test readiness</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Configuration checks only. A real test session, Stripe webhook delivery and independent storage isolation still require verification.</p>
+          <ul className="mt-4 space-y-3">
+            {gates.map(gate => (
+              <li className="flex items-start gap-3" key={gate.id}>
+                <span aria-label={gate.configured ? "Configured" : "Not configured"} className={`mt-0.5 rounded-full border px-2 py-0.5 text-xs font-semibold ${gate.configured ? "border-green-600/30 text-green-700 dark:text-green-300" : "border-amber-600/30 text-amber-700 dark:text-amber-300"}`}>
+                  {gate.configured ? "Set" : "Blocked"}
+                </span>
+                <div>
+                  <p className="text-sm font-semibold">{gate.label}</p>
+                  <p className="text-xs text-muted-foreground">{gate.explanation}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
         {enabled ? (
           <QuickAuditOwnerPilotForm />
         ) : (
