@@ -81,6 +81,11 @@ export function createOwnerPilotCheckoutHandler(overrides: Partial<Dependencies>
 
     const parsed = ownerPilotSchema.safeParse(await request.json().catch(() => null))
     if (!parsed.success) return noStore({ ok: false, code: "PILOT_INTAKE_INVALID" }, 400)
+    const auditedSite = new URL(parsed.data.websiteUrl)
+    if (auditedSite.protocol !== "https:" || auditedSite.username || auditedSite.password ||
+      auditedSite.port || !["aspectmarketingsolutions.app", "www.aspectmarketingsolutions.app"].includes(auditedSite.hostname.toLowerCase())) {
+      return noStore({ ok: false, code: "PILOT_AMS_SITE_ONLY" }, 400)
+    }
 
     const secret = env.AMS_STRIPE_QUICK_AUDIT_SECRET_KEY?.trim()
     const priceId = env.AMS_STRIPE_QUICK_AUDIT_PRICE_ID?.trim()
