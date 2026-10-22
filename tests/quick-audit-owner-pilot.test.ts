@@ -16,6 +16,7 @@ const intake = {
   notes: "Private synthetic-owner test: no public customer order",
 }
 const env: NodeJS.ProcessEnv = {
+  NODE_ENV: "test",
   VERCEL_ENV: "preview",
   VERCEL_URL: "aspect-audit-pilot.vercel.app",
   AMS_QUICK_AUDIT_OWNER_PILOT_ENABLED: "true",
