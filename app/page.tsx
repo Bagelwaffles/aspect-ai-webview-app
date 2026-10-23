@@ -106,34 +106,33 @@ export default function HomePage() {
         <div className={styles.heroCopy}>
           <div className={styles.eyebrow}>
             <span className={styles.liveDot} />
-            Practical AI for growing businesses
+            INTELLIGENT GROWTH SYSTEMS · HUMAN CONTROLLED
           </div>
 
           <h1>
-            Marketing feels easier
-            <span>when the right work is automated.</span>
+            Your marketing. In motion.
+            <span>Your decisions. In control.</span>
           </h1>
 
           <p className={styles.heroText}>
             {subscriptionCheckoutLive ? (
               <>
-                Start with seven production-verified AI agents from $29/month, or choose the
-                $49 Quick Marketing Audit for a focused one-time review. AMS also supports content,
-                lead generation, follow-up, visibility, creator workflows, and day-to-day operations —
-                with human control where it matters.
+                One connected place for content, leads, follow-up, visibility, and smarter marketing workflows.
+                Explore seven production-verified AI agents from $29/month, or get focused direction with
+                the $49 Quick Marketing Audit. Every consequential action stays under human control.
               </>
             ) : (
               <>
-                Seven AMS AI agents have production verification, but subscription checkout and paid AI
-                execution are temporarily paused while AMS runs in zero-cost mode. The $49 Quick Marketing
-                Audit remains the active paid starting point, and the full agent catalog stays visible for review.
+                Your next marketing move deserves clarity, speed, and control. Seven AMS agents have
+                production verification, but subscription checkout and paid agent execution are paused in
+                zero-cost mode. The $49 Quick Marketing Audit remains the active paid starting point.
               </>
             )}
           </p>
 
           <div className={styles.heroActions}>
             <Link className={styles.primaryButton} href="/agents#catalog">
-              Explore AI agents <span aria-hidden="true">→</span>
+              Explore the agent network <span aria-hidden="true">→</span>
             </Link>
             <Link className={styles.secondaryButton} href="/quick-marketing-audit">
               Get the $49 audit
@@ -165,8 +164,8 @@ export default function HomePage() {
             <div className={styles.workspace}>
               <div className={styles.workspaceHeader}>
                 <div>
-                  <span className={styles.microLabel}>AMS WORKSPACE</span>
-                  <h2>Your marketing command center</h2>
+                  <span className={styles.microLabel}>AMS / CONTROL CENTER</span>
+                  <h2>Work smarter. Stay in command.</h2>
                 </div>
                 <span className={styles.onlinePill}>Live</span>
               </div>
@@ -176,7 +175,7 @@ export default function HomePage() {
                   <span>Today&apos;s workflow</span>
                   <span>Human-controlled</span>
                 </div>
-                <h3>Launch a focused small-business campaign</h3>
+                <h3>From brief to ready-for-review campaign</h3>
                 <div className={styles.flowLine}>
                   <span className={styles.flowActive}>Brief</span>
                   <i />
@@ -237,6 +236,20 @@ export default function HomePage() {
         <span>Production-verified agents</span>
         <span>Clear pricing</span>
       </section>
+      <section className={styles.brandStatement} aria-label="AMS brand promise">
+        <div className={styles.brandStatementTop}>
+          <span>ASPECT / BRAND PROMISE</span>
+          <span>INTELLIGENCE WITH ACCOUNTABILITY</span>
+        </div>
+        <p>
+          Always on. <em>Always working.</em>
+          <strong> Built to grow your brand.</strong>
+        </p>
+        <div className={styles.brandKeywords} aria-label="Our pillars">
+          <span>AUTOMATE</span><span>AMPLIFY</span><span>GROW</span>
+        </div>
+      </section>
+
       <p className={styles.lifecycleNote}>
         Five statuses. Live, Beta, Setup Required, Blocked, and Planned.
       </p>
