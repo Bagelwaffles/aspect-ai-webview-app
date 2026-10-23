@@ -59,7 +59,9 @@ Maintain one draft expansion pathway per agent category, conditional on the spec
 - **Creator:** Clip/overlay/video service only after render/export/publish/delivery rights and costs are proven; Twitch Shorts remains owner-controlled Beta.
 - **Platform:** Enterprise onboarding/implementation quote, not unverified full-agent lifetime access.
 
-Do not attach a public purchase price, checkout link, autonomous sender, or guaranteed deliverable to any Beta/Setup Required/Planned/Blocked agent. Existing older Stripe products are staged/retired for a reason.
+Do not attach a public purchase price, checkout link, autonomous sender, or guaranteed deliverable to any Beta/Setup Required/Planned/Blocked agent.
+
+**Complete catalog coverage added:** `lib/ams-upsell-roadmap.ts` contains one specifically named potential next customer outcome and a strict activation prerequisite for each of the other **26 non-Live agents**, including Fiverr Bridge, Overmind, Twitch/YouTube, Shopify, support, research and builder agents. Each entry is marked `internal_concept_not_for_sale`. `tests/ams-upsell-offers.test.ts` now checks that the seven visible Live-agent mappings and 26 internal-only proposals exactly cover all 33 current agent slugs, and that no non-Live agent can expose a verified cross-sell. This is a planning artifact, not 26 newly launched paid products. Existing older Stripe products are staged/retired for a reason.
 
 ## Auto-send decision and phased activation
 
