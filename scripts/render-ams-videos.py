@@ -2,7 +2,7 @@
 """Original text-led AMS video explainers, no customer data or borrowed footage."""
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-import math, subprocess, sys
+import math, subprocess, sys, shutil
 
 W,H,FPS=960,540,12
 OUT=Path(sys.argv[1] if len(sys.argv)>1 else "public/videos")
@@ -91,7 +91,8 @@ def stamp(t):
 def build(film):
     name,length,brand,label,chapters,foot=film
     out=OUT/(name+".mp4")
-    cmd=["ffmpeg","-hide_banner","-loglevel","error","-y","-f","rawvideo","-pix_fmt","rgb24","-s",f"{W}x{H}","-r",str(FPS),"-i","pipe:0",
+    import imageio_ffmpeg
+    cmd=[shutil.which("ffmpeg") or imageio_ffmpeg.get_ffmpeg_exe(),"-hide_banner","-loglevel","error","-y","-f","rawvideo","-pix_fmt","rgb24","-s",f"{W}x{H}","-r",str(FPS),"-i","pipe:0",
          "-f","lavfi","-i","anullsrc=r=44100:cl=stereo","-map","0:v:0","-map","1:a:0","-c:v","libx264","-preset","veryfast","-crf","28",
          "-pix_fmt","yuv420p","-r",str(FPS),"-c:a","aac","-b:a","24k","-t",str(length),"-movflags","+faststart","-shortest",str(out)]
     p=subprocess.Popen(cmd,stdin=subprocess.PIPE)
