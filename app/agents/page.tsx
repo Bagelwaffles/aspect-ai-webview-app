@@ -65,13 +65,10 @@ export default function AgentsPage() {
     [category, status],
   )
 
-  const counts = customerAgents.reduce<Record<AgentStatus, number>>((totals, agent) => {
-    totals[agent.status] += 1
-    return totals
-  }, { live: 0, beta: 0, "setup-required": 0, planned: 0, blocked: 0 })
+  
 
   return (
-    <main className={`${styles.network} ams-public-page`}>
+    <main className={`${styles.network} ams-public-page ams-public-page--balanced`}>
       <AmsPublicHeader />
       
 
@@ -166,8 +163,7 @@ export default function AgentsPage() {
             <h2>{filteredAgents.length} agents in view.</h2>
           </div>
           <p>
-            Every card shows the real commercial state. “Available now” routes to an existing purchase path. Beta and roadmap agents stay visible for comparison,
-            but AMS does not attach a fake price or checkout button to unfinished functionality.
+            Choose a marketing goal and see what each agent can help with. Services that are not available are clearly marked and cannot be purchased.
           </p>
         </div>
 
@@ -255,8 +251,7 @@ export default function AgentsPage() {
           <p className={styles.kicker}>How buying AMS works</p>
           <h2>One catalog. Clear purchase paths.</h2>
           <p>
-            Customers should be able to discover an agent, understand what it does, watch the sales video, and know immediately whether it can be purchased today.
-            AMS keeps commercial access separate from roadmap visibility so the store can grow without making claims the product cannot support.
+            See the benefits, compare options, and choose what fits your business.
           </p>
         </div>
         <div className={styles.steps}>

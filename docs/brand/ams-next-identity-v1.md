@@ -78,3 +78,12 @@ Use identical name, emblem, palette, headline style, and brand signature across:
 - [ ] Owner approves reviewed screenshots and preview before any merge or production promotion.
 
 The design branch is deliberately separate from the existing Google verification, Aiven, Gmail, and campaign-preview work. No account credentials or environment variables are required for this design phase.
+
+## Customer-facing information policy (Oct 23, 2026)
+
+- The public website explains business outcomes, actual pricing/credit entitlements, current purchase availability, delivery expectations and clear customer approval/privacy information.
+- Operational configuration, internal agent readiness evidence, implementation milestones, developer terminology, deployment plumbing, API/OAuth/credential details, and status debugging are **not** customer-facing marketing copy.
+- Preserve the privacy policy, Google data-use, deletion, terms and billing disclosures. Don't hide information customers need to make an informed purchase.
+- Agent Store excludes `internal: true` agents from public listings and direct public detail pages; status labels use plain English without changing stored technical states.
+- A cinematic master banner gives way to progressively quieter grid/glow atmospheric backgrounds on catalog, pricing, audit and contact pages. Strong contrast and legible forms take priority over effects.
+- Social brand, product mechanics and owner console remain separate responsibilities.

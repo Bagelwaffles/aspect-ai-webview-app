@@ -528,3 +528,46 @@
 .ams-public-footer{background:#030611}
 .ams-public-nav a:hover,.ams-public-nav a:focus-visible,.ams-public-footer__nav a:hover{color:#6cb8ff}
 .ams-public-page :is(a,button,input,select,textarea):focus-visible{outline-color:#66b9ff}
+
+/* AMS atmospheric public backgrounds inspired by the owner's metallic world-network banner.
+   Neon accents frame readable content; no duplicated text-heavy banner wallpaper. */
+.ams-public-page {
+  --ams-bg-ink: #030715;
+  --ams-card-ink: rgba(9,18,41,.96);
+  --ams-edge-blue: rgba(75,145,255,.26);
+  background-color:var(--ams-bg-ink);
+  background-image:
+    radial-gradient(ellipse at 84% 2%,rgba(95,47,231,.19),transparent 34rem),
+    radial-gradient(ellipse at 10% 13%,rgba(25,103,235,.14),transparent 36rem),
+    linear-gradient(90deg,rgba(78,146,255,.023) 1px,transparent 1px),
+    linear-gradient(rgba(78,146,255,.023) 1px,transparent 1px),
+    linear-gradient(180deg,#030715 0%,#08142d 50%,#030715 100%);
+  background-size:auto,auto,88px 88px,88px 88px,auto;
+  color:#e9f1ff;
+}
+.ams-public-page--balanced {
+  background-image:
+    radial-gradient(ellipse at 89% 2%,rgba(108,45,232,.22),transparent 34rem),
+    radial-gradient(ellipse at 6% 12%,rgba(22,100,245,.16),transparent 33rem),
+    linear-gradient(90deg,rgba(76,150,255,.022) 1px,transparent 1px),
+    linear-gradient(rgba(76,150,255,.022) 1px,transparent 1px),
+    linear-gradient(180deg,#030715,#081329 57%,#030715);
+}
+.ams-public-page--quiet {
+  background-image:
+    radial-gradient(ellipse at 94% 0,rgba(95,44,217,.10),transparent 30rem),
+    radial-gradient(ellipse at 2% 12%,rgba(28,106,241,.10),transparent 28rem),
+    linear-gradient(90deg,rgba(76,150,255,.012) 1px,transparent 1px),
+    linear-gradient(rgba(76,150,255,.012) 1px,transparent 1px),
+    linear-gradient(180deg,#030715,#081024 65%,#030715);
+}
+.ams-public-page [data-slot="card"] {
+  border:1px solid rgba(84,145,248,.25);
+  background:linear-gradient(145deg,rgba(47,85,181,.065),rgba(94,37,172,.025) 64%),var(--ams-card-ink);
+  box-shadow:0 20px 54px rgba(0,0,0,.23),0 0 0 1px rgba(92,139,238,.024);
+}
+.ams-public-page .text-muted-foreground {color:#b9c9e1!important}
+.ams-public-page [data-slot="card-description"] {color:#c3d0e5!important}
+.ams-public-page :is(h1,h2,h3) {text-wrap:balance}
+.ams-public-page--quiet [data-slot="card"] {background-color:rgba(8,18,38,.97)}
+@media (prefers-reduced-motion:reduce){.ams-public-page *, .ams-public-header * {scroll-behavior:auto!important;animation:none!important;transition:none!important}}
