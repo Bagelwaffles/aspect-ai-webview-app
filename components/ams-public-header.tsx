@@ -15,6 +15,16 @@ export function AmsPublicHeader() {
           <Link href="/quick-marketing-audit">Marketing Audit</Link>
           <Link href="/contact">Contact</Link>
         </nav>
+        <details className="ams-public-mobile-menu">
+          <summary>Menu <span aria-hidden="true">☰</span></summary>
+          <nav aria-label="Mobile navigation">
+            <Link href="/agents">Agent Store</Link>
+            <Link href="/creators">Creator OS</Link>
+            <Link href="/pricing">Pricing</Link>
+            <Link href="/quick-marketing-audit">Marketing Audit</Link>
+            <Link href="/contact">Contact</Link>
+          </nav>
+        </details>
         <Link href="/login?next=/dashboard" className="ams-public-signin">Sign in</Link>
       </div>
     </header>
