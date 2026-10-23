@@ -311,3 +311,27 @@
     radial-gradient(circle at 16% 0%,rgba(201,255,61,.08),transparent 28rem),
     rgba(14,21,34,.86);
 }
+
+
+/* AMS / NEXT — align the catalog with the approved cyan/violet/silver identity. */
+.network {
+  --ink: #060a14;
+  --panel: #101b31;
+  --panel-2: #14213a;
+  --line: rgba(165,201,238,.17);
+  --muted: #b5c1d3;
+  --paper: #eaf2ff;
+  --lime: #63dcff;
+  --violet: #8f7cff;
+  --blue: #63dcff;
+  background:
+    radial-gradient(ellipse at 80% 0%,rgba(143,124,255,.18),transparent 35rem),
+    linear-gradient(rgba(165,201,238,.028) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(165,201,238,.028) 1px,transparent 1px),
+    #060a14;
+  background-size: auto, 72px 72px, 72px 72px, auto;
+}
+.network .hero::before { background: var(--violet); opacity: .15; }
+.network .hero h1 { text-transform: none; letter-spacing: -.063em; }
+.network .hero h1 span { -webkit-text-stroke: 1px var(--lime); }
+.network a:focus-visible, .network button:focus-visible { outline: 2px solid var(--lime); }
