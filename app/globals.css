@@ -516,3 +516,15 @@
   .ams-public-footer__inner { grid-template-columns: 1fr; padding: 30px 0; justify-items: start; gap: 18px; }
   .ams-public-footer__nav { justify-content: flex-start; flex-wrap: wrap; }
 }
+
+/* Official logo and global-electric identity across AMS public surfaces only. */
+.ams-public-page{--ams-public-cyan:#4aa8ff;--ams-public-violet:#9654ff;--ams-public-lime:#4aa8ff;--ams-public-text:#e8f0ff;--ams-public-muted:#b5c3de;--ams-public-line:rgba(67,138,255,.22);--primary:#288cff;--primary-foreground:#fff;background:radial-gradient(ellipse at 88% 0,rgba(105,44,228,.2),transparent 34rem),linear-gradient(#030611,#090e20 53%,#030611)}
+.ams-public-page [data-slot="button"]:not([class*="border"]){background:linear-gradient(110deg,#157fff,#6e48ee);color:white}
+.ams-public-header{background:rgba(3,6,18,.96);border-bottom-color:rgba(71,130,255,.3)}
+.ams-public-brand__mark{display:inline-flex;width:42px;height:42px;overflow:hidden;background:none;box-shadow:none;border-radius:12px}
+.ams-public-brand__mark img{display:block;width:100%;height:100%;object-fit:contain}
+.ams-public-brand__name{font-weight:770;color:#ecf3ff}
+.ams-public-brand__name strong{color:#b7c3df;font-weight:480}
+.ams-public-footer{background:#030611}
+.ams-public-nav a:hover,.ams-public-nav a:focus-visible,.ams-public-footer__nav a:hover{color:#6cb8ff}
+.ams-public-page :is(a,button,input,select,textarea):focus-visible{outline-color:#66b9ff}

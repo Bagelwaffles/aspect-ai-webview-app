@@ -29,7 +29,7 @@
 | Muted blue-gray | `#B5C1D3` | Body text |
 | Success lime | `#C9FF3D` | *Optional minor status accent only*, not a competing dominant hue |
 
-**Logo usage:** Reuse the already approved AMS full wordmark for wide layouts and the existing approved simplified A emblem for compact avatars, favicons, Google Play and OAuth. The current codebase still renders a text-based "A" as a fallback; the approved binary logo asset was not located at the expected public paths during this pass. **Do not replace the fallback with an invented new logo or claim the asset has been integrated.** Import the reviewed original asset later on this preview branch before production signoff.
+**Official owner-supplied assets (October 22):** The supplied global-network hero, metallic wordmark banner, square AMS icon and angular A emblem are hosted on the company Shopify CDN, with URLs in `lib/ams-brand-assets.ts`. Homepage, public headers and footers, and social metadata use these assets. Existing Android binaries and Google OAuth graphics remain unchanged until their respective approved review.
 
 **Composition:** Big concise type, asymmetrical grids, midnight negative space, soft cyan-to-violet edge lighting, precise rules/grid detail, elegantly framed UI previews, and minimal animated flourishes. Keep it legible and fast on low-end mobile devices. Any workspace preview is labeled illustrative; never present mock data as real customer performance.
 
@@ -69,7 +69,8 @@ Use identical name, emblem, palette, headline style, and brand signature across:
 
 - [ ] Visual QA on home, agents, pricing, quick audit, creators, contact, privacy, and terms.
 - [ ] Mobile menu works for keyboard and touch; focus visible.
-- [ ] Confirm actual approved logo assets and social templates, without altering live social profiles yet.
+- [x] Integrate the four owner-supplied brand images into the preview; social profiles remain untouched.
+- [ ] Validate image CDN, responsive layouts and social exports.
 - [ ] Verify all existing links, sign-in, Stripe status flags and $49 audit checkout continue unchanged.
 - [ ] Confirm Google verification homepage disclosure and Privacy link remain present.
 - [ ] Check contrast, reduced motion, performance, metadata and favicon.

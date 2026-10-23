@@ -1263,3 +1263,53 @@
   .signIn { padding: 0 10px; }
   .mobileMenu summary { padding: 0 9px; }
 }
+
+/* Official metallic/neon AMS brand system — electric blue, violet, silver. */
+.site{--bg:#030611;--text:#e8f0ff;--muted:#b7c6e1;--subtle:#899fbe;--cyan:#429fff;--violet:#9854ff;--lime:#61afff;--line:rgba(73,139,255,.23);background:radial-gradient(ellipse at 88% 0,rgba(95,33,225,.24),transparent 32rem),linear-gradient(#020510,#071122 55%,#020510)}
+.site::before{opacity:.19}
+.header{width:min(1320px,calc(100% - 40px));border-bottom-color:rgba(68,129,252,.26)}
+.brand{color:#eef4ff;font-weight:780;letter-spacing:.01em}
+.brand strong{color:#b4c1dc}
+.brandMark{display:inline-flex;width:42px;height:42px;overflow:hidden;border-radius:12px;background:none;box-shadow:none}
+.brandMark img{display:block;width:100%;height:100%;object-fit:contain}
+.nav a:hover,.nav a:focus-visible{color:#70bdff}
+.cinematicHero{position:relative;z-index:1;width:min(1440px,calc(100% - 24px));margin:18px auto 0;overflow:hidden;border:1px solid rgba(52,118,248,.4);border-radius:20px;background:#020611;box-shadow:0 0 70px rgba(38,91,255,.14),0 25px 90px rgba(0,0,0,.45)}
+.cinematicArtwork{position:relative;line-height:0}
+.cinematicPanorama{display:block;width:100%;height:auto}
+.mobileBrandArtwork{display:none}
+.cinematicCaption{display:flex;align-items:center;justify-content:space-between;gap:22px;padding:20px 34px;border-top:1px solid rgba(88,144,255,.27);background:linear-gradient(100deg,#091733,#130c32)}
+.cinematicCaption>div>span{display:block;color:#83baff;font:800 10px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.18em}
+.cinematicCaption p{margin:8px 0 0;color:#c0d1ee;font-size:14px;line-height:1.5}
+.cinematicCta{display:inline-flex;align-items:center;justify-content:center;min-height:45px;padding:0 20px;gap:23px;flex-shrink:0;border:1px solid rgba(110,166,255,.7);border-radius:11px;background:linear-gradient(110deg,#117dff,#6744e9);color:#fff!important;font-weight:750;font-size:13px;box-shadow:0 6px 30px rgba(34,99,255,.18);transition:filter .2s ease,transform .2s ease}
+.cinematicCta:hover,.cinematicCta:focus-visible{filter:brightness(1.2);transform:translateY(-2px)}
+.hero{min-height:595px;padding:85px 0 78px}
+.hero h1 span,.finalCta h2 span{background-image:linear-gradient(90deg,#73bdff,#e4eeff 45%,#b28aff)}
+.eyebrow,.kicker,.microLabel{color:#7abaff}
+.eyebrow{border-color:rgba(55,138,255,.35);background:rgba(34,100,224,.1)}
+.liveDot{background:#329cff;box-shadow:0 0 0 5px rgba(44,136,255,.14),0 0 22px rgba(38,130,255,.65)}
+.primaryButton,.auditButton{background:linear-gradient(110deg,#177fff,#5e58ff 56%,#9348fa);color:#fff!important;box-shadow:0 14px 42px rgba(38,97,249,.20)}
+.glowFrame{background:linear-gradient(135deg,rgba(39,133,255,.9),rgba(107,75,255,.18) 47%,rgba(147,55,255,.8));box-shadow:0 22px 68px rgba(35,95,255,.19)}
+.workspace{background:linear-gradient(155deg,#101c40,#080c21)}
+.statusDot{background:#358eff;box-shadow:0 0 0 6px rgba(47,139,255,.09)}
+.brandStatement{border-color:rgba(54,114,253,.35);background:linear-gradient(120deg,#0b1634,#110a29)}
+.brandStatement p em{color:#77bfff}
+.brandStatement p strong{color:#bba0ff}
+.brandStatementTop{color:#78baff}
+.auditBand{border-color:rgba(64,119,255,.3)}
+.brandSignature{position:relative;z-index:1;width:min(1260px,calc(100% - 28px));margin:25px auto 80px;overflow:hidden;border:1px solid rgba(61,116,245,.35);border-radius:20px;background:#020611;box-shadow:0 15px 70px rgba(27,75,245,.15)}
+.brandSignature img{width:100%;height:auto;display:block}
+@media(max-width:980px){.hero{min-height:0}.cinematicCaption{padding:18px 24px}}
+@media(max-width:720px){
+.cinematicHero{width:min(100% - 14px,1440px);margin-top:8px;border-radius:15px}
+.cinematicPanorama{display:none}
+.mobileBrandArtwork{display:flex;min-height:360px;flex-direction:column;align-items:center;justify-content:center;padding:20px 12px 30px;background:radial-gradient(ellipse at 50% 45%,rgba(50,71,197,.27),transparent 78%),#020713;line-height:1.2;text-align:center}
+.mobileBrandArtwork img{display:block;width:min(235px,70vw);height:auto;mix-blend-mode:screen}
+.mobileBrandArtwork strong{margin-top:-5px;color:#f1f6ff;font-size:clamp(39px,10vw,58px);font-weight:900;line-height:1;letter-spacing:.07em;text-shadow:0 0 22px rgba(51,111,255,.6)}
+.mobileBrandArtwork>span{margin-top:7px;color:#b9cbed;font-size:clamp(10px,3vw,15px);letter-spacing:.17em}
+.mobileBrandArtwork small{margin-top:22px;color:#9eaff1;font-size:10px;letter-spacing:.06em}
+.cinematicCaption{flex-direction:column;align-items:stretch;gap:16px;text-align:center}
+.cinematicCta{width:100%}
+.hero{padding-top:66px}
+.brandSignature{margin-bottom:36px}
+}
+@media(prefers-reduced-motion:reduce){.cinematicCta{transition:none}}
