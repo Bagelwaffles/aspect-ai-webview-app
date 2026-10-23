@@ -69,3 +69,10 @@ References:
 - https://resend.com/docs/api-reference/emails/send-email
 - https://resend.com/changelog/idempotency-keys
 - https://developers.cloudflare.com/email-service/configuration/domains/
+
+
+## Isolated provider attestation storage (2026-10-23 validation extension)
+
+`lib/server/quick-audit-resend-domain-proof-store.ts` now implements protected Preview-only Redis proof read/write with a strict `ams:preview:quick-audit:<dedicated-id>:` namespace and **900-second TTL**. The separate `verifyAndRecordResendDomainForOwner` helper only runs under a separately authenticated, human-approved administrative Preview invocation using a temporary provider credential. It performs a real provider domain check and stores ONLY the resulting non-secret proof; it does not store the credential. Production or expired/wrong-domain proofs are rejected. The mail worker only gets an injected read-only `readDomainProof` and a domain-scoped `sending_access` token; it never receives the administrative token.
+
+**Not yet connected:** there is no owner-authenticated proof-verifier route/job invoking the helper, no associated dedicated Preview Redis configuration in this branch, and no real send-only key in Vercel. This is intentional to avoid creating an unprotected key or customer-email endpoint. Validation uses synthetic provider responses in tests. Resend dashboard domain verification is complete but is not itself proof that the application sent or delivered anything. An owner-controlled provider-side key creation and safe Vercel entry must occur in Work; do not paste tokens in chat.
