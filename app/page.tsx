@@ -39,19 +39,19 @@ const liveAgents = [
   {
     eyebrow: "01 · LIVE",
     title: "Content Agent",
-    copy: "Create marketing copy, product descriptions, email drafts, and social content from one useful brief.",
+    copy: "Draft marketing copy, product descriptions, emails, and social posts from a simple brief.",
     href: "/agents/content-agent",
   },
   {
     eyebrow: "02 · LIVE",
     title: "Lead Magnet Agent",
-    copy: "Turn a customer problem into a focused lead magnet concept and conversion asset for your campaign.",
+    copy: "Shape a useful lead magnet around the problem your customers need solved.",
     href: "/agents/lead-magnet-agent",
   },
   {
     eyebrow: "03 · LIVE",
     title: "Nurture Agent",
-    copy: "Create structured follow-up sequences that help qualified leads keep moving while you stay in control.",
+    copy: "Draft thoughtful follow-ups that keep conversations moving, with you in control.",
     href: "/agents/nurture-agent",
   },
 ]
@@ -60,17 +60,17 @@ const steps = [
   {
     number: "01",
     title: "Choose the result",
-    copy: "Start with the business outcome you want: content, leads, follow-up, search visibility, operations, or a fast audit.",
+    copy: "Choose a business goal: create content, capture interest, or follow up.",
   },
   {
     number: "02",
     title: "Use the right agent",
-    copy: "Every agent shows its current availability, what it does, and how to access it before you commit.",
+    copy: "See what each agent does and whether it’s available before you buy.",
   },
   {
     number: "03",
     title: "Review before it matters",
-    copy: "Sensitive actions such as publishing, payments, or account changes keep explicit human approval.",
+    copy: "Publishing, payments, and account changes require your approval.",
   },
 ]
 
@@ -339,12 +339,12 @@ export default function HomePage() {
         <div className={styles.sectionHeading}>
           <div>
             <p className={styles.kicker}>{subscriptionCheckoutLive ? "Explore our AI marketing tools" : "Discover what AMS can do"}</p>
-            <h2>{subscriptionCheckoutLive ? "Start with agents already working in production." : "Review agents already proven in production."}</h2>
+            <h2>Meet three proven AMS agents.</h2>
           </div>
           <p>
             {subscriptionCheckoutLive
-              ? "These are three of the seven agents included in AMS plans. Explore their benefits and find the right fit."
-              : "Meet three of our marketing agents. New subscriptions are paused for now; check the Agent Store for current availability."}
+              ? "Get useful content, lead magnets, and follow-up drafts. See which agent fits your next task."
+              : "See what these three agents can do. New subscriptions are paused; check the Agent Store for availability."}
           </p>
         </div>
 
@@ -363,7 +363,7 @@ export default function HomePage() {
               <h3>{agent.title}</h3>
               <p>{agent.copy}</p>
               <Link href={agent.href}>
-                View sales page <span aria-hidden="true">→</span>
+                Explore {agent.title} <span aria-hidden="true">→</span>
               </Link>
             </article>
           ))}
@@ -371,7 +371,7 @@ export default function HomePage() {
 
         <div className={styles.centerAction}>
           <Link className={styles.secondaryButton} href="/agents#catalog">
-            Explore the Agent Store
+            Browse all AMS agents
           </Link>
         </div>
       </section>
@@ -379,9 +379,9 @@ export default function HomePage() {
       <section className={cx("section", "experienceSection")} id="how-it-works">
         <div className={styles.experienceIntro}>
           <p className={styles.kicker}>How it works</p>
-          <h2>Simple enough to use. Controlled enough to trust.</h2>
+          <h2>Three steps. You're in control.</h2>
           <p>
-            AMS is designed to make automation useful without hiding what is happening behind it.
+            Choose an outcome, pick the right agent, and review any consequential action.
           </p>
         </div>
 
