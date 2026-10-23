@@ -81,15 +81,15 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
     z.boolean(),
     z.null(),
     z.array(jsonValueSchema).max(100),
-    z.record(jsonValueSchema),
+    z.record(z.string(), jsonValueSchema),
   ]),
 )
 
 export const amsN8nGatewayRequestSchema = z
   .object({
     action: z.enum(ALLOWED_ACTIONS),
-    payload: z.record(jsonValueSchema).default({}),
-    meta: z.record(jsonValueSchema).optional(),
+    payload: z.record(z.string(), jsonValueSchema).default({}),
+    meta: z.record(z.string(), jsonValueSchema).optional(),
   })
   .strict()
 
