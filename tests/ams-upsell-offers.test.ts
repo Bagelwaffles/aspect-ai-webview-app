@@ -10,6 +10,8 @@ import {
   getVerifiedAgentUpsell,
 } from "../lib/ams-upsell-offers"
 import { SUBSCRIPTION_INCLUDED_AGENTS } from "../lib/subscription-agent-catalog"
+import { agents } from "../app/agents/agentCatalog"
+import { ROADMAP_AGENT_UPSELLS, ROADMAP_UPSELL_STATE } from "../lib/ams-upsell-roadmap"
 
 test("audit implementation packages are optional and bounded to 1, 3, 5 fixes", () => {
   assert.deepEqual(AUDIT_IMPLEMENTATION_OFFERS.map(x => x.maximumFixes), [1, 3, 5])
@@ -53,5 +55,22 @@ test("subscription upsells use existing verified web billing paths", () => {
   for (const offer of SUBSCRIPTION_EXPANSION) {
     assert.ok(offer.href.startsWith("/"))
     assert.match(offer.criteria, /Only/)
+  }
+})
+
+test("all 33 agents have a distinct, lifecycle-safe future or verified next offer", () => {
+  assert.equal(agents.length, 33)
+  const live = agents.filter(x => x.status === "live").map(x => x.slug).sort()
+  const notLive = agents.filter(x => x.status !== "live").map(x => x.slug).sort()
+  assert.deepEqual(Object.keys(VERIFIED_AGENT_UPSELLS).sort(), live)
+  assert.deepEqual(Object.keys(ROADMAP_AGENT_UPSELLS).sort(), notLive)
+  assert.equal(ROADMAP_UPSELL_STATE, "internal_concept_not_for_sale")
+  for (const [slug, proposal] of Object.entries(ROADMAP_AGENT_UPSELLS)) {
+    assert.ok(slug.length > 0)
+    assert.ok(proposal.nextOutcome.length > 15)
+    assert.ok(proposal.prerequisite.length > 20)
+    const agent = agents.find(x => x.slug === slug)
+    assert.ok(agent && agent.status !== "live")
+    assert.equal(getVerifiedAgentUpsell(slug, agent!.status), null)
   }
 })
