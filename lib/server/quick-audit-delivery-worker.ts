@@ -9,7 +9,6 @@ import { Redis } from "@upstash/redis"
 
 import {
   QuickAuditDeliveryOutbox,
-  type AuditDeliveryRecord,
 } from "./quick-audit-delivery-outbox"
 import {
   RedisQuickAuditResultStore,
@@ -115,7 +114,7 @@ export async function deliverQuickAuditOwnerPreview(input: {
     return { status: "disabled" }
   }
   const ownerEmail = env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim().toLowerCase() ?? ""
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(ownerEmail)) return { status: "disabled" }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) return { status: "disabled" }
 
   const outbox = input.outbox ?? new QuickAuditDeliveryOutbox()
   const proofStore = input.proof ?? new RedisPaidQuickAuditProof()
