@@ -1,4 +1,6 @@
 import Link from "next/link"
+import Image from "next/image"
+import { AMS_BRAND_ASSETS } from "@/lib/ams-brand-assets"
 
 export function AmsPublicFooter() {
   return (
@@ -6,7 +8,7 @@ export function AmsPublicFooter() {
       <div className="ams-public-footer__inner">
         <div className="ams-public-footer__brand">
           <Link href="/" className="ams-public-brand" aria-label="Aspect Marketing Solutions home">
-            <span className="ams-public-brand__mark">A</span>
+            <span className="ams-public-brand__mark"><Image src={AMS_BRAND_ASSETS.icon} alt="" width={42} height={42} unoptimized /></span>
             <span className="ams-public-brand__name">Aspect <strong>Marketing Solutions</strong></span>
           </Link>
           <p>Always on. Always working. Built to grow your brand.</p>

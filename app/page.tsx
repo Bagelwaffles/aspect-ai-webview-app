@@ -1,4 +1,6 @@
 import Link from "next/link"
+import Image from "next/image"
+import { AMS_BRAND_ASSETS } from "@/lib/ams-brand-assets"
 import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 import styles from "./marketing.module.css"
 
@@ -83,7 +85,7 @@ export default function HomePage() {
 
       <header className={styles.header}>
         <a className={styles.brand} href="#top" aria-label="Aspect Marketing Solutions home">
-          <span className={styles.brandMark}>A</span>
+          <span className={styles.brandMark}><Image src={AMS_BRAND_ASSETS.icon} width={42} height={42} alt="" unoptimized /></span>
           <span>
             Aspect <strong>Marketing Solutions</strong>
           </span>
@@ -113,7 +115,27 @@ export default function HomePage() {
         </Link>
       </header>
 
-      <section className={styles.hero} id="top">
+      <section className={styles.cinematicHero} id="top" aria-label="Aspect Marketing Solutions official brand">
+        <div className={styles.cinematicArtwork}>
+          <Image src={AMS_BRAND_ASSETS.hero} width={1536} height={864} priority unoptimized className={styles.cinematicPanorama}
+            alt="ASPECT Marketing Solutions metallic logo between connected electric-blue and violet global networks" />
+          <div className={styles.mobileBrandArtwork}>
+            <Image src={AMS_BRAND_ASSETS.emblem} width={330} height={330} unoptimized alt="Metallic angular A logo" />
+            <strong>ASPECT</strong>
+            <span>MARKETING SOLUTIONS</span>
+            <small>AI AGENTS · AUTOMATION · GROWTH</small>
+          </div>
+        </div>
+        <div className={styles.cinematicCaption}>
+          <div>
+            <span>GLOBAL THINKING · HUMAN CONTROL</span>
+            <p>AI marketing intelligence built to move your business forward.</p>
+          </div>
+          <Link href="/agents#catalog" className={styles.cinematicCta}>Explore AI agents <span aria-hidden="true">↗</span></Link>
+        </div>
+      </section>
+
+      <section className={styles.hero}>
         <div className={styles.heroCopy}>
           <div className={styles.eyebrow}>
             <span className={styles.liveDot} />
@@ -407,9 +429,13 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className={styles.brandSignature} aria-label="Official Aspect Marketing Solutions wordmark">
+        <Image src={AMS_BRAND_ASSETS.banner} width={1536} height={420} unoptimized alt="Aspect Marketing Solutions — AI Agents, Automation, Growth" />
+      </section>
+
       <footer className={styles.footer}>
         <div className={styles.brand}>
-          <span className={styles.brandMark}>A</span>
+          <span className={styles.brandMark}><Image src={AMS_BRAND_ASSETS.icon} width={42} height={42} alt="" unoptimized /></span>
           <span>
             Aspect <strong>Marketing Solutions</strong>
           </span>

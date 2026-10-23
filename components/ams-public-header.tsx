@@ -1,11 +1,13 @@
 import Link from "next/link"
+import Image from "next/image"
+import { AMS_BRAND_ASSETS } from "@/lib/ams-brand-assets"
 
 export function AmsPublicHeader() {
   return (
     <header className="ams-public-header">
       <div className="ams-public-header__inner">
         <Link href="/" className="ams-public-brand" aria-label="Aspect Marketing Solutions home">
-          <span className="ams-public-brand__mark">A</span>
+          <span className="ams-public-brand__mark"><Image src={AMS_BRAND_ASSETS.icon} alt="" width={42} height={42} unoptimized /></span>
           <span className="ams-public-brand__name">Aspect <strong>Marketing Solutions</strong></span>
         </Link>
         <nav className="ams-public-nav" aria-label="Primary navigation">
