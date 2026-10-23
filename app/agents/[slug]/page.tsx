@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 import { agents, getAgent, statusMeta } from "../agentCatalog"
 import { getAgentSalesOffer, getCategoryOutcome } from "../agentSales"
+import { getVerifiedAgentUpsell, upsellsUiEnabled } from "@/lib/ams-upsell-offers"
 
 export function generateStaticParams() {
   return agents.map((agent) => ({ slug: agent.slug }))
@@ -70,6 +71,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
   const meta = statusMeta[agent.status]
   const offer = getAgentSalesOffer(agent)
   const outcome = getCategoryOutcome(agent.category)
+  const nextOffer = upsellsUiEnabled() ? getVerifiedAgentUpsell(agent.slug, agent.status) : null
   const steps = salesSteps(offer.mode)
   const related = agents
     .filter((candidate) => candidate.slug !== agent.slug && candidate.category === agent.category)
@@ -249,6 +251,26 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
           </Card>
         </div>
       </section>
+
+      {nextOffer ? (
+        <section className="border-t border-border/70 px-5 py-12 sm:px-8" aria-labelledby="optional-agent-services">
+          <div className="mx-auto flex max-w-6xl flex-col gap-5 rounded-2xl border border-primary/25 bg-primary/5 p-6 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-3xl space-y-2">
+              <p className="text-sm font-semibold uppercase tracking-wider text-primary">Optional next step</p>
+              <h2 id="optional-agent-services" className="text-2xl font-bold">{nextOffer.title}</h2>
+              <p className="text-sm text-muted-foreground">{nextOffer.description}</p>
+              <p className="text-sm font-medium">{nextOffer.priceLabel}</p>
+              <p className="text-xs text-muted-foreground">
+                Your existing subscription already includes this Live agent. Additional help or a different plan is optional;
+                no new charge, email enrollment, or external publishing starts from viewing this offer.
+              </p>
+            </div>
+            <Button asChild variant="outline">
+              <Link href={nextOffer.href}>{nextOffer.type === "quote" ? "Request a scoped quote" : "Compare plans"}<ArrowRight className="ml-2 h-4 w-4" /></Link>
+            </Button>
+          </div>
+        </section>
+      ) : null}
 
       {related.length ? (
         <section className="px-5 py-14 sm:px-8 lg:py-20">
