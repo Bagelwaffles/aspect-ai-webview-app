@@ -85,9 +85,9 @@ const eventEnvelopeSchema = z.object({
     status: z.string().optional(),
     type: z.string().min(1),
     version: z.string().optional(),
-    condition: z.record(z.string()).optional(),
+    condition: z.record(z.string(), z.string()).optional(),
   }).passthrough(),
-  event: z.record(z.unknown()).optional(),
+  event: z.record(z.string(), z.unknown()).optional(),
   challenge: z.string().optional(),
 })
 
