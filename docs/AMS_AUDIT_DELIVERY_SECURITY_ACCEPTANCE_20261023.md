@@ -28,3 +28,6 @@ The Zod fix is a **major-version compatibility decision**, not a safe blind over
 No production merge, release, Vercel environment mutation, Stripe payment/price/coupon/webhook mutation, real customer mail, domain or OAuth change, n8n/Android/Twitch change, or shared Redis credential reuse.
 
 **Verification distinctions:** Code committed is not CI passed; CI passed is not hosted Preview working; provider message acceptance is not inbox receipt; inbox receipt in a controlled owner test is not customer release readiness.
+
+## Security-patched delivery integration CI (2026-10-23)
+The branch now includes the exact security-patch files verified on draft PR #297: Next.js 15.5.28, Zod 4.6.7, pinned regenerated pnpm lockfile, and four compatible explicit-string-key record schemas. This integration is **Preview-only and default-off**. CI must establish that the existing audit outbox, worker tests and app compile alongside the patched dependencies; a passed build does not constitute a real Gmail sender or inbox delivery. One-use Stripe test coupon remains untouched, and test webhooks must remain isolated before checkout.
