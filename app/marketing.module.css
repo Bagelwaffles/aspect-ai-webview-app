@@ -541,8 +541,10 @@
 
 .outcomeCard {
   position: relative;
-  min-height: 320px;
+  display: flex;
+  min-height: 352px;
   padding: 28px;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 24px;
@@ -596,14 +598,36 @@
 }
 
 .outcomeCard small {
-  position: absolute;
-  right: 28px;
-  bottom: 26px;
-  left: 28px;
+  display: block;
+  margin-top: auto;
   padding-top: 16px;
   border-top: 1px solid var(--line);
-  color: var(--subtle);
-  font-size: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.outcomeLink {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 7px 0;
+  color: var(--cyan) !important;
+  font-size: 12px;
+  font-weight: 750;
+  transition: gap 0.18s ease;
+}
+
+.outcomeLink:hover {
+  gap: 18px;
+}
+
+.outcomeLink:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 5px;
+  border-radius: 3px;
 }
 
 .agentSection {
@@ -1012,7 +1036,7 @@
   }
 
   .outcomeCard {
-    min-height: 300px;
+    min-height: 340px;
   }
 
   .experienceSection {
