@@ -4,7 +4,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { AmsPublicHeader } from "@/components/ams-public-header"
 import { AmsPublicFooter } from "@/components/ams-public-footer"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import styles from "./agents.module.css"
 
@@ -55,6 +55,12 @@ const operatingSteps = [
 export default function AgentsPage() {
   const [category, setCategory] = useState<CategoryFilter>("All")
   const [status, setStatus] = useState<StatusFilter>("All")
+
+  useEffect(() => {
+    const requestedCategory = new URLSearchParams(window.location.search).get("category")
+    const match = categoryOptions.find((option) => option.toLowerCase() === requestedCategory?.trim().toLowerCase())
+    if (match) setCategory(match)
+  }, [])
 
   const filteredAgents = useMemo(
     () =>
@@ -135,6 +141,7 @@ export default function AgentsPage() {
                   key={option}
                   type="button"
                   onClick={() => setCategory(option)}
+                  aria-pressed={category === option}
                 >
                   {option}
                 </button>
@@ -150,6 +157,7 @@ export default function AgentsPage() {
                   key={option}
                   type="button"
                   onClick={() => setStatus(option)}
+                  aria-pressed={status === option}
                 >
                   {option === "All" ? "All options" : publicStatus[option]}
                 </button>
