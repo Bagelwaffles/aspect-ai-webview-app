@@ -41,18 +41,21 @@ const liveAgents = [
     title: "Content Agent",
     copy: "Draft marketing copy, product descriptions, emails, and social posts from a simple brief.",
     href: "/agents/content-agent",
+    video: "ams-content-agent",
   },
   {
     eyebrow: "02 · LIVE",
     title: "Lead Magnet Agent",
     copy: "Shape a useful lead magnet around the problem your customers need solved.",
     href: "/agents/lead-magnet-agent",
+    video: "ams-lead-magnet-agent",
   },
   {
     eyebrow: "03 · LIVE",
     title: "Nurture Agent",
     copy: "Draft thoughtful follow-ups that keep conversations moving, with you in control.",
     href: "/agents/nurture-agent",
+    video: "ams-nurture-agent",
   },
 ]
 
@@ -267,6 +270,35 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className={cx("section", "introVideoSection")} aria-labelledby="ams-video-intro">
+        <div className={styles.introVideoCopy}>
+          <p className={styles.kicker}>Get to know AMS · 21 seconds</p>
+          <h2 id="ams-video-intro">See what AMS can help you create.</h2>
+          <p>
+            A quick visual tour of content, lead magnets, follow-up and owner-controlled
+            marketing workflows. No customer data or real account screens appear in this video.
+          </p>
+          <Link className={styles.introVideoLink} href="/agents#catalog">
+            Explore our available agents <span aria-hidden="true">→</span>
+          </Link>
+        </div>
+        <div className={styles.introVideoPanel}>
+          <video
+            className={styles.introVideo}
+            controls
+            playsInline
+            preload="none"
+            poster="/videos/ams-introduction-poster.jpg"
+            aria-label="AMS introductory video about marketing tools and capabilities"
+          >
+            <source src="/videos/ams-introduction.mp4" type="video/mp4" />
+            <track kind="captions" src="/videos/ams-introduction.vtt" srcLang="en" label="English captions" />
+            Your browser does not support embedded video.
+          </video>
+          <p>Illustrative overview with on-screen text · Select Play to watch.</p>
+        </div>
+      </section>
+
       <section className={styles.trustBar} aria-label="AMS principles">
         <span>Small-business focused</span>
         <span>Human approval built in</span>
@@ -355,11 +387,26 @@ export default function HomePage() {
                 <span>{agent.eyebrow}</span>
                 <span className={styles.statusDot} />
               </div>
-              <div className={styles.agentVisual} aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </div>
+              <figure className={styles.agentVideoShell}>
+                <video
+                  className={styles.agentVideo}
+                  controls
+                  playsInline
+                  preload="none"
+                  poster={`/videos/${agent.video}-poster.jpg`}
+                  aria-label={`${agent.title} illustrative video explainer`}
+                >
+                  <source src={`/videos/${agent.video}.mp4`} type="video/mp4" />
+                  <track
+                    kind="captions"
+                    src={`/videos/${agent.video}.vtt`}
+                    srcLang="en"
+                    label="English captions"
+                  />
+                  Your browser does not support embedded video.
+                </video>
+                <figcaption>15-second overview · Illustrative, not a live demo</figcaption>
+              </figure>
               <h3>{agent.title}</h3>
               <p>{agent.copy}</p>
               <Link href={agent.href}>
