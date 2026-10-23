@@ -19,6 +19,7 @@ const data = {
   paidAndPersisted: true,
 }
 const flagEnv: NodeJS.ProcessEnv = {
+  NODE_ENV: "test",
   VERCEL_ENV: "preview",
   AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL: owner,
   AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED: "true",
