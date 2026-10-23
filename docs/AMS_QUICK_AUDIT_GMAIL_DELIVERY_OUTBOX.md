@@ -23,3 +23,26 @@ The native completion event optionally queues one durable audit delivery record 
 5. Reconcile pending/sent/failed states and add protected owner operator dashboard/alerts so a report is never silently lost. Then promote preview to production only after all end-to-end gates pass.
 
 Do **not** claim full end-to-end Gmail delivery or customer-ready automation from this outbox-only release.
+
+## 2026-10-23 — owner-only Preview delivery core added (still Draft / HOLD)
+
+- `lib/server/quick-audit-delivery-worker.ts` now contains the disabled-by-default `deliverQuickAuditOwnerPreview` core. It requires both `VERCEL_ENV=preview` and an independently enabled `AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED=true` flag; neither is enabled by this commit.
+- Only a test-mode Checkout Session and a delivery record addressed to the configured `AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL` can pass the guard. Customer addresses and live sessions are rejected, even when the feature flag is set.
+- Before the Redis claim and any sender call, the worker verifies the stored completed Stripe webhook session record **and** the matching persisted native audit result. Mismatched audit IDs, request IDs, or missing reports are held without sending.
+- It renders the existing five findings, improved headline, offer, promotional post, and seven-day plan as text-only email to avoid unsafe HTML rendering. A provider response is stored as `submitted`, not `delivered`. Uncertain outcomes are held and never automatically retried.
+- The worker accepts a server-provided `QuickAuditTransactionalSender`; there is **no public route, Cron schedule, actual Gmail transport, customer delivery, feature-flag change, or webhook/payment call** in this release. The existing primary Gmail OAuth sender in PR #262 must be connected after it passes its own owner-only acceptance.
+- New tests in `tests/quick-audit-delivery-worker.test.ts` cover default-off, production block, owner-only destination, paid-record and report integrity, one-time submission, ambiguous response, duplicate suppression, and complete text generation. Treat the implementation as code-complete only after exact-head CI succeeds.
+
+## Reuse the existing one-time coupon; do not pay yet
+
+Stripe TEST account `acct_1Smr2bGloGM6sjzB` already contains valid, unredeemed coupon `coupon_ams_owner_audit_pilot_20261021`: $44 off, duration once, maximum one redemption. The Preview pilot in Draft PR #290 applies this **directly**, so no promotion code or replacement coupon is required.
+
+**Known webhook isolation blocker:** The test account still has an enabled `checkout.session.completed` destination at the **production hostname** `https://www.aspectmarketingsolutions.app/api/webhooks/stripe`. This must be independently isolated before any hosted pilot checkout. The coupon's presence does not establish safe test routing.
+
+## Remaining release gates (unchanged)
+
+1. Independently isolate preview Redis and test Stripe event routing from production. Do not rotate or disable existing production endpoints for a pilot.
+2. Complete PR #262 owner sender OAuth/refresh persistence and integrate it with this worker behind a server-to-server authenticated preview route; never copy ChatGPT's Gmail connector grant to AMS.
+3. Verify first owner-only Gmail submission **and independent inbox receipt**, persistence, replay suppression, and uncertain-send operator resolution, with no new real-money charge.
+4. Add reliable queue scanning/reconciliation, alerts and customer destination binding, scope compliance, consent/suppression for relevant messages, and failure recovery before implementing customer auto-delivery. The owner-only Preview worker is not a customer sender.
+5. Merge/deploy only after full exact-head CI/security checks and independent owner release approval. Production and other services remain unchanged.
