@@ -185,7 +185,7 @@ const cancelSchema = z
 const createSchema = z
   .object({
     objective: z.string().trim().min(10).max(2_000),
-    action: z.record(z.unknown()),
+    action: z.record(z.string(), z.unknown()),
     idempotencyKey: z.string().trim().min(8).max(200).regex(/^[A-Za-z0-9._:-]+$/),
   })
   .strict()
