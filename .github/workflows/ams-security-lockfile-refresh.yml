@@ -1,0 +1,46 @@
+name: AMS security lockfile regeneration (temporary)
+
+on:
+  push:
+    branches:
+      - fix/ams-next-15-5-28-security-20261023
+    paths:
+      - package.json
+      - .github/workflows/ams-security-lockfile-refresh.yml
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    if: github.repository == 'Bagelwaffles/aspect-ai-webview-app'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout security branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Enable Corepack and pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.28.0 --activate
+      - name: Regenerate lockfile from npm registry
+        run: pnpm install --lockfile-only --ignore-scripts
+      - name: Verify manifest versions and lockfile resolution
+        run: |
+          node -e 'const p=require("./package.json"); if(p.dependencies.next!=="15.5.28"||p.devDependencies["eslint-config-next"]!=="15.5.28")process.exit(1)'
+          grep -q 'version: 15.5.28' pnpm-lock.yaml
+          git diff --exit-code -- package.json
+      - name: Commit regenerated lockfile only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$(git status --porcelain -- pnpm-lock.yaml)" || { echo "No lockfile change"; exit 1; }
+          git add -- pnpm-lock.yaml
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(security): regenerate pnpm lockfile for Next 15.5.28'
+          git push origin HEAD:refs/heads/fix/ams-next-15-5-28-security-20261023
