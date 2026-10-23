@@ -32,21 +32,36 @@ Future operator-only steps:
 7. Confirm the actual customer-view received message with From, Reply-To, SPF/DKIM/DMARC results, zero private identity exposure, content accuracy and no duplicate audit delivery; inspect provider message ID **and independent inbox proof**. Delivery API HTTP 200 is not proof of inbox acceptance.
 8. Add bounce/complaint webhooks with signature validation, persistent suppression, safe reconciliation, API usage alerts and delivery recovery before wider customer sending. Marketing, campaign, and AI auto-replies require separate consent/controls, and should NOT use an audit-purchase transaction as marketing opt-in.
 
-## Current code
+## Current code — restricted sender separation (2026-10-23 revision)
 
-`lib/server/quick-audit-resend-sender.ts` implements provider-bound `QuickAuditTransactionalSender` with:
-- no runtime initialization without Preview flag and both missing-by-default credentials;
-- `GET https://api.resend.com/domains/:domain_id` checked just before send, requiring exact domain name, `status=verified`, `capabilities.sending=enabled`;
-- explicit branded From and Reply-To, refusal of personal Gmail identity;
-- `POST https://api.resend.com/emails` with plaintext report and SHA-256, content-bound idempotency key (Resend advertises 24h retention; the existing durable outbox remains primary);
-- no automatic retry of uncertain sends and no secret-bearing logs;
-- returned From is only the value submitted to provider, not proof of final Received headers.
+`lib/server/quick-audit-resend-sender.ts` now accepts **only** `AMS_RESEND_SEND_API_KEY`, which must be a Resend **Sending access** key restricted to verified domain `aspectmarketingsolutions.app` (ID `60c30272-c705-493a-9be4-0b7df9ab31c8`). This credential is used only with `POST https://api.resend.com/emails`. No `GET /domains` call or `full_access` credential belongs in the sending adapter.
 
-**Not implemented in this PR:** public customer sending, authenticated dispatcher, complete payment webhook isolation, DNS changes, actual Resend-domain setup, API credential, active scheduler, unsubscribe or bounce handling, customer email reply automation, production deployment. No protected branch existing delivery worker or Stripe state was mutated.
+Resend does not expose domain-read operations to `sending_access` keys. Accordingly:
+- `lib/server/quick-audit-resend-domain-proof.ts` defines `inspectResendDomainForOwner`, an **administrative one-time helper** requiring a separate owner's full-access credential that should never be stored in mail worker runtime env. It makes a read-only `GET /domains/:id`, checks exact verified domain identity and sending enabled, and returns non-secret proof.
+- The worker requires a separately injected `readDomainProof` from a trusted storage/read path. The proof expires in **15 minutes**, cannot self-renew, and must match exact provider domain ID, domain name, API-sourced status, and enabled sending. Missing/expired evidence fails closed before send.
+- **Integration still pending:** Build an authenticated *owner-only* proof writer and a bounded protected Redis proof reader. Neither routine is exposed as a public route in this PR. Do not fabricate proof from an environment boolean or an owner claim, or give the email worker an admin key. Until the independent proof handoff is implemented, there is intentionally no configured sender instance that can dispatch live messages.
+- The response From address identifies what was submitted to Resend, **not independent recipient-header proof**. A controlled inbox test must validate actual RFC From, Reply-To, SPF, DKIM, DMARC and no personal Gmail leakage.
 
-## Acceptance tests
+Existing customer Quick Audit delivery outbox still prevents duplicate provider submission after ambiguous outcomes; Resend's idempotency key is a supplemental 24-hour safeguard.
 
-`tests/quick-audit-resend-sender.test.ts` covers absence of config / production guard, provider domain and sending capability, branded From/Reply-To, deterministic idempotency, malformed provider acceptance, send failures, and no personal-account fallback. Only call this tested code integrated once owner provider-side acceptance exists. Keep both this and its parent in Draft until real provider and customer-view evidence passes.
+Important: The signed-in Resend dashboard now shows **Domain VERIFIED, Forge Enabled**; this was corroborated from the connected Chrome tab and recorded in PR #300. **No API key exists in the Vercel branch scoped env inventory yet.** Owner has now approved proceeding with a restricted-key Preview integration and controlled owner test; do not misread that as approval to send customer emails, turn on production, purchase services or redeem Stripe coupon outside isolated setup.
+
+### Owner-only key setup and safe storage
+
+In connected Chrome via ChatGPT Work, choose Resend API Keys → Create API Key:
+- Name `AMS Quick Audit Preview — Sending Only`
+- **Permission: Sending access**
+- **Domain restriction: aspectmarketingsolutions.app**
+- Never choose Full access for the sending key.
+- Save the one-time token directly to the **isolated Preview branch** of Vercel project `aspect-ai-overlord`, name `AMS_RESEND_SEND_API_KEY`, encrypted server-side, never in chat, Github issues, screenshots, or stdout.
+- Set `AMS_RESEND_DOMAIN_ID` to the known UUID in the same Preview branch.
+- Keep `AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED` unset/false. Do NOT store any full-access Resend credential in the Vercel mail sending environment.
+- Treat connecting a key as configuration only, not permission to send; real owner-only dispatch remains gated on isolated Preview webhook+Redis and authenticated proof writer/reader.
+- If Work cannot securely transfer the one-time token from Resend to Vercel, stop and let owner enter it directly; do not pass it through ChatGPT messages.
+
+## Acceptance tests — revised
+
+`tests/quick-audit-resend-sender.test.ts` covers Preview-only flag, exact known domain ID, independent verified proof, expiry after fifteen minutes, branded From/Reply-To, deterministic provider idempotency, provider failure, an admin-only provider probe using a synthetic credential, and ensuring the send-only worker calls **POST /emails only**.
 
 References:
 - https://resend.com/pricing
