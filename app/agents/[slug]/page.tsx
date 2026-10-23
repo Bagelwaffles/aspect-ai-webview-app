@@ -221,7 +221,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
                   <CardDescription className="leading-6">{copy}</CardDescription>
                 </CardHeader>
               </Card>
-            )) : <p className="text-muted-foreground">This service is not yet available to purchase.</p>}
+            ))}
           </div>
         </div>
       </section>
