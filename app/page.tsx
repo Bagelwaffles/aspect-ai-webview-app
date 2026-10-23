@@ -10,24 +10,28 @@ const outcomes = [
     title: "Content without the blank page.",
     copy: "Turn one clear brief into practical copy, campaign ideas, lead magnets, emails, and social content.",
     meta: "Content Agent · Lead Magnet · SEO Writer",
+    href: "/agents?category=Content#catalog",
   },
   {
     label: "Grow",
     title: "More attention. Better follow-up.",
     copy: "Build repeatable lead capture and nurture systems that keep opportunities moving instead of disappearing.",
     meta: "Nurture Agent · Social Publisher · Competitive Intel",
+    href: "/agents?category=Marketing#catalog",
   },
   {
     label: "Publish",
     title: "Move from idea to channel faster.",
     copy: "Coordinate video, creator, social, and publishing workflows with human approval where public actions matter.",
     meta: "YouTube Publisher · Clip Generator · Stream Assistant",
+    href: "/agents?category=Creator#catalog",
   },
   {
     label: "Operate",
     title: "Less busywork behind the scenes.",
     copy: "Connect commerce, customer support, analytics, and internal workflows so your business stays organized.",
     meta: "Shopify Ops · Support · Analytics",
+    href: "/agents?category=Operations#catalog",
   },
 ]
 
@@ -323,6 +327,9 @@ export default function HomePage() {
               <h3>{item.title}</h3>
               <p>{item.copy}</p>
               <small>{item.meta}</small>
+              <Link className={styles.outcomeLink} href={item.href}>
+                Explore related agents <span aria-hidden="true">↗</span>
+              </Link>
             </article>
           ))}
         </div>
