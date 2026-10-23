@@ -5,6 +5,8 @@ import { QuickAuditDeliveryOutbox, type OutboxRedis } from "../lib/server/quick-
 import {
   deliverQuickAuditOwnerPreview,
   renderQuickAuditPlainText,
+  AMS_CUSTOMER_FROM_ADDRESS,
+  AMS_CUSTOMER_FROM_NAME,
   type PaidQuickAuditProof,
   type QuickAuditTransactionalSender,
 } from "../lib/server/quick-audit-delivery-worker"
@@ -72,9 +74,22 @@ function fixture(options: {
   evidence?: boolean
   reportMatches?: boolean
   providerFails?: boolean
+  identityStatus?: "accepted" | "pending" | "missing"
+  identityFrom?: string
+  identityName?: string
+  identityReplyTo?: string
+  identityThrows?: boolean
+  providerFrom?: string
 } = {}) {
   const box = new QuickAuditDeliveryOutbox(fakeRedis())
-  const sent: Array<{ recipient: string; subject: string; plainText: string }> = []
+  const sent: Array<{
+    recipient: string
+    fromAddress: string
+    fromName: string
+    replyToAddress: string
+    subject: string
+    plainText: string
+  }> = []
   const proof: PaidQuickAuditProof = {
     async readSession(checkoutSessionId) {
       return options.evidence === false ? null : {
@@ -90,10 +105,22 @@ function fixture(options: {
     async save() { throw new Error("Worker must not create or change audit reports") },
   }
   const sender: QuickAuditTransactionalSender = {
+    async inspectSender(address) {
+      if (options.identityThrows) throw new Error("Provider sender-identity lookup failed")
+      return {
+        address: options.identityFrom ?? address,
+        displayName: options.identityName ?? AMS_CUSTOMER_FROM_NAME,
+        replyToAddress: options.identityReplyTo ?? AMS_CUSTOMER_FROM_ADDRESS,
+        verificationStatus: options.identityStatus ?? "accepted",
+      }
+    },
     async send(message) {
       sent.push(message)
       if (options.providerFails) throw new Error("Unknown response from Gmail")
-      return { messageId: "gmail-test-provider-id" }
+      return {
+        messageId: "gmail-test-provider-id",
+        fromAddress: options.providerFrom ?? message.fromAddress,
+      }
     },
   }
   return { box, proof, reports, sender, sent }
@@ -144,6 +171,9 @@ test("sends full audit at most once after durable paid and report proof", async 
   assert.deepEqual(await deliverQuickAuditOwnerPreview(input), { status: "submitted" })
   assert.equal(f.sent.length, 1)
   assert.equal(f.sent[0].recipient, owner)
+  assert.equal(f.sent[0].fromAddress, AMS_CUSTOMER_FROM_ADDRESS)
+  assert.equal(f.sent[0].fromName, "Aspect Marketing Solutions")
+  assert.equal(f.sent[0].replyToAddress, AMS_CUSTOMER_FROM_ADDRESS)
   assert.match(f.sent[0].plainText, /FIVE PRIORITY FINDINGS/)
   assert.match(f.sent[0].plainText, /Day 7: Action 7/)
   assert.match(f.sent[0].plainText, /Flowers for your special event/)
@@ -171,4 +201,39 @@ test("plain-text report includes findings and seven-day plan without HTML wrappe
   assert.match(text, /Issue 5/)
   assert.match(text, /Day 7/)
   assert.doesNotMatch(text, /<html|<script/i)
+})
+
+test("blocks missing or unverified business From without consuming an audit claim", async () => {
+  for (const variant of [
+    { identityStatus: "pending" as const },
+    { identityStatus: "missing" as const },
+    { identityFrom: "kimberleyaversbiz@gmail.com" },
+    { identityName: "Personal Gmail" },
+    { identityReplyTo: "kimberleyaversbiz@gmail.com" },
+    { identityThrows: true },
+  ]) {
+    const f = fixture(variant)
+    await f.box.enqueue(data)
+    const result = await deliverQuickAuditOwnerPreview({
+      requestId: data.requestId, sender: f.sender, env: flagEnv,
+      outbox: f.box, proof: f.proof, reports: f.reports,
+    })
+    assert.deepEqual(result, { status: "held" }, JSON.stringify(variant))
+    assert.equal(f.sent.length, 0)
+    assert.equal((await f.box.read(data.requestId))?.state, "queued")
+  }
+})
+
+test("rejects provider acceptance under a personal Gmail From and prevents a duplicate", async () => {
+  const f = fixture({ providerFrom: "kimberleyaversbiz@gmail.com" })
+  await f.box.enqueue(data)
+  const input = {
+    requestId: data.requestId, sender: f.sender, env: flagEnv,
+    outbox: f.box, proof: f.proof, reports: f.reports,
+  }
+  assert.deepEqual(await deliverQuickAuditOwnerPreview(input), { status: "uncertain" })
+  assert.equal(f.sent.length, 1)
+  assert.equal((await f.box.read(data.requestId))?.state, "uncertain")
+  assert.deepEqual(await deliverQuickAuditOwnerPreview(input), { status: "duplicate" })
+  assert.equal(f.sent.length, 1)
 })
