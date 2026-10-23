@@ -12,6 +12,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 import { agents, getAgent, statusMeta } from "../agentCatalog"
 import { getAgentSalesOffer, getCategoryOutcome } from "../agentSales"
+import { customerAgentDescription, customerOfferDescription } from "../customerCopy"
+import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 
 export function generateStaticParams() {
   return agents.filter((agent) => !agent.internal).map((agent) => ({ slug: agent.slug }))
@@ -69,6 +71,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
 
   const meta = statusMeta[agent.status]
   const offer = getAgentSalesOffer(agent)
+  const checkoutAvailable = isContentAgentLaunchEnabled()
   const outcome = getCategoryOutcome(agent.category)
   const steps = salesSteps(offer.mode)
   const related = agents
@@ -98,7 +101,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
               <h1 className="max-w-4xl text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl">
                 {heroLead} <span className="text-primary">{agent.name}</span> {heroTail}
               </h1>
-              <p className="max-w-3xl text-lg leading-8 text-muted-foreground">{agent.description}</p>
+              <p className="max-w-3xl text-lg leading-8 text-muted-foreground">{customerAgentDescription(agent)}</p>
               <p className="max-w-3xl text-base leading-7 text-foreground/80">{outcome}</p>
             </div>
 
@@ -132,20 +135,20 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
           ) : null}
           <Card className="border-primary/25 bg-primary/5 shadow-xl">
             <CardHeader>
-              <CardDescription>{offer.label}</CardDescription>
+              <CardDescription>{!checkoutAvailable && offer.mode === "subscription" ? "New subscriptions paused" : offer.label}</CardDescription>
               <CardTitle className="text-3xl sm:text-4xl">{offer.price}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
-              <p className="leading-7 text-muted-foreground">{offer.detail}</p>
+              <p className="leading-7 text-muted-foreground">{customerOfferDescription(agent)}</p>
               <div className="space-y-3 border-t border-border/70 pt-5">
-                {agent.capabilities.slice(0, 4).map((capability) => (
+                {agent.status === "live" ? agent.capabilities.slice(0, 4).map((capability) => (
                   <div className="flex items-start gap-3 text-sm" key={capability}>
                     <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
                       <Check className="h-3 w-3" />
                     </span>
                     <span>{capability}</span>
                   </div>
-                ))}
+                )) : null}
               </div>
             </CardContent>
           </Card>
@@ -191,14 +194,14 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {agent.capabilities.map((capability) => (
+            {agent.status === "live" ? agent.capabilities.map((capability) => (
               <Card key={capability}>
                 <CardHeader>
                   <Sparkles className="mb-2 h-5 w-5 text-primary" />
                   <CardTitle className="text-lg">{capability}</CardTitle>
                 </CardHeader>
               </Card>
-            ))}
+            )) : <p className="text-muted-foreground">This service is not yet available to purchase.</p>}
           </div>
         </div>
       </section>
@@ -218,7 +221,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
                   <CardDescription className="leading-6">{copy}</CardDescription>
                 </CardHeader>
               </Card>
-            ))}
+            )) : <p className="text-muted-foreground">This service is not yet available to purchase.</p>}
           </div>
         </div>
       </section>
@@ -231,7 +234,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
               <CardTitle>Clear availability. You stay in control.</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-7 text-muted-foreground">
-              <p>{offer.detail}</p>
+              <p>{customerOfferDescription(agent)}</p>
               <p>Services not yet available cannot be purchased. You review customer-facing content before using it.</p>
             </CardContent>
           </Card>
@@ -259,7 +262,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
                         <Badge variant="outline">{candidateOffer.label}</Badge>
                       </div>
                       <CardTitle className="pt-2">{candidate.name}</CardTitle>
-                      <CardDescription className="leading-6">{candidate.description}</CardDescription>
+                      <CardDescription className="leading-6">{customerAgentDescription(candidate)}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="font-bold">{candidateOffer.price}</div>
@@ -279,7 +282,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
         <div className="mx-auto flex max-w-6xl flex-col justify-between gap-6 lg:flex-row lg:items-center">
           <div className="max-w-3xl space-y-2">
             <h2 className="text-3xl font-black tracking-tight sm:text-4xl">{offer.mode === "roadmap" ? "Buy what is ready today." : `Ready for ${agent.name}?`}</h2>
-            <p className="leading-7 text-muted-foreground">{offer.detail}</p>
+            <p className="leading-7 text-muted-foreground">{customerOfferDescription(agent)}</p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-3">
             <Button asChild size="lg"><Link href={offer.primaryHref}>{offer.primaryLabel}<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>

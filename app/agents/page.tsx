@@ -10,6 +10,7 @@ import styles from "./agents.module.css"
 
 import { agents, statusMeta, type AgentStatus } from "./agentCatalog"
 import { getAgentSalesOffer } from "./agentSales"
+import { customerAgentDescription, customerOfferDescription } from "./customerCopy"
 
 const categoryOptions = [
   "All",
@@ -196,16 +197,16 @@ export default function AgentsPage() {
                   )}
                   <p className={styles.category}>{agent.category}</p>
                   <h3>{agent.name}</h3>
-                  <p className={styles.description}>{agent.description}</p>
+                  <p className={styles.description}>{customerAgentDescription(agent)}</p>
 
                   <div className="rounded-lg border border-white/10 bg-black/20 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50">{offer.label}</div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50">{!subscriptionCheckoutLive && offer.mode === "subscription" ? "New subscriptions paused" : offer.label}</div>
                     <div className="mt-1 text-xl font-bold text-white">{offer.price}</div>
-                    <p className="mt-2 text-sm leading-6 text-white/60">{offer.detail}</p>
+                    <p className="mt-2 text-sm leading-6 text-white/60">{customerOfferDescription(agent)}</p>
                   </div>
 
                   <div className={styles.capabilities} aria-label={`${agent.name} capabilities`}>
-                    {agent.capabilities.map((capability) => <span className={styles.capability} key={capability}>{capability}</span>)}
+                    {agent.status === "live" ? agent.capabilities.map((capability) => <span className={styles.capability} key={capability}>{capability}</span>) : null}
                   </div>
 
                   <div className="grid gap-2">
@@ -220,7 +221,7 @@ export default function AgentsPage() {
                   </div>
 
                   <div className={styles.cardFooter}>
-                    <div className={styles.statusNote}><span className={styles.statusDot} /><span>{agent.statusReason}</span></div>
+                    <div className={styles.statusNote}><span className={styles.statusDot} /><span>{publicStatus[agent.status]}</span></div>
                   </div>
                 </article>
               )
