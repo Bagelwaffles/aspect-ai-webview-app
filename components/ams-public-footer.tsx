@@ -4,10 +4,13 @@ export function AmsPublicFooter() {
   return (
     <footer className="ams-public-footer">
       <div className="ams-public-footer__inner">
-        <Link href="/" className="ams-public-brand" aria-label="Aspect Marketing Solutions home">
-          <span className="ams-public-brand__mark">A</span>
-          <span className="ams-public-brand__name">Aspect <strong>Marketing Solutions</strong></span>
-        </Link>
+        <div className="ams-public-footer__brand">
+          <Link href="/" className="ams-public-brand" aria-label="Aspect Marketing Solutions home">
+            <span className="ams-public-brand__mark">A</span>
+            <span className="ams-public-brand__name">Aspect <strong>Marketing Solutions</strong></span>
+          </Link>
+          <p>Always on. Always working. Built to grow your brand.</p>
+        </div>
         <nav className="ams-public-footer__nav" aria-label="Footer navigation">
           <Link href="/agents">Agents</Link>
           <Link href="/creators">Creators</Link>
