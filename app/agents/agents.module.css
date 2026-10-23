@@ -311,3 +311,47 @@
     radial-gradient(circle at 16% 0%,rgba(201,255,61,.08),transparent 28rem),
     rgba(14,21,34,.86);
 }
+
+
+/* AMS / NEXT — align the catalog with the approved cyan/violet/silver identity. */
+.network {
+  --ink: #060a14;
+  --panel: #101b31;
+  --panel-2: #14213a;
+  --line: rgba(165,201,238,.17);
+  --muted: #b5c1d3;
+  --paper: #eaf2ff;
+  --lime: #63dcff;
+  --violet: #8f7cff;
+  --blue: #63dcff;
+  background:
+    radial-gradient(ellipse at 80% 0%,rgba(143,124,255,.18),transparent 35rem),
+    linear-gradient(rgba(165,201,238,.028) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(165,201,238,.028) 1px,transparent 1px),
+    #060a14;
+  background-size: auto, 72px 72px, 72px 72px, auto;
+}
+.network .hero::before { background: var(--violet); opacity: .15; }
+.network .hero h1 { text-transform: none; letter-spacing: -.063em; }
+.network .hero h1 span { -webkit-text-stroke: 1px var(--lime); }
+.network a:focus-visible, .network button:focus-visible { outline: 2px solid var(--lime); }
+
+/* Metallic blue/violet catalog consistency with official owner-provided assets. */
+.network{--ink:#030611;--panel:#111b36;--panel-2:#162444;--paper:#e8f0ff;--muted:#b5c3de;--lime:#64b7ff;--violet:#9654ff;--blue:#3a96ff;--line:rgba(74,140,255,.24)}
+.network .hero{background:radial-gradient(ellipse at 80% 5%,rgba(107,47,222,.12),transparent 44rem)}
+.network .hero h1 span{-webkit-text-stroke:1.2px #72bcff}
+
+/* Cleaner customer storefront; atmospheric pattern without distracting from copy. */
+.network.ams-public-page--balanced {
+  background-image:
+    radial-gradient(ellipse at 84% 0,rgba(114,47,238,.18),transparent 35rem),
+    radial-gradient(ellipse at 7% 15%,rgba(34,107,241,.13),transparent 32rem),
+    linear-gradient(90deg,rgba(78,145,255,.023) 1px,transparent 1px),
+    linear-gradient(rgba(78,145,255,.023) 1px,transparent 1px),
+    linear-gradient(180deg,#030713,#08142c 55%,#030713);
+  background-size:auto,auto,88px 88px,88px 88px,auto;
+}
+.network .card,.network .lifeCard,.network .step {background-color:rgba(8,17,38,.95);border-color:rgba(72,136,251,.27)}
+.network .hero h1 span{color:#8fc6ff;-webkit-text-stroke:0}
+.network .availabilityNotice {display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center;padding:16px 20px;max-width:1100px;margin:0 auto 24px;border:1px solid rgba(72,136,251,.24);border-radius:15px;background:rgba(13,27,55,.94);color:#c0d0e8;font-size:13px}
+.network .availabilityNotice strong{color:#eaf1ff}

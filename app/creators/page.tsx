@@ -41,6 +41,7 @@ export const metadata: Metadata = {
 }
 
 type ModuleStatus = "Pilot" | "Integration required" | "Roadmap"
+const friendlyCreatorStatus: Record<ModuleStatus, string> = { Pilot: "Limited preview", "Integration required": "Not yet available", Roadmap: "Coming soon" }
 
 type CreatorModule = {
   icon: typeof Gamepad2
@@ -203,33 +204,18 @@ const creatorModules: CreatorModule[] = [
   },
 ]
 
-const platformFoundations = [
-  "Creator workspaces, profiles, projects, campaigns, and role-based team access",
-  "Media uploads, asset library, versioning, best-of vault, and eventual export/delete controls",
-  "Job queue, retries, idempotency, rate limits, failure states, and observability",
-  "Human approval queue before publishing, outreach, spending, moderation, or account mutation",
-  "OAuth/integration layer with least-privilege permissions, revocation, and connection health",
-  "Notifications, milestones, deadlines, sponsor obligations, and operational alerts",
-  "Audit logs and execution evidence so the platform can prove what happened and what did not",
-  "Feature flags and status labels so unfinished integrations fail closed instead of pretending to work",
-  "Mobile-friendly workflows and compatibility with the broader AMS Android distribution strategy",
-  "Documentation, onboarding, accessibility, support paths, privacy, retention, and security testing",
-]
-
 const pilotPrinciples = [
-  "No capture card required to start planning and clipping workflows.",
-  "No automatic publishing or account mutation is represented as working until it is actually verified.",
-  "No fabricated analytics, fake growth claims, guaranteed reach, or fake monetization readiness.",
-  "No forced trend chasing when the creator's real audience and enjoyment point somewhere else.",
-  "No creator integration shares credentials with AMS business channels by default.",
-  "No new paid Creator SKU until the customer-facing execution, persistence, failure handling, and support path are proven.",
+  "You approve content before it is published.",
+  "We use real results and never promise guaranteed views or revenue.",
+  "Your account and personal information should remain under your control.",
+  "Paid features will only be offered when they are ready for customers.",
 ]
 
 export default function CreatorsPage() {
   return (
     <>
       <AmsPublicHeader />
-      <main className="ams-public-page ams-public-page min-h-screen bg-background text-foreground">
+      <main className="ams-public-page ams-public-page--balanced min-h-screen bg-background text-foreground">
       
 
       <section className="border-b border-border/70 px-5 py-16 sm:px-8 lg:py-24">
@@ -247,7 +233,7 @@ export default function CreatorsPage() {
                 Run the channel like a <span className="text-primary">creator business</span> without killing the fun.
               </h1>
               <p className="max-w-3xl text-lg leading-8 text-muted-foreground">
-                AMS Creator OS is the professional operating layer behind a streamer: planning, gaming intelligence, VOD and clip operations, editing, publishing, analytics, community, collaborations, monetization, production tech, safety, and the infrastructure required to make those systems reliable.
+                Plan streams, find shareable moments, organize clips, prepare social posts, and build a stronger creator brand—without losing your voice or creative control.
               </p>
             </div>
 
@@ -263,16 +249,16 @@ export default function CreatorsPage() {
 
           <Card className="border-primary/25 bg-primary/5 shadow-xl">
             <CardHeader>
-              <CardDescription>Commercial boundary</CardDescription>
-              <CardTitle className="text-3xl sm:text-4xl">Build the full platform. Sell only proven execution.</CardTitle>
+              <CardDescription>What is available</CardDescription>
+              <CardTitle className="text-3xl sm:text-4xl">Start with our limited creator preview.</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5 text-sm leading-6 text-muted-foreground">
               <p>
-                The Creator OS roadmap is intentionally broader than what is customer-executable today. Every module below is labeled Pilot, Integration required, or Roadmap so a future buyer can see the difference between a tested workflow and a planned capability.
+                Creator OS is still expanding. Explore what is being tested and what is coming next. Features that are not ready cannot be purchased.
               </p>
               <div className="border-t border-border/70 pt-5">
-                <p className="font-semibold text-foreground">Current objective</p>
-                <p className="mt-2">Prove intake, planning, clip operations, real analytics, persistence, approvals, and creator-safe integrations before attaching a paid Creator subscription or automatic publishing promise.</p>
+                <p className="font-semibold text-foreground">Our commitment</p>
+                <p className="mt-2">We will clearly explain what you can access today and ask for your approval before public actions.</p>
               </div>
             </CardContent>
           </Card>
@@ -282,34 +268,24 @@ export default function CreatorsPage() {
       <section className="px-5 py-14 sm:px-8 lg:py-20">
         <div className="mx-auto max-w-7xl space-y-8">
           <div className="max-w-4xl space-y-3">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Full professional stack</p>
-            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Everything a serious gaming creator eventually needs, organized in one operating system.</h2>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Creator possibilities</p>
+            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Make more of every stream.</h2>
             <p className="leading-7 text-muted-foreground">
-              These are platform modules, not new entries added to the 33-agent catalog. The existing Streamer/Twitch roadmap agent remains the agent foundation while Creator OS coordinates the wider workflow around it.
+              Explore planning, clips, social content, community, and monetization ideas. Every feature has a clear availability label.
             </p>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {creatorModules.map(({ icon: Icon, title, status, summary, capabilities }) => (
+            {creatorModules.map(({ icon: Icon, title, status, summary }) => (
               <Card key={title} className="flex h-full flex-col">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-3">
                     <Icon className="mt-1 h-5 w-5 shrink-0 text-primary" />
-                    <Badge variant="outline" className={statusStyle[status]}>{status}</Badge>
+                    <Badge variant="outline" className={statusStyle[status]}>{friendlyCreatorStatus[status]}</Badge>
                   </div>
                   <CardTitle className="pt-2">{title}</CardTitle>
                   <CardDescription className="leading-6">{summary}</CardDescription>
                 </CardHeader>
-                <CardContent className="mt-auto">
-                  <ul className="space-y-2 text-sm leading-6 text-muted-foreground">
-                    {capabilities.map((capability) => (
-                      <li className="flex gap-2" key={capability}>
-                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                        <span>{capability}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
               </Card>
             ))}
           </div>
@@ -356,34 +332,11 @@ export default function CreatorsPage() {
         </div>
       </section>
 
-      <section className="px-5 py-14 sm:px-8 lg:py-20">
-        <div className="mx-auto max-w-7xl space-y-8">
-          <div className="max-w-4xl space-y-3">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Platform foundations</p>
-            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">The infrastructure that keeps automation from becoming chaos.</h2>
-            <p className="leading-7 text-muted-foreground">
-              A professional platform needs far more than prompts. These are the operational foundations the Creator OS roadmap must preserve as integrations move from pilot to production.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            {platformFoundations.map((foundation) => (
-              <Card key={foundation}>
-                <CardContent className="flex gap-3 pt-6">
-                  <ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-primary" />
-                  <p className="text-sm leading-6 text-muted-foreground">{foundation}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section className="border-y border-border/70 bg-muted/20 px-5 py-14 sm:px-8 lg:py-20">
         <div className="mx-auto max-w-7xl space-y-8">
           <div className="max-w-3xl space-y-3">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Non-negotiable pilot rules</p>
-            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Proof before automation theater.</h2>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Built on trust</p>
+            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Your content. Your decisions.</h2>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
@@ -404,9 +357,9 @@ export default function CreatorsPage() {
       <section className="border-t border-border/70 bg-primary/5 px-5 py-14 sm:px-8 lg:py-20">
         <div className="mx-auto flex max-w-6xl flex-col justify-between gap-6 lg:flex-row lg:items-center">
           <div className="max-w-3xl space-y-2">
-            <h2 className="text-3xl font-black tracking-tight sm:text-4xl">The Creator OS is the product vision. The pilot is where we earn the right to sell it.</h2>
+            <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Help shape the next creator tools.</h2>
             <p className="leading-7 text-muted-foreground">
-              Real creators give us the evidence needed to harden intake, media handling, analytics, integrations, approvals, safety, and support before AMS turns this into another paid software lane.
+              Join our limited preview and help us focus on the tools that matter most to creators.
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-3">

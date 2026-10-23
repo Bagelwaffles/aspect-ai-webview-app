@@ -12,16 +12,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 import { agents, getAgent, statusMeta } from "../agentCatalog"
 import { getAgentSalesOffer, getCategoryOutcome } from "../agentSales"
+import { customerAgentDescription, customerOfferDescription } from "../customerCopy"
+import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 
 export function generateStaticParams() {
-  return agents.map((agent) => ({ slug: agent.slug }))
+  return agents.filter((agent) => !agent.internal).map((agent) => ({ slug: agent.slug }))
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
   const agent = getAgent(slug)
 
-  if (!agent) return {}
+  if (!agent || agent.internal) return {}
 
   const offer = getAgentSalesOffer(agent)
   return {
@@ -34,8 +36,8 @@ function salesSteps(mode: ReturnType<typeof getAgentSalesOffer>["mode"]) {
   if (mode === "subscription") {
     return [
       ["1", "Choose a plan", "Pick Starter, Growth, or Pro based on the shared monthly credit pool you need."],
-      ["2", "Open the agent", "Use this agent from its verified AMS customer workflow after authentication and entitlement checks."],
-      ["3", "Review the output", "A completed generation uses one shared plan credit. Human review and the agent’s guardrails remain in effect."],
+      ["2", "Open the agent", "Sign in and choose the marketing task you want to complete."],
+      ["3", "Review the output", "Review each result before using it. Each completed request uses one plan credit."],
     ]
   }
 
@@ -43,36 +45,37 @@ function salesSteps(mode: ReturnType<typeof getAgentSalesOffer>["mode"]) {
     return [
       ["1", "Start the $49 order", "Use the existing secure Quick Marketing Audit checkout."],
       ["2", "Submit business context", "AMS uses the supplied business inputs to create the focused audit and action plan."],
-      ["3", "Receive the result", "The native AMS fulfillment path stores and serves the customer result without changing subscription credits."],
+      ["3", "Receive the result", "Get your audit and action plan within the stated delivery window."],
     ]
   }
 
   if (mode === "beta") {
     return [
       ["1", "Review the beta scope", "See exactly what this controlled product surface can and cannot do today."],
-      ["2", "Use only the verified path", "Beta access remains restricted while AMS gathers the production evidence needed for Live status."],
-      ["3", "Buy when it graduates", "AMS will attach a normal commercial offer only after the production and customer-experience gates pass."],
+      ["2", "Use only the verified path", "Access is limited while we prepare this service for more customers."],
+      ["3", "Buy when it graduates", "Purchasing will be available when this service is ready."],
     ]
   }
 
   return [
     ["1", "Review the concept", "Use this page to understand the business job, intended capabilities, and current product status."],
     ["2", "Watch the roadmap", "AMS keeps unfinished agents visible so customers can compare what exists today with what is coming next."],
-    ["3", "Buy after verification", "A purchase path appears only after the agent is proven and promoted to a commercially available state."],
+    ["3", "Buy after verification", "Purchasing will be available once this service is ready."],
   ]
 }
 
 export default async function AgentSalesPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const agent = getAgent(slug)
-  if (!agent) notFound()
+  if (!agent || agent.internal) notFound()
 
   const meta = statusMeta[agent.status]
   const offer = getAgentSalesOffer(agent)
+  const checkoutAvailable = isContentAgentLaunchEnabled()
   const outcome = getCategoryOutcome(agent.category)
   const steps = salesSteps(offer.mode)
   const related = agents
-    .filter((candidate) => candidate.slug !== agent.slug && candidate.category === agent.category)
+    .filter((candidate) => !candidate.internal && candidate.slug !== agent.slug && candidate.category === agent.category)
     .slice(0, 3)
 
   const heroLead = offer.mode === "roadmap" ? "Explore" : offer.mode === "beta" ? "See what’s next with" : "Put"
@@ -98,7 +101,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
               <h1 className="max-w-4xl text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl">
                 {heroLead} <span className="text-primary">{agent.name}</span> {heroTail}
               </h1>
-              <p className="max-w-3xl text-lg leading-8 text-muted-foreground">{agent.description}</p>
+              <p className="max-w-3xl text-lg leading-8 text-muted-foreground">{customerAgentDescription(agent)}</p>
               <p className="max-w-3xl text-base leading-7 text-foreground/80">{outcome}</p>
             </div>
 
@@ -132,20 +135,20 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
           ) : null}
           <Card className="border-primary/25 bg-primary/5 shadow-xl">
             <CardHeader>
-              <CardDescription>{offer.label}</CardDescription>
+              <CardDescription>{!checkoutAvailable && offer.mode === "subscription" ? "New subscriptions paused" : offer.label}</CardDescription>
               <CardTitle className="text-3xl sm:text-4xl">{offer.price}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
-              <p className="leading-7 text-muted-foreground">{offer.detail}</p>
+              <p className="leading-7 text-muted-foreground">{customerOfferDescription(agent)}</p>
               <div className="space-y-3 border-t border-border/70 pt-5">
-                {agent.capabilities.slice(0, 4).map((capability) => (
+                {agent.status === "live" ? agent.capabilities.slice(0, 4).map((capability) => (
                   <div className="flex items-start gap-3 text-sm" key={capability}>
                     <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
                       <Check className="h-3 w-3" />
                     </span>
                     <span>{capability}</span>
                   </div>
-                ))}
+                )) : null}
               </div>
             </CardContent>
           </Card>
@@ -159,9 +162,9 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
             <p className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-primary">
               <PlayCircle className="h-4 w-4" /> Sales video
             </p>
-            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">See the AMS sales model in action.</h2>
+            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">See how AMS can support your business.</h2>
             <p className="leading-7 text-muted-foreground">
-              This sales film is embedded on every agent page so buyers can understand the AMS offer, operating model, and verified-first approach before choosing a product.
+              Watch an introduction to our approach to marketing and business growth.
             </p>
           </div>
 
@@ -184,21 +187,21 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
         <div className="mx-auto max-w-7xl space-y-8">
           <div className="max-w-3xl space-y-3">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">What you are buying</p>
-            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">A scoped agent with visible boundaries.</h2>
+            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">A focused tool for a real business goal.</h2>
             <p className="leading-7 text-muted-foreground">
               AMS sells specific business jobs, not a vague promise that one bot can do everything. These are the capabilities currently associated with {agent.name}.
             </p>
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {agent.capabilities.map((capability) => (
+            {agent.status === "live" ? agent.capabilities.map((capability) => (
               <Card key={capability}>
                 <CardHeader>
                   <Sparkles className="mb-2 h-5 w-5 text-primary" />
                   <CardTitle className="text-lg">{capability}</CardTitle>
                 </CardHeader>
               </Card>
-            ))}
+            )) : <p className="text-muted-foreground">This service is not yet available to purchase.</p>}
           </div>
         </div>
       </section>
@@ -207,7 +210,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
         <div className="mx-auto max-w-7xl space-y-8">
           <div className="max-w-3xl space-y-3">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">How it works</p>
-            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">From interest to a controlled result.</h2>
+            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Three simple steps to get started.</h2>
           </div>
           <div className="grid gap-5 md:grid-cols-3">
             {steps.map(([number, title, copy]) => (
@@ -223,29 +226,17 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
         </div>
       </section>
 
-      <section className="border-y border-border/70 bg-muted/20 px-5 py-14 sm:px-8 lg:py-20">
-        <div className="mx-auto grid max-w-7xl gap-5 lg:grid-cols-3">
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <ShieldCheck className="mb-2 h-5 w-5 text-primary" />
-              <CardDescription>Commercial status</CardDescription>
-              <CardTitle>{offer.label}</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm leading-6 text-muted-foreground">{offer.detail}</CardContent>
-          </Card>
+      <section className="border-y border-border/70 bg-muted/20 px-5 py-12 sm:px-8">
+        <div className="mx-auto max-w-5xl">
           <Card>
             <CardHeader>
-              <CardDescription>Why this lifecycle status</CardDescription>
-              <CardTitle>{meta.label}</CardTitle>
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              <CardTitle>Clear availability. You stay in control.</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm leading-6 text-muted-foreground">{agent.statusReason}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>Next activation gate</CardDescription>
-              <CardTitle>What moves it forward</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm leading-6 text-muted-foreground">{agent.nextMilestone}</CardContent>
+            <CardContent className="space-y-3 text-sm leading-7 text-muted-foreground">
+              <p>{customerOfferDescription(agent)}</p>
+              <p>Services not yet available cannot be purchased. You review customer-facing content before using it.</p>
+            </CardContent>
           </Card>
         </div>
       </section>
@@ -255,7 +246,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
           <div className="mx-auto max-w-7xl space-y-8">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div className="space-y-2">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Cross-sell</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Explore more</p>
                 <h2 className="text-3xl font-black tracking-tight sm:text-4xl">More {agent.category.toLowerCase()} agents.</h2>
               </div>
               <Button asChild variant="outline"><Link href="/agents">Open full catalog</Link></Button>
@@ -271,7 +262,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
                         <Badge variant="outline">{candidateOffer.label}</Badge>
                       </div>
                       <CardTitle className="pt-2">{candidate.name}</CardTitle>
-                      <CardDescription className="leading-6">{candidate.description}</CardDescription>
+                      <CardDescription className="leading-6">{customerAgentDescription(candidate)}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="font-bold">{candidateOffer.price}</div>
@@ -291,7 +282,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
         <div className="mx-auto flex max-w-6xl flex-col justify-between gap-6 lg:flex-row lg:items-center">
           <div className="max-w-3xl space-y-2">
             <h2 className="text-3xl font-black tracking-tight sm:text-4xl">{offer.mode === "roadmap" ? "Buy what is ready today." : `Ready for ${agent.name}?`}</h2>
-            <p className="leading-7 text-muted-foreground">{offer.detail}</p>
+            <p className="leading-7 text-muted-foreground">{customerOfferDescription(agent)}</p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-3">
             <Button asChild size="lg"><Link href={offer.primaryHref}>{offer.primaryLabel}<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>

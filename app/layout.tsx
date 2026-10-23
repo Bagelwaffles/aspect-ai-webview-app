@@ -1,5 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
+import { AMS_BRAND_ASSETS } from "@/lib/ams-brand-assets"
 import { MarketingAttribution } from "@/components/marketing-attribution"
 import "./globals.css"
 
@@ -21,7 +22,9 @@ export const metadata: Metadata = {
     "marketing audit",
     "Aspect Marketing Solutions",
   ],
+  icons: { icon: [{ url: AMS_BRAND_ASSETS.icon, type: "image/png" }], apple: [{ url: AMS_BRAND_ASSETS.icon }] },
   openGraph: {
+    images: [{ url: AMS_BRAND_ASSETS.hero, width: 1536, height: 864, alt: "Aspect Marketing Solutions — AI Agents, Automation, Growth" }],
     type: "website",
     url: siteUrl,
     siteName: "Aspect Marketing Solutions",
@@ -29,7 +32,8 @@ export const metadata: Metadata = {
     description,
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
+    images: [AMS_BRAND_ASSETS.hero],
     title,
     description,
   },

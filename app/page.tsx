@@ -1,4 +1,6 @@
 import Link from "next/link"
+import Image from "next/image"
+import { AMS_BRAND_ASSETS } from "@/lib/ams-brand-assets"
 import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 import styles from "./marketing.module.css"
 
@@ -8,24 +10,28 @@ const outcomes = [
     title: "Content without the blank page.",
     copy: "Turn one clear brief into practical copy, campaign ideas, lead magnets, emails, and social content.",
     meta: "Content Agent · Lead Magnet · SEO Writer",
+    href: "/agents?category=Content#catalog",
   },
   {
     label: "Grow",
     title: "More attention. Better follow-up.",
     copy: "Build repeatable lead capture and nurture systems that keep opportunities moving instead of disappearing.",
     meta: "Nurture Agent · Social Publisher · Competitive Intel",
+    href: "/agents?category=Marketing#catalog",
   },
   {
     label: "Publish",
     title: "Move from idea to channel faster.",
     copy: "Coordinate video, creator, social, and publishing workflows with human approval where public actions matter.",
     meta: "YouTube Publisher · Clip Generator · Stream Assistant",
+    href: "/agents?category=Creator#catalog",
   },
   {
     label: "Operate",
     title: "Less busywork behind the scenes.",
     copy: "Connect commerce, customer support, analytics, and internal workflows so your business stays organized.",
     meta: "Shopify Ops · Support · Analytics",
+    href: "/agents?category=Operations#catalog",
   },
 ]
 
@@ -33,20 +39,23 @@ const liveAgents = [
   {
     eyebrow: "01 · LIVE",
     title: "Content Agent",
-    copy: "Create marketing copy, product descriptions, email drafts, and social content from one useful brief.",
+    copy: "Draft marketing copy, product descriptions, emails, and social posts from a simple brief.",
     href: "/agents/content-agent",
+    video: "ams-content-agent",
   },
   {
     eyebrow: "02 · LIVE",
     title: "Lead Magnet Agent",
-    copy: "Turn a customer problem into a focused lead magnet concept and conversion asset for your campaign.",
+    copy: "Shape a useful lead magnet around the problem your customers need solved.",
     href: "/agents/lead-magnet-agent",
+    video: "ams-lead-magnet-agent",
   },
   {
     eyebrow: "03 · LIVE",
     title: "Nurture Agent",
-    copy: "Create structured follow-up sequences that help qualified leads keep moving while you stay in control.",
+    copy: "Draft thoughtful follow-ups that keep conversations moving, with you in control.",
     href: "/agents/nurture-agent",
+    video: "ams-nurture-agent",
   },
 ]
 
@@ -54,17 +63,17 @@ const steps = [
   {
     number: "01",
     title: "Choose the result",
-    copy: "Start with the business outcome you want: content, leads, follow-up, search visibility, operations, or a fast audit.",
+    copy: "Choose a business goal: create content, capture interest, or follow up.",
   },
   {
     number: "02",
     title: "Use the right agent",
-    copy: "Every agent shows its current availability, what it does, and how to access it before you commit.",
+    copy: "See what each agent does and whether it’s available before you buy.",
   },
   {
     number: "03",
     title: "Review before it matters",
-    copy: "Sensitive actions such as publishing, payments, or account changes keep explicit human approval.",
+    copy: "Publishing, payments, and account changes require your approval.",
   },
 ]
 
@@ -83,7 +92,7 @@ export default function HomePage() {
 
       <header className={styles.header}>
         <a className={styles.brand} href="#top" aria-label="Aspect Marketing Solutions home">
-          <span className={styles.brandMark}>A</span>
+          <span className={styles.brandMark}><Image src={AMS_BRAND_ASSETS.icon} width={42} height={42} alt="" unoptimized /></span>
           <span>
             Aspect <strong>Marketing Solutions</strong>
           </span>
@@ -97,43 +106,73 @@ export default function HomePage() {
           <Link href="/contact">Contact</Link>
         </nav>
 
+        <details className={styles.mobileMenu}>
+          <summary>Menu <span aria-hidden="true">☰</span></summary>
+          <nav aria-label="Mobile navigation">
+            <Link href="/agents">Agent Store</Link>
+            <Link href="/creators">Creator OS</Link>
+            <Link href="/pricing">Pricing</Link>
+            <Link href="/quick-marketing-audit">Marketing Audit</Link>
+            <Link href="/contact">Contact</Link>
+          </nav>
+        </details>
+
         <Link className={styles.signIn} href="/login?next=/dashboard">
           Sign in
         </Link>
       </header>
 
-      <section className={styles.hero} id="top">
+      <section className={styles.cinematicHero} id="top" aria-label="Aspect Marketing Solutions official brand">
+        <div className={styles.cinematicArtwork}>
+          <Image src={AMS_BRAND_ASSETS.hero} width={1536} height={864} priority unoptimized className={styles.cinematicPanorama}
+            alt="ASPECT Marketing Solutions metallic logo between connected electric-blue and violet global networks" />
+          <div className={styles.mobileBrandArtwork}>
+            <Image src={AMS_BRAND_ASSETS.emblem} width={330} height={330} unoptimized alt="Metallic angular A logo" />
+            <strong>ASPECT</strong>
+            <span>MARKETING SOLUTIONS</span>
+            <small>AI AGENTS · AUTOMATION · GROWTH</small>
+          </div>
+        </div>
+        <div className={styles.cinematicCaption}>
+          <div>
+            <span>GLOBAL THINKING · HUMAN CONTROL</span>
+            <p>AI marketing intelligence built to move your business forward.</p>
+          </div>
+          <Link href="/agents#catalog" className={styles.cinematicCta}>Explore AI agents <span aria-hidden="true">↗</span></Link>
+        </div>
+      </section>
+
+      <section className={styles.hero}>
         <div className={styles.heroCopy}>
           <div className={styles.eyebrow}>
             <span className={styles.liveDot} />
-            Practical AI for growing businesses
+            INTELLIGENT GROWTH SYSTEMS · HUMAN CONTROLLED
           </div>
 
           <h1>
-            Marketing feels easier
-            <span>when the right work is automated.</span>
+            Your marketing. In motion.
+            <span>Your decisions. In control.</span>
           </h1>
 
           <p className={styles.heroText}>
             {subscriptionCheckoutLive ? (
               <>
-                Start with seven production-verified AI agents from $29/month, or choose the
-                $49 Quick Marketing Audit for a focused one-time review. AMS also supports content,
-                lead generation, follow-up, visibility, creator workflows, and day-to-day operations —
-                with human control where it matters.
+                One connected place for content, leads, follow-up, visibility, and smarter marketing workflows.
+                Explore seven production-verified AI agents from $29/month, or get focused direction with
+                the $49 Quick Marketing Audit. Every consequential action stays under human control.
               </>
             ) : (
               <>
-                Seven AMS AI agents have production verification, but subscription checkout and paid AI
-                execution are temporarily paused while AMS runs in zero-cost mode. The $49 Quick Marketing
-                Audit remains the active paid starting point, and the full agent catalog stays visible for review.
+                Get sharper content, stronger lead follow-up, and a clearer marketing plan. Seven AMS agents
+                have proven capabilities, but new subscriptions are temporarily unavailable.
+                Start with the $49 Quick Marketing Audit.
               </>
             )}
           </p>
 
           <div className={styles.heroActions}>
             <Link className={styles.primaryButton} href="/agents#catalog">
-              Explore AI agents <span aria-hidden="true">→</span>
+              Explore the agent network <span aria-hidden="true">→</span>
             </Link>
             <Link className={styles.secondaryButton} href="/quick-marketing-audit">
               Get the $49 audit
@@ -146,12 +185,12 @@ export default function HomePage() {
               <span>Live agents</span>
             </div>
             <div>
-              <strong>33</strong>
-              <span>Agents in catalog</span>
+              <strong>AI</strong>
+              <span>Tools for your business</span>
             </div>
             <div>
               <strong>{subscriptionCheckoutLive ? "$29" : "PAUSED"}</strong>
-              <span>{subscriptionCheckoutLive ? "Plans from / month" : "Subscription checkout"}</span>
+              <span>{subscriptionCheckoutLive ? "Plans start at / month" : "Subscription checkout"}</span>
             </div>
             <div>
               <strong>$49</strong>
@@ -165,8 +204,8 @@ export default function HomePage() {
             <div className={styles.workspace}>
               <div className={styles.workspaceHeader}>
                 <div>
-                  <span className={styles.microLabel}>AMS WORKSPACE</span>
-                  <h2>Your marketing command center</h2>
+                  <span className={styles.microLabel}>YOUR MARKETING WORKSPACE</span>
+                  <h2>Work smarter. Stay in command.</h2>
                 </div>
                 <span className={styles.onlinePill}>Live</span>
               </div>
@@ -176,7 +215,7 @@ export default function HomePage() {
                   <span>Today&apos;s workflow</span>
                   <span>Human-controlled</span>
                 </div>
-                <h3>Launch a focused small-business campaign</h3>
+                <h3>From brief to ready-for-review campaign</h3>
                 <div className={styles.flowLine}>
                   <span className={styles.flowActive}>Brief</span>
                   <i />
@@ -227,35 +266,75 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-          <p className={styles.previewNote}>Product-style preview — not a customer account screenshot.</p>
+          <p className={styles.previewNote}>Illustrative product preview.</p>
+        </div>
+      </section>
+
+      <section className={cx("section", "introVideoSection")} aria-labelledby="ams-video-intro">
+        <div className={styles.introVideoCopy}>
+          <p className={styles.kicker}>Get to know AMS · 21 seconds</p>
+          <h2 id="ams-video-intro">See what AMS can help you create.</h2>
+          <p>
+            A quick visual tour of content, lead magnets, follow-up and owner-controlled
+            marketing workflows. No customer data or real account screens appear in this video.
+          </p>
+          <Link className={styles.introVideoLink} href="/agents#catalog">
+            Explore our available agents <span aria-hidden="true">→</span>
+          </Link>
+        </div>
+        <div className={styles.introVideoPanel}>
+          <video
+            className={styles.introVideo}
+            controls
+            playsInline
+            preload="none"
+            poster="/videos/ams-introduction-poster.jpg"
+            aria-label="AMS introductory video about marketing tools and capabilities"
+          >
+            <source src="/videos/ams-introduction.mp4" type="video/mp4" />
+            <track kind="captions" src="/videos/ams-introduction.vtt" srcLang="en" label="English captions" />
+            Your browser does not support embedded video.
+          </video>
+          <p>Illustrative overview with on-screen text · Select Play to watch.</p>
         </div>
       </section>
 
       <section className={styles.trustBar} aria-label="AMS principles">
         <span>Small-business focused</span>
         <span>Human approval built in</span>
-        <span>Production-verified agents</span>
+        <span>Clear service availability</span>
         <span>Clear pricing</span>
       </section>
+      <section className={styles.brandStatement} aria-label="AMS brand promise">
+        <div className={styles.brandStatementTop}>
+          <span>ASPECT / BRAND PROMISE</span>
+          <span>INTELLIGENCE WITH ACCOUNTABILITY</span>
+        </div>
+        <p>
+          Always on. <em>Always working.</em>
+          <strong> Built to grow your brand.</strong>
+        </p>
+        <div className={styles.brandKeywords} aria-label="Our pillars">
+          <span>AUTOMATE</span><span>AMPLIFY</span><span>GROW</span>
+        </div>
+      </section>
+
       <p className={styles.lifecycleNote}>
-        Five statuses. Live, Beta, Setup Required, Blocked, and Planned.
+        
       </p>
 
-      <section className={styles.section} aria-labelledby="owner-gmail-data-use">
+      <section className={styles.section} aria-labelledby="connected-data-privacy">
         <div className={styles.sectionHeading}>
           <div>
-            <p className={styles.kicker}>Owner operations · Preview-only</p>
-            <h2 id="owner-gmail-data-use">How AMS uses Gmail for internal business notifications.</h2>
+            <p className={styles.kicker}>Privacy and control</p>
+            <h2 id="connected-data-privacy">Your business data deserves respect.</h2>
           </div>
           <p>
-            In the protected owner workspace, AMS is testing separately authorized Gmail
-            connections that inspect selected message headers for business inquiries,
-            payments, Google Play updates, and account-security alerts. Only the primary
-            owner account may send owner notifications and, after separate activation,
-            a fixed first-contact acknowledgment; the secondary account is read-only.
-            Customer Gmail connections and unrestricted AI-generated email replies are
-            not available. See our <Link href="/privacy">Google data-use, privacy and
-            manual deletion disclosures</Link>.
+            AMS uses separately authorized Google account access for limited owner business
+            notifications and inquiry handling. Customer Gmail accounts are not connected to
+            this feature; only permitted owner actions can send messages. Learn more about
+            access, data use and manual deletion in our{" "}
+            <Link href="/privacy">privacy and Google data-use policy</Link>.
           </p>
         </div>
       </section>
@@ -280,6 +359,9 @@ export default function HomePage() {
               <h3>{item.title}</h3>
               <p>{item.copy}</p>
               <small>{item.meta}</small>
+              <Link className={styles.outcomeLink} href={item.href}>
+                Explore related agents <span aria-hidden="true">↗</span>
+              </Link>
             </article>
           ))}
         </div>
@@ -288,13 +370,13 @@ export default function HomePage() {
       <section className={cx("section", "agentSection")}>
         <div className={styles.sectionHeading}>
           <div>
-            <p className={styles.kicker}>{subscriptionCheckoutLive ? "Available now" : "Production verified"}</p>
-            <h2>{subscriptionCheckoutLive ? "Start with agents already working in production." : "Review agents already proven in production."}</h2>
+            <p className={styles.kicker}>{subscriptionCheckoutLive ? "Explore our AI marketing tools" : "Discover what AMS can do"}</p>
+            <h2>Meet three proven AMS agents.</h2>
           </div>
           <p>
             {subscriptionCheckoutLive
-              ? "These are three of the seven live agents included in AMS plans. The full Agent Store shows all 33 agents and their current status."
-              : "These are three of the seven production-verified Live agents. Subscription checkout is temporarily paused; the full Agent Store still shows all 33 agents and their current status."}
+              ? "Get useful content, lead magnets, and follow-up drafts. See which agent fits your next task."
+              : "See what these three agents can do. New subscriptions are paused; check the Agent Store for availability."}
           </p>
         </div>
 
@@ -305,15 +387,30 @@ export default function HomePage() {
                 <span>{agent.eyebrow}</span>
                 <span className={styles.statusDot} />
               </div>
-              <div className={styles.agentVisual} aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </div>
+              <figure className={styles.agentVideoShell}>
+                <video
+                  className={styles.agentVideo}
+                  controls
+                  playsInline
+                  preload="none"
+                  poster={`/videos/${agent.video}-poster.jpg`}
+                  aria-label={`${agent.title} illustrative video explainer`}
+                >
+                  <source src={`/videos/${agent.video}.mp4`} type="video/mp4" />
+                  <track
+                    kind="captions"
+                    src={`/videos/${agent.video}.vtt`}
+                    srcLang="en"
+                    label="English captions"
+                  />
+                  Your browser does not support embedded video.
+                </video>
+                <figcaption>15-second overview · Illustrative, not a live demo</figcaption>
+              </figure>
               <h3>{agent.title}</h3>
               <p>{agent.copy}</p>
               <Link href={agent.href}>
-                View sales page <span aria-hidden="true">→</span>
+                Explore {agent.title} <span aria-hidden="true">→</span>
               </Link>
             </article>
           ))}
@@ -321,7 +418,7 @@ export default function HomePage() {
 
         <div className={styles.centerAction}>
           <Link className={styles.secondaryButton} href="/agents#catalog">
-            Browse all 33 agents
+            Browse all AMS agents
           </Link>
         </div>
       </section>
@@ -329,9 +426,9 @@ export default function HomePage() {
       <section className={cx("section", "experienceSection")} id="how-it-works">
         <div className={styles.experienceIntro}>
           <p className={styles.kicker}>How it works</p>
-          <h2>Simple enough to use. Controlled enough to trust.</h2>
+          <h2>Three steps. You&apos;re in control.</h2>
           <p>
-            AMS is designed to make automation useful without hiding what is happening behind it.
+            Choose an outcome, pick the right agent, and review any consequential action.
           </p>
         </div>
 
@@ -383,9 +480,13 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className={styles.brandSignature} aria-label="Official Aspect Marketing Solutions wordmark">
+        <Image src={AMS_BRAND_ASSETS.banner} width={1536} height={420} unoptimized alt="Aspect Marketing Solutions — AI Agents, Automation, Growth" />
+      </section>
+
       <footer className={styles.footer}>
         <div className={styles.brand}>
-          <span className={styles.brandMark}>A</span>
+          <span className={styles.brandMark}><Image src={AMS_BRAND_ASSETS.icon} width={42} height={42} alt="" unoptimized /></span>
           <span>
             Aspect <strong>Marketing Solutions</strong>
           </span>

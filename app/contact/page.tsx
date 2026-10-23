@@ -18,7 +18,7 @@ export default function ContactPage() {
   return (
     <>
       <AmsPublicHeader />
-      <main className="ams-public-page ams-public-page min-h-screen bg-background px-5 py-12 sm:px-8 lg:py-20">
+      <main className="ams-public-page ams-public-page--quiet min-h-screen bg-background px-5 py-12 sm:px-8 lg:py-20">
       <div className="mx-auto max-w-5xl space-y-8">
         <div className="max-w-3xl space-y-4">
           <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
@@ -80,7 +80,7 @@ export default function ContactPage() {
               <CardDescription>Explore first</CardDescription>
               <CardTitle>Browse the Agent Store</CardTitle>
               <CardDescription className="leading-6">
-                Compare Live, Beta, Setup Required, Blocked, and Planned capabilities before you buy. AMS keeps unfinished work clearly separated from products that are available now.
+                See which marketing tools are available, offer limited access, or are coming soon.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -95,9 +95,9 @@ export default function ContactPage() {
 
         <Card className="border-emerald-500/20 bg-emerald-500/5">
           <CardHeader>
-            <CardTitle>Verified paths instead of a dead contact form</CardTitle>
+            <CardTitle>Choose your next step</CardTitle>
             <CardDescription className="leading-6">
-              AMS routes new buyers through product paths that are already connected to a real next step. A generic contact form will not be presented as working until its storage and follow-up path is verified end to end.
+              Not sure where to start? Browse the agents or begin with a one-time marketing audit. You will always see what is included before purchase.
             </CardDescription>
           </CardHeader>
         </Card>

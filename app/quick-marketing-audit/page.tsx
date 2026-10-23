@@ -29,7 +29,7 @@ export default async function QuickMarketingAuditPage() {
   return (
     <>
       <AmsPublicHeader />
-      <main className="ams-public-page ams-public-page min-h-screen bg-background px-4 py-10 sm:px-6 lg:py-16">
+      <main className="ams-public-page ams-public-page--quiet min-h-screen bg-background px-4 py-10 sm:px-6 lg:py-16">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
         <section className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
           <div className="space-y-6">
@@ -103,7 +103,7 @@ export default async function QuickMarketingAuditPage() {
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
                   <p className="font-medium">Checkout is temporarily paused.</p>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    AMS is upgrading the fulfillment path for this offer. We are not accepting payment until the delivery system is verified again.
+                    This service is temporarily unavailable for purchase. We will reopen orders when delivery is ready.
                   </p>
                 </div>
               )}
@@ -129,7 +129,7 @@ export default async function QuickMarketingAuditPage() {
           <Card>
             <CardHeader>
               <CardTitle>What happens after you buy</CardTitle>
-              <CardDescription>A simple delivery process with no fake automation claims.</CardDescription>
+              <CardDescription>Know what happens from purchase to delivery.</CardDescription>
             </CardHeader>
             <CardContent>
               <ol className="space-y-4 text-sm text-muted-foreground">
@@ -143,15 +143,15 @@ export default async function QuickMarketingAuditPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Why this is the first AMS offer</CardTitle>
-              <CardDescription>Useful now, automatable later.</CardDescription>
+              <CardTitle>A focused first step for your business</CardTitle>
+              <CardDescription>Practical advice without a long-term commitment.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-muted-foreground">
               <p>
-                AMS is bringing its agent platform online in controlled stages. This audit is deliberately simple: buyers get a real deliverable now while the deeper autonomous workflows continue through production verification.
+                Your audit focuses on stronger messaging, practical marketing improvements, and a prioritized action plan.
               </p>
               <p>
-                That means you are buying the outcome described on this page—not a claim that every historical AMS agent is already autonomous or production-ready.
+                This is a one-time service, not a subscription. Results vary; revenue or search rankings are not guaranteed.
               </p>
             </CardContent>
           </Card>
