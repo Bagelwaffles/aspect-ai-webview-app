@@ -4,7 +4,7 @@
 ## Verified blockers, no changes to payment routing
 - Main AMS Stripe **test account** has an active `checkout.session.completed` webhook on `https://www.aspectmarketingsolutions.app/api/webhooks/stripe`.
 - Separate AMS Stripe **sandbox** also has checkout completion webhooks directed to existing live AMS infrastructure (website and Cloudflare Worker). No checkout/coupon redemption until isolated. No webhook was changed.
-- Resend feature branch has the restricted sender key/domain ID but **does not** have the owner email, owner-auth configuration, or Upstash credentials scoped to another self-test branch. Vercel Preview variables are branch-specific.
+- Resend feature branch now has the owner email, owner-only test recipient, Resend sending key/domain ID, and namespaced Upstash REST configuration scoped to this exact Preview branch. Presence of `AMS_OWNER_EMAIL` is not proof that the authenticated owner route works; no customer sending or domain-proof writer has been enabled.
 - Upstash refused a second **free** database: one-free-database account limit. No upgrade or purchase was made.
 - Only available Upstash Free database is `ams-scheduled-tasks-preview`, with hostname `accepted-quetzal-206056.upstash.io`. This may be reused only for *logically namespaced, non-payment Preview proof storage* if explicitly configured; it is NOT a dedicated physical datastore, not authorization to reuse customer payment data, and not a substitute for payment-isolation proof.
 - A separate Aiven Preview Valkey service exists, but it is not plug-and-play with the code's `@upstash/redis` REST client. Do not cross-wire it or repurpose existing owner data.
@@ -15,10 +15,17 @@
 - This is CONFIGURATION DIAGNOSTICS only; even an all-green configuration result must never be interpreted as authorization or readiness to send. The customer delivery worker remains disabled.
 
 ## Next integration gates
-1. Securely configure `AMS_OWNER_EMAIL`, `AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL` and, if the owner explicitly chooses the shared Preview-only proof store, the encrypted branch-scoped `AMS_QUICK_AUDIT_RESEND_PROOF_REDIS_REST_URL`, `AMS_QUICK_AUDIT_RESEND_PROOF_REDIS_REST_TOKEN`, and namespace `AMS_QUICK_AUDIT_RESEND_PROOF_NAMESPACE`. Do not retrieve API keys into chat or GitHub.
+1. **Configuration completed, runtime validation pending:** owner email, owner-only test recipient, Resend sending credentials and all three namespaced proof-store variables are configured on the exact Preview branch. The REST token is stored as a sensitive secret in Vercel; no secret is stored in GitHub, displayed in chat, or copied to production. A new Preview deployment must load the configuration before the authenticated preflight can be verified.
 2. Independently verify proof-store separation and basic read/write via an authenticated owner-only action; complete the *read-only* domain-proof writer/reader integration with temporary administrative credential outside the sender runtime.
 3. Establish that any real Stripe test checkout/webhook and durable paid-audit records remain completely isolated from the production website/worker. Until then use synthetic CI fixtures only.
 4. Only after authentication, isolation and single-send controls are verified, use the prior conditional owner approval for one owner-only email, then independently inspect RFC From/Reply-To/SPF/DKIM/DMARC and replay suppression.
 5. No merge, production deploy, customer mail, paid upgrade, Stripe mutation or automatic sending without separate approval.
 
 Avoid additional deployments until all outstanding configuration changes are batched into one validated Preview release candidate.
+
+## October 23, 2026 — non-payment Preview proof-store acceptance
+- Owner approved reusing the existing **free** Upstash `ams-scheduled-tasks-preview` database strictly for namespaced, non-payment Resend Preview proof. Verified database identity and endpoint, active state, free plan, and automatic plan upgrades disabled; no new database, paid plan, or production dependency was created.
+- Existing dedicated namespace was validated against the preflight regex. Executed `SET key NX EX 180` → `GET key` → `DEL key` for a temporary key inside that Preview namespace: all three returned the expected values, and the test key was deleted. This verifies a **tool-level** scoped read/write/delete, not an application-level proof writer or physical database isolation.
+- Vercel confirmed exactly seven required Resend Preview variables including `AMS_QUICK_AUDIT_RESEND_PROOF_REDIS_REST_TOKEN`, each with target `preview` and exact Git branch; the token is `sensitive`, and nothing was added to production. This database token has database-wide permissions, so namespace separation must not be represented as access-control isolation.
+- Read-only Stripe review: both AMS main test mode and separate AMS sandbox still have enabled `checkout.session.completed` event destinations. The connected Stripe endpoint listing did not expose destination URLs. Previous operational evidence identified live-site/Worker routing; **webhook isolation remains unproven**. No checkout, webhook edits, or payment records were touched.
+- This documentation-only change requests one existing-Git-linked Preview refresh so it can load the newly batched branch settings. The earlier Vercel deployment API 403 path is intentionally not repeated. No automatic send, inbox test, Stripe changes, merge, or production deployment is authorized by this commit.
