@@ -379,7 +379,7 @@ export default function HomePage() {
       <section className={cx("section", "experienceSection")} id="how-it-works">
         <div className={styles.experienceIntro}>
           <p className={styles.kicker}>How it works</p>
-          <h2>Three steps. You're in control.</h2>
+          <h2>Three steps. You&apos;re in control.</h2>
           <p>
             Choose an outcome, pick the right agent, and review any consequential action.
           </p>
