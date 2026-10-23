@@ -156,9 +156,9 @@ export default function HomePage() {
               </>
             ) : (
               <>
-                Your next marketing move deserves clarity, speed, and control. Seven AMS agents have
-                production verification, but subscription checkout and paid agent execution are paused in
-                zero-cost mode. The $49 Quick Marketing Audit remains the active paid starting point.
+                Get sharper content, stronger lead follow-up, and a clearer marketing plan. Seven AMS agents
+                have proven capabilities, but new subscriptions are temporarily unavailable.
+                Start with the $49 Quick Marketing Audit.
               </>
             )}
           </p>
@@ -178,12 +178,12 @@ export default function HomePage() {
               <span>Live agents</span>
             </div>
             <div>
-              <strong>33</strong>
-              <span>Agents in catalog</span>
+              <strong>AI</strong>
+              <span>Tools for your business</span>
             </div>
             <div>
               <strong>{subscriptionCheckoutLive ? "$29" : "PAUSED"}</strong>
-              <span>{subscriptionCheckoutLive ? "Plans from / month" : "Subscription checkout"}</span>
+              <span>{subscriptionCheckoutLive ? "Plans start at / month" : "Subscription checkout"}</span>
             </div>
             <div>
               <strong>$49</strong>
@@ -197,7 +197,7 @@ export default function HomePage() {
             <div className={styles.workspace}>
               <div className={styles.workspaceHeader}>
                 <div>
-                  <span className={styles.microLabel}>AMS / CONTROL CENTER</span>
+                  <span className={styles.microLabel}>YOUR MARKETING WORKSPACE</span>
                   <h2>Work smarter. Stay in command.</h2>
                 </div>
                 <span className={styles.onlinePill}>Live</span>
@@ -259,14 +259,14 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-          <p className={styles.previewNote}>Product-style preview — not a customer account screenshot.</p>
+          <p className={styles.previewNote}>Illustrative product preview.</p>
         </div>
       </section>
 
       <section className={styles.trustBar} aria-label="AMS principles">
         <span>Small-business focused</span>
         <span>Human approval built in</span>
-        <span>Production-verified agents</span>
+        <span>Clear service availability</span>
         <span>Clear pricing</span>
       </section>
       <section className={styles.brandStatement} aria-label="AMS brand promise">
@@ -284,24 +284,21 @@ export default function HomePage() {
       </section>
 
       <p className={styles.lifecycleNote}>
-        Five statuses. Live, Beta, Setup Required, Blocked, and Planned.
+        
       </p>
 
-      <section className={styles.section} aria-labelledby="owner-gmail-data-use">
+      <section className={styles.section} aria-labelledby="connected-data-privacy">
         <div className={styles.sectionHeading}>
           <div>
-            <p className={styles.kicker}>Owner operations · Preview-only</p>
-            <h2 id="owner-gmail-data-use">How AMS uses Gmail for internal business notifications.</h2>
+            <p className={styles.kicker}>Privacy and control</p>
+            <h2 id="connected-data-privacy">Your business data deserves respect.</h2>
           </div>
           <p>
-            In the protected owner workspace, AMS is testing separately authorized Gmail
-            connections that inspect selected message headers for business inquiries,
-            payments, Google Play updates, and account-security alerts. Only the primary
-            owner account may send owner notifications and, after separate activation,
-            a fixed first-contact acknowledgment; the secondary account is read-only.
-            Customer Gmail connections and unrestricted AI-generated email replies are
-            not available. See our <Link href="/privacy">Google data-use, privacy and
-            manual deletion disclosures</Link>.
+            AMS uses separately authorized Google account access for limited owner business
+            notifications and inquiry handling. Customer Gmail accounts are not connected to
+            this feature; only permitted owner actions can send messages. Learn more about
+            access, data use and manual deletion in our{" "}
+            <Link href="/privacy">privacy and Google data-use policy</Link>.
           </p>
         </div>
       </section>
@@ -334,13 +331,13 @@ export default function HomePage() {
       <section className={cx("section", "agentSection")}>
         <div className={styles.sectionHeading}>
           <div>
-            <p className={styles.kicker}>{subscriptionCheckoutLive ? "Available now" : "Production verified"}</p>
+            <p className={styles.kicker}>{subscriptionCheckoutLive ? "Explore our AI marketing tools" : "Discover what AMS can do"}</p>
             <h2>{subscriptionCheckoutLive ? "Start with agents already working in production." : "Review agents already proven in production."}</h2>
           </div>
           <p>
             {subscriptionCheckoutLive
-              ? "These are three of the seven live agents included in AMS plans. The full Agent Store shows all 33 agents and their current status."
-              : "These are three of the seven production-verified Live agents. Subscription checkout is temporarily paused; the full Agent Store still shows all 33 agents and their current status."}
+              ? "These are three of the seven agents included in AMS plans. Explore their benefits and find the right fit."
+              : "Meet three of our marketing agents. New subscriptions are paused for now; check the Agent Store for current availability."}
           </p>
         </div>
 
@@ -367,7 +364,7 @@ export default function HomePage() {
 
         <div className={styles.centerAction}>
           <Link className={styles.secondaryButton} href="/agents#catalog">
-            Browse all 33 agents
+            Explore the Agent Store
           </Link>
         </div>
       </section>

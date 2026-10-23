@@ -8,7 +8,7 @@ import { useMemo, useState } from "react"
 
 import styles from "./agents.module.css"
 
-import { agents, agentStatusCounts, statusMeta, type AgentStatus } from "./agentCatalog"
+import { agents, statusMeta, type AgentStatus } from "./agentCatalog"
 import { getAgentSalesOffer } from "./agentSales"
 
 const categoryOptions = [
@@ -25,6 +25,18 @@ const categoryOptions = [
 ] as const
 
 const statusOptions = ["All", "live", "beta", "setup-required", "planned", "blocked"] as const
+const customerAgents = agents.filter((agent) => !agent.internal)
+const publicStatus: Record<AgentStatus, string> = {
+  live: "Available", beta: "Limited preview", "setup-required": "Not yet available",
+  planned: "Coming soon", blocked: "Unavailable"
+}
+const publicDescription: Record<AgentStatus, string> = {
+  live: "An established service. Check current purchase options before ordering.",
+  beta: "Access is limited while we continue improving the experience.",
+  "setup-required": "This service cannot be purchased yet.",
+  planned: "A future service that is not yet for sale.",
+  blocked: "This service is currently unavailable."
+}
 
 type CategoryFilter = (typeof categoryOptions)[number]
 type StatusFilter = (typeof statusOptions)[number]
@@ -45,7 +57,7 @@ export default function AgentsPage() {
 
   const filteredAgents = useMemo(
     () =>
-      agents.filter((agent) => {
+      customerAgents.filter((agent) => {
         const categoryMatch = category === "All" || agent.category === category
         const statusMatch = status === "All" || agent.status === status
         return categoryMatch && statusMatch
@@ -53,7 +65,10 @@ export default function AgentsPage() {
     [category, status],
   )
 
-  const counts = agentStatusCounts
+  const counts = customerAgents.reduce<Record<AgentStatus, number>>((totals, agent) => {
+    totals[agent.status] += 1
+    return totals
+  }, { live: 0, beta: 0, "setup-required": 0, planned: 0, blocked: 0 })
 
   return (
     <main className={`${styles.network} ams-public-page`}>
@@ -61,46 +76,43 @@ export default function AgentsPage() {
       
 
       <section className={styles.hero}>
-        <p className={styles.kicker}><span className={styles.kickerDot} />Aspect Agent Store // verified capability, honest availability</p>
+        <p className={styles.kicker}><span className={styles.kickerDot} />ASPECT AGENT STORE · MARKETING GROWTH</p>
         <div className={styles.heroGrid}>
           <h1>Shop the agent network.<span>Put AI to work.</span></h1>
           <div className={styles.heroCopy}>
             <p>
               {subscriptionCheckoutLive ? (
-                <>Browse the complete AMS catalog, open a dedicated sales page for every agent, and buy the capabilities that are actually available today. Seven verified Live agents are included in AMS subscriptions starting at $29/month. The Quick Marketing Audit remains a separate $49 one-time service. Everything else stays visible as Beta, Setup Required, Planned, or Blocked so you can see what is coming without being sold vaporware.</>
+                <>Find useful tools for content, leads, follow-up, search visibility and growth. Seven agents are included in plans starting at $29/month; the Quick Marketing Audit is $49 one time. Check each service for availability before you buy.</>
               ) : (
-                <>Browse the complete AMS catalog and review the capabilities already proven in production. Seven agents remain verified Live, but subscription checkout and paid AI execution are temporarily paused in zero-cost mode. The Quick Marketing Audit remains the active $49 paid starting point. Everything else stays visible as Beta, Setup Required, Planned, or Blocked.</>
+                <>Browse tools for content, leads, follow-up and marketing growth. New subscriptions are temporarily unavailable; you can still explore the catalog and start with the $49 Quick Marketing Audit.</>
               )}
             </p>
             <div className={styles.heroActions}>
               <a className={styles.primary} href="#catalog">Browse all agents <span>↓</span></a>
-              <Link className={styles.secondary} href="/pricing#plans">{subscriptionCheckoutLive ? "Get 7 Live agents from $29/mo" : "View verified agent pricing"} <span>↗</span></Link>
+              <Link className={styles.secondary} href="/pricing#plans">{subscriptionCheckoutLive ? "See plans from $29/mo" : "Compare plans"} <span>↗</span></Link>
             </div>
           </div>
         </div>
       </section>
 
-      <section className={styles.signal} aria-label="Current lifecycle counts">
-        <div className={styles.signalItem} data-status="live"><span className={styles.signalLabel}>{subscriptionCheckoutLive ? "Live // buy now" : "Live // checkout paused"}</span><strong className={styles.signalValue}>{counts.live}</strong></div>
-        <div className={styles.signalItem} data-status="beta"><span className={styles.signalLabel}>Beta // controlled</span><strong className={styles.signalValue}>{counts.beta}</strong></div>
-        <div className={styles.signalItem} data-status="development"><span className={styles.signalLabel}>Setup required</span><strong className={styles.signalValue}>{counts["setup-required"]}</strong></div>
-        <div className={styles.signalItem} data-status="soon"><span className={styles.signalLabel}>Planned</span><strong className={styles.signalValue}>{counts.planned}</strong></div>
-        <div className={styles.signalItem} data-status="blocked"><span className={styles.signalLabel}>Blocked</span><strong className={styles.signalValue}>{counts.blocked}</strong></div>
-      </section>
+      <div className={styles.availabilityNotice}>
+        <strong>{subscriptionCheckoutLive ? "Explore the options available today." : "New subscriptions are temporarily paused."}</strong>
+        <span>Service availability is always shown before purchase.</span>
+      </div>
 
       <section className={`${styles.section} ${styles.showcaseSection}`} aria-labelledby="live-agent-showcase-title">
         <div className={styles.showcaseCopy}>
           <div>
-            <p className={styles.kicker}>{subscriptionCheckoutLive ? "Seven agents // available now" : "Seven agents // production verified"}</p>
+            <p className={styles.kicker}>{subscriptionCheckoutLive ? "AI FOR YOUR BUSINESS" : "EXPLORE THE POSSIBILITIES"}</p>
             <h2 id="live-agent-showcase-title">Meet the Live AMS team.</h2>
           </div>
           <div>
             <p>
-              {subscriptionCheckoutLive ? "Content, lead magnets, email campaigns, nurture, outreach, SEO, and product creation are already included in AMS subscriptions. Explore every Live agent below or compare plans to put the full team to work." : "Content, lead magnets, email campaigns, nurture, outreach, SEO, and product creation have production-verified paths. Subscription checkout is temporarily paused; explore the agents now and keep pricing visible for reactivation."}
+              {subscriptionCheckoutLive ? "Content, lead magnets, email campaigns, nurture, outreach, SEO, and product creation are already included in AMS subscriptions. Explore every Live agent below or compare plans to put the full team to work." : "Explore content, lead magnets, email campaigns, follow-up, SEO and product tools. New subscriptions are temporarily unavailable."}
             </p>
             <div className={styles.heroActions}>
-              <a className={styles.primary} href="#catalog">Explore all 33 agents <span>↓</span></a>
-              <Link className={styles.secondary} href="/pricing#plans">{subscriptionCheckoutLive ? "Get 7 Live agents" : "View pricing + pause status"} <span>↗</span></Link>
+              <a className={styles.primary} href="#catalog">Explore the Agent Store <span>↓</span></a>
+              <Link className={styles.secondary} href="/pricing#plans">{subscriptionCheckoutLive ? "Compare plans" : "View pricing"} <span>↗</span></Link>
             </div>
           </div>
         </div>
@@ -141,7 +153,7 @@ export default function AgentsPage() {
                   type="button"
                   onClick={() => setStatus(option)}
                 >
-                  {option === "All" ? "All statuses" : statusMeta[option].label}
+                  {option === "All" ? "All options" : publicStatus[option]}
                 </button>
               ))}
             </div>
@@ -150,7 +162,7 @@ export default function AgentsPage() {
 
         <div className={styles.catalogHeading}>
           <div>
-            <p className={styles.kicker}>Sales catalog</p>
+            <p className={styles.kicker}>Explore the agents</p>
             <h2>{filteredAgents.length} agents in view.</h2>
           </div>
           <p>
@@ -169,8 +181,8 @@ export default function AgentsPage() {
                   <div className={styles.cardTop}>
                     <span className={styles.cardIndex}>{String(index + 1).padStart(2, "0")}</span>
                     <div className={styles.badges}>
-                      {agent.internal ? <span className={styles.internal}>Internal surface</span> : null}
-                      <span className={styles.badge} data-status={meta.visual}>{meta.label}</span>
+                      
+                      <span className={styles.badge} data-status={meta.visual}>{publicStatus[agent.status]}</span>
                     </div>
                   </div>
 
@@ -225,30 +237,16 @@ export default function AgentsPage() {
 
       <section className={styles.section} id="lifecycle">
         <div className={styles.sectionHead}>
-          <div>
-            <p className={styles.kicker}>Availability means something here</p>
-            <h2>Buy the verified layer. See the roadmap behind it.</h2>
-          </div>
-          <p>
-            The full catalog is intentionally larger than the paid catalog. AMS only promotes an agent toward Live after its real execution path,
-            authentication, persistence, failure handling, operator controls, and customer experience are verified. That keeps the sales catalog aggressive without becoming misleading.
-          </p>
+          <div><p className={styles.kicker}>Clear availability</p><h2>Know what you can use before you buy.</h2></div>
+          <p>We clearly distinguish what is available, what has limited access, and what is coming later.</p>
         </div>
-
         <div className={styles.lifecycle}>
-          {(Object.keys(statusMeta) as AgentStatus[]).map((key, index) => {
-            const meta = statusMeta[key]
-            return (
-              <article className={styles.lifeCard} data-status={meta.visual} key={key}>
-                <div className={styles.lifeTop}>
-                  <span className={styles.lifeIndex}>0{index + 1}</span>
-                  <span className={styles.lifePill}>{meta.label}</span>
-                </div>
-                <h3>{meta.label}</h3>
-                <p>{meta.description}</p>
-              </article>
-            )
-          })}
+          {(Object.keys(statusMeta) as AgentStatus[]).map((key, index) => (
+            <article className={styles.lifeCard} data-status={statusMeta[key].visual} key={key}>
+              <div className={styles.lifeTop}><span className={styles.lifeIndex}>0{index + 1}</span><span className={styles.lifePill}>{publicStatus[key]}</span></div>
+              <h3>{publicStatus[key]}</h3><p>{publicDescription[key]}</p>
+            </article>
+          ))}
         </div>
       </section>
 
