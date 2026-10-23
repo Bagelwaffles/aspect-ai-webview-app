@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { getEthicalOfferPage } from "@/lib/ethical-agent-farm-offers"
+import { auditQuoteContext, getAuditImplementationOffer, upsellsUiEnabled } from "@/lib/ams-upsell-offers"
 
 type SubmissionState = "idle" | "sending" | "sent" | "error"
 
@@ -17,6 +18,9 @@ export default function OfferRequestPage() {
   const searchParams = useSearchParams()
   const slug = searchParams.get("offer") || "quick-marketing-audit"
   const offer = useMemo(() => getEthicalOfferPage(slug) ?? getEthicalOfferPage("quick-marketing-audit")!, [slug])
+  const packageId = searchParams.get("package") ?? ""
+  const auditPackage = upsellsUiEnabled() && offer.slug === "business-cleanup-plan" ? getAuditImplementationOffer(packageId) : undefined
+  const presetNotes = auditPackage ? auditQuoteContext(auditPackage.id) ?? "" : ""
   const [state, setState] = useState<SubmissionState>("idle")
   const [message, setMessage] = useState("")
   const [agreed, setAgreed] = useState(false)
@@ -61,7 +65,7 @@ export default function OfferRequestPage() {
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="space-y-3">
           <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Offer request</p>
-          <h1 className="text-4xl font-bold tracking-tight">{offer.name}</h1>
+          <h1 className="text-4xl font-bold tracking-tight">{auditPackage ? `Request ${auditPackage.title}` : offer.name}</h1>
           <p className="text-muted-foreground">
             Request human review for this service. No payment is accepted on this path.
           </p>
@@ -69,8 +73,8 @@ export default function OfferRequestPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{offer.name}</CardTitle>
-            <CardDescription>{offer.price}</CardDescription>
+            <CardTitle>{auditPackage?.title ?? offer.name}</CardTitle>
+            <CardDescription>{auditPackage?.priceLabel ?? offer.price}</CardDescription>
           </CardHeader>
           <CardContent>
             {state === "sent" ? (
@@ -119,7 +123,7 @@ export default function OfferRequestPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="notesOrGoals">Notes / goals</Label>
-                  <Textarea id="notesOrGoals" name="notesOrGoals" rows={5} maxLength={2000} />
+                  <Textarea id="notesOrGoals" name="notesOrGoals" rows={7} maxLength={2000} defaultValue={presetNotes} placeholder="Describe your business goals and what you want AMS to implement." />
                 </div>
                 <div className="flex items-start gap-3 rounded-lg border p-4">
                   <input
@@ -133,6 +137,11 @@ export default function OfferRequestPage() {
                     I understand this is an ethical marketing service request and no revenue results are guaranteed.
                   </Label>
                 </div>
+                {auditPackage ? (
+                  <p className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
+                    This is an optional request for a separately scoped implementation quote. Your original $49 audit is complete on its own. Submitting does not charge you, start work, or authorize access to any account.
+                  </p>
+                ) : null}
                 <input type="hidden" name="selectedOffer" value={offer.slug} />
                 <div className="flex flex-wrap gap-3">
                   <Button type="submit" disabled={state === "sending" || !agreed}>
