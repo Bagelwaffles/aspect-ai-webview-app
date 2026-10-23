@@ -97,6 +97,17 @@ export default function HomePage() {
           <Link href="/contact">Contact</Link>
         </nav>
 
+        <details className={styles.mobileMenu}>
+          <summary>Menu <span aria-hidden="true">☰</span></summary>
+          <nav aria-label="Mobile navigation">
+            <Link href="/agents">Agent Store</Link>
+            <Link href="/creators">Creator OS</Link>
+            <Link href="/pricing">Pricing</Link>
+            <Link href="/quick-marketing-audit">Marketing Audit</Link>
+            <Link href="/contact">Contact</Link>
+          </nav>
+        </details>
+
         <Link className={styles.signIn} href="/login?next=/dashboard">
           Sign in
         </Link>
