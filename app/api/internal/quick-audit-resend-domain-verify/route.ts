@@ -11,10 +11,18 @@ export async function POST(request: NextRequest) {
   return handleOwnerDomainVerification(request, {
     env: process.env,
     authorize: () => authorizeOwnerApiRequest(request, { requireTrustedOrigin: true }),
-    redis: () => new Redis({
-      url: process.env.AMS_QUICK_AUDIT_RESEND_PROOF_REDIS_REST_URL!,
-      token: process.env.AMS_QUICK_AUDIT_RESEND_PROOF_REDIS_REST_TOKEN!,
-    }),
+    redis: () => {
+      const redis = new Redis({
+        url: process.env.AMS_QUICK_AUDIT_RESEND_PROOF_REDIS_REST_URL!,
+        token: process.env.AMS_QUICK_AUDIT_RESEND_PROOF_REDIS_REST_TOKEN!,
+      })
+      return {
+        get: <T>(key: string) => redis.get<T>(key),
+        set: (key: string, value: string, options: { ex: number; nx?: true }) =>
+          options.nx ? redis.set(key, value, { nx: true, ex: options.ex })
+            : redis.set(key, value, { ex: options.ex }),
+      }
+    },
   })
 }
 
