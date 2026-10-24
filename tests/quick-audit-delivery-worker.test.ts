@@ -1,4 +1,5 @@
 import { test } from "node:test"
+import { RESEND_PREVIEW_BRANCH } from "../lib/server/quick-audit-resend-preview-preflight"
 import assert from "node:assert/strict"
 
 import { QuickAuditDeliveryOutbox, type OutboxRedis } from "../lib/server/quick-audit-delivery-outbox"
@@ -23,6 +24,7 @@ const data = {
 const flagEnv: NodeJS.ProcessEnv = {
   NODE_ENV: "test",
   VERCEL_ENV: "preview",
+  VERCEL_GIT_COMMIT_REF: RESEND_PREVIEW_BRANCH,
   AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL: owner,
   AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED: "true",
 }
@@ -236,4 +238,47 @@ test("rejects provider acceptance under a personal Gmail From and prevents a dup
   assert.equal((await f.box.read(data.requestId))?.state, "uncertain")
   assert.deepEqual(await deliverQuickAuditOwnerPreview(input), { status: "duplicate" })
   assert.equal(f.sent.length, 1)
+})
+
+test("owner dispatcher refuses other Preview branches before touching any store or sender", async () => {
+  const f = fixture()
+  await f.box.enqueue(data)
+  for (const env of [
+    { ...flagEnv, VERCEL_GIT_COMMIT_REF: "main" },
+    { ...flagEnv, VERCEL_GIT_COMMIT_REF: "feat/unrelated" },
+    { ...flagEnv, VERCEL_GIT_COMMIT_REF: undefined },
+  ]) {
+    assert.deepEqual(await deliverQuickAuditOwnerPreview({
+      requestId: data.requestId, sender: f.sender, env,
+      outbox: f.box, proof: f.proof, reports: f.reports,
+    }), { status: "disabled" })
+  }
+  assert.equal(f.sent.length, 0)
+  assert.equal((await f.box.read(data.requestId))?.state, "queued")
+})
+
+test("owner dispatcher refuses missing isolated-store injections instead of falling back to default Redis", async () => {
+  const f = fixture()
+  await f.box.enqueue(data)
+  const essential = {
+    requestId: data.requestId,
+    sender: f.sender,
+    env: flagEnv,
+  }
+  for (const dependencies of [
+    {},
+    { outbox: f.box },
+    { proof: f.proof },
+    { reports: f.reports },
+    { outbox: f.box, proof: f.proof },
+    { outbox: f.box, reports: f.reports },
+    { proof: f.proof, reports: f.reports },
+  ]) {
+    assert.deepEqual(
+      await deliverQuickAuditOwnerPreview({ ...essential, ...dependencies }),
+      { status: "disabled" },
+    )
+  }
+  assert.equal(f.sent.length, 0)
+  assert.equal((await f.box.read(data.requestId))?.state, "queued")
 })
