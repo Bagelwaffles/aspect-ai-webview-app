@@ -55,7 +55,7 @@ test("owner authorization and trusted origin reject before credentials, clients 
   const f = fixture()
   assert.equal((await handleOwnerDomainVerification(request(), { ...f.input,
     authorize: async () => ({ ok: false, status: 401 }) })).status, 401)
-  for (const headers of [{ origin: "https://hostile.example.test" }, { "sec-fetch-site": "cross-site" }]) {
+  for (const headers of [{ origin: "https://hostile.example.test", "sec-fetch-site": "same-origin" }, { origin, "sec-fetch-site": "cross-site" }]) {
     assert.equal((await handleOwnerDomainVerification(request(undefined, headers), f.input)).status, 403)
   }
   assert.equal(f.clients, 0); assert.equal(f.requests, 0)
