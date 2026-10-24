@@ -59,3 +59,10 @@ Avoid additional deployments until all outstanding configuration changes are bat
 - The owner-only Preview probe and all 11 configuration checks previously passed; current customer/paid-data isolation and independent Resend provider domain attestation remain BLOCKED. The domain-proof Redis key was confirmed absent. No proof fabrication, admin credential in sender runtime, email dispatch, webhook changes, production promotion, PR merge, or purchase.
 
 - CI scope on this safety-only amendment: type checking, application fixture tests (including default-store/branch denial), build, isolated staging smoke and secret scan. The stacked PR base remains the branded-audit sender branch after CI triggers; this note does not authorize a merge.
+
+## October 23, 2026 — patched Undici and final frozen CI candidate
+- The previous full reconciliation job failed at the dependency-audit gate because `undici@7.29.1` was in the production dependency graph; patched version `7.30.1` addresses the October 2026 high-severity advisories.
+- Restricted the fix to this Draft Preview branch: `package.json` now pins `undici: 7.30.1` in pnpm overrides. Corresponding lockfile package, dependencies, snapshots and override entries were updated with the same `7.30.1` version. The package tarball SHA-512 integrity was independently corroborated across public registry-based lockfiles; **the GitHub frozen-install step remains the deciding check**.
+- A temporary one-shot Preview-only lockfile regeneration workflow was added and then removed from the branch; no privileged workflow remains. Production remains untouched.
+- Re-run the repository's full frozen pnpm install, high-severity dependency audit, TypeScript, lint, application tests, isolated staging smoke, secret scan and build. This entry is a request for independent CI validation, **not** a claim that those checks have passed.
+- Safety constraints unchanged: no Resend sending, Stripe test checkout, webhook mutation, customer delivery, domain-proof fabrication, payment-store fallback, production change, or PR merge.
