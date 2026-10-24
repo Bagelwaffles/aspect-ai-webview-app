@@ -6,6 +6,7 @@ import { inspectResendPreviewPreflight, RESEND_PREVIEW_BRANCH,
 import { AMS_RESEND_DOMAIN_ID } from "../lib/server/quick-audit-resend-domain-proof"
 
 const safe: NodeJS.ProcessEnv = {
+  NODE_ENV: "test",
   VERCEL_ENV: "preview",
   VERCEL_GIT_COMMIT_REF: RESEND_PREVIEW_BRANCH,
   AMS_RESEND_SEND_API_KEY: "fake-should-never-be-in-output",
@@ -67,6 +68,7 @@ test("prohibits production/default Redis, unknown preview host and unscoped name
 
 test("bare Resend key/domain without owner and isolated store never passes", () => {
   const result = inspectResendPreviewPreflight({
+    NODE_ENV: "test",
     VERCEL_ENV: "preview",
     VERCEL_GIT_COMMIT_REF: RESEND_PREVIEW_BRANCH,
     AMS_RESEND_SEND_API_KEY: "fake-secret",
