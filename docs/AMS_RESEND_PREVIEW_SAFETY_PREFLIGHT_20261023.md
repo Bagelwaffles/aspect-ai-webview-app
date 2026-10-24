@@ -103,3 +103,5 @@ Avoid additional deployments until all outstanding configuration changes are bat
 - Resend Full Access key remains revoked; no new admin key is authorized. No production change, existing Stripe webhook mutation, customer message, payment, send-switch enablement or PR merge.
 
 - Independent full CI required for the signed in-process Stripe probe: frozen install/security audit, owner-authenticated route TypeScript/build, synthetic signature/replay/cleanup tests, staging/runtime security tests and secret scanning. A GREEN build is not evidence of a hosted self-test until the owner actually runs the new button.
+
+- CI rerun: fixed the explicit ProcessEnv type on the locally overridden intake config in the signed synthetic probe; no behavior, auth, credentials, Stripe account or delivery flag changed. All acceptance results remain unclaimed until tests pass.
