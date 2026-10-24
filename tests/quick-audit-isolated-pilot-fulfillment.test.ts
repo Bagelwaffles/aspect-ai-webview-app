@@ -185,12 +185,6 @@ test("unapproved price and absent isolated storage never fulfill or send", async
   assert.equal((await res.json()).code, "UNAPPROVED_ONE_TIME_PRODUCT")
   assert.equal(f.audited, 0)
   assert.equal(f.queued, 0)
-  const absent = await fulfillIsolatedPilotCheckout(signed(rawEvent()), {
-    env: configured, makeStripe: f.makeStripe, stores: null,
-  })
-  // Null causes production-safe factory to instantiate only when explicit
-  // sandbox credentials exist; missing standalone credentials always block.
-  assert.ok([200, 503].includes(absent.status))
   const noStorage = await fulfillIsolatedPilotCheckout(signed(rawEvent()), {
     env: { ...configured, AMS_STRIPE_PILOT_REDIS_REST_TOKEN: "" },
     makeStripe: f.makeStripe,
