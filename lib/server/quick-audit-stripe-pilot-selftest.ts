@@ -61,7 +61,7 @@ export async function runOwnerSignedStripePilotProbe(
     "AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED",
     "AMS_QUICK_AUDIT_DELIVERY_OUTBOX_ENABLED",
   ].every(name => env[name] !== "true")
-  const isolatedEnv = { ...env, AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED: "true" }
+  const isolatedEnv: NodeJS.ProcessEnv = { ...env, AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED: "true" }
   if (!off || !pilotIntakeConfiguration(isolatedEnv).ready) return blocked()
 
   const eventId = options.eventId ?? "evt_" + randomBytes(16).toString("hex")
