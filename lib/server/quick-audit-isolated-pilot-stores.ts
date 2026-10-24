@@ -13,16 +13,18 @@ import { RedisQuickAuditStore } from "./quick-audit-fulfillment"
 import { RedisQuickAuditResultStore, createNativeQuickAuditAuditGateway } from "./quick-audit-native"
 import { QuickAuditDeliveryOutbox } from "./quick-audit-delivery-outbox"
 import { RedisPaidQuickAuditProof } from "./quick-audit-delivery-worker"
-import { pilotIntakeConfiguration } from "./quick-audit-isolated-stripe-pilot"
+import { pilotIntakeConfiguration, pilotDispatchConfiguration } from "./quick-audit-isolated-stripe-pilot"
 
 export function createIsolatedPilotStores(
   env: NodeJS.ProcessEnv = process.env,
   injectedRedis?: Redis,
+  mode: "intake" | "dispatch" = "intake",
 ) {
   // Guard BEFORE constructing or reading any Redis client. The applicant's
   // default URL and the previously approved shared Upstash proof database
   // are forbidden for payment/customer data.
-  if (!pilotIntakeConfiguration(env).ready) {
+  const gate = mode === "dispatch" ? pilotDispatchConfiguration(env) : pilotIntakeConfiguration(env)
+  if (!gate.ready) {
     return null
   }
 
