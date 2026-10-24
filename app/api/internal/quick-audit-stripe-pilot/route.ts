@@ -7,12 +7,18 @@
  */
 import { handlePilotStripeWebhook } from "@/lib/server/quick-audit-isolated-stripe-pilot"
 import { createIsolatedPilotStores } from "@/lib/server/quick-audit-isolated-pilot-stores"
+import { fulfillIsolatedPilotCheckout } from "@/lib/server/quick-audit-isolated-pilot-fulfillment"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
   const env = process.env
+  if (env.AMS_STRIPE_PILOT_FULFILLMENT_ENABLED === "true") {
+    // Separate, strictly gated paid-record fulfillment. Never fall back to
+    // receipt-only behavior after an attempted fulfillment configuration.
+    return fulfillIsolatedPilotCheckout(request, { env })
+  }
   // The guarded factory never opens the application's default Redis.
   // No audit or fulfillment occurs in this endpoint even when configured.
   let adapters: ReturnType<typeof createIsolatedPilotStores> = null
