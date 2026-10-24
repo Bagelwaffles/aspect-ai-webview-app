@@ -1,0 +1,63 @@
+name: AMS Undici Preview lockfile repair
+
+on:
+  push:
+    branches:
+      - feat/ams-resend-transactional-preview-20261023
+    paths:
+      - .github/workflows/ams-undici-preview-lock-repair.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ams-undici-lockfile-preview-only
+  cancel-in-progress: false
+
+jobs:
+  regenerate-lockfile:
+    if: github.ref == 'refs/heads/feat/ams-resend-transactional-preview-20261023'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Use repository-pinned package manager
+        run: |
+          corepack enable
+          corepack pnpm --version
+          node -e "const p=require('./package.json');if(p.packageManager!=='pnpm@10.28.0'||p.pnpm?.overrides?.undici!=='7.30.1')process.exit(1)"
+      - name: Generate genuine lockfile from pinned npm registry dependency
+        run: |
+          corepack pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts
+          grep -q '^  undici@7.30.1:' pnpm-lock.yaml
+          if grep -q '^  undici@7.29.1:' pnpm-lock.yaml; then
+            echo "Unpatched undici remains" >&2
+            exit 1
+          fi
+          corepack pnpm install --frozen-lockfile --ignore-scripts
+          corepack pnpm audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm
+          corepack pnpm audit --prod --audit-level=high
+          git diff --check
+          if ! git diff --quiet -- package.json; then
+            echo "Unexpected package manifest mutation" >&2
+            exit 1
+          fi
+      - name: Commit just the generated Preview lockfile
+        run: |
+          set -eu
+          if git diff --quiet -- pnpm-lock.yaml; then
+            echo "No lockfile changes required"
+            exit 0
+          fi
+          test "$(git branch --show-current)" = "feat/ams-resend-transactional-preview-20261023"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git diff --cached --name-only | grep -qx 'pnpm-lock.yaml'
+          git commit -m "fix(deps): regenerate pinned undici 7.30.1 lockfile"
+          git push origin HEAD:refs/heads/feat/ams-resend-transactional-preview-20261023
