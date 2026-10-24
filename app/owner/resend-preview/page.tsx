@@ -2,6 +2,7 @@ import Link from "next/link"
 import { getServerSession } from "next-auth"
 import { authOptions, isCustomerAuthConfigured } from "@/lib/auth"
 import { ResendPreviewControls } from "./resend-preview-controls"
+import { StripeReceiptControls } from "./stripe-receipt-controls"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -34,7 +35,10 @@ export default async function ResendPreviewOwnerPage() {
           </p>
         </div>
         {authorized ? (
-          <ResendPreviewControls />
+          <>
+            <ResendPreviewControls />
+            <StripeReceiptControls />
+          </>
         ) : (
           <section className="rounded-xl border border-amber-500/40 bg-amber-950/25 p-5">
             <h2 className="font-semibold text-amber-200">Owner session required</h2>
