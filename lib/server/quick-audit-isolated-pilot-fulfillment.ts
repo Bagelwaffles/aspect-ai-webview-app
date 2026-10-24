@@ -5,7 +5,7 @@
  * No outbound customer or owner email may be sent from a webhook.
  */
 import Stripe from "stripe"
-import { processQuickAuditCheckout, QuickAuditFulfillmentError } from "./quick-audit-fulfillment"
+import { processQuickAuditCheckout, QuickAuditFulfillmentError, type QuickAuditEvidence } from "./quick-audit-fulfillment"
 import { createIsolatedPilotStores } from "./quick-audit-isolated-pilot-stores"
 import {
   AMS_PILOT_STRIPE_ACCOUNT,
@@ -25,6 +25,7 @@ export async function fulfillIsolatedPilotCheckout(
     env: NodeJS.ProcessEnv
     makeStripe?: (secret: string) => Stripe
     stores?: ReturnType<typeof createIsolatedPilotStores>
+    evidenceCollector?: (url: string) => Promise<QuickAuditEvidence>
   },
 ): Promise<Response> {
   const env = input.env
@@ -94,6 +95,7 @@ export async function fulfillIsolatedPilotCheckout(
       },
       store: stores.payment,
       auditGateway: stores.auditGateway,
+      evidenceCollector: input.evidenceCollector,
       expectedPriceId: env.AMS_STRIPE_PILOT_PRICE_ID!,
       expectedLivemode: false,
       // Queue ONLY the configured owner, never a customer address and never
