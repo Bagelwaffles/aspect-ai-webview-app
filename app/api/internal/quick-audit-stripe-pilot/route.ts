@@ -5,22 +5,22 @@
  * credentials, endpoint secret and explicit intake flag. Checkout events are
  * never acknowledged as fulfilled or forwarded to production.
  */
-import { Redis } from "@upstash/redis"
-import { handlePilotStripeWebhook, pilotIntakeConfiguration } from "@/lib/server/quick-audit-isolated-stripe-pilot"
+import { handlePilotStripeWebhook } from "@/lib/server/quick-audit-isolated-stripe-pilot"
+import { createIsolatedPilotStores } from "@/lib/server/quick-audit-isolated-pilot-stores"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
   const env = process.env
-  const config = pilotIntakeConfiguration(env)
-  let store: Redis | null = null
-  if (config.ready) {
-    const url = env.AMS_STRIPE_PILOT_REDIS_REST_URL!
-    const token = env.AMS_STRIPE_PILOT_REDIS_REST_TOKEN!
-    try { store = new Redis({ url, token }) } catch { store = null }
-  }
-  return handlePilotStripeWebhook(request, { env, store })
+  // The guarded factory never opens the application's default Redis.
+  // No audit or fulfillment occurs in this endpoint even when configured.
+  let adapters: ReturnType<typeof createIsolatedPilotStores> = null
+  try { adapters = createIsolatedPilotStores(env) } catch { adapters = null }
+  return handlePilotStripeWebhook(request, {
+    env,
+    store: adapters?.eventReceipts ?? null,
+  })
 }
 
 export async function GET() {
