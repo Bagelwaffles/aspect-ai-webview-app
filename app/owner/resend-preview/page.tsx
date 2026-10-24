@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions, isCustomerAuthConfigured } from "@/lib/auth"
 import { ResendPreviewControls } from "./resend-preview-controls"
 import { StripeReceiptControls } from "./stripe-receipt-controls"
+import { ConnectivityControls } from "./connectivity-controls"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -38,6 +39,7 @@ export default async function ResendPreviewOwnerPage() {
           <>
             <ResendPreviewControls />
             <StripeReceiptControls />
+            <ConnectivityControls />
           </>
         ) : (
           <section className="rounded-xl border border-amber-500/40 bg-amber-950/25 p-5">
