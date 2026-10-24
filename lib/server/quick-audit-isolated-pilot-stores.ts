@@ -23,7 +23,8 @@ export function createIsolatedPilotStores(
   // Guard BEFORE constructing or reading any Redis client. The applicant's
   // default URL and the previously approved shared Upstash proof database
   // are forbidden for payment/customer data.
-  const gate = mode === "dispatch" ? pilotDispatchConfiguration(env) :\n    mode === "fulfillment" ? pilotFulfillmentConfiguration(env) : pilotIntakeConfiguration(env)
+  const gate = mode === "dispatch" ? pilotDispatchConfiguration(env) :
+    mode === "fulfillment" ? pilotFulfillmentConfiguration(env) : pilotIntakeConfiguration(env)
   if (!gate.ready) {
     return null
   }
