@@ -13,6 +13,7 @@ import {
 
 const namespace = "ams:preview:quick-audit:resend-owner-probe:"
 const env: NodeJS.ProcessEnv = {
+  NODE_ENV: "test",
   VERCEL_ENV: "preview",
   VERCEL_GIT_COMMIT_REF: RESEND_PREVIEW_BRANCH,
   AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED: "false",
