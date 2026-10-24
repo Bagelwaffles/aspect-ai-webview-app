@@ -118,3 +118,13 @@ test("invalid probe identifier causes no datastore activity", async () => {
   }), false)
   assert.equal(f.writes.length, 0)
 })
+
+test("incorrect read-back value causes cleanup and fail-closed result", async () => {
+  const f = fixture()
+  f.redis.get = async () => "wrong-value" as never
+  assert.equal(await runOwnerResendPreviewProofStoreProbe(f.redis, env, {
+    identifier: "owner-probe-a1", marker: "synthetic-value",
+  }), false)
+  assert.equal(f.values.size, 0)
+  assert.equal(f.deletes.length, 1)
+})
