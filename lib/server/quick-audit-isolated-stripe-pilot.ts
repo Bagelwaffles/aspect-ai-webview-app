@@ -98,6 +98,30 @@ export function pilotDispatchConfiguration(env: NodeJS.ProcessEnv) {
   return { ready: true, code: "PILOT_DISPATCH_ARMED", host: storage.host } as const
 }
 
+
+/**
+ * A separate fulfillment gate. The receipt-only intake never fulfills
+ * checkout sessions; this gate requires the new sandbox's API key and price.
+ * It never authorizes sending, only durable paid-record creation.
+ */
+export function pilotFulfillmentConfiguration(env: NodeJS.ProcessEnv) {
+  const storage = pilotStorageConfiguration(env)
+  if (!storage.ready) return storage
+  if (env.AMS_STRIPE_PILOT_FULFILLMENT_ENABLED !== "true" ||
+      env.AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED === "true" ||
+      env.AMS_QUICK_AUDIT_PILOT_DISPATCH_ENABLED === "true") {
+    return { ready: false, code: "PILOT_FULFILLMENT_DISABLED" } as const
+  }
+  if (!env.AMS_STRIPE_PILOT_WEBHOOK_SECRET?.startsWith("whsec_") ||
+      env.AMS_STRIPE_PILOT_WEBHOOK_SECRET.length < 20 ||
+      !env.AMS_STRIPE_PILOT_TEST_SECRET_KEY?.startsWith("sk_test_") ||
+      !/^price_[A-Za-z0-9]{8,200}$/u.test(env.AMS_STRIPE_PILOT_PRICE_ID ?? "") ||
+      !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL ?? "")) {
+    return { ready: false, code: "PILOT_FULFILLMENT_UNCONFIGURED" } as const
+  }
+  return { ready: true, code: "PILOT_FULFILLMENT_CONFIGURED", host: storage.host } as const
+}
+
 function outcome(status: number, code: string, duplicate = false): Response {
   return Response.json({ ok: false, code, duplicate, paymentTestPerformed: false,
     sendEnabled: false, fulfillmentEnabled: false }, {
