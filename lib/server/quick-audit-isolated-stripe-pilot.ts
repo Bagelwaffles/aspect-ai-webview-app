@@ -92,7 +92,7 @@ export function pilotDispatchConfiguration(env: NodeJS.ProcessEnv) {
   if (env.AMS_STRIPE_PILOT_FULFILLMENT_ENABLED !== "true" ||
       env.AMS_QUICK_AUDIT_PILOT_DISPATCH_ENABLED !== "true" ||
       env.AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED !== "true" ||
-      !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim() ?? "")) {
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim() ?? "")) {
     return { ready: false, code: "PILOT_DISPATCH_DISABLED" } as const
   }
   return { ready: true, code: "PILOT_DISPATCH_ARMED", host: storage.host } as const
@@ -116,7 +116,7 @@ export function pilotFulfillmentConfiguration(env: NodeJS.ProcessEnv) {
       env.AMS_STRIPE_PILOT_WEBHOOK_SECRET.length < 20 ||
       !env.AMS_STRIPE_PILOT_TEST_SECRET_KEY?.startsWith("sk_test_") ||
       !/^price_[A-Za-z0-9]{8,200}$/u.test(env.AMS_STRIPE_PILOT_PRICE_ID ?? "") ||
-      !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL ?? "")) {
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL ?? "")) {
     return { ready: false, code: "PILOT_FULFILLMENT_UNCONFIGURED" } as const
   }
   return { ready: true, code: "PILOT_FULFILLMENT_CONFIGURED", host: storage.host } as const
