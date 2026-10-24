@@ -92,3 +92,5 @@ Avoid additional deployments until all outstanding configuration changes are bat
 - Final full-CI candidate: exercise signed sandbox synthetic webhook handling, owner-only dispatch guards, explicit isolated datastore adapters, pinned dependency audit, TypeScript, application tests, Vercel build and runtime security tests. No external sandbox configuration or sending is authorized by this commit.
 
 - Full-CI retry candidate: repaired adapter-mode selector syntax after Preview compiler failure; require clean frozen-install, dependency audit, TypeScript, application fixtures, build, isolated staging/security smoke and secret scan before any owner workflow is enabled. Production and Stripe remain untouched.
+
+- Final test fix: application suite identified six fixtures blocked by a malformed synthetic owner-address validator; corrected the whitespace regex while preserving all Preview and delivery gates. Re-run full reconciliation on the repaired head before treating any synthetic fulfillment assertion as passing.
