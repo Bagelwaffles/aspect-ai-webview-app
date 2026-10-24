@@ -31,7 +31,7 @@ export type PilotReceipt = {
  * A distinct URL is only a necessary condition; project/DB identity,
  * credentials, and ACL independence still require separate proof.
  */
-export function pilotIntakeConfiguration(env: NodeJS.ProcessEnv) {
+export function pilotStorageConfiguration(env: NodeJS.ProcessEnv) {
   const ownUrl = env.AMS_STRIPE_PILOT_REDIS_REST_URL?.trim()
   const proofUrl = env.AMS_QUICK_AUDIT_RESEND_PROOF_REDIS_REST_URL?.trim()
   const defaults = [env.UPSTASH_REDIS_REST_URL, env.KV_REST_API_URL]
@@ -56,22 +56,46 @@ export function pilotIntakeConfiguration(env: NodeJS.ProcessEnv) {
   } catch {
     return { ready: false, code: "PILOT_STORAGE_NOT_ISOLATED" } as const
   }
-
   if (env.VERCEL_ENV !== "preview" ||
       env.VERCEL_GIT_COMMIT_REF !== RESEND_PREVIEW_BRANCH ||
       env.AMS_STRIPE_PILOT_ACCOUNT_ID !== AMS_PILOT_STRIPE_ACCOUNT ||
-      env.AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED !== "true" ||
+      !env.AMS_STRIPE_PILOT_REDIS_REST_TOKEN?.trim() ||
+      !KEY_NAMESPACE.test(env.AMS_STRIPE_PILOT_REDIS_NAMESPACE ?? "")) {
+    return { ready: false, code: "PILOT_STORAGE_SCOPE_DENIED" } as const
+  }
+  return { ready: true, code: "PILOT_STORAGE_CONFIGURED", host } as const
+}
+
+export function pilotIntakeConfiguration(env: NodeJS.ProcessEnv) {
+  const storage = pilotStorageConfiguration(env)
+  if (!storage.ready) return storage
+  if (env.AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED !== "true" ||
       env.AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED === "true" ||
       env.AMS_QUICK_AUDIT_DELIVERY_OUTBOX_ENABLED === "true") {
     return { ready: false, code: "PILOT_INTAKE_DISABLED" } as const
   }
   if (!env.AMS_STRIPE_PILOT_WEBHOOK_SECRET?.startsWith("whsec_") ||
-      env.AMS_STRIPE_PILOT_WEBHOOK_SECRET.length < 20 ||
-      !env.AMS_STRIPE_PILOT_REDIS_REST_TOKEN?.trim() ||
-      !KEY_NAMESPACE.test(env.AMS_STRIPE_PILOT_REDIS_NAMESPACE ?? "")) {
+      env.AMS_STRIPE_PILOT_WEBHOOK_SECRET.length < 20) {
     return { ready: false, code: "PILOT_INTAKE_UNCONFIGURED" } as const
   }
-  return { ready: true, code: "PILOT_INTAKE_CONFIGURED", host } as const
+  return { ready: true, code: "PILOT_INTAKE_CONFIGURED", host: storage.host } as const
+}
+
+/**
+ * Separate manual owner-only dispatch gate. A real isolated payment
+ * fulfillment path, operational verification and explicit authorization must
+ * all be present before this ever becomes true. Never infer it from intake.
+ */
+export function pilotDispatchConfiguration(env: NodeJS.ProcessEnv) {
+  const storage = pilotStorageConfiguration(env)
+  if (!storage.ready) return storage
+  if (env.AMS_STRIPE_PILOT_FULFILLMENT_ENABLED !== "true" ||
+      env.AMS_QUICK_AUDIT_PILOT_DISPATCH_ENABLED !== "true" ||
+      env.AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED !== "true" ||
+      env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim() === "") {
+    return { ready: false, code: "PILOT_DISPATCH_DISABLED" } as const
+  }
+  return { ready: true, code: "PILOT_DISPATCH_ARMED", host: storage.host } as const
 }
 
 function outcome(status: number, code: string, duplicate = false): Response {
