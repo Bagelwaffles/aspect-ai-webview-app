@@ -92,7 +92,7 @@ export function pilotDispatchConfiguration(env: NodeJS.ProcessEnv) {
   if (env.AMS_STRIPE_PILOT_FULFILLMENT_ENABLED !== "true" ||
       env.AMS_QUICK_AUDIT_PILOT_DISPATCH_ENABLED !== "true" ||
       env.AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED !== "true" ||
-      env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim() === "") {
+      !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim() ?? "")) {
     return { ready: false, code: "PILOT_DISPATCH_DISABLED" } as const
   }
   return { ready: true, code: "PILOT_DISPATCH_ARMED", host: storage.host } as const
