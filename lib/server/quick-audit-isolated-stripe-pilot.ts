@@ -66,6 +66,27 @@ export function pilotStorageConfiguration(env: NodeJS.ProcessEnv) {
   return { ready: true, code: "PILOT_STORAGE_CONFIGURED", host } as const
 }
 
+/**
+ * Time-box external, receipt-only Stripe webhook acceptance. No full payment,
+ * fulfillment, dispatch, or mail paths may be enabled for this brief probe.
+ * A Vercel branch-scoped setting must explicitly expire within 10 minutes.
+ * Expiration is checked on EVERY incoming request, even if the deployment
+ * remains READY and a flag is accidentally left configured.
+ */
+export function pilotReceiptOnlyWindowOpen(env: NodeJS.ProcessEnv, now = Date.now()): boolean {
+  const until = Date.parse(env.AMS_STRIPE_PILOT_WEBHOOK_INTAKE_UNTIL ?? "")
+  return env.VERCEL_ENV === "preview" &&
+    env.VERCEL_GIT_COMMIT_REF === RESEND_PREVIEW_BRANCH &&
+    env.AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED === "true" &&
+    Number.isFinite(until) && until > now && until - now <= 10 * 60_000 &&
+    [
+      "AMS_STRIPE_PILOT_FULFILLMENT_ENABLED",
+      "AMS_QUICK_AUDIT_PILOT_DISPATCH_ENABLED",
+      "AMS_QUICK_AUDIT_DELIVERY_OUTBOX_ENABLED",
+      "AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED",
+    ].every(name => env[name] !== "true")
+}
+
 export function pilotIntakeConfiguration(env: NodeJS.ProcessEnv) {
   const storage = pilotStorageConfiguration(env)
   if (!storage.ready) return storage
