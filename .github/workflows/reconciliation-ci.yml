@@ -2,7 +2,9 @@ name: AMS Reconciliation CI
 
 on:
   pull_request:
-    branches: [main]
+    # PR #300 is deliberately stacked; run the SAME reconciliation suite on
+    # its current feature base without merging or retargeting it to main.
+    branches: [main, feat/ams-branded-audit-sender-20261023]
   workflow_dispatch:
 
 permissions:
@@ -174,3 +176,56 @@ jobs:
           test "$(curl --silent --output /tmp/one-time-checkout.json --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/ethical-agent-farm/checkout)" = "410"
           node -e 'const value=require("/tmp/one-time-checkout.json"); if(value.code!=="ONE_TIME_CHECKOUT_DISABLED") process.exit(1)'
           test "$(curl --silent --output /tmp/session.json --write-out '%{http_code}' http://127.0.0.1:3000/api/auth/session)" = "200"
+
+      - name: Preview-only webhook hostname HTTP guard smoke
+        env:
+          NEXTAUTH_SECRET: ci-only-placeholder-secret-not-for-production
+          NEXTAUTH_URL: http://127.0.0.1:3000
+          VERCEL_ENV: preview
+          VERCEL_GIT_COMMIT_REF: feat/ams-resend-transactional-preview-20261023
+          AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED: "false"
+        run: |
+          set -euo pipefail
+          pnpm start > /tmp/ams-webhook-host-guard.log 2>&1 &
+          APP_PID=$!
+          trap 'kill "$APP_PID" 2>/dev/null || true; cat /tmp/ams-webhook-host-guard.log' EXIT
+
+          for attempt in $(seq 1 40); do
+            if curl --silent --output /dev/null http://127.0.0.1:3000/; then
+              break
+            fi
+            sleep 1
+          done
+
+          INGRESS_HOST="stripe-webhook-preview.aspectmarketingsolutions.app"
+          expect_denied() {
+            local path="$1"
+            local method="${2:-GET}"
+            local response_headers
+            response_headers="$(mktemp)"
+            local status
+            status="$(curl --silent --max-time 15 --request "$method" \
+              --header "Host: $INGRESS_HOST" \
+              --dump-header "$response_headers" --output /dev/null \
+              --write-out '%{http_code}' "http://127.0.0.1:3000$path")"
+            test "$status" = "404"
+            grep -Eqi '^x-robots-tag: noindex, nofollow' "$response_headers"
+            rm -f "$response_headers"
+          }
+          expect_denied /
+          expect_denied /owner/resend-preview
+          expect_denied /api/auth/session
+          expect_denied /api/internal/quick-audit-pilot-dispatch POST
+          expect_denied /api/internal/quick-audit-stripe-pilot GET
+          expect_denied /api/internal/quick-audit-stripe-pilot?test=1 POST
+          expect_denied /_next/static/nonexistent.js
+          expect_denied /favicon.ico
+          expect_denied /api/internal/quick-audit-stripe-pilot OPTIONS
+
+          # Exactly one allowed route reaches the existing fail-closed handler.
+          # Intake is OFF, so this unsigned local POST must not be accepted.
+          status="$(curl --silent --max-time 15 --request POST \
+            --header "Host: $INGRESS_HOST" \
+            --output /dev/null --write-out '%{http_code}' \
+            http://127.0.0.1:3000/api/internal/quick-audit-stripe-pilot)"
+          test "$status" = "503"
