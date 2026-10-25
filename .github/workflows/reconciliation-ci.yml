@@ -208,8 +208,13 @@ jobs:
               --header "Host: $INGRESS_HOST" \
               --dump-header "$response_headers" --output /dev/null \
               --write-out '%{http_code}' "http://127.0.0.1:3000$path")"
+            local guard_header="missing"
+            if grep -Eqi '^x-robots-tag: noindex, nofollow' "$response_headers"; then
+              guard_header="present"
+            fi
+            printf 'HOST_GUARD_DIAGNOSTIC method=%s path=%s status=%s guard_header=%s\\n' "$method" "$path" "$status" "$guard_header"
             test "$status" = "404"
-            grep -Eqi '^x-robots-tag: noindex, nofollow' "$response_headers"
+            test "$guard_header" = "present"
             rm -f "$response_headers"
           }
           expect_denied /
@@ -228,4 +233,5 @@ jobs:
             --header "Host: $INGRESS_HOST" \
             --output /dev/null --write-out '%{http_code}' \
             http://127.0.0.1:3000/api/internal/quick-audit-stripe-pilot)"
+          printf 'HOST_GUARD_DIAGNOSTIC method=POST path=/api/internal/quick-audit-stripe-pilot status=%s\\n' "$status"
           test "$status" = "503"
