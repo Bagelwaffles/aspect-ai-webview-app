@@ -5,6 +5,7 @@ import { RESEND_PREVIEW_BRANCH } from "../lib/server/quick-audit-resend-preview-
 
 const now = Date.parse("2026-10-25T21:00:00.000Z")
 const base: NodeJS.ProcessEnv = {
+  NODE_ENV: "test",
   VERCEL_ENV: "preview",
   VERCEL_GIT_COMMIT_REF: RESEND_PREVIEW_BRANCH,
   AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED: "true",
