@@ -1,4 +1,5 @@
 import { getToken } from "next-auth/jwt";
+import { classifyPilotIngressRequest } from "@/lib/server/quick-audit-stripe-pilot-host-policy";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
@@ -10,6 +11,28 @@ import { configuredOperatorOwnerEmail, isOperatorOwnerEmail } from "@/lib/operat
 const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 
 export async function middleware(request: NextRequest) {
+  // Vercel exceptions are hostname-wide. This guard must run before every
+  // other route, including owner auth, Next assets and dashboard pages.
+  const pilotIngress = classifyPilotIngressRequest({
+    hostHeader: request.headers.get("host"),
+    urlHostname: request.nextUrl.hostname,
+    method: request.method,
+    pathname: request.nextUrl.pathname,
+    search: request.nextUrl.search,
+    vercelEnvironment: process.env.VERCEL_ENV,
+    gitBranch: process.env.VERCEL_GIT_COMMIT_REF,
+  });
+  if (pilotIngress === "deny") {
+    return new NextResponse(null, {
+      status: 404,
+      headers: {
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex, nofollow",
+      },
+    });
+  }
+  if (pilotIngress === "allow") return NextResponse.next();
+
   const requiresInternalAdmin =
     request.nextUrl.pathname === "/dashboard" ||
     request.nextUrl.pathname.startsWith("/dashboard/") ||
@@ -70,5 +93,8 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/ethical-agent-farm-requests"]
+  // Intentionally match ALL paths so the dedicated Preview hostname cannot
+  // expose auth routes, application pages or framework assets through a
+  // hostname-wide Deployment Protection Exception.
+  matcher: ["/:path*"]
 };
