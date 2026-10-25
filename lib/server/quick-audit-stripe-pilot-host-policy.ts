@@ -24,12 +24,16 @@ export type PilotIngressDecision = "not-ingress-host" | "allow" | "deny"
 export function classifyPilotIngressRequest(input: PilotIngressRequest): PilotIngressDecision {
   const host = input.hostHeader?.toLowerCase() ?? ""
   const urlHost = input.urlHostname.toLowerCase()
-  // An inconsistent host or URL cannot bypass this check when either matches
-  // the designated public hostname. Reject ambiguity rather than redirect.
+  // Next.js may normalize nextUrl.hostname to an internal server origin
+  // even though the incoming HTTP Host is the exact public virtual host.
+  // Vercel routes requests by the Host authority before executing middleware;
+  // require the exact Host and never trust X-Forwarded-Host for this decision.
+  // If Next's internal URL points at the ingress host but Host does not,
+  // reject instead of allowing unrelated protected application routing.
   if (host !== STRIPE_PILOT_INGRESS_HOST && urlHost !== STRIPE_PILOT_INGRESS_HOST) {
     return "not-ingress-host"
   }
-  if (host !== STRIPE_PILOT_INGRESS_HOST || urlHost !== STRIPE_PILOT_INGRESS_HOST) {
+  if (host !== STRIPE_PILOT_INGRESS_HOST) {
     return "deny"
   }
   if (input.vercelEnvironment !== "preview" ||

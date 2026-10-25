@@ -37,7 +37,7 @@ test("only exact method/path on dedicated sandbox Preview hostname is routed", (
 test("unexpected host headers, previews and branch refs fail closed", () => {
   const bad: Partial<PilotIngressRequest>[] = [
     { hostHeader: "example.org" },
-    { urlHostname: "example.org" },
+
     { hostHeader: STRIPE_PILOT_INGRESS_HOST + ":443" },
     { hostHeader: STRIPE_PILOT_INGRESS_HOST + "." },
     { vercelEnvironment: "production" },
@@ -48,6 +48,22 @@ test("unexpected host headers, previews and branch refs fail closed", () => {
   for (const change of bad) {
     assert.equal(classifyPilotIngressRequest({ ...approved, ...change }), "deny", JSON.stringify(change))
   }
+})
+
+test("Next middleware internal URL normalization never widens the HTTP Host allowlist", () => {
+  // Next may reconstruct nextUrl from the internal server origin instead of
+  // the publicly routed virtual host. Exact Host is still mandatory.
+  for (const normalizedHost of ["localhost", "127.0.0.1", "internal.vercel.app"]) {
+    assert.equal(classifyPilotIngressRequest({
+      ...approved, urlHostname: normalizedHost,
+    }), "allow")
+    assert.equal(classifyPilotIngressRequest({
+      ...approved, hostHeader: "example.org", urlHostname: normalizedHost,
+    }), "not-ingress-host")
+  }
+  assert.equal(classifyPilotIngressRequest({
+    ...approved, hostHeader: "example.org", urlHostname: STRIPE_PILOT_INGRESS_HOST,
+  }), "deny")
 })
 
 test("unrelated protected and production hosts retain existing auth routing", () => {
