@@ -5,7 +5,7 @@
  * credentials, endpoint secret and explicit intake flag. Checkout events are
  * never acknowledged as fulfilled or forwarded to production.
  */
-import { handlePilotStripeWebhook } from "@/lib/server/quick-audit-isolated-stripe-pilot"
+import { handlePilotStripeWebhook, pilotReceiptOnlyWindowOpen } from "@/lib/server/quick-audit-isolated-stripe-pilot"
 import { createIsolatedPilotStores } from "@/lib/server/quick-audit-isolated-pilot-stores"
 import { fulfillIsolatedPilotCheckout } from "@/lib/server/quick-audit-isolated-pilot-fulfillment"
 
@@ -14,6 +14,16 @@ export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
   const env = process.env
+  // Guard all real external receipt-only intake before opening Redis or parsing
+  // a Stripe body. No silent open-ended intake window is permitted.
+  if (env.AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED === "true" &&
+      !pilotReceiptOnlyWindowOpen(env)) {
+    return Response.json(
+      { ok: false, code: "PILOT_RECEIPT_ONLY_WINDOW_CLOSED",
+        fulfillmentEnabled: false, sendEnabled: false },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    )
+  }
   if (env.AMS_STRIPE_PILOT_FULFILLMENT_ENABLED === "true") {
     // Separate, strictly gated paid-record fulfillment. Never fall back to
     // receipt-only behavior after an attempted fulfillment configuration.
