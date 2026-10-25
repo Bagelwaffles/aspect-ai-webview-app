@@ -180,7 +180,8 @@ jobs:
       - name: Preview-only webhook hostname HTTP guard smoke
         env:
           NEXTAUTH_SECRET: ci-only-placeholder-secret-not-for-production
-          NEXTAUTH_URL: http://127.0.0.1:3000
+          NEXTAUTH_URL: http://127.0.0.1:3101
+          PORT: "3101"
           VERCEL_ENV: preview
           VERCEL_GIT_COMMIT_REF: feat/ams-resend-transactional-preview-20261023
           AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED: "false"
@@ -190,12 +191,17 @@ jobs:
           APP_PID=$!
           trap 'kill "$APP_PID" 2>/dev/null || true; cat /tmp/ams-webhook-host-guard.log' EXIT
 
+          # Separate port is mandatory: the preceding smoke step may leave
+          # a child Next.js process on 3000 when its pnpm wrapper exits.
+          ready="false"
           for attempt in $(seq 1 40); do
-            if curl --silent --output /dev/null http://127.0.0.1:3000/; then
+            if curl --fail --silent --output /dev/null http://127.0.0.1:3101/; then
+              ready="true"
               break
             fi
             sleep 1
           done
+          test "$ready" = "true"
 
           INGRESS_HOST="stripe-webhook-preview.aspectmarketingsolutions.app"
           expect_denied() {
@@ -207,12 +213,12 @@ jobs:
             status="$(curl --silent --max-time 15 --request "$method" \
               --header "Host: $INGRESS_HOST" \
               --dump-header "$response_headers" --output /dev/null \
-              --write-out '%{http_code}' "http://127.0.0.1:3000$path")"
+              --write-out '%{http_code}' "http://127.0.0.1:3101$path")"
             local guard_header="missing"
             if grep -Eqi '^x-robots-tag: noindex, nofollow' "$response_headers"; then
               guard_header="present"
             fi
-            printf 'HOST_GUARD_DIAGNOSTIC method=%s path=%s status=%s guard_header=%s\\n' "$method" "$path" "$status" "$guard_header"
+            printf 'HOST_GUARD_DIAGNOSTIC method=%s path=%s status=%s guard_header=%s\n' "$method" "$path" "$status" "$guard_header"
             test "$status" = "404"
             test "$guard_header" = "present"
             rm -f "$response_headers"
@@ -232,6 +238,6 @@ jobs:
           status="$(curl --silent --max-time 15 --request POST \
             --header "Host: $INGRESS_HOST" \
             --output /dev/null --write-out '%{http_code}' \
-            http://127.0.0.1:3000/api/internal/quick-audit-stripe-pilot)"
-          printf 'HOST_GUARD_DIAGNOSTIC method=POST path=/api/internal/quick-audit-stripe-pilot status=%s\\n' "$status"
+            http://127.0.0.1:3101/api/internal/quick-audit-stripe-pilot)"
+          printf 'HOST_GUARD_DIAGNOSTIC method=POST path=/api/internal/quick-audit-stripe-pilot status=%s\n' "$status"
           test "$status" = "503"
