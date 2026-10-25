@@ -203,7 +203,9 @@ jobs:
           # a child Next.js process on 3000 when its pnpm wrapper exits.
           ready="false"
           for attempt in $(seq 1 40); do
-            if curl --fail --silent --output /dev/null http://127.0.0.1:3101/; then
+            # A branch-wide lockdown intentionally returns HTTP 404 for "/".
+            # An HTTP response still proves the Next server accepted the TCP request.
+            if curl --silent --show-error --max-time 5 --output /dev/null http://127.0.0.1:3101/; then
               ready="true"
               break
             fi
