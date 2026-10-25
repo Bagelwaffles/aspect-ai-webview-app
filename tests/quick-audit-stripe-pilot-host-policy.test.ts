@@ -69,7 +69,8 @@ test("Next middleware internal URL normalization never widens the HTTP Host allo
 test("unrelated protected and production hosts retain existing auth routing", () => {
   for (const host of [
     "www.aspectmarketingsolutions.app",
-    "aspect-ai-overlord-git-716b96-kimberleyaversbiz-4131s-projects.vercel.app",
+    "aspect-ai-overlord-mxwseeznx-kimberleyaversbiz-4131s-projects.vercel.app",
+    "aspect-ai-overlord-git-97ab49-kimberleyaversbiz-4131s-projects.vercel.app",
   ]) {
     assert.equal(classifyPilotIngressRequest({
       ...approved, hostHeader: host, urlHostname: host,

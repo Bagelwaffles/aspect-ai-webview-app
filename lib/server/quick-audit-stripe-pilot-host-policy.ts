@@ -1,11 +1,13 @@
 /**
- * Fail-closed routing for a dedicated, potentially unprotected Vercel Preview hostname.
+ * Fail-closed routing for the existing, branch-specific protected Vercel Preview alias.
  * A Vercel domain exception is hostname-wide: this policy MUST run on every path,
  * including Next.js internals, before a domain exception is ever enabled.
+ * This reserves the existing branch alias for webhook-only access; owner UI must use
+ * a separate authenticated deployment URL. No exception is enabled here.
  * This does not enable intake or authorize a payment; the POST handler still
  * requires an unexpired signed Stripe sandbox event and isolated receipt store.
  */
-export const STRIPE_PILOT_INGRESS_HOST = "stripe-webhook-preview.aspectmarketingsolutions.app"
+export const STRIPE_PILOT_INGRESS_HOST = "aspect-ai-overlord-git-716b96-kimberleyaversbiz-4131s-projects.vercel.app"
 export const STRIPE_PILOT_INGRESS_PATH = "/api/internal/quick-audit-stripe-pilot"
 const STRIPE_PILOT_PREVIEW_BRANCH = "feat/ams-resend-transactional-preview-20261023"
 

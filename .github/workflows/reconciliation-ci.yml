@@ -210,7 +210,7 @@ jobs:
           test "$ready" = "true"
 
           # Resolve hostname locally only. No external DNS or Vercel exposure.
-          INGRESS_HOST="stripe-webhook-preview.aspectmarketingsolutions.app"
+          INGRESS_HOST="aspect-ai-overlord-git-716b96-kimberleyaversbiz-4131s-projects.vercel.app"
           expect_denied() {
             local path="$1"
             local method="${2:-GET}"
