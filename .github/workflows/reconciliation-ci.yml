@@ -98,6 +98,7 @@ jobs:
         env:
           VERCEL_ENV: preview
           VERCEL_GIT_COMMIT_REF: feat/ams-resend-transactional-preview-20261023
+          AMS_STRIPE_PILOT_INGRESS_LOCKDOWN: "true"
         run: pnpm run build
 
       - name: Staging container runtime smoke tests
@@ -190,6 +191,7 @@ jobs:
           PORT: "3101"
           VERCEL_ENV: preview
           VERCEL_GIT_COMMIT_REF: feat/ams-resend-transactional-preview-20261023
+          AMS_STRIPE_PILOT_INGRESS_LOCKDOWN: "true"
           AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED: "false"
         run: |
           set -euo pipefail

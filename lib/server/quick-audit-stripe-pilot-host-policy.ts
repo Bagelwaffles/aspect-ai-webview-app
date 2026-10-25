@@ -12,6 +12,8 @@ export const STRIPE_PILOT_INGRESS_PATH = "/api/internal/quick-audit-stripe-pilot
 const STRIPE_PILOT_PREVIEW_BRANCH = "feat/ams-resend-transactional-preview-20261023"
 
 export type PilotIngressRequest = Readonly<{
+  // Explicit branch-scoped Preview variable; not inferred from untrusted Host.
+  forcePreviewLockdown?: boolean
   hostHeader: string | null
   urlHostname: string
   method: string
@@ -24,6 +26,17 @@ export type PilotIngressRequest = Readonly<{
 export type PilotIngressDecision = "not-ingress-host" | "allow" | "deny"
 
 export function classifyPilotIngressRequest(input: PilotIngressRequest): PilotIngressDecision {
+  // Live Vercel Edge may reconstruct both Host and nextUrl.hostname to a
+  // non-public internal origin. The branch's Preview-scoped lockdown is
+  // explicit, host-independent, and denies everything except signed webhook
+  // intake. Do not weaken this to trust forwarded headers from the internet.
+  if (input.forcePreviewLockdown) {
+    if (input.vercelEnvironment !== "preview" ||
+        input.gitBranch !== STRIPE_PILOT_PREVIEW_BRANCH) return "deny"
+    return input.method === "POST" &&
+      input.pathname === STRIPE_PILOT_INGRESS_PATH &&
+      input.search === "" ? "allow" : "deny"
+  }
   const host = input.hostHeader?.toLowerCase() ?? ""
   const urlHost = input.urlHostname.toLowerCase()
   // Next.js may normalize nextUrl.hostname to an internal server origin

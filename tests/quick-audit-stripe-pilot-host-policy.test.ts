@@ -66,6 +66,28 @@ test("Next middleware internal URL normalization never widens the HTTP Host allo
   }), "deny")
 })
 
+test("branch-scoped Preview lockdown denies all methods/routes regardless of Vercel internal host normalization", () => {
+  for (const host of [
+    STRIPE_PILOT_INGRESS_HOST, "127.0.0.1", "localhost", "internal.vercel.app",
+    "aspect-ai-overlord-mxwseeznx-kimberleyaversbiz-4131s-projects.vercel.app",
+  ]) {
+    const input = { ...approved, forcePreviewLockdown: true, hostHeader: host, urlHostname: host }
+    assert.equal(classifyPilotIngressRequest(input), "allow", "only exact webhook POST " + host)
+    for (const method of ["GET", "HEAD", "OPTIONS", "PUT", "DELETE", "PATCH"]) {
+      assert.equal(classifyPilotIngressRequest({ ...input, method }), "deny", method + host)
+    }
+    for (const pathname of ["/", "/owner/resend-preview", "/api/auth/session",
+      "/_next/static/chunks/app.js", "/api/internal/quick-audit-pilot-dispatch",
+      "/api/internal/quick-audit-stripe-pilot/"]) {
+      assert.equal(classifyPilotIngressRequest({ ...input, pathname }), "deny", pathname + host)
+    }
+    assert.equal(classifyPilotIngressRequest({ ...input, search: "?probe=1" }), "deny")
+    assert.equal(classifyPilotIngressRequest({ ...input, vercelEnvironment: "production" }), "deny")
+    assert.equal(classifyPilotIngressRequest({ ...input, gitBranch: "main" }), "deny")
+    assert.equal(classifyPilotIngressRequest({ ...input, gitBranch: undefined }), "deny")
+  }
+})
+
 test("unrelated protected and production hosts retain existing auth routing", () => {
   for (const host of [
     "www.aspectmarketingsolutions.app",

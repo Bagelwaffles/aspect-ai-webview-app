@@ -21,6 +21,7 @@ export async function middleware(request: NextRequest) {
     search: request.nextUrl.search,
     vercelEnvironment: process.env.VERCEL_ENV,
     gitBranch: process.env.VERCEL_GIT_COMMIT_REF,
+    forcePreviewLockdown: process.env.AMS_STRIPE_PILOT_INGRESS_LOCKDOWN === "true",
   });
   if (pilotIngress === "deny") {
     return new NextResponse(null, {
