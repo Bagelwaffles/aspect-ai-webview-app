@@ -1,5 +1,5 @@
 import { getToken } from "next-auth/jwt";
-import { classifyPilotIngressRequest } from "@/lib/server/quick-audit-stripe-pilot-host-policy";
+import { classifyPilotIngressRequest, STRIPE_PILOT_INGRESS_HOST, STRIPE_PILOT_INGRESS_PATH } from "@/lib/server/quick-audit-stripe-pilot-host-policy";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
@@ -22,6 +22,22 @@ export async function middleware(request: NextRequest) {
     vercelEnvironment: process.env.VERCEL_ENV,
     gitBranch: process.env.VERCEL_GIT_COMMIT_REF,
   });
+  // Synthetic CI-only diagnostic: booleans only, no request details, payloads
+  // or credentials. This cannot run on Vercel without an explicit CI-only flag.
+  if (process.env.CI === "true" &&
+      process.env.AMS_STRIPE_PILOT_CI_DIAGNOSTIC === "enabled" &&
+      request.method === "POST" &&
+      request.nextUrl.pathname === STRIPE_PILOT_INGRESS_PATH) {
+    console.info("HOST_GUARD_CONTEXT", JSON.stringify({
+      hostMatch: request.headers.get("host")?.toLowerCase() === STRIPE_PILOT_INGRESS_HOST,
+      urlHostMatch: request.nextUrl.hostname.toLowerCase() === STRIPE_PILOT_INGRESS_HOST,
+      hostIncludesPort: request.headers.get("host")?.includes(":") ?? false,
+      preview: process.env.VERCEL_ENV === "preview",
+      expectedBranch: process.env.VERCEL_GIT_COMMIT_REF === "feat/ams-resend-transactional-preview-20261023",
+      emptyQuery: request.nextUrl.search === "",
+      allow: pilotIngress === "allow",
+    }));
+  }
   if (pilotIngress === "deny") {
     return new NextResponse(null, {
       status: 404,

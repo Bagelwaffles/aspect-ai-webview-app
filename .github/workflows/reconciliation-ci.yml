@@ -92,6 +92,13 @@ jobs:
         run: pnpm test
 
       - name: Production build
+        # Next.js middleware can read build-time env substitutions. Compile
+        # synthetic CI with the same Preview scope used by the HTTP guard.
+        # No Vercel/Stripe/Resend secrets or live service connections.
+        env:
+          VERCEL_ENV: preview
+          VERCEL_GIT_COMMIT_REF: feat/ams-resend-transactional-preview-20261023
+          AMS_STRIPE_PILOT_CI_DIAGNOSTIC: enabled
         run: pnpm run build
 
       - name: Staging container runtime smoke tests
@@ -185,6 +192,7 @@ jobs:
           VERCEL_ENV: preview
           VERCEL_GIT_COMMIT_REF: feat/ams-resend-transactional-preview-20261023
           AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED: "false"
+          AMS_STRIPE_PILOT_CI_DIAGNOSTIC: enabled
         run: |
           set -euo pipefail
           pnpm start > /tmp/ams-webhook-host-guard.log 2>&1 &
