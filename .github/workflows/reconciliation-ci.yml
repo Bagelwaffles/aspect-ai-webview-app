@@ -203,6 +203,7 @@ jobs:
           done
           test "$ready" = "true"
 
+          # Resolve hostname locally only. No external DNS or Vercel exposure.
           INGRESS_HOST="stripe-webhook-preview.aspectmarketingsolutions.app"
           expect_denied() {
             local path="$1"
@@ -211,9 +212,10 @@ jobs:
             response_headers="$(mktemp)"
             local status
             status="$(curl --silent --max-time 15 --request "$method" \
+              --noproxy '*' --resolve "$INGRESS_HOST:3101:127.0.0.1" \
               --header "Host: $INGRESS_HOST" \
               --dump-header "$response_headers" --output /dev/null \
-              --write-out '%{http_code}' "http://127.0.0.1:3101$path")"
+              --write-out '%{http_code}' "http://$INGRESS_HOST:3101$path")"
             local guard_header="missing"
             if grep -Eqi '^x-robots-tag: noindex, nofollow' "$response_headers"; then
               guard_header="present"
@@ -236,8 +238,9 @@ jobs:
           # Exactly one allowed route reaches the existing fail-closed handler.
           # Intake is OFF, so this unsigned local POST must not be accepted.
           status="$(curl --silent --max-time 15 --request POST \
+            --noproxy '*' --resolve "$INGRESS_HOST:3101:127.0.0.1" \
             --header "Host: $INGRESS_HOST" \
             --output /dev/null --write-out '%{http_code}' \
-            http://127.0.0.1:3101/api/internal/quick-audit-stripe-pilot)"
+            "http://$INGRESS_HOST:3101/api/internal/quick-audit-stripe-pilot")"
           printf 'HOST_GUARD_DIAGNOSTIC method=POST path=/api/internal/quick-audit-stripe-pilot status=%s\n' "$status"
           test "$status" = "503"
