@@ -202,7 +202,7 @@ export default function AgentsPage() {
 
                   <div className="grid gap-2">
                     <Link className={styles.cardLink} href={`/agents/${agent.slug}`}>
-                      <span>View sales page + video</span>
+                      <span>View agent details</span>
                       <span>↗</span>
                     </Link>
                     <Link className={styles.cardLink} href={offer.primaryHref}>
@@ -257,7 +257,7 @@ export default function AgentsPage() {
           <p className={styles.kicker}>How buying AMS works</p>
           <h2>One catalog. Clear purchase paths.</h2>
           <p>
-            Customers should be able to discover an agent, understand what it does, watch the sales video, and know immediately whether it can be purchased today.
+            Customers should be able to discover an agent, understand what it does, review its verified status, and know immediately whether it can be purchased today.
             AMS keeps commercial access separate from roadmap visibility so the store can grow without making claims the product cannot support.
           </p>
         </div>
