@@ -1,0 +1,54 @@
+name: Temporary AMS sales security lockfile refresh
+
+on:
+  push:
+    branches:
+      - test/ams-sales-video-security-overlay-20261026
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    if: contains(github.event.head_commit.message, '[lock-refresh]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+      - name: Regenerate locked dependencies without scripts
+        run: |
+          set -euo pipefail
+          pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile
+          pnpm install --lockfile-only --ignore-scripts --frozen-lockfile
+          if grep -q 'undici@7.29.1:' pnpm-lock.yaml; then
+            echo "::error::Vulnerable undici 7.29.1 remains in lockfile"
+            exit 1
+          fi
+          if ! grep -q 'undici@7.30.1:' pnpm-lock.yaml; then
+            echo "::error::Expected undici 7.30.1 not resolved"
+            exit 1
+          fi
+      - name: Commit only generated lockfile to isolated branch
+        run: |
+          set -euo pipefail
+          git add pnpm-lock.yaml
+          if git diff --cached --quiet; then
+            echo "Lockfile unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: regenerate isolated audited undici lockfile"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
