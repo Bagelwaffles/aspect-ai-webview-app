@@ -10,8 +10,8 @@ import {
 } from "../app/agents/agentSales"
 import { SUBSCRIPTION_INCLUDED_AGENTS } from "../lib/subscription-agent-catalog"
 
-test("every public agent page has a sales offer and embedded sales video", () => {
-  assert.match(AMS_AGENT_SALES_VIDEO_EMBED_URL, /^https:\/\/app\.heygen\.com\/embeds\/[a-zA-Z0-9]+$/)
+test("unverified shared video is hidden while every agent keeps its verified sales route", () => {
+  assert.equal(AMS_AGENT_SALES_VIDEO_EMBED_URL, null)
 
   for (const agent of agents) {
     const offer = getAgentSalesOffer(agent)
@@ -19,7 +19,16 @@ test("every public agent page has a sales offer and embedded sales video", () =>
     assert.ok(offer.primaryLabel, `${agent.slug} needs a primary sales label`)
     assert.equal(offer.videoEmbedUrl, AMS_AGENT_SALES_VIDEO_EMBED_URL)
     assert.ok(offer.videoTitle, `${agent.slug} needs accessible video title text`)
+    assert.equal(offer.videoEmbedUrl, null, `${agent.slug} must not show the broken shared embed`)
   }
+})
+
+test("missing video shows an accessible fallback instead of an unverified iframe", () => {
+  const salesPageSource = readFileSync(join(process.cwd(), "app/agents/[slug]/page.tsx"), "utf8")
+  assert.match(salesPageSource, /offer\.videoEmbedUrl\s*\?/)
+  assert.match(salesPageSource, /Video preview currently unavailable/)
+  assert.match(salesPageSource, /role="status"/)
+  assert.doesNotMatch(salesPageSource, /watch the sales video/)
 })
 
 test("the seven verified shared-credit agents sell only through existing subscription plans", () => {
