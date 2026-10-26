@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { buildSmokyPublicCoachingFeed, SMOKY_PUBLIC_COACHING_FEED_VERSION } from "@/lib/server/smoky-public-coaching"
+import { buildSmokyPublicCoachingFeed, isSmokyCoachingStoreConfigured, SMOKY_PUBLIC_COACHING_FEED_VERSION } from "@/lib/server/smoky-public-coaching"
 import { getLatestTwitchMediaQueue } from "@/lib/server/twitch-media-factory"
 
 export const runtime = "nodejs"
@@ -39,8 +39,23 @@ export async function GET(request: NextRequest) {
     }, { headers: publicHeaders(request, false) })
   }
 
+  // Empty results are meaningful only after the data source is confirmed available.
+  // A Preview branch without Redis credentials must not report "no new clips".
+  if (!isSmokyCoachingStoreConfigured()) {
+    return NextResponse.json({
+      ok: false, enabled: false, version: SMOKY_PUBLIC_COACHING_FEED_VERSION,
+      items: [], reason: "SOURCE_NOT_CONFIGURED",
+    }, { status: 503, headers: publicHeaders(request, false) })
+  }
+
   try {
     const queue = await getLatestTwitchMediaQueue()
+    if (!queue) {
+      return NextResponse.json({
+        ok: false, enabled: false, version: SMOKY_PUBLIC_COACHING_FEED_VERSION,
+        items: [], reason: "SOURCE_QUEUE_UNAVAILABLE",
+      }, { status: 503, headers: publicHeaders(request, false) })
+    }
     const items = buildSmokyPublicCoachingFeed(queue)
     return NextResponse.json({
       ok: true, enabled: true, version: SMOKY_PUBLIC_COACHING_FEED_VERSION,
