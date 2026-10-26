@@ -2,6 +2,13 @@ import type { TwitchMediaQueue } from "@/lib/server/twitch-media-factory"
 
 export const SMOKY_PUBLIC_COACHING_FEED_VERSION = "smoky-public-coaching-v1" as const
 
+/** The queue can only be read when both parts of one supported Redis pair exist. */
+export function isSmokyCoachingStoreConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  const url = env.UPSTASH_REDIS_REST_URL?.trim() || env.KV_REST_API_URL?.trim()
+  const token = env.UPSTASH_REDIS_REST_TOKEN?.trim() || env.KV_REST_API_TOKEN?.trim()
+  return Boolean(url && token)
+}
+
 export type SmokyPublicCoachingItem = {
   clipId: string
   title: string
