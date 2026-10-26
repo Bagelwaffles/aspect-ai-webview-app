@@ -31,6 +31,15 @@ test("missing video shows an accessible fallback instead of an unverified iframe
   assert.doesNotMatch(salesPageSource, /watch the sales video/)
 })
 
+test("agent catalog defers to server checkout availability rather than a stale public launch flag", () => {
+  const catalog = readFileSync(join(process.cwd(), "app/agents/page.tsx"), "utf8")
+  const salesPage = readFileSync(join(process.cwd(), "app/agents/[slug]/page.tsx"), "utf8")
+  assert.doesNotMatch(catalog, /subscriptionCheckoutLive|NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE/)
+  assert.match(catalog, /check the Pricing page for current subscription checkout availability/i)
+  assert.match(salesPage, /isSubscriptionCheckoutAvailable/)
+  assert.match(salesPage, /Subscription checkout paused/)
+})
+
 test("the seven verified shared-credit agents sell only through existing subscription plans", () => {
   for (const included of SUBSCRIPTION_INCLUDED_AGENTS) {
     const agent = agents.find((candidate) => candidate.slug === included.slug)
