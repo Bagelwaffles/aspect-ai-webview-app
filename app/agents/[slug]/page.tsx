@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 import { agents, getAgent, statusMeta } from "../agentCatalog"
 import { getAgentSalesOffer, getCategoryOutcome } from "../agentSales"
+import { isSubscriptionCheckoutAvailable } from "@/lib/server/subscription-checkout-availability"
 
 export function generateStaticParams() {
   return agents.map((agent) => ({ slug: agent.slug }))
@@ -68,7 +69,11 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
   if (!agent) notFound()
 
   const meta = statusMeta[agent.status]
-  const offer = getAgentSalesOffer(agent)
+  const originalOffer = getAgentSalesOffer(agent)
+  const subscriptionsAvailable = isSubscriptionCheckoutAvailable()
+  const offer = originalOffer.mode === "subscription" && !subscriptionsAvailable
+    ? { ...originalOffer, label: "Subscription checkout paused", primaryLabel: "View plan details", detail: "Seven Live agents have verified production workflows, but new subscription checkout is currently closed. Compare published plan pricing; no new subscription payment can begin while this gate is closed." }
+    : originalOffer
   const outcome = getCategoryOutcome(agent.category)
   const steps = salesSteps(offer.mode)
   const related = agents
@@ -277,7 +282,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
                     <CardHeader>
                       <div className="flex flex-wrap gap-2">
                         <Badge variant="outline">{statusMeta[candidate.status].label}</Badge>
-                        <Badge variant="outline">{candidateOffer.label}</Badge>
+                        <Badge variant="outline">{candidateOffer.mode === "subscription" && !subscriptionsAvailable ? "Checkout paused" : candidateOffer.label}</Badge>
                       </div>
                       <CardTitle className="pt-2">{candidate.name}</CardTitle>
                       <CardDescription className="leading-6">{candidate.description}</CardDescription>
