@@ -4,7 +4,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import Image from "next/image"
 import { notFound } from "next/navigation"
-import { ArrowRight, Check, PlayCircle, ShieldCheck, Sparkles } from "lucide-react"
+import { ArrowRight, Check, ShieldCheck, Sparkles } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const offer = getAgentSalesOffer(agent)
   return {
     title: `${agent.name} | Aspect Marketing Solutions`,
-    description: `${agent.description} ${offer.price}. Review availability, watch the sales video, and see the verified AMS purchase path.`,
+    description: `${agent.description} ${offer.price}. Review availability, current capabilities, and the verified AMS purchase path.`,
   }
 }
 
@@ -157,26 +157,35 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
         <div className="mx-auto max-w-6xl space-y-7">
           <div className="max-w-3xl space-y-3">
             <p className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-              <PlayCircle className="h-4 w-4" /> Sales video
+              <ShieldCheck className="h-4 w-4" /> Agent overview
             </p>
-            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">See the AMS sales model in action.</h2>
+            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Understand this AMS agent.</h2>
             <p className="leading-7 text-muted-foreground">
-              This sales film is embedded on every agent page so buyers can understand the AMS offer, operating model, and verified-first approach before choosing a product.
+              Review its capabilities, current release status, and verified-first purchase path before choosing a product.
             </p>
           </div>
-
-          <div className="overflow-hidden rounded-2xl border border-border bg-black shadow-2xl">
-            <div className="aspect-video w-full">
-              <iframe
-                className="h-full w-full"
-                src={offer.videoEmbedUrl}
-                title={offer.videoTitle}
-                allow="encrypted-media; fullscreen; picture-in-picture"
-                allowFullScreen
-                loading="lazy"
-              />
+          {offer.videoEmbedUrl ? (
+            <div className="overflow-hidden rounded-2xl border border-border bg-black shadow-2xl">
+              <div className="aspect-video w-full">
+                <iframe
+                  className="h-full w-full"
+                  src={offer.videoEmbedUrl}
+                  title={offer.videoTitle}
+                  allow="encrypted-media; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  loading="lazy"
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div role="status" className="rounded-2xl border border-border bg-muted/20 p-6">
+              <p className="font-semibold">Video preview currently unavailable</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                The shared sales video could not be verified. You can still review the agent&apos;s capabilities,
+                launch status, and available links on this page.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
