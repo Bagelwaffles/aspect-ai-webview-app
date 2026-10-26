@@ -13,7 +13,7 @@ export const analyticsIdempotencyKeySchema = z
   .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{7,119}$/)
 
 const jsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
-  z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(jsonValueSchema)]),
+  z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
 )
 
 const analyticsRunSchema = z.object({
