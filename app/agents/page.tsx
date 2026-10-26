@@ -29,12 +29,9 @@ const statusOptions = ["All", "live", "beta", "setup-required", "planned", "bloc
 type CategoryFilter = (typeof categoryOptions)[number]
 type StatusFilter = (typeof statusOptions)[number]
 
-const subscriptionCheckoutLive =
-  process.env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE?.trim().toLowerCase() === "true"
-
 const operatingSteps = [
   ["01", "Choose the business job", "Start with the outcome you need: content, lead generation support, email sequences, SEO, product packaging, analytics, or another scoped workflow."],
-  ["02", "Check availability before buying", subscriptionCheckoutLive ? "Live agents can be purchased through the existing AMS subscription. The $49 Marketing Audit uses its existing one-time checkout. Beta and roadmap agents are clearly labeled and are not sold as finished products." : "Seven agents remain production-verified Live, but subscription checkout is temporarily paused in zero-cost mode. The $49 Marketing Audit remains the active paid starting point. Beta and roadmap agents are clearly labeled and are not sold as finished products."],
+  ["02", "Check availability before buying", "Seven production-verified Live agents have published plan pricing. New checkout may be paused; verify current availability on Pricing. The $49 Quick Marketing Audit follows a separate checkout."],
   ["03", "Keep humans in control", "Sensitive actions, publishing, credentials, payments, and privileged system changes stay behind explicit authorization and verification boundaries."],
   ["04", "Expand as agents graduate", "AMS can add newly verified agents to the commercial catalog only after their production path, controls, and customer experience are proven."],
 ]
@@ -66,22 +63,18 @@ export default function AgentsPage() {
           <h1>Shop the agent network.<span>Put AI to work.</span></h1>
           <div className={styles.heroCopy}>
             <p>
-              {subscriptionCheckoutLive ? (
-                <>Browse the complete AMS catalog, open a dedicated sales page for every agent, and buy the capabilities that are actually available today. Seven verified Live agents are included in AMS subscriptions starting at $29/month. The Quick Marketing Audit remains a separate $49 one-time service. Everything else stays visible as Beta, Setup Required, Planned, or Blocked so you can see what is coming without being sold vaporware.</>
-              ) : (
-                <>Browse the complete AMS catalog and review the capabilities already proven in production. Seven agents remain verified Live, but subscription checkout and paid AI execution are temporarily paused in zero-cost mode. The Quick Marketing Audit remains the active $49 paid starting point. Everything else stays visible as Beta, Setup Required, Planned, or Blocked.</>
-              )}
+              <>Browse the AMS catalog and seven production-verified Live agents. Plan prices start at $29/month; check the Pricing page for current subscription checkout availability. The $49 Quick Marketing Audit remains a separate one-time service. Beta and roadmap agents are not sold as finished products.</>
             </p>
             <div className={styles.heroActions}>
               <a className={styles.primary} href="#catalog">Browse all agents <span>↓</span></a>
-              <Link className={styles.secondary} href="/pricing#plans">{subscriptionCheckoutLive ? "Get 7 Live agents from $29/mo" : "View verified agent pricing"} <span>↗</span></Link>
+              <Link className={styles.secondary} href="/pricing#plans">{"View pricing and availability"} <span>↗</span></Link>
             </div>
           </div>
         </div>
       </section>
 
       <section className={styles.signal} aria-label="Current lifecycle counts">
-        <div className={styles.signalItem} data-status="live"><span className={styles.signalLabel}>{subscriptionCheckoutLive ? "Live // buy now" : "Live // checkout paused"}</span><strong className={styles.signalValue}>{counts.live}</strong></div>
+        <div className={styles.signalItem} data-status="live"><span className={styles.signalLabel}>{"Live // verify checkout status"}</span><strong className={styles.signalValue}>{counts.live}</strong></div>
         <div className={styles.signalItem} data-status="beta"><span className={styles.signalLabel}>Beta // controlled</span><strong className={styles.signalValue}>{counts.beta}</strong></div>
         <div className={styles.signalItem} data-status="development"><span className={styles.signalLabel}>Setup required</span><strong className={styles.signalValue}>{counts["setup-required"]}</strong></div>
         <div className={styles.signalItem} data-status="soon"><span className={styles.signalLabel}>Planned</span><strong className={styles.signalValue}>{counts.planned}</strong></div>
@@ -91,16 +84,16 @@ export default function AgentsPage() {
       <section className={`${styles.section} ${styles.showcaseSection}`} aria-labelledby="live-agent-showcase-title">
         <div className={styles.showcaseCopy}>
           <div>
-            <p className={styles.kicker}>{subscriptionCheckoutLive ? "Seven agents // available now" : "Seven agents // production verified"}</p>
+            <p className={styles.kicker}>{"Seven agents // production verified"}</p>
             <h2 id="live-agent-showcase-title">Meet the Live AMS team.</h2>
           </div>
           <div>
             <p>
-              {subscriptionCheckoutLive ? "Content, lead magnets, email campaigns, nurture, outreach, SEO, and product creation are already included in AMS subscriptions. Explore every Live agent below or compare plans to put the full team to work." : "Content, lead magnets, email campaigns, nurture, outreach, SEO, and product creation have production-verified paths. Subscription checkout is temporarily paused; explore the agents now and keep pricing visible for reactivation."}
+              {"Content, lead magnets, email campaigns, nurture, outreach, SEO, and product creation have production-verified paths. Explore their capabilities and check Pricing for available purchase options."}
             </p>
             <div className={styles.heroActions}>
               <a className={styles.primary} href="#catalog">Explore all 33 agents <span>↓</span></a>
-              <Link className={styles.secondary} href="/pricing#plans">{subscriptionCheckoutLive ? "Get 7 Live agents" : "View pricing + pause status"} <span>↗</span></Link>
+              <Link className={styles.secondary} href="/pricing#plans">{"View pricing + checkout status"} <span>↗</span></Link>
             </div>
           </div>
         </div>
@@ -154,7 +147,7 @@ export default function AgentsPage() {
             <h2>{filteredAgents.length} agents in view.</h2>
           </div>
           <p>
-            Every card shows the real commercial state. “Available now” routes to an existing purchase path. Beta and roadmap agents stay visible for comparison,
+            Each card describes verified capabilities and published offers. Use Pricing to confirm whether subscription checkout is currently open. Beta and roadmap agents stay visible for comparison,
             but AMS does not attach a fake price or checkout button to unfinished functionality.
           </p>
         </div>
@@ -191,7 +184,7 @@ export default function AgentsPage() {
                   <p className={styles.description}>{agent.description}</p>
 
                   <div className="rounded-lg border border-white/10 bg-black/20 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50">{offer.label}</div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50">{offer.mode === "subscription" ? "Verified Live • check pricing" : offer.label}</div>
                     <div className="mt-1 text-xl font-bold text-white">{offer.price}</div>
                     <p className="mt-2 text-sm leading-6 text-white/60">{offer.detail}</p>
                   </div>
@@ -206,7 +199,7 @@ export default function AgentsPage() {
                       <span>↗</span>
                     </Link>
                     <Link className={styles.cardLink} href={offer.primaryHref}>
-                      <span>{offer.primaryLabel}</span>
+                      <span>{offer.mode === "subscription" ? "View plans & availability" : offer.primaryLabel}</span>
                       <span>↗</span>
                     </Link>
                   </div>
@@ -273,12 +266,12 @@ export default function AgentsPage() {
       <section className={styles.cta}>
         <div className={styles.ctaInner}>
           <div>
-            <h2>{subscriptionCheckoutLive ? "Ready to put the Live agents to work?" : "Seven Live agents are verified and ready for reactivation."}</h2>
+            <h2>{"Seven Live agents. Check checkout availability."}</h2>
             <p>
-              {subscriptionCheckoutLive ? "Start with the shared-credit AMS subscription and get access to the seven production-verified Live agents. The catalog will expand as additional agents earn their production status." : "Paid AI execution is intentionally paused in zero-cost mode, so subscription checkout is closed for now. Review the verified catalog and current pricing without starting a charge."}
+              {"Review verified capabilities and plan pricing. New subscription checkout is subject to the server-side AI runtime and owner activation gates shown on Pricing."}
             </p>
           </div>
-          <Link className={styles.ctaButton} href="/pricing#plans">{subscriptionCheckoutLive ? "Choose a plan" : "View pricing"} <span>↗</span></Link>
+          <Link className={styles.ctaButton} href="/pricing#plans">{"View pricing and availability"} <span>↗</span></Link>
         </div>
       </section>
 
