@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
+import { isSubscriptionCheckoutAvailable } from "@/lib/server/subscription-checkout-availability"
 import styles from "./marketing.module.css"
 
 const outcomes = [
@@ -73,7 +73,7 @@ function cx(...names: string[]) {
 }
 
 export default function HomePage() {
-  const subscriptionCheckoutLive = isContentAgentLaunchEnabled()
+  const subscriptionCheckoutLive = isSubscriptionCheckoutAvailable()
 
   return (
     <main className={styles.site}>
