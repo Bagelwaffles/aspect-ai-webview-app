@@ -8,7 +8,14 @@ type RedisCredentialEnv = Partial<Record<
   string
 >>
 
-export function isSmokyCoachingStoreConfigured(env: RedisCredentialEnv = process.env): boolean {
+export function isSmokyCoachingStoreConfigured(
+  env: RedisCredentialEnv = {
+    UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+    UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
+    KV_REST_API_URL: process.env.KV_REST_API_URL,
+    KV_REST_API_TOKEN: process.env.KV_REST_API_TOKEN,
+  },
+): boolean {
   const url = env.UPSTASH_REDIS_REST_URL?.trim() || env.KV_REST_API_URL?.trim()
   const token = env.UPSTASH_REDIS_REST_TOKEN?.trim() || env.KV_REST_API_TOKEN?.trim()
   return Boolean(url && token)
