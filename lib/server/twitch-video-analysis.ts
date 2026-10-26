@@ -52,9 +52,31 @@ export function isTwitchVideoAnalysisRenderEligible(
   return analysis.recommendation === "render" && analysis.score >= TWITCH_VIDEO_RENDER_SCORE_MIN
 }
 
-function clampMoment(value: number | null, duration: number) {
-  if (value === null || !Number.isFinite(value)) return null
-  return Math.max(0, Math.min(duration, value))
+export const TWITCH_ADAPTIVE_MIN_HIGHLIGHT_SECONDS = 5
+export const TWITCH_ADAPTIVE_MAX_HIGHLIGHT_SECONDS = 60
+
+/**
+ * Never silently stretch, truncate, or substitute a full raw capture for
+ * an invalid AI-selected highlight. Missing or truncated stories fail closed.
+ */
+export function resolveAdaptiveTwitchHighlightWindow(
+  start: number | null,
+  end: number | null,
+  sourceDuration: number,
+): { start: number; end: number; durationSeconds: number } | null {
+  if (
+    start === null || end === null ||
+    !Number.isFinite(start) || !Number.isFinite(end) ||
+    !Number.isFinite(sourceDuration) || sourceDuration < TWITCH_ADAPTIVE_MIN_HIGHLIGHT_SECONDS
+  ) return null
+  const sourceLimit = Math.min(sourceDuration, TWITCH_ADAPTIVE_MAX_HIGHLIGHT_SECONDS)
+  const length = end - start
+  if (
+    start < 0 || end > sourceLimit ||
+    length < TWITCH_ADAPTIVE_MIN_HIGHLIGHT_SECONDS ||
+    length > TWITCH_ADAPTIVE_MAX_HIGHLIGHT_SECONDS
+  ) return null
+  return { start, end, durationSeconds: length }
 }
 
 function compactWhitespace(value: string) {
@@ -247,7 +269,10 @@ async function requestVideoEvidence(input: {
     "score must be an integer 0-100.",
     "recommendation must be render or skip. Scores below 65 must be skip.",
     "observedMoments must contain 1-6 short statements describing only visible or audible evidence.",
-    "bestStartSeconds/bestEndSeconds should identify the strongest window when useful, otherwise null.",
+    "For every render recommendation, supply both bestStartSeconds and bestEndSeconds in seconds within the ACTUAL supplied clip (minimum selected length 5 seconds, maximum 60 seconds).",
+    "Choose the SHORTEST COMPLETE compelling moment: include only necessary setup, visible action, spoken joke/reaction, and natural payoff. Duration varies by content; never pad toward a fixed target.",
+    "When an important action or sentence is cut off at the start/end of the supplied source, or no complete coherent moment can be isolated, return recommendation=skip and null timestamps.",
+    "Ensure hook and caption describe exactly what the selected window shows and avoid unverified elimination counts.",
     "hook and caption must stay factual and grounded in the footage.",
     "Write the hook as a concise, natural viewer-facing headline, at most 8 words. Lead with the specific visible action or tension; avoid generic labels such as intense combat or quick eliminations when a concrete detail is visible.",
     "Write caption as one short sentence, at most 12 words. Do not repeat the hook. Do not copy sampling labels or technical analysis language into either field.",
@@ -265,6 +290,7 @@ async function requestVideoEvidence(input: {
       "Do not invent kills, wins, reactions, dialogue, game events, people, or outcomes.",
       "Prefer clear action, tension, humor, surprise, skill, payoff, or a strong reaction.",
       "Penalize loading screens, menus, dead air, repetitive traversal, unclear context, and weak visual payoff.",
+      "Do not require a uniform runtime. Reject incomplete context or a window that cannot contain the entire payoff in the source video.",
       "If evidence is ambiguous, choose skip rather than guessing.",
       "Do not publish, message, moderate, spend money, or mutate external accounts.",
       "Output only valid JSON matching the requested compact shape.",
@@ -313,7 +339,7 @@ export async function analyzeTwitchClipVideo(
   }
 
   const signed = presignR2Object("GET", item.objectKey, { expiresInSeconds: 900 }, env)
-  const duration = Math.max(5, Math.min(120, item.duration ?? 60))
+  const duration = Math.max(5, Math.min(TWITCH_ADAPTIVE_MAX_HIGHLIGHT_SECONDS, item.duration ?? 60))
   const model = getTwitchVideoAnalysisModel(env)
 
   let raw: TwitchVideoEvidence | null = null
@@ -336,21 +362,17 @@ export async function analyzeTwitchClipVideo(
   if (!raw) throw new Error("TWITCH_VIDEO_ANALYSIS_EVIDENCE_INVALID")
 
   const score = Math.max(0, Math.min(100, Math.round(raw.score)))
+  const chosenWindow = resolveAdaptiveTwitchHighlightWindow(
+    raw.bestStartSeconds, raw.bestEndSeconds, duration,
+  )
+  const bestStartSeconds = chosenWindow?.start ?? null
+  const bestEndSeconds = chosenWindow?.end ?? null
   const recommendation =
-    raw.recommendation === "render" && score >= TWITCH_VIDEO_RENDER_SCORE_MIN
+    raw.recommendation === "render" &&
+    score >= TWITCH_VIDEO_RENDER_SCORE_MIN &&
+    chosenWindow !== null
       ? "render"
       : "skip"
-
-  let bestStartSeconds = clampMoment(raw.bestStartSeconds, duration)
-  let bestEndSeconds = clampMoment(raw.bestEndSeconds, duration)
-  if (
-    bestStartSeconds !== null &&
-    bestEndSeconds !== null &&
-    bestEndSeconds <= bestStartSeconds
-  ) {
-    bestStartSeconds = null
-    bestEndSeconds = null
-  }
 
   const creatorName = queue.broadcasterLogin
   const normalizedEvidence: TwitchVideoEvidence = {
