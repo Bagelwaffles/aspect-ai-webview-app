@@ -331,11 +331,19 @@ export async function analyzeTwitchClipVideo(
 
   if (!options.force && item.videoAnalysis?.version === TWITCH_VIDEO_ANALYSIS_VERSION) {
     const cached = twitchVideoAnalysisRecordSchema.parse(item.videoAnalysis)
-    const publishMetadata = buildTwitchPublishMetadata({ creatorName: queue.broadcasterLogin,
-      sourceTitle: item.title, evidence: cached })
-    const corrected = twitchVideoAnalysisRecordSchema.parse({ ...cached, publishMetadata })
-    await saveTwitchMediaVideoAnalysis(item.clipId, corrected, { env })
-    return corrected
+    const cacheHasCompleteWindow = cached.recommendation !== "render" ||
+      resolveAdaptiveTwitchHighlightWindow(
+        cached.bestStartSeconds,
+        cached.bestEndSeconds,
+        Math.max(5, Math.min(TWITCH_ADAPTIVE_MAX_HIGHLIGHT_SECONDS, item.duration ?? 60)),
+      ) !== null
+    if (cacheHasCompleteWindow) {
+      const publishMetadata = buildTwitchPublishMetadata({ creatorName: queue.broadcasterLogin,
+        sourceTitle: item.title, evidence: cached })
+      const corrected = twitchVideoAnalysisRecordSchema.parse({ ...cached, publishMetadata })
+      await saveTwitchMediaVideoAnalysis(item.clipId, corrected, { env })
+      return corrected
+    }
   }
 
   const signed = presignR2Object("GET", item.objectKey, { expiresInSeconds: 900 }, env)
