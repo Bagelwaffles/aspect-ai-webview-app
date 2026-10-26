@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { buildSmokyPublicCoachingFeed, safePublicTwitchClipUrl } from "../lib/server/smoky-public-coaching"
+import { buildSmokyPublicCoachingFeed, isSmokyCoachingStoreConfigured, safePublicTwitchClipUrl } from "../lib/server/smoky-public-coaching"
 import type { TwitchMediaQueue } from "../lib/server/twitch-media-factory"
 
 const record = {
@@ -80,6 +80,23 @@ test("unseen or low-confidence or synthetic footage cannot become coaching", () 
   }
   assert.deepEqual(buildSmokyPublicCoachingFeed(queue({}, { status: "discovered" })), [])
   assert.deepEqual(buildSmokyPublicCoachingFeed(queue({}, { objectKey: null })), [])
+})
+
+test("missing or partial Redis configuration cannot count as a successful source check", () => {
+  assert.equal(isSmokyCoachingStoreConfigured({}), false)
+  assert.equal(isSmokyCoachingStoreConfigured({ UPSTASH_REDIS_REST_URL: "https://example.upstash.io" }), false)
+  assert.equal(isSmokyCoachingStoreConfigured({
+    UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+    UPSTASH_REDIS_REST_TOKEN: "private-test-token",
+  }), true)
+  assert.equal(isSmokyCoachingStoreConfigured({
+    KV_REST_API_URL: "https://example.upstash.io",
+    KV_REST_API_TOKEN: "private-test-token",
+  }), true)
+  assert.equal(isSmokyCoachingStoreConfigured({
+    UPSTASH_REDIS_REST_URL: " ",
+    UPSTASH_REDIS_REST_TOKEN: " ",
+  }), false)
 })
 
 test("rejects malicious or non-Smoky links", () => {
