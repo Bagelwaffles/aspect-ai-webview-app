@@ -19,7 +19,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BASE="https://ams-stripe-ingress-sandbox-jh7cvppct.vercel.app"
+          BASE="https://ams-stripe-ingress-sandbox-aug6bxph2.vercel.app"
           status() {
             local method="$1" path="$2"
             local response
