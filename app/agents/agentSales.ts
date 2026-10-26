@@ -13,12 +13,12 @@ export type AgentSalesOffer = {
   primaryHref: string
   secondaryLabel?: string
   secondaryHref?: string
-  videoEmbedUrl: string
+  videoEmbedUrl: string | null
   videoTitle: string
 }
 
-export const AMS_AGENT_SALES_VIDEO_ID = "f1cd50c072c34d37ab911a1c4895ce4a"
-export const AMS_AGENT_SALES_VIDEO_EMBED_URL = `https://app.heygen.com/embeds/${AMS_AGENT_SALES_VIDEO_ID}`
+/** The previous shared HeyGen ID returned video_not_found on October 26, 2026.\n * Only enable a replacement after its public embed is independently verified. */
+export const AMS_AGENT_SALES_VIDEO_EMBED_URL: string | null = null
 
 const subscriptionSlugs = new Set(SUBSCRIPTION_INCLUDED_AGENTS.map((agent) => agent.slug))
 
