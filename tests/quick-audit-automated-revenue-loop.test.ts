@@ -22,8 +22,8 @@ import type { createIsolatedPilotStores } from "../lib/server/quick-audit-isolat
 
 const owner = "owner-audit-test@example.net"
 const requestId = "request_synthetic_safe_123456"
-const sessionId = "cs_test_synthetic_123456789"
-const eventId = "evt_synthetic_123456789"
+const sessionId = "cs_test_synthetic123456789"
+const eventId = "evt_synthetic123456789"
 const approvedPrice = "price_synthetic_123456789"
 const signedSecret = "whsec_synthetic_audit_loop_signing_only"
 const testTime = new Date("2026-10-27T17:00:00.000Z")
