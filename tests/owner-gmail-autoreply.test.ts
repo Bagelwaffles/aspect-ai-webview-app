@@ -89,6 +89,23 @@ test("only an initial, directly addressed AMS human inquiry qualifies", () => {
     assert.equal(eligibleBusinessInquiry(headers(changed), "business@example.com", "secondary@example.com"), null, JSON.stringify(changed))
   }
 })
+test("forwarded business-address inquiry requires exact alias opt-in, not arbitrary To addresses", async () => {
+  const alias = "kimberley@aspectmarketingsolutions.app"
+  const forwarded = headers({ To: `Aspect Marketing Solutions <${alias}>` })
+  assert.equal(eligibleBusinessInquiry(forwarded, "business@example.com", "secondary@example.com"), null)
+  assert.equal(eligibleBusinessInquiry(forwarded, "business@example.com", "secondary@example.com", "info@aspectmarketingsolutions.app"), null)
+  assert.equal(eligibleBusinessInquiry(forwarded, "business@example.com", "secondary@example.com", alias)?.recipient, "prospect@example.net")
+  assert.equal(eligibleBusinessInquiry(headers({ To: "secondary@example.com" }), "business@example.com", "secondary@example.com", alias), null)
+  assert.equal(eligibleBusinessInquiry(headers({ From: alias, To: alias }), "business@example.com", "secondary@example.com", alias), null)
+  const c = replyContext()
+  const mail = { ...sample(), headers: forwarded }
+  assert.equal(await maybeAutoReplyToBusinessInquiry(mail, c), "ineligible")
+  assert.equal(await maybeAutoReplyToBusinessInquiry(mail, {
+    ...c, env: { ...c.env, AMS_GMAIL_INQUIRY_ALIAS: alias },
+  }), "accepted")
+  assert.equal(c.getSends(), 1)
+})
+
 test("default-off and secondary account never send even with a sender token", async () => {
   const c = replyContext()
   assert.equal(await maybeAutoReplyToBusinessInquiry(sample(), { ...c, env: { ...c.env, AMS_GMAIL_AUTOREPLY_ENABLED: "false" } }), "disabled")
