@@ -319,9 +319,10 @@ export async function processQuickAuditCheckout(input: {
   if (session.mode !== "payment" || session.status !== "complete" || session.payment_status !== "paid") {
     throw new QuickAuditFulfillmentError("QUICK_AUDIT_PAYMENT_UNSETTLED", "Quick Audit Checkout Session is not paid and complete", 400)
   }
-  if (session.expires_at && session.expires_at <= Math.floor(Date.now() / 1000)) {
-    throw new QuickAuditFulfillmentError("QUICK_AUDIT_SESSION_EXPIRED", "Quick Audit Checkout Session is expired", 400)
-  }
+  // expires_at controls how long an OPEN Checkout Session accepts payment.
+  // Stripe can legitimately retry a webhook after that timestamp. For an
+  // independently retrieved session already COMPLETE and PAID, checking the
+  // old checkout deadline would incorrectly reject a settled order.
   const lineItems = await input.gateway.listLineItems(session.id)
   const matching = lineItems.data.filter((item) => item.price?.id === input.expectedPriceId && item.quantity === 1)
   if (matching.length !== 1 || lineItems.data.length !== 1) return { processed: false, applied: false, reason: "UNAPPROVED_ONE_TIME_PRODUCT" }
