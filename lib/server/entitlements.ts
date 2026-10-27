@@ -342,8 +342,8 @@ export async function revokeStripeSubscriptionEntitlement(
   return new UpstashStripeEntitlementWriter(redis).revoke(input)
 }
 
-export async function claimStripeEvent(eventId: string): Promise<StripeEventClaim> {
-  const redis = getRedis()
+export async function claimStripeEvent(eventId: string, isolatedRedis?: Redis): Promise<StripeEventClaim> {
+  const redis = isolatedRedis ?? getRedis()
   const id = eventId.trim()
   if (!redis || !id) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
   const token = randomUUID()
@@ -367,8 +367,8 @@ export async function claimStripeEvent(eventId: string): Promise<StripeEventClai
   throw new Error("STRIPE_EVENT_CLAIM_INVALID_RESPONSE")
 }
 
-export async function completeStripeEvent(eventId: string, token: string) {
-  const redis = getRedis()
+export async function completeStripeEvent(eventId: string, token: string, isolatedRedis?: Redis) {
+  const redis = isolatedRedis ?? getRedis()
   const id = eventId.trim()
   const owner = token.trim()
   if (!redis || !id || !owner) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
@@ -389,8 +389,8 @@ export async function completeStripeEvent(eventId: string, token: string) {
   }
 }
 
-export async function releaseStripeEvent(eventId: string, token: string) {
-  const redis = getRedis()
+export async function releaseStripeEvent(eventId: string, token: string, isolatedRedis?: Redis) {
+  const redis = isolatedRedis ?? getRedis()
   const id = eventId.trim()
   const owner = token.trim()
   if (!redis || !id || !owner) throw new Error("ENTITLEMENT_STORE_NOT_CONFIGURED")
