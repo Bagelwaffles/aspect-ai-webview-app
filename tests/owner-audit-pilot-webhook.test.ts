@@ -4,10 +4,14 @@ import type Stripe from "stripe"
 import { NextRequest } from "next/server"
 import { isSignedOwnerAuditPilotEvent, ownerPilotWebhookIntakeReady, ownerAuditPilotWebhookPOST } from "../lib/server/owner-audit-pilot-webhook"
 
-const url = "https://aspect-ai-overlord-git-e240cd-kimberleyaversbiz-4131s-projects.vercel.app/api/internal/quick-audit-pilot/webhook"
+const immutableHost = "aspect-ai-overlord-foj6a2r0j-kimberleyaversbiz-4131s-projects.vercel.app"
+const branchAlias = "aspect-ai-overlord-git-e240cd-kimberleyaversbiz-4131s-projects.vercel.app"
+const url = `https://${immutableHost}/api/internal/quick-audit-pilot/webhook`
 const base: NodeJS.ProcessEnv = {
   NODE_ENV: "test",
   VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "feat/audit-delivery-security-preview-20261023",
+  VERCEL_URL: immutableHost, VERCEL_BRANCH_URL: branchAlias,
+  AMS_QUICK_AUDIT_PILOT_IMMUTABLE_HOST_GUARD: "true",
   AMS_QUICK_AUDIT_OWNER_PILOT_REDIS_REST_URL: "https://pretty-crab-239388.upstash.io",
   AMS_QUICK_AUDIT_OWNER_PILOT_REDIS_REST_TOKEN: "test-only-fixture",
   AMS_QUICK_AUDIT_OWNER_PILOT_WEBHOOK_INTAKE_ENABLED: "true",
@@ -69,4 +73,18 @@ test("pilot event filter refuses non-pilot, other account, live and wrong sessio
   assert.equal(isSignedOwnerAuditPilotEvent({ ...event, account: "acct_other" }), false)
   assert.equal(isSignedOwnerAuditPilotEvent({ ...event, type: "invoice.paid" } as unknown as Stripe.Event), false)
   assert.equal(isSignedOwnerAuditPilotEvent({ ...event, data: { object: { id: "cs_test_owner", mode: "payment", metadata: {} } } } as Stripe.Event), false)
+})
+
+test("pilot intake is bound to only its exact immutable Preview hostname", () => {
+  assert.equal(ownerPilotWebhookIntakeReady(base, url, now), true)
+  assert.equal(ownerPilotWebhookIntakeReady(base, url.replace(immutableHost, branchAlias), now), false)
+  assert.equal(ownerPilotWebhookIntakeReady(base,
+    url.replace(immutableHost, "aspect-ai-overlord-abcdefgh1-kimberleyaversbiz-4131s-projects.vercel.app"), now), false)
+  assert.equal(ownerPilotWebhookIntakeReady(base,
+    url.replace(immutableHost, "other-project-abcdefgh1-kimberleyaversbiz-4131s-projects.vercel.app"), now), false)
+  assert.equal(ownerPilotWebhookIntakeReady({ ...base, VERCEL_URL: "" }, url, now), false)
+  assert.equal(ownerPilotWebhookIntakeReady({ ...base, AMS_QUICK_AUDIT_PILOT_IMMUTABLE_HOST_GUARD: "false" }, url, now), false)
+  assert.equal(ownerPilotWebhookIntakeReady(base, url + "?share=1", now), false)
+  assert.equal(ownerPilotWebhookIntakeReady(base, url + "#fragment", now), false)
+  assert.equal(ownerPilotWebhookIntakeReady(base, url.replace("https://", "https://user:pass@"), now), false)
 })
