@@ -247,7 +247,7 @@ export function createOwnerSignedReceiptHandoff(overrides: Partial<RequestDeps> 
       const created = await stores.eventReceipts.set(
         ackKey, JSON.stringify(ack), { nx: true, ex: 90 * 24 * 60 * 60 },
       )
-      if (created !== "OK" && created !== true) {
+      if (created !== "OK") {
         const existingRaw = await stores.eventReceipts.get(ackKey)
         const existing: unknown = typeof existingRaw === "string"
           ? JSON.parse(existingRaw) : existingRaw
