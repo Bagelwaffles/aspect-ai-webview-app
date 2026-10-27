@@ -54,6 +54,7 @@ export function ownerPilotCheckoutReadiness(env: NodeJS.ProcessEnv, now: number)
   const recipient = env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim().toLowerCase()
   return pilotFulfillmentConfiguration(env).ready &&
     env.AMS_STRIPE_PILOT_CHECKOUT_ENABLED === "true" &&
+    env.AMS_QUICK_AUDIT_DELIVERY_OUTBOX_ENABLED === "true" &&
     /^[A-Za-z0-9_-]{16,80}$/.test(runId) &&
     Number.isFinite(expiry) && expiry > now && expiry - now <= 10 * 60_000 &&
     Boolean(owner && recipient && recipient === owner) &&
