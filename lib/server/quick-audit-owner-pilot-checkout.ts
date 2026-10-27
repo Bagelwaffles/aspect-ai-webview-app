@@ -112,6 +112,7 @@ export function createOwnerPilotTestCheckoutHandler(overrides: Partial<Deps> = {
         metadata: {
           ams_offer: "quick-marketing-audit",
           ams_request_id: requestId,
+          ams_preview_run_id: runId,
           ams_business_name: "Aspect Marketing Solutions",
           ams_website_url: "https://www.aspectmarketingsolutions.app",
           ams_industry: "Marketing automation",
