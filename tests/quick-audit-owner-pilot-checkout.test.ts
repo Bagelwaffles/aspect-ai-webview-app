@@ -88,6 +88,7 @@ test("fail-closed test checkout requires valid isolated sandbox identity and a <
     { AMS_STRIPE_PILOT_CHECKOUT_UNTIL: "2026-10-27T20:59:59Z" },
     { AMS_STRIPE_PILOT_CHECKOUT_UNTIL: "2026-10-27T21:11:00Z" },
     { AMS_STRIPE_PILOT_FULFILLMENT_ENABLED: "false" },
+    { AMS_QUICK_AUDIT_DELIVERY_OUTBOX_ENABLED: "false" },
     { AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED: "true" },
     { AMS_QUICK_AUDIT_PILOT_DISPATCH_ENABLED: "true" },
     { AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED: "true" },
