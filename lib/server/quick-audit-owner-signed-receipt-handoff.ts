@@ -235,6 +235,33 @@ export function createOwnerSignedReceiptHandoff(overrides: Partial<RequestDeps> 
           outbox.recipient !== expectedOwner) {
         return reply(503, "PILOT_OUTBOX_NOT_QUEUED")
       }
+      // Only a verified, persisted paid audit AND matching durable owner
+      // outbox may authorize a future signed Stripe retry to receive 200.
+      // The standalone gateway itself cannot produce this acknowledgment.
+      const ackKey = GATEWAY_RECEIPT_PREFIX.replace("event:", "ack:") + eventId
+      const ack = {
+        kind: "paid-owner-audit-queued-v1", eventId, sessionId, requestId,
+        runId, digest: receipt.digest, auditId: report.auditId,
+        recordedAt: new Date(now).toISOString(),
+      }
+      const created = await stores.eventReceipts.set(
+        ackKey, JSON.stringify(ack), { nx: true, ex: 90 * 24 * 60 * 60 },
+      )
+      if (created !== "OK" && created !== true) {
+        const existingRaw = await stores.eventReceipts.get(ackKey)
+        const existing: unknown = typeof existingRaw === "string"
+          ? JSON.parse(existingRaw) : existingRaw
+        if (!existing || typeof existing !== "object" ||
+            (existing as typeof ack).kind !== ack.kind ||
+            (existing as typeof ack).eventId !== eventId ||
+            (existing as typeof ack).sessionId !== sessionId ||
+            (existing as typeof ack).requestId !== requestId ||
+            (existing as typeof ack).runId !== runId ||
+            (existing as typeof ack).digest !== receipt.digest ||
+            (existing as typeof ack).auditId !== report.auditId) {
+          return reply(409, "PILOT_ACK_CONFLICT")
+        }
+      }
       return reply(200, result.duplicate ? "PILOT_PAID_AUDIT_DUPLICATE" : "PILOT_PAID_AUDIT_QUEUED")
     } catch (error) {
       const code = error instanceof QuickAuditFulfillmentError
