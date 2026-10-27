@@ -101,7 +101,10 @@ test("forwarded business-address inquiry requires exact alias opt-in, not arbitr
   const mail = { ...sample(), headers: forwarded }
   assert.equal(await maybeAutoReplyToBusinessInquiry(mail, c), "ineligible")
   assert.equal(await maybeAutoReplyToBusinessInquiry(mail, {
-    ...c, env: { ...c.env, VERCEL_ENV: "production", AMS_GMAIL_INQUIRY_ALIAS: alias },
+    ...c, env: {
+      ...c.env, VERCEL_ENV: "production", AMS_GMAIL_INQUIRY_ALIAS: alias,
+      AMS_GMAIL_CONSENT_MODE: "approved-owner-use", AMS_GMAIL_POLICY_APPROVED: "true",
+    },
   }), "ineligible")
   assert.equal(await maybeAutoReplyToBusinessInquiry(mail, {
     ...c, env: { ...c.env, VERCEL_ENV: "preview", AMS_GMAIL_INQUIRY_ALIAS: alias },
