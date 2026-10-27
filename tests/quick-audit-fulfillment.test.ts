@@ -161,9 +161,19 @@ test("durable completion atomically links the Checkout, event, request, and n8n 
   assert.equal(args[3], "cs_test_linked")
 })
 
-test("unpaid and expired Checkout Sessions fail closed", async () => {
+test("unpaid or truly expired sessions fail closed", async () => {
   await assert.rejects(processingFixture({ session: session({ payment_status: "unpaid" }) }).run, (error) => error instanceof QuickAuditFulfillmentError && error.code === "QUICK_AUDIT_PAYMENT_UNSETTLED")
-  await assert.rejects(processingFixture({ session: session({ expires_at: 1 }) }).run, (error) => error instanceof QuickAuditFulfillmentError && error.code === "QUICK_AUDIT_SESSION_EXPIRED")
+  await assert.rejects(processingFixture({ session: session({ status: "expired", payment_status: "unpaid", expires_at: 1 }) }).run, (error) => error instanceof QuickAuditFulfillmentError && error.code === "QUICK_AUDIT_PAYMENT_UNSETTLED")
+})
+
+test("settled completed Checkout remains eligible after its original open-session deadline", async () => {
+  const fixture = processingFixture({ session: session({ expires_at: 1 }) })
+  const result = await fixture.run()
+  assert.equal(result.reason, "QUICK_AUDIT_COMPLETED")
+  assert.equal(result.applied, true)
+  const replay = await fixture.run()
+  assert.equal(replay.duplicate, true)
+  assert.equal(fixture.audits(), 1)
 })
 
 test("unapproved one-time price is ignored without n8n execution", async () => {
