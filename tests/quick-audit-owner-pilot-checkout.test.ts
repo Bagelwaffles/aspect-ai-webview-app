@@ -131,6 +131,7 @@ test("owner-created TEST session carries exact audit metadata and deterministic 
   assert.equal(entry.params.line_items?.[0]?.price, priceId)
   assert.equal(entry.params.allow_promotion_codes, false)
   assert.equal(entry.params.metadata?.ams_offer, "quick-marketing-audit")
+  assert.equal(entry.params.metadata?.ams_preview_run_id, valid.AMS_STRIPE_PILOT_CHECKOUT_RUN_ID)
   assert.equal(entry.params.metadata?.ams_business_name, "Aspect Marketing Solutions")
   assert.equal(entry.params.metadata?.ams_website_url, "https://www.aspectmarketingsolutions.app")
   assert.ok(String(entry.params.metadata?.ams_request_id ?? "").startsWith("quick-audit-"))
