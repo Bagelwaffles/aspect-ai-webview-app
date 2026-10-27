@@ -1,26 +1,23 @@
-import assert from "node:assert/strict";
-import test from "node:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import assert from "node:assert/strict"
+import test from "node:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
-const cfg = JSON.parse(readFileSync(join(process.cwd(), "vercel.json"), "utf8"));
-const deny = cfg.routes[0];
-const pilotPath = "/api/internal/quick-audit-pilot/webhook";
-const hostPattern = new RegExp(deny.has[0].value.re);
-const denyPattern = new RegExp(deny.src);
+const cfg = JSON.parse(readFileSync(join(process.cwd(), "vercel.json"), "utf8")) as {
+  routes: Array<{ src: string; dest?: string; status?: number; has?: unknown[] }>
+}
 
-test("Vercel routes deny everything but the exact pilot webhook on immutable deployment hosts", () => {
-  assert.equal(deny.status, 404);
-  assert.equal(deny.has[0].type, "host");
-  assert.equal(deny.headers["Cache-Control"], "no-store");
-  assert.equal(hostPattern.test("aspect-ai-overlord-nz5p3xn5z-kimberleyaversbiz-4131s-projects.vercel.app"), true);
-  assert.equal(hostPattern.test("aspect-ai-overlord-git-e240cd-kimberleyaversbiz-4131s-projects.vercel.app"), false);
-  assert.equal(hostPattern.test("www.aspectmarketingsolutions.app"), false);
-  assert.equal(hostPattern.test("aspect-ai-overlord-nz5p3xn5z-kimberleyaversbiz-4131s-projects.vercel.app.bad.com"), false);
-  assert.equal(denyPattern.test(pilotPath), false);
-  for (const pathname of ["/", "/owner", "/login", "/dashboard", "/api/webhooks/stripe",
-       "/api/internal/quick-audit-test/checkout", "/api/internal/quick-audit-pilot/webhook/",
-       "/api/internal/quick-audit-pilot/webhook/more", "/_next/static/app.js", "/favicon.ico", "/api/auth/session"]) {
-    assert.equal(denyPattern.test(pathname), true, pathname);
-  }
-});
+/**
+ * Vercel Deployment Protection remains responsible for SSO on Preview URLs.
+ * Blanket hostname 404 routing is not a safe pilot isolation mechanism: it
+ * affects unrelated immutable Preview deployments.
+ */
+test("Vercel routing preserves API and pages without blanket immutable Preview denial", () => {
+  assert.deepEqual(cfg.routes, [
+    { src: "/api/(.*)", dest: "/api/$1" },
+    { src: "/(.*)", dest: "/$1" },
+  ])
+  assert.equal(cfg.routes.some((route) =>
+    route.status === 404 && Array.isArray(route.has) && route.has.length > 0,
+  ), false)
+})
