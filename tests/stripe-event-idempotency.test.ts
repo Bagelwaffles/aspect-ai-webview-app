@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { Redis } from "@upstash/redis"
 import { claimStripeEvent, completeStripeEvent, releaseStripeEvent } from "../lib/server/entitlements"
+import { RedisQuickAuditStore } from "../lib/server/quick-audit-fulfillment"
 
 /**
  * An isolated, deterministic Redis state-machine fixture for exercising the
@@ -145,4 +146,95 @@ test("isolated Redis stores cannot claim or complete each other's event state", 
   await completeStripeEvent("evt_isolation_fixture", claimA.token, a)
   assert.deepEqual(await claimStripeEvent("evt_isolation_fixture", a), { state: "completed" })
   assert.deepEqual(await claimStripeEvent("evt_isolation_fixture", b), { state: "processing" })
+})
+
+test("abandoned Quick Audit reservation is recoverable after ten minutes without losing completed deduplication", async () => {
+  let elapsedSeconds = 0
+  const records = new Map<string, { value: string; expiresAt: number }>()
+  const get = (key: string): string | null => {
+    const record = records.get(key)
+    if (record && record.expiresAt <= elapsedSeconds) {
+      records.delete(key)
+      return null
+    }
+    return record?.value ?? null
+  }
+
+  // A minimal atomic Redis-EVAL fixture with a controllable clock.
+  // It exercises the exact reserve/complete/release calls without any external credentials.
+  const redis = {
+    async eval(script: string, keys: string[], args: unknown[]): Promise<unknown> {
+      const current = get(keys[0])
+      if (script.includes("if existing then return existing end")) {
+        if (current !== null) return current
+        const ttl = Number(args[1])
+        assert.equal(ttl, 600, "unfinished reservations must not block retries for 90 days")
+        records.set(keys[0], { value: String(args[0]), expiresAt: elapsedSeconds + ttl })
+        return ""
+      }
+      if (script.includes("local decoded = cjson.decode(current)")) {
+        if (current === null) return 0
+        if (JSON.parse(current).token !== args[0]) return -1
+        const ttl = Number(args[2])
+        assert.equal(ttl, 7_776_000, "completed results retain the full 90 days")
+        records.set(keys[0], { value: String(args[1]), expiresAt: elapsedSeconds + ttl })
+        for (const key of keys.slice(1)) {
+          records.set(key, { value: String(args[3]), expiresAt: elapsedSeconds + ttl })
+        }
+        return 1
+      }
+      if (script.includes("local v=redis.call('GET',KEYS[1])")) {
+        if (current === null) return 0
+        const record = JSON.parse(current)
+        if (record.token === args[0] && record.status === "processing") {
+          records.delete(keys[0])
+          return 1
+        }
+        return 0
+      }
+      throw new Error("Unexpected Redis EVAL script")
+    },
+  }
+  const store = new RedisQuickAuditStore(redis)
+  const input = {
+    checkoutSessionId: "cs_test_crash_recovery",
+    stripeEventId: "evt_crash_recovery",
+    requestId: "request_crash_recovery",
+  }
+  const first = await store.reserve(input)
+  assert.equal(first.state, "reserved")
+  if (first.state !== "reserved") throw new Error("Expected first reservation")
+  elapsedSeconds = 599
+  assert.equal((await store.reserve(input)).state, "processing")
+
+  // Simulate an abrupt serverless termination (no release call).
+  elapsedSeconds = 601
+  const second = await store.reserve(input)
+  assert.equal(second.state, "reserved")
+  if (second.state !== "reserved") throw new Error("Expected expired reservation to be reclaimed")
+  assert.notEqual(second.token, first.token)
+
+  const result = {
+    status: "completed" as const,
+    ...input,
+    n8nAuditId: "audit_crash_recovery",
+    completedAt: "2026-10-27T00:00:00.000Z",
+  }
+  await assert.rejects(
+    store.complete({ ...result, token: first.token }),
+    /QUICK_AUDIT_CLAIM_LOST/,
+  )
+  await store.release({ checkoutSessionId: input.checkoutSessionId, token: first.token })
+  assert.equal((await store.reserve(input)).state, "processing")
+
+  await store.complete({ ...result, token: second.token })
+  const duplicate = await store.reserve(input)
+  assert.equal(duplicate.state, "duplicate")
+  if (duplicate.state !== "duplicate") throw new Error("Expected durable completed result")
+  assert.equal(duplicate.record.n8nAuditId, result.n8nAuditId)
+
+  elapsedSeconds += 7_775_999
+  assert.equal((await store.reserve(input)).state, "duplicate")
+  elapsedSeconds += 2
+  assert.equal((await store.reserve(input)).state, "reserved")
 })
