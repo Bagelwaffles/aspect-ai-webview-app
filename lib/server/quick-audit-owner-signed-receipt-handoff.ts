@@ -205,8 +205,33 @@ export function createOwnerSignedReceiptHandoff(overrides: Partial<RequestDeps> 
           })
         },
       })
-      const outbox = await stores.outbox.read(requestId)
-      if (!outbox || outbox.checkoutSessionId !== sessionId ||
+      // A durable paid record can outlive a transient queue failure. A replay
+      // must restore ONLY the missing owner outbox, never rerun the audit.
+      // The report and paid record must independently agree before doing so.
+      if (!result.processed || !result.n8nAuditId) {
+        return reply(503, "PILOT_PAID_AUDIT_NOT_PROCESSED")
+      }
+      const report = await stores.reports.getByRequestId(requestId)
+      if (!report || report.version !== "native-v1" ||
+          report.requestId !== requestId ||
+          report.auditId !== result.n8nAuditId ||
+          report.businessName !== "Aspect Marketing Solutions" ||
+          report.websiteUrl !== "https://www.aspectmarketingsolutions.app" ||
+          report.findings.length !== 5 ||
+          report.sevenDayPlan.length !== 7) {
+        return reply(503, "PILOT_DURABLE_REPORT_UNVERIFIED")
+      }
+      let outbox = await stores.outbox.read(requestId)
+      if (!outbox) {
+        await stores.outbox.enqueue({
+          auditId: report.auditId, requestId, checkoutSessionId: sessionId,
+          recipient: expectedOwner, paidAndPersisted: true,
+        })
+        outbox = await stores.outbox.read(requestId)
+      }
+      if (!outbox || outbox.auditId !== report.auditId ||
+          outbox.requestId !== requestId ||
+          outbox.checkoutSessionId !== sessionId ||
           outbox.recipient !== expectedOwner) {
         return reply(503, "PILOT_OUTBOX_NOT_QUEUED")
       }
