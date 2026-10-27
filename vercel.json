@@ -2,21 +2,6 @@
   "version": 2,
   "routes": [
     {
-      "src": "^/(?!api/internal/quick-audit-pilot/webhook$).*",
-      "has": [
-        {
-          "type": "host",
-          "value": {
-            "re": "^aspect-ai-overlord-[a-z0-9]{7,14}-kimberleyaversbiz-4131s-projects\\.vercel\\.app$"
-          }
-        }
-      ],
-      "status": 404,
-      "headers": {
-        "Cache-Control": "no-store"
-      }
-    },
-    {
       "src": "/api/(.*)",
       "dest": "/api/$1"
     },
