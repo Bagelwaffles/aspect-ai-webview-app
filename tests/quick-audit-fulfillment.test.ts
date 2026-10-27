@@ -166,9 +166,9 @@ test("Redis reservation script claims by atomic NX before classifying concurrent
   const redis = {
     async eval(script: string, keys: string[], args: unknown[]) {
       // Enforce actual Lua operation order; do not just mock success.
-      assert.match(script, /local claimed = redis.call\\('SET', KEYS\\[1\\]/u)
-      assert.match(script, /if claimed then return '' end/u)
-      assert.match(script, /return redis.call\\('GET', KEYS\\[1\\]\\) or ''/u)
+      assert.ok(script.includes("local claimed = redis.call('SET', KEYS[1]"))
+      assert.ok(script.includes("if claimed then return '' end"))
+      assert.ok(script.includes("return redis.call('GET', KEYS[1]) or ''"))
       const existing = stored.get(keys[0])
       if (existing) return existing
       stored.set(keys[0], String(args[0]))
