@@ -13,6 +13,8 @@ on:
       - tests/owner-audit-pilot-domain-guard.test.ts
       - lib/server/owner-audit-pilot-webhook.ts
       - tests/owner-audit-pilot-webhook.test.ts
+      - tools/pr295-acceptance/stripe-replay-worker.mjs
+      - tests/pr295-disposable-stripe-receiver.test.mjs
 
 permissions:
   contents: read
@@ -36,4 +38,4 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
       - name: Run isolated replay regression
-        run: node --import tsx --test tests/stripe-event-idempotency.test.ts tests/owner-audit-pilot-vercel-routing.test.ts tests/owner-audit-pilot-domain-guard.test.ts tests/owner-audit-pilot-webhook.test.ts
+        run: node --import tsx --test tests/stripe-event-idempotency.test.ts tests/owner-audit-pilot-vercel-routing.test.ts tests/owner-audit-pilot-domain-guard.test.ts tests/owner-audit-pilot-webhook.test.ts tests/pr295-disposable-stripe-receiver.test.mjs
