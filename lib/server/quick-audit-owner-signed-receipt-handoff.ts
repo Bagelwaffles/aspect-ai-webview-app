@@ -69,6 +69,9 @@ export function ownerSignedReceiptHandoffReady(env: NodeJS.ProcessEnv, now: numb
   const owner = env.AMS_OWNER_EMAIL?.trim().toLowerCase()
   const recipient = env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim().toLowerCase()
   return pilotFulfillmentConfiguration(env).ready &&
+    // The existing standalone gateway writes the signed receipt to this exact
+    // physically isolated Stripe TEST database. Never read the shared proof DB.
+    env.AMS_STRIPE_PILOT_REDIS_REST_URL === "https://internal-chicken-238070.upstash.io" &&
     env.VERCEL_ENV === "preview" &&
     env.VERCEL_GIT_COMMIT_REF === RESEND_PREVIEW_BRANCH &&
     env.AMS_STRIPE_PILOT_HANDOFF_ENABLED === "true" &&
