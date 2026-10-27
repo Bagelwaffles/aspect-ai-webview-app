@@ -53,8 +53,21 @@ function fixture(options:{
  let outbox:{auditId:string;requestId:string;checkoutSessionId:string;recipient:string;state:string}|null=null
  let simulatedQueueFailure=options.failOutboxOnce===true
  let reportPersisted=false
+ let ackStored:string|null=null
  const stores={
-   eventReceipts:{async get(){calls.push("receipt-read");return options.receipt===undefined?receipt:options.receipt}},
+   eventReceipts:{
+     async get(key:string){
+       calls.push(key.includes(":ack:")?"ack-read":"receipt-read")
+       return key.includes(":ack:") ? ackStored : (options.receipt===undefined?receipt:options.receipt)
+     },
+     async set(key:string,value:string) {
+       assert.ok(key.includes(":ack:"))
+       calls.push("ack-write")
+       if (ackStored) return null
+       ackStored=value
+       return "OK"
+     },
+   },
    payment:{
      async reserve(){if(completed)return{state:"duplicate",record:completed};return{state:"reserved",token:"test-claim"}},
      async complete(item:QuickAuditRecord){completed=item},
@@ -127,6 +140,8 @@ test("real-origin receipt and provider event mock drive native audit/outbox once
  assert.equal((await second.json()).code,"PILOT_PAID_AUDIT_DUPLICATE")
  assert.equal(f.calls.filter(x=>x==="native-audit").length,1)
  assert.equal(f.calls.filter(x=>x==="outbox").length,1)
+ assert.equal(f.calls.filter(x=>x==="ack-write").length,2)
+ assert.equal(f.calls.filter(x=>x==="ack-read").length,1)
 })
 test("after outbox write failure, signed owner replay restores only missing outbox without rerunning audit",async()=>{
  const f=fixture({failOutboxOnce:true})
