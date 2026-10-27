@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { Redis } from "@upstash/redis"
 import { claimStripeEvent, completeStripeEvent, releaseStripeEvent } from "../lib/server/entitlements"
-import { RedisQuickAuditStore } from "../lib/server/quick-audit-fulfillment"
+import { QuickAuditFulfillmentError, RedisQuickAuditStore } from "../lib/server/quick-audit-fulfillment"
 
 /**
  * An isolated, deterministic Redis state-machine fixture for exercising the
@@ -222,7 +222,7 @@ test("abandoned Quick Audit reservation is recoverable after ten minutes without
   }
   await assert.rejects(
     store.complete({ ...result, token: first.token }),
-    /QUICK_AUDIT_CLAIM_LOST/,
+    (error: unknown) => error instanceof QuickAuditFulfillmentError && error.code === "QUICK_AUDIT_CLAIM_LOST",
   )
   await store.release({ checkoutSessionId: input.checkoutSessionId, token: first.token })
   assert.equal((await store.reserve(input)).state, "processing")
