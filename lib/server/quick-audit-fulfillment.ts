@@ -77,10 +77,11 @@ function redisClient(): RedisClient | null {
 }
 
 const RESERVE_SCRIPT = `
-local existing = redis.call('GET', KEYS[1])
-if existing then return existing end
-redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2], 'NX')
-return ''
+-- The claim and its outcome must be decided atomically inside one script.
+-- Never return "reserved" after an NX SET that lost a concurrent race.
+local claimed = redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2], 'NX')
+if claimed then return '' end
+return redis.call('GET', KEYS[1]) or ''
 `
 
 const COMPLETE_SCRIPT = `
