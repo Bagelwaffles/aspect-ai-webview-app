@@ -46,11 +46,13 @@ const request = (body:unknown={eventId}) => new NextRequest("https://example.com
   {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
 function fixture(options:{
   receipt?:unknown;paid?:Record<string,unknown>;event?:Record<string,unknown>;
-  env?:Partial<NodeJS.ProcessEnv>;owner?:boolean;
+  env?:Partial<NodeJS.ProcessEnv>;owner?:boolean;failOutboxOnce?:boolean;missingReport?:boolean;
 }={}) {
  const calls:string[]=[]
  let completed:QuickAuditRecord|null=null
  let outbox:{auditId:string;requestId:string;checkoutSessionId:string;recipient:string;state:string}|null=null
+ let simulatedQueueFailure=options.failOutboxOnce===true
+ let reportPersisted=false
  const stores={
    eventReceipts:{async get(){calls.push("receipt-read");return options.receipt===undefined?receipt:options.receipt}},
    payment:{
@@ -58,10 +60,22 @@ function fixture(options:{
      async complete(item:QuickAuditRecord){completed=item},
      async release(){},
    },
-   auditGateway:{async run(){calls.push("native-audit");return{auditId:"audit_1234567890"}}},
+   auditGateway:{async run(){calls.push("native-audit");reportPersisted=!options.missingReport;return{auditId:"audit_1234567890"}}},
+   reports:{
+     async getByRequestId(id:string) {
+       calls.push("report-read")
+       if (!reportPersisted || id!==requestId) return null
+       return {version:"native-v1",requestId,auditId:"audit_1234567890",
+         businessName:"Aspect Marketing Solutions",websiteUrl:"https://www.aspectmarketingsolutions.app",
+         findings:Array.from({length:5},()=>({title:"Issue",observation:"Example",fix:"Action"})),
+         sevenDayPlan:Array.from({length:7},(_,i)=>({day:i+1,action:"Action"}))}
+     },
+   },
    outbox:{
      async enqueue(item:{auditId:string;requestId:string;checkoutSessionId:string;recipient:string}){
-       calls.push("outbox");outbox={...item,state:"queued"};return outbox},
+       calls.push("outbox")
+       if (simulatedQueueFailure) {simulatedQueueFailure=false;throw Error("simulated temporary outbox failure")}
+       outbox={...item,state:"queued"};return outbox},
      async read(){return outbox},
    },
  } as unknown as NonNullable<ReturnType<typeof createIsolatedPilotStores>>
@@ -114,6 +128,28 @@ test("real-origin receipt and provider event mock drive native audit/outbox once
  assert.equal(f.calls.filter(x=>x==="native-audit").length,1)
  assert.equal(f.calls.filter(x=>x==="outbox").length,1)
 })
+test("after outbox write failure, signed owner replay restores only missing outbox without rerunning audit",async()=>{
+ const f=fixture({failOutboxOnce:true})
+ const first=await f.handler(request())
+ assert.equal(first.status,200)
+ assert.equal((await first.json()).code,"PILOT_PAID_AUDIT_QUEUED")
+ assert.equal(f.calls.filter(x=>x==="native-audit").length,1)
+ assert.equal(f.calls.filter(x=>x==="outbox").length,2)
+ const again=await f.handler(request())
+ assert.equal(again.status,200)
+ assert.equal((await again.json()).code,"PILOT_PAID_AUDIT_DUPLICATE")
+ assert.equal(f.calls.filter(x=>x==="native-audit").length,1)
+ assert.equal(f.calls.filter(x=>x==="outbox").length,2)
+})
+
+test("missing durable native report denies owner queue even if Stripe payment settled",async()=>{
+ const f=fixture({missingReport:true})
+ const response=await f.handler(request())
+ assert.equal(response.status,503)
+ assert.equal((await response.json()).code,"PILOT_DURABLE_REPORT_UNVERIFIED")
+ assert.equal(f.calls.includes("outbox"),true)
+})
+
 test("unapproved price amount, wrong customer and unrelated event fail before native audit",async()=>{
  for(const changed of [
   {paid:{...paid,amount_total:500}}, {paid:{...paid,customer_details:{email:"someone@example.net"}}},
