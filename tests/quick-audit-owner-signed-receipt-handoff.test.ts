@@ -25,7 +25,7 @@ const event = { id:eventId,object:"event",type:"checkout.session.completed",live
 const env: NodeJS.ProcessEnv = {
   NODE_ENV:"test",VERCEL_ENV:"preview",VERCEL_GIT_COMMIT_REF:RESEND_PREVIEW_BRANCH,
   AMS_STRIPE_PILOT_ACCOUNT_ID:AMS_PILOT_STRIPE_ACCOUNT,
-  AMS_STRIPE_PILOT_REDIS_REST_URL:"https://isolated-owner-handoff-123.upstash.io",
+  AMS_STRIPE_PILOT_REDIS_REST_URL:"https://internal-chicken-238070.upstash.io",
   AMS_STRIPE_PILOT_REDIS_REST_TOKEN:"synthetic-no-network",
   AMS_STRIPE_PILOT_REDIS_NAMESPACE:"ams:preview:stripe-pilot:owner-handoff:",
   AMS_QUICK_AUDIT_RESEND_PROOF_REDIS_REST_URL:"https://accepted-quetzal-206056.upstash.io",
@@ -85,6 +85,7 @@ test("readiness requires strict Preview, owner, isolation, short window and outb
   {AMS_STRIPE_PILOT_HANDOFF_UNTIL:new Date(now-1).toISOString()},
   {AMS_STRIPE_PILOT_HANDOFF_UNTIL:new Date(now+11*60_000).toISOString()},
   {AMS_STRIPE_PILOT_CHECKOUT_ENABLED:"true"},{AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED:"true"},
+  {AMS_STRIPE_PILOT_REDIS_REST_URL:"https://wrong-upstash.upstash.io"},
   {AMS_QUICK_AUDIT_DELIVERY_OUTBOX_ENABLED:"false"},{AMS_OWNER_EMAIL:"other@example.net"},
   {AMS_STRIPE_PILOT_APPROVED_SESSION_ID:"cs_live_forbidden"}]) {
   assert.equal(ownerSignedReceiptHandoffReady({...env,...patch},now),false,JSON.stringify(patch))
