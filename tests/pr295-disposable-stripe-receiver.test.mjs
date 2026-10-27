@@ -129,3 +129,65 @@ test("failed persistence returns retriable HTTP 503; secrets and payload never a
   assert.equal(text.includes(SECRET), false);
   assert.equal(text.includes(environment.UPSTASH_RECEIPT_WRITE_TOKEN), false);
 });
+
+test("untrusted oversized bodies are rejected before a Redis call, even without Content-Length", async () => {
+  let redisCalls = 0;
+  const handler = createReceiver({
+    now: () => NOW,
+    fetchRedis: async () => {
+      redisCalls++;
+      throw new Error("Must not contact Redis");
+    },
+  });
+  const oversized = new Request(RECEIVER, {
+    method: "POST",
+    headers: { "stripe-signature": "invalid" },
+    body: "X".repeat(70000),
+  });
+  assert.equal(oversized.headers.get("content-length"), null);
+  const response = await handler(oversized, environment);
+  assert.equal(response.status, 413);
+  assert.equal((await response.json()).code, "PAYLOAD_TOO_LARGE");
+  assert.equal(redisCalls, 0);
+
+  // A payload just over the size limit cannot slip through a chunked stream.
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode("a".repeat(32000)));
+      controller.enqueue(new TextEncoder().encode("b".repeat(34000)));
+      controller.close();
+    },
+  });
+  const streamed = new Request(RECEIVER, {
+    method: "POST",
+    headers: { "stripe-signature": "invalid" },
+    body: stream,
+    duplex: "half",
+  });
+  const streamedResponse = await handler(streamed, environment);
+  assert.equal(streamedResponse.status, 413);
+  assert.equal(redisCalls, 0);
+});
+
+test("snapshot event shape is required and thin event shape is rejected", async () => {
+  let redisCalls = 0;
+  const handler = createReceiver({
+    now: () => NOW,
+    fetchRedis: async () => {
+      redisCalls++;
+      return new Response(JSON.stringify({ result: [1, 1] }), { status: 200 });
+    },
+  });
+  // Stripe Workbench must use the SNAPSHOT payload option for this receiver.
+  const thin = {
+    id: "evt_SyntheticThinFixture",
+    object: "event",
+    livemode: false,
+    type: "test_helpers.test_clock.created",
+    context: "acct_1Smr2bGloGM6sjzB",
+    related_object: { id: "clock_test" },
+  };
+  const response = await send(handler, thin);
+  assert.equal(response.status, 403);
+  assert.equal(redisCalls, 0);
+});
