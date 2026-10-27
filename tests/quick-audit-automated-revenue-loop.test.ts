@@ -10,7 +10,7 @@ import assert from "node:assert/strict"
 import Stripe from "stripe"
 
 import { fulfillIsolatedPilotCheckout } from "../lib/server/quick-audit-isolated-pilot-fulfillment"
-import { AMS_PILOT_STRIPE_ACCOUNT } from "../lib/server/quick-audit-isolated-stripe-pilot"
+import { AMS_PILOT_STRIPE_ACCOUNT, pilotFulfillmentConfiguration } from "../lib/server/quick-audit-isolated-stripe-pilot"
 import { createNativeQuickAuditAuditGateway, type QuickAuditResultStore, type NativeQuickAuditResult } from "../lib/server/quick-audit-native"
 import { QuickAuditDeliveryOutbox, type OutboxRedis } from "../lib/server/quick-audit-delivery-outbox"
 import { createResendAuditSender } from "../lib/server/quick-audit-resend-sender"
@@ -24,7 +24,7 @@ const owner = "owner-audit-test@example.net"
 const requestId = "request_synthetic_safe_123456"
 const sessionId = "cs_test_synthetic123456789"
 const eventId = "evt_synthetic123456789"
-const approvedPrice = "price_synthetic_123456789"
+const approvedPrice = "price_synthetic123456789"
 const signedSecret = "whsec_synthetic_audit_loop_signing_only"
 const testTime = new Date("2026-10-27T17:00:00.000Z")
 const stripeClient = new Stripe("sk_test_synthetic_only_no_network")
@@ -166,6 +166,7 @@ function createFixtures() {
 
 test("synthetic signed paid checkout generates exactly one native audit, one durable outbox, and one mocked branded Resend submission", async () => {
   const f = createFixtures()
+  assert.equal(pilotFulfillmentConfiguration(f.env).ready, true, "Synthetic TEST fixture must pass all isolated-fulfillment guards")
   const first = await fulfillIsolatedPilotCheckout(signedRequest(), {
     env: f.env, stores: f.stores, makeStripe: f.makeStripe,
     evidenceCollector: async () => ({ hasPrimaryCta: false, hasContactInfo: true }),
