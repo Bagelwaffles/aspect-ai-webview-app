@@ -24,6 +24,25 @@ export function windowOpen(env, nowMs = Date.now()) {
     Number.isFinite(deadline) && deadline > nowMs && deadline - nowMs <= 10 * 60_000
 }
 
+/**
+ * One separate, exact-session TEST audit handoff window. The original
+ * historical receipt-only proof remains unchanged and is NOT eligible.
+ * No email or fulfillment runs in this standalone Stripe receiver.
+ */
+export function auditHandoffWindowOpen(env, nowMs = Date.now()) {
+  const deadline = Date.parse(env.AMS_GATEWAY_INTAKE_UNTIL || '')
+  const owner = String(env.AMS_GATEWAY_AUDIT_OWNER_EMAIL || '').trim().toLowerCase()
+  return env.VERCEL_ENV === 'preview' &&
+    env.AMS_GATEWAY_INTAKE_ENABLED === 'true' &&
+    env.AMS_GATEWAY_AUDIT_HANDOFF_ENABLED === 'true' &&
+    env.AMS_GATEWAY_ACCOUNT_ID === SANDBOX_ACCOUNT &&
+    /^cs_test_[A-Za-z0-9]{8,200}$/.test(env.AMS_GATEWAY_SESSION_ID || '') &&
+    env.AMS_GATEWAY_SESSION_ID !== SESSION_ID &&
+    /^[A-Za-z0-9_-]{16,80}$/.test(env.AMS_GATEWAY_AUDIT_RUN_ID || '') &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(owner) &&
+    Number.isFinite(deadline) && deadline > nowMs && deadline - nowMs <= 10 * 60_000
+}
+
 export function configReady(env) {
   try {
     if (!env.AMS_GATEWAY_WEBHOOK_SECRET?.startsWith('whsec_') ||
@@ -68,7 +87,8 @@ export async function receive(request, { env = process.env, nowMs = Date.now(), 
   if (request.method !== 'POST') return answer(405, 'POST_ONLY')
   const url = new URL(request.url)
   if (url.pathname !== WEBHOOK_PATH || url.search) return answer(404, 'ROUTE_DENIED')
-  if (!windowOpen(env, nowMs)) return answer(503, 'PILOT_RECEIPT_ONLY_WINDOW_CLOSED')
+  const handoff = auditHandoffWindowOpen(env, nowMs)
+  if (!handoff && !windowOpen(env, nowMs)) return answer(503, 'PILOT_RECEIPT_ONLY_WINDOW_CLOSED')
   if (!configReady(env)) return answer(503, 'PILOT_INGRESS_NOT_CONFIGURED')
   const length = Number(request.headers.get('content-length') || '0')
   if (Number.isFinite(length) && length > MAX_BYTES) return answer(413, 'PILOT_PAYLOAD_TOO_LARGE')
@@ -85,13 +105,37 @@ export async function receive(request, { env = process.env, nowMs = Date.now(), 
   }
   if (event.type !== 'checkout.session.completed') return answer(403, 'PILOT_EVENT_TYPE_DENIED')
   const session = event.data?.object
-  if (session?.object !== 'checkout.session' || session.id !== SESSION_ID || session.livemode !== false ||
-      session.mode !== 'payment' || session.payment_status !== 'paid' ||
+  const expectedSession = handoff ? env.AMS_GATEWAY_SESSION_ID : SESSION_ID
+  if (session?.object !== 'checkout.session' || session.id !== expectedSession || session.livemode !== false ||
+      session.mode !== 'payment' || session.status !== 'complete' || session.payment_status !== 'paid' ||
       session.amount_total !== 4900 || session.currency !== 'usd') {
     return answer(403, 'PILOT_CHECKOUT_SCOPE_DENIED')
   }
+  if (handoff) {
+    const md = session.metadata || {}
+    const owner = String(env.AMS_GATEWAY_AUDIT_OWNER_EMAIL).trim().toLowerCase()
+    if (md.ams_offer !== 'quick-marketing-audit' ||
+        md.ams_preview_run_id !== env.AMS_GATEWAY_AUDIT_RUN_ID ||
+        !/^quick-audit-[a-f0-9]{32}$/.test(md.ams_request_id || '') ||
+        md.ams_business_name !== 'Aspect Marketing Solutions' ||
+        md.ams_website_url !== 'https://www.aspectmarketingsolutions.app' ||
+        md.ams_industry !== 'Marketing automation' ||
+        md.ams_goals !== 'Check real paid TEST fulfillment and branded owner-only report delivery' ||
+        String(session.customer_details?.email || '').toLowerCase() !== owner) {
+      return answer(403, 'PILOT_AUDIT_METADATA_DENIED')
+    }
+  }
   const hash = createHash('sha256').update(raw).digest('hex')
-  const receipt = { id:event.id, type:event.type, digest:hash, livemode:false, checkoutSessionId:SESSION_ID, recordedAt:new Date(nowMs).toISOString() }
+  // No raw Stripe payload, signing key, signature or customer email is stored.
+  const receipt = {
+    id:event.id, type:event.type, digest:hash, livemode:false,
+    checkoutSessionId:expectedSession, recordedAt:new Date(nowMs).toISOString(),
+    ...(handoff ? {
+      kind:'signed-owner-audit-v1', account:SANDBOX_ACCOUNT,
+      requestId:session.metadata.ams_request_id,
+      runId:env.AMS_GATEWAY_AUDIT_RUN_ID,
+    } : {}),
+  }
   const key = env.AMS_GATEWAY_REDIS_NAMESPACE + 'event:' + event.id
   try {
     const result = await redisCommand(env,['SET',key,JSON.stringify(receipt),'EX',RETENTION_SECONDS,'NX'],fetchFn)
