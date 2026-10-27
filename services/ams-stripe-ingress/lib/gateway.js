@@ -107,7 +107,7 @@ export async function receive(request, { env = process.env, nowMs = Date.now(), 
   const session = event.data?.object
   const expectedSession = handoff ? env.AMS_GATEWAY_SESSION_ID : SESSION_ID
   if (session?.object !== 'checkout.session' || session.id !== expectedSession || session.livemode !== false ||
-      session.mode !== 'payment' || session.status !== 'complete' || session.payment_status !== 'paid' ||
+      session.mode !== 'payment' || (handoff && session.status !== 'complete') || session.payment_status !== 'paid' ||
       session.amount_total !== 4900 || session.currency !== 'usd') {
     return answer(403, 'PILOT_CHECKOUT_SCOPE_DENIED')
   }
