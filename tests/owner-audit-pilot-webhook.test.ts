@@ -6,6 +6,7 @@ import { isSignedOwnerAuditPilotEvent, ownerPilotWebhookIntakeReady, ownerAuditP
 
 const url = "https://aspect-ai-overlord-git-e240cd-kimberleyaversbiz-4131s-projects.vercel.app/api/internal/quick-audit-pilot/webhook"
 const base: NodeJS.ProcessEnv = {
+  NODE_ENV: "test",
   VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "feat/audit-delivery-security-preview-20261023",
   AMS_QUICK_AUDIT_OWNER_PILOT_REDIS_REST_URL: "https://pretty-crab-239388.upstash.io",
   AMS_QUICK_AUDIT_OWNER_PILOT_REDIS_REST_TOKEN: "test-only-fixture",
@@ -18,7 +19,7 @@ const base: NodeJS.ProcessEnv = {
 const now = Date.parse("2026-10-26T21:00:00.000Z")
 
 test("pilot intake is OFF by default and never accepts production or wrong Preview branch", async () => {
-  assert.equal(ownerPilotWebhookIntakeReady({}, url, now), false)
+  assert.equal(ownerPilotWebhookIntakeReady({ NODE_ENV: "test" }, url, now), false)
   assert.equal(ownerPilotWebhookIntakeReady({ ...base, VERCEL_ENV: "production" }, url, now), false)
   assert.equal(ownerPilotWebhookIntakeReady({ ...base, VERCEL_GIT_COMMIT_REF: "main" }, url, now), false)
   assert.equal(ownerPilotWebhookIntakeReady({ ...base, AMS_QUICK_AUDIT_OWNER_PILOT_WEBHOOK_INTAKE_ENABLED: "false" }, url, now), false)
@@ -66,6 +67,6 @@ test("pilot event filter refuses non-pilot, other account, live and wrong sessio
   assert.equal(isSignedOwnerAuditPilotEvent(event), true)
   assert.equal(isSignedOwnerAuditPilotEvent({ ...event, livemode: true }), false)
   assert.equal(isSignedOwnerAuditPilotEvent({ ...event, account: "acct_other" }), false)
-  assert.equal(isSignedOwnerAuditPilotEvent({ ...event, type: "invoice.paid" }), false)
+  assert.equal(isSignedOwnerAuditPilotEvent({ ...event, type: "invoice.paid" } as unknown as Stripe.Event), false)
   assert.equal(isSignedOwnerAuditPilotEvent({ ...event, data: { object: { id: "cs_test_owner", mode: "payment", metadata: {} } } } as Stripe.Event), false)
 })
