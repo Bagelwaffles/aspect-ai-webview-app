@@ -156,6 +156,36 @@ test("signed sandbox paid session generates one synthetic durable audit and one 
   assert.equal(f.queued, 1)
 })
 
+test("previous receipt-only sandbox Checkout cannot be promoted into paid audit fulfillment", async () => {
+  // This models the real, already-paid October 25 gateway receipt fixture:
+  // it has no ams_offer or business/audit intake metadata. A signed receipt
+  // is not independent proof that a marketing audit was ordered.
+  const f = fixture()
+  const receiptOnlySession = {
+    ...session,
+    metadata: {
+      ams_preview_gate: "receipt-only",
+      environment: "sandbox",
+      fulfillment: "disabled",
+      sandbox: "true",
+      scope: "gateway-receipt",
+      sending: "disabled",
+    },
+  }
+  const json = JSON.parse(rawEvent()) as {
+    data: { object: Record<string, unknown> }
+  }
+  json.data.object = receiptOnlySession
+  const response = await fulfillIsolatedPilotCheckout(signed(JSON.stringify(json)), {
+    env: configured, makeStripe: f.makeStripe, stores: f.stores,
+  })
+  assert.equal(response.status, 200)
+  assert.equal((await response.json()).code, "PILOT_UNRELATED_CHECKOUT_IGNORED")
+  assert.equal(f.stripeReads, 0)
+  assert.equal(f.audited, 0)
+  assert.equal(f.queued, 0)
+})
+
 test("wrong Stripe account, invalid signature and wrong event mode fail without paid records", async () => {
   const f = fixture("acct_another_account")
   const denied = await fulfillIsolatedPilotCheckout(signed(rawEvent()), {
