@@ -34,7 +34,7 @@ export function ownerPilotWebhookIntakeReady(env: NodeJS.ProcessEnv, requestUrl:
     receiver.pathname === "/api/internal/quick-audit-pilot/webhook" &&
     redisUrl.protocol === "https:" &&
     redisUrl.hostname === REDIS_ENDPOINT &&
-    !redisUrl.username && !redisUrl.password && !redisUrl.search &&
+    !redisUrl.username && !redisUrl.password && !redisUrl.search && !redisUrl.hash && !redisUrl.port && redisUrl.pathname === "/" &&
     Boolean(env.AMS_QUICK_AUDIT_OWNER_PILOT_REDIS_REST_TOKEN?.trim()) &&
     env.AMS_QUICK_AUDIT_OWNER_PILOT_WEBHOOK_INTAKE_ENABLED === "true" &&
     Number.isFinite(until) && until > now && until - now <= MAX_OPEN_WINDOW_MS &&
@@ -85,6 +85,7 @@ export async function ownerAuditPilotWebhookPOST(request: NextRequest, env: Node
   // The generic subscription and Quick Audit Redis variables are deliberately NOT used.
   const handler = createQuickAuditWebhookHandler({
     env: {
+      NODE_ENV: env.NODE_ENV ?? "production",
       AMS_STRIPE_QUICK_AUDIT_SECRET_KEY: key,
       AMS_STRIPE_QUICK_AUDIT_WEBHOOK_SECRET: webhookSecret,
       AMS_STRIPE_QUICK_AUDIT_PRICE_ID: PILOT_PRICE,
