@@ -6,6 +6,8 @@ import type Stripe from "stripe"
 const QUICK_AUDIT_TIMEOUT_MS = 8_000
 const MAX_HTML_BYTES = 1_000_000
 const RECORD_TTL_SECONDS = 60 * 60 * 24 * 90
+// Reclaim an abandoned in-flight reservation after a worker crash; completed records retain 90 days.
+const PROCESSING_LEASE_SECONDS = 60 * 10
 
 export type QuickAuditEvidence = Record<string, boolean | null>
 
@@ -105,7 +107,7 @@ export class RedisQuickAuditStore implements QuickAuditStore {
     const raw = await this.redis.eval(
       RESERVE_SCRIPT,
       [`ams:quick-audit:session:${input.checkoutSessionId}`],
-      [JSON.stringify(pending), String(RECORD_TTL_SECONDS)],
+      [JSON.stringify(pending), String(PROCESSING_LEASE_SECONDS)],
     )
     if (!raw) return { state: "reserved" as const, token }
     const existing = JSON.parse(String(raw)) as Partial<QuickAuditRecord> & { status?: string; token?: string }

@@ -18,11 +18,12 @@ const data = {
   recipient: owner,
   paidAndPersisted: true,
 }
-const flagEnv = {
+const flagEnv: NodeJS.ProcessEnv = {
+  NODE_ENV: "test",
   VERCEL_ENV: "preview",
   AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL: owner,
   AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED: "true",
-} as NodeJS.ProcessEnv
+}
 
 function fakeRedis() {
   const records = new Map<string, string>()
