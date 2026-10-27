@@ -68,6 +68,36 @@ export async function verifyStripeHeader(raw, header, secret, nowMs) {
   return false;
 }
 
+// Read at most 64 KiB before verifying the signature; never buffer an unbounded
+// unauthenticated request in a publicly reachable disposable Worker.
+async function readBoundedBody(request, maxBytes) {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        void reader.cancel("REPLAY_RECEIVER_BODY_TOO_LARGE").catch(() => {});
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(body);
+}
+
 function validRedisUrl(text) {
   try {
     const u = new URL(text);
@@ -89,10 +119,10 @@ export function createReceiver({ fetchRedis = fetch, now = () => Date.now() } = 
     }
     const length = Number(request.headers.get("content-length") || "0");
     if (length > 65536) return reply(413, "PAYLOAD_TOO_LARGE");
-    const raw = await request.text();
-    if (new TextEncoder().encode(raw).byteLength > 65536) {
-      return reply(413, "PAYLOAD_TOO_LARGE");
-    }
+    let raw;
+    try { raw = await readBoundedBody(request, 65536); }
+    catch { return reply(400, "INVALID_BODY"); }
+    if (raw === null) return reply(413, "PAYLOAD_TOO_LARGE");
     if (!await verifyStripeHeader(
       raw, request.headers.get("stripe-signature"),
       env.STRIPE_TEST_SIGNING_SECRET, now(),
