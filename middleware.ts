@@ -6,10 +6,17 @@ import {
   verifyInternalAdminCookie,
 } from "@/app/lib/internal-admin-cookie";
 import { configuredOperatorOwnerEmail, isOperatorOwnerEmail } from "@/lib/operator-owner";
+import { isDedicatedOwnerAuditPilotHost, isPermittedOwnerAuditPilotPath } from "@/lib/server/owner-audit-pilot-domain-guard";
 
 const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 
 export async function middleware(request: NextRequest) {
+  // Only the immutable, one-deployment owner pilot host may be exempted from Vercel auth.
+  // Deny ALL non-webhook paths on that host, before any existing dashboard/auth routing.
+  if (isDedicatedOwnerAuditPilotHost(request.nextUrl.hostname, process.env) &&
+      !isPermittedOwnerAuditPilotPath(request.nextUrl.pathname)) {
+    return new NextResponse(null, { status: 404, headers: { "Cache-Control": "no-store" } });
+  }
   const requiresInternalAdmin =
     request.nextUrl.pathname === "/dashboard" ||
     request.nextUrl.pathname.startsWith("/dashboard/") ||
@@ -70,5 +77,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/ethical-agent-farm-requests"]
+  matcher: ["/:path*"]
 };
