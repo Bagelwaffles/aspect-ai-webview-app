@@ -9,7 +9,7 @@ const RETRY_CODE = 'PILOT_FULFILLMENT_NOT_ENABLED'
 const isolatedDbHost = 'internal-chicken-238070.upstash.io'
 
 function answer(status, code, extra = {}) {
-  return Response.json({ ok: false, code, fulfillmentEnabled: false, sendEnabled: false, ...extra }, {
+  return Response.json({ ok: status === 200, code, fulfillmentEnabled: false, sendEnabled: false, ...extra }, {
     status,
     headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'X-Content-Type-Options': 'nosniff' },
   })
@@ -143,6 +143,26 @@ export async function receive(request, { env = process.env, nowMs = Date.now(), 
       const existing = await redisCommand(env,['GET',key],fetchFn)
       const current = typeof existing === 'string' ? JSON.parse(existing) : existing
       if (current?.id !== receipt.id || current.digest !== receipt.digest) return answer(409,'PILOT_EVENT_COLLISION')
+      if (handoff) {
+        // A signed Stripe retry is acknowledged ONLY after the separate,
+        // owner-authenticated Preview worker durably persisted its audit and
+        // owner-only queue, then wrote the immutable completion attestation.
+        // Merely receiving Stripe's event never qualifies for HTTP 200.
+        const ackRaw = await redisCommand(
+          env, ['GET',env.AMS_GATEWAY_REDIS_NAMESPACE + 'ack:' + event.id],fetchFn,
+        )
+        let ack
+        try { ack = typeof ackRaw === 'string' ? JSON.parse(ackRaw) : ackRaw } catch { ack = null }
+        if (ack?.kind === 'paid-owner-audit-queued-v1' &&
+            ack.eventId === event.id &&
+            ack.sessionId === expectedSession &&
+            ack.requestId === session.metadata.ams_request_id &&
+            ack.runId === env.AMS_GATEWAY_AUDIT_RUN_ID &&
+            ack.digest === receipt.digest &&
+            /^audit_[A-Za-z0-9_-]{8,200}$/.test(ack.auditId || '')) {
+          return answer(200,'PILOT_PAID_AUDIT_QUEUED_ACKNOWLEDGED',{duplicate:true})
+        }
+      }
       return answer(503,RETRY_CODE,{ duplicate:true })
     }
     // Deliberately non-2xx: no payment fulfillment has been performed.
