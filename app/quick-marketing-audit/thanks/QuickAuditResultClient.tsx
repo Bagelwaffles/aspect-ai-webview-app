@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { CheckCircle2, Download, Loader2, Printer, RefreshCw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { AUDIT_IMPLEMENTATION_OFFERS, upsellsUiEnabled } from "@/lib/ams-upsell-offers"
 import {
   artifactFilename,
   buildBrandedHtmlArtifact,
@@ -225,6 +227,39 @@ export function QuickAuditResultClient() {
           </ol>
         </CardContent>
       </Card>
+
+      {upsellsUiEnabled() ? (
+        <section className="space-y-4" aria-labelledby="optional-audit-implementation">
+          <div className="space-y-2">
+            <h2 id="optional-audit-implementation" className="text-2xl font-bold">Want AMS to implement any of these fixes?</h2>
+            <p className="text-sm text-muted-foreground">
+              Your paid audit is complete and yours to use. These optional services are quoted and approved separately.
+              You can implement every recommendation yourself without buying anything else.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {AUDIT_IMPLEMENTATION_OFFERS.map((offer) => (
+              <Card key={offer.id}>
+                <CardHeader>
+                  <CardTitle className="text-lg">{offer.title}</CardTitle>
+                  <p className="text-sm font-semibold">{offer.priceLabel}</p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm font-medium">{offer.outcome}</p>
+                  <p className="text-sm text-muted-foreground">{offer.scope}</p>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href={`/ethical-agent-farm/request?offer=${offer.requestOffer}&package=${offer.id}`}>Request a quote</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Want to manage your marketing yourself instead? <Link className="underline" href="/pricing#plans">Compare AMS plans.</Link>
+            No purchase or email enrollment happens from a quote request.
+          </p>
+        </section>
+      ) : null}
 
       <p className="text-xs text-muted-foreground">
         This audit is an evidence-based marketing review, not a guarantee of revenue, rankings, or platform performance. Automated page checks are signals and may not detect every feature on a dynamic site.
