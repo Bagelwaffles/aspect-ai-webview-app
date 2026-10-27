@@ -132,7 +132,7 @@ test("owner-created TEST session carries exact audit metadata and deterministic 
   assert.equal(entry.params.metadata?.ams_offer, "quick-marketing-audit")
   assert.equal(entry.params.metadata?.ams_business_name, "Aspect Marketing Solutions")
   assert.equal(entry.params.metadata?.ams_website_url, "https://www.aspectmarketingsolutions.app")
-  assert.ok(entry.params.metadata?.ams_request_id?.startsWith("quick-audit-"))
+  assert.ok(String(entry.params.metadata?.ams_request_id ?? "").startsWith("quick-audit-"))
   assert.equal(entry.params.success_url?.startsWith(origin), true)
   assert.match(entry.idempotency ?? "", /^ams-pilot-checkout-[a-f0-9]{64}$/)
   assert.deepEqual(f.events, ["account-read", "price-read:" + priceId, "session-create"])
