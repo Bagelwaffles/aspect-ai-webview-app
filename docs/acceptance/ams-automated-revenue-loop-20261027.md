@@ -16,6 +16,27 @@
 | Google Gmail | [#275](https://github.com/Bagelwaffles/aspect-ai-webview-app/pull/275#issuecomment-6301203633): primary Preview OAuth grant and natural-refresh PASS; independent Gmail connector owner-to-owner receipt PASS (not AMS worker). Campaign pilot remains OFF; no AMS generated email run or authenticated Preview campaign receipt. [#262](https://github.com/Bagelwaffles/aspect-ai-webview-app/pull/262) keeps secondary monitoring-only. | Google OAuth grant is **not** approval for public Gmail marketing sends; owner test outside AMS is not AMS send/receipt evidence. |
 | Production offers | Main code has $49 one-time checkout with durable runtime launch gate; live Stripe catalog has active $49 and $29/$79/$149 prices. | Active Stripe prices do not mean checkout, fulfillment, credits or billing lifecycle are presently enabled end-to-end. |
 
+## Owner's proposed $5 live checkout + inquiry acceptance — NOT YET AUTHORIZED TO CHARGE
+
+The owner will personally conduct **one $5 payment test** only **after** all readiness gates pass and we present the exact LIVE checkout, amount, scope, and refund handling for fresh confirmation. The authorization to **prepare** this test does not mean a charge may be created now. Do not change the advertised $49 product's public price, quietly generate a live payment link, or run a second $49 sandbox Checkout.
+
+Two separate results are required:
+
+**A. New inquiry and acknowledgment (no payment):**
+- [ ] Confirm how a message addressed to `kimberley@aspectmarketingsolutions.app` is routed by Cloudflare and what **To** address Gmail actually reports. Public `/contact` currently has no general contact-form API; do not claim a submitted contact-form inquiry was ingested.
+- [ ] Reuse the owner Gmail Draft [#262](https://github.com/Bagelwaffles/aspect-ai-webview-app/pull/262) metadata monitor; exact public alias eligibility is separately opt-in and sending remains OFF. Google scope/consent policy must be approved. Do not use primary/secondary monitored owner mailboxes as the simulated outside customer, since they are excluded as senders.
+- [ ] With explicit approval for one **owner-controlled** genuine external-message test (no mass outreach), verify primary inbox intake, correct classification, exact once-only ack, actual independent receipt of the generic acknowledgment, no extra reply after repeat polling, no loop, durable dedup and zero offers/billing. Unknown inbound origin/security must FAIL CLOSED.
+- [ ] Do not mistake a generic receipt for AI answering an inquiry. Any context-aware response needs independently reviewed scope/content and later dedicated acceptance.
+
+**B. Live $5 purchase (only after preflight and owner confirmation):**
+- [ ] Confirm $49 live Quick Audit checkout and durable result delivery with strictly TEST-mode proof first. An isolated Stripe sandbox `acct_1UTtFMGuhFCl8JHa` currently has **zero coupons** (read-only October 27 inventory); no "$44 off" discount is available in that sandbox by default.
+- [ ] The nominal audit item costs $49, not $5. Choose **one explicitly owner-approved, non-public, single-use $44 reduction** on the genuine $49 item **only if** Stripe discount semantics, metadata, price identity, amount, tax and refund policy are independently validated. Alternatively a separate $5 pilot product requires its own distinct entitlement and proof; **a $5 receipt must never impersonate a $49 audit purchase**.
+- [ ] Do not enable public promotion-code entry globally; use owner-only safe Checkout setup, verify `amount_total=500` USD cents and exact intended item/discount and account **before payment**. No test-card payment proves LIVE customer collection, and no live charge is permitted before release gates.
+- [ ] Immediately after the owner-paid test, independently verify successful signed LIVE event; one durable order record; matching business intake; one actual AI audit result; one transactional email to the owner-controlled test inbox with correct From/Reply-To; no duplicate after provider retry; correct accessible delivery state; subscription/credit upsells **shown but never charged without a customer-initiated new checkout**.
+- [ ] If any stage fails, stop the pipeline safely, preserve evidence, notify the owner of any actual live charge and handle refund per explicit owner instruction and Stripe policy. Do not quietly refund or retry charges automatically without authorization.
+
+**Acceptance:** both lanes independently pass, with exact provider evidence and rollback; then public outreach may be separately approved. Until then: `INQUIRY_AUTOREPLY=OFF`, `FULFILLMENT=HOLD`, `CUSTOMER_SENDING=OFF`, `LIVE_$5_TEST=NOT_STARTED`.
+
 ## The shortest secure remaining path
 
 1. **No-repeat source checkpoint.** Pin exact heads of Draft #300/#306/#275/#262. Preserve the sandbox receipt proof. Do not repeat the already-completed test Checkout, purchase another test coupon, or run unrelated CI merely to re-prove the signed receipt. Confirm the new receipt-only rejection regression on #300 passes in focused CI; keep each PR Draft.
