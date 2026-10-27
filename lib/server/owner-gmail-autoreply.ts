@@ -75,7 +75,9 @@ export async function maybeAutoReplyToBusinessInquiry(options: {
   const config = gmailConfig("primary", env)
   const eligible = eligibleBusinessInquiry(
     options.headers, config.primary, env.AMS_GMAIL_SECONDARY_EMAIL ?? "",
-    env.AMS_GMAIL_INQUIRY_ALIAS,
+    // A forwarded company address must not silently enable customer-facing
+    // replies from the owner's personal Gmail identity in production.
+    env.VERCEL_ENV === "preview" ? env.AMS_GMAIL_INQUIRY_ALIAS : undefined,
   )
   if (!eligible || !/^[A-Za-z0-9_-]{1,200}$/u.test(options.messageId) ||
     !/^[A-Za-z0-9_-]{1,200}$/u.test(options.threadId ?? "")) return "ineligible"
