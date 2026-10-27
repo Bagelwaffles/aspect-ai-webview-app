@@ -56,6 +56,50 @@ In this order, with no handoff to another session:
 
 If any setup, provider resend, deletion or secret revocation becomes uncertain, **stop the test immediately**. If resources already exist, prioritize disabling the Worker and the temporary Stripe destination, then complete deletion as authorized. Never claim SUCCESS until all acceptance **and cleanup** checks are independently verified.
 
+## 4. Mandatory STOP-AND-REPORT format
+
+**Use this exact format in the final Work response AND a sanitized PR #295 acceptance comment whenever a gate fails, the owner-only secret handoff is needed, a test fails, or cleanup cannot be independently verified.** Do not just say "blocked" or "please proceed." Report once at the stop point; do not repeat previously completed CI, engineering, synthetic, or Redis tests.
+
+```text
+PR #295 ACCEPTANCE REPORT
+RESULT: BLOCKED / FAILED / PAUSED_FOR_OWNER / PASSED
+PHASE: PRE-CREATION / CREDENTIAL-PREFLIGHT / RECEIVER-SETUP / STRIPE-DELIVERY / CLEANUP / FINAL-VERIFICATION
+REPLAY ACCEPTANCE: NOT VERIFIED / VERIFIED (only with genuine same-event Stripe delivery evidence AND cleanup)
+STOP TRIGGER: [one precise cause, with observed error or unavailable control; NO secrets]
+LAST VERIFIED CHECKPOINT: [PR Draft state, head SHA, TEST account, and last verified safety gate]
+GATES:
+  Stripe CLI account and targeted same-event resend: PASS / FAIL / NOT VERIFIED
+  Cloudflare create, delete and encrypted Secret controls: PASS / FAIL / NOT VERIFIED
+  Restricted Redis ACL issuance and out-of-scope denial: PASS / FAIL / NOT VERIFIED
+  Exact issued Redis REST token rejected after DELUSER: PASS / FAIL / NOT VERIFIED
+  Owner-only secret transfer (automation paused, masked): COMPLETE / REQUIRED / NOT APPLICABLE
+  Two provider-origin deliveries of the SAME event ID: PASS / FAIL / NOT ATTEMPTED
+  Durable Redis duplicate suppression: PASS / FAIL / NOT ATTEMPTED
+RESOURCE LEDGER:
+  Cloudflare Worker: NOT CREATED / [name, status: disabled|deleted|still active]
+  New Stripe TEST destination: NOT CREATED / [we_id, status: disabled|deleted|still active]
+  Temporary Redis ACL user/token: NOT CREATED / [username only, revoked? YES|NO|NOT VERIFIED]
+  Stripe non-payment event: NOT CREATED / [evt_id, attempts observed]
+  Receipt key: NOT CREATED / [nonsecret key identifier, status]
+CLEANUP:
+  Temporary Worker and endpoint unreachable: NOT NEEDED / VERIFIED / INCOMPLETE
+  New Stripe destination absent: NOT NEEDED / VERIFIED / INCOMPLETE
+  Issued temporary Redis token rejected: NOT NEEDED / VERIFIED / INCOMPLETE
+  Original we_1U47cRGloGM6sjzBqvsquYWw unchanged: VERIFIED / NOT VERIFIED
+  AMS Vercel Require Log In unchanged: VERIFIED / NOT VERIFIED
+  Production, payment, email, merge: NONE / [describe any exception immediately]
+NEXT SAFE ACTION: [one specific action and actor, or "none until owner-only handoff"]
+EVIDENCE: [nonsecret dashboard observations, API IDs, timestamp/status, GitHub PR comment URL]
+```
+
+**Decision rule:** `PASSED` is forbidden if any replay or mandatory teardown field is `NOT VERIFIED` or `INCOMPLETE`. A `200` from a simulated request, a Redis EVAL test, or a disabled old event's Resend button is not Stripe-origin acceptance. Never turn `NOT VERIFIED` into `PASS` based on a documented capability alone.
+
+**If stopped before creation:** Keep every resource field `NOT CREATED` and cleanup `NOT NEEDED`; explicitly name the one remaining gate, not a vague recap. **If a temporary resource exists:** First fail-close intake and disable any new destination, then attempt the authorized deletion/revocation sequence in the SAME session. Record each resource ID and independent post-deletion observation; if removal fails, use `CLEANUP INCOMPLETE`, identify the exact residual resource, and stop without exposing credentials. Never hide a teardown failure.
+
+**Owner-only handoff:** Use `PAUSED_FOR_OWNER` and identify the exact manual step (for example, issuing/revoking a disposable Upstash ACL REST token with credential masking and automation paused); do not ask the owner to paste passwords, signing secrets or tokens into ChatGPT. Resume only after the owner confirms the private handoff/revocation check succeeded, and independently recheck nonsecret status.
+
+**Current known checkpoint — 27 October 2026:** Stripe Workbench browser Shell authenticated to TEST account `acct_1Smr2bGloGM6sjzB` and displayed `events resend --webhook-endpoint` targeting syntax; Cloudflare Worker create/delete and Secret controls and Stripe destination Add/Disable/Delete controls observed in Chrome. **Unverified blocker:** the exact issued restricted Upstash REST token being rejected after its ACL user is deleted; owner-only credential lifecycle not executed. No disposable Worker, destination, ACL user/token, new event, or receipt created at this checkpoint. Do not infer later state without fresh evidence.
+
 ## Implementation notes
 
 - No Stripe API key is used by this Worker: the fresh destination's `whsec_` Secret authenticates webhook payloads; the code rejects live-mode events and non-test-clock event types.
@@ -65,4 +109,4 @@ If any setup, provider resend, deletion or secret revocation becomes uncertain, 
 
 Useful technical references: Cloudflare Worker secrets and delete-worker documentation; Upstash Redis REST/EVAL documentation; Stripe webhook endpoint API and authenticated retry/resend controls.
 
-**STOP/GO checkpoint as of authoring:** Source and runbook can be reviewed and tested offline. No Cloudflare account deletion permissions, restricted Upstash credential lifecycle or Stripe dashboard resend controls were independently verified in this chat. Therefore DO NOT deploy automatically.
+**STOP/GO checkpoint:** Read the mandatory report format above and latest PR #295 acceptance comment before acting. Browser-based Stripe CLI account identity and targeted resend syntax were verified at comment #6435483325; **restricted Upstash token invalidation after ACL user deletion and owner-only handoff remain NOT VERIFIED**. Keep the receiver uncreated and intake OFF until the rollback-first gate is independently met. Do not deploy automatically.
