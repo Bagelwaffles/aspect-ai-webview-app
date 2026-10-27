@@ -22,15 +22,24 @@ function addresses(raw: string) {
   return [...raw.matchAll(ADDRESS_PATTERN)].map(match => match[0].toLowerCase())
 }
 
-export function eligibleBusinessInquiry(headers: Header[], primaryEmail: string, secondaryEmail: string) {
+const APPROVED_PUBLIC_INQUIRY_ALIAS = "kimberley@aspectmarketingsolutions.app"
+
+export function eligibleBusinessInquiry(headers: Header[], primaryEmail: string, secondaryEmail: string, configuredAlias?: string) {
   const subject = header(headers, "Subject").trim()
   if (!/^[\x20-\x7e]{1,120}$/u.test(subject) || /^(?:re|fw|fwd)\s*:/iu.test(subject)) return null
   if (!SUBJECT_BRAND.test(subject) || !SUBJECT_INQUIRY.test(subject) || SENSITIVE.test(subject)) return null
   const senders = addresses(header(headers, "From"))
   const recipients = addresses(header(headers, "To"))
-  if (senders.length !== 1 || recipients.length === 0 || !recipients.includes(primaryEmail.toLowerCase())) return null
+  // Cloudflare forwarding can preserve the customer's original To header.
+  // Permit ONLY the verified AMS public alias, and only when the owner has
+  // explicitly configured it. Arbitrary secondary mailboxes remain denied.
+  const publicAlias = configuredAlias?.trim().toLowerCase() === APPROVED_PUBLIC_INQUIRY_ALIAS
+    ? APPROVED_PUBLIC_INQUIRY_ALIAS : null
+  if (senders.length !== 1 || recipients.length === 0 ||
+      !recipients.some(recipient => recipient === primaryEmail.toLowerCase() || recipient === publicAlias)) return null
   const sender = senders[0]
-  if (sender === primaryEmail.toLowerCase() || sender === secondaryEmail.toLowerCase()) return null
+  if (sender === primaryEmail.toLowerCase() || sender === secondaryEmail.toLowerCase() ||
+      sender === APPROVED_PUBLIC_INQUIRY_ALIAS) return null
   if (/^(?:no-?reply|do-?not-?reply|postmaster|mailer-daemon|bounce|notifications?)@/iu.test(sender)) return null
   const replyTo = header(headers, "Reply-To")
   if (replyTo && (addresses(replyTo).length !== 1 || addresses(replyTo)[0] !== sender)) return null
@@ -64,7 +73,10 @@ export async function maybeAutoReplyToBusinessInquiry(options: {
     env.AMS_GMAIL_SEND_ENABLED !== "true") return "disabled"
   const c = ownerGmailContext(input)
   const config = gmailConfig("primary", env)
-  const eligible = eligibleBusinessInquiry(options.headers, config.primary, env.AMS_GMAIL_SECONDARY_EMAIL ?? "")
+  const eligible = eligibleBusinessInquiry(
+    options.headers, config.primary, env.AMS_GMAIL_SECONDARY_EMAIL ?? "",
+    env.AMS_GMAIL_INQUIRY_ALIAS,
+  )
   if (!eligible || !/^[A-Za-z0-9_-]{1,200}$/u.test(options.messageId) ||
     !/^[A-Za-z0-9_-]{1,200}$/u.test(options.threadId ?? "")) return "ineligible"
   if (!Number.isFinite(options.internalDate) ||
