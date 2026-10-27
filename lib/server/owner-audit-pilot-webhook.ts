@@ -5,6 +5,7 @@ import { claimStripeEvent, completeStripeEvent, releaseStripeEvent } from "./ent
 import { createQuickAuditWebhookHandler } from "./quick-audit-webhook"
 import { RedisQuickAuditStore } from "./quick-audit-fulfillment"
 import { createNativeQuickAuditAuditGateway, RedisQuickAuditResultStore } from "./quick-audit-native"
+import { isDedicatedOwnerAuditPilotHost } from "./owner-audit-pilot-domain-guard"
 
 const PILOT_BRANCH = "feat/audit-delivery-security-preview-20261023"
 const MAIN_TEST_ACCOUNT = "acct_1Smr2bGloGM6sjzB"
@@ -30,7 +31,12 @@ export function ownerPilotWebhookIntakeReady(env: NodeJS.ProcessEnv, requestUrl:
     env.VERCEL_ENV === "preview" &&
     env.VERCEL_GIT_COMMIT_REF === PILOT_BRANCH &&
     receiver.protocol === "https:" &&
-    receiver.hostname.endsWith(".vercel.app") &&
+    !receiver.username && !receiver.password && !receiver.port &&
+    !receiver.search && !receiver.hash &&
+    // Require one immutable, branch-scoped deployment host. An arbitrary
+    // *.vercel.app host or mutable branch alias must never open pilot intake.
+    Boolean(env.VERCEL_URL?.trim()) &&
+    isDedicatedOwnerAuditPilotHost(receiver.hostname, env) &&
     receiver.pathname === "/api/internal/quick-audit-pilot/webhook" &&
     redisUrl.protocol === "https:" &&
     redisUrl.hostname === REDIS_ENDPOINT &&
