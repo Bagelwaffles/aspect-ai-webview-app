@@ -16,7 +16,7 @@ export function isDedicatedOwnerAuditPilotHost(hostname: string, env: NodeJS.Pro
   const branchHost = env.VERCEL_BRANCH_URL?.trim().toLowerCase();
   // Only generated immutable deployment URLs; excludes -git- branch aliases,
   // project production and all custom domains, even when system envs are absent.
-  if (!/^aspect-ai-overlord-[a-z0-9]{7,14}-kimberleyaversbiz-4131s-projects\\.vercel\\.app$/.test(host) ||
+  if (!/^aspect-ai-overlord-[a-z0-9]{7,14}-kimberleyaversbiz-4131s-projects\.vercel\.app$/.test(host) ||
       host === branchHost) return false;
   if (deploymentHost) {
     // If supplied by Vercel, its own immutable host must also match.
