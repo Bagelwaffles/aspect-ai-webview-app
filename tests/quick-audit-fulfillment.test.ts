@@ -161,6 +161,42 @@ test("durable completion atomically links the Checkout, event, request, and n8n 
   assert.equal(args[3], "cs_test_linked")
 })
 
+test("Redis reservation script claims by atomic NX before classifying concurrent or completed work", async () => {
+  const stored = new Map<string, string>()
+  const redis = {
+    async eval(script: string, keys: string[], args: unknown[]) {
+      // Enforce actual Lua operation order; do not just mock success.
+      assert.match(script, /local claimed = redis.call\\('SET', KEYS\\[1\\]/u)
+      assert.match(script, /if claimed then return '' end/u)
+      assert.match(script, /return redis.call\\('GET', KEYS\\[1\\]\\) or ''/u)
+      const existing = stored.get(keys[0])
+      if (existing) return existing
+      stored.set(keys[0], String(args[0]))
+      return ""
+    },
+  }
+  const store = new RedisQuickAuditStore(redis)
+  const input = {
+    checkoutSessionId: "cs_test_atomic123456789",
+    stripeEventId: "evt_atomic123456789",
+    requestId: "request-atomic123456789",
+  }
+  // The two callers must never both believe they own the same payment.
+  const [first, second] = await Promise.all([store.reserve(input), store.reserve(input)])
+  assert.equal(first.state, "reserved")
+  assert.equal(second.state, "processing")
+  const completed: QuickAuditRecord = {
+    status: "completed",
+    ...input,
+    n8nAuditId: "audit_atomic123456789",
+    completedAt: "2026-10-27T00:00:00.000Z",
+  }
+  stored.set("ams:quick-audit:session:" + input.checkoutSessionId, JSON.stringify(completed))
+  const third = await store.reserve(input)
+  assert.equal(third.state, "duplicate")
+  if (third.state === "duplicate") assert.equal(third.record.n8nAuditId, completed.n8nAuditId)
+})
+
 test("unpaid or truly expired sessions fail closed", async () => {
   await assert.rejects(processingFixture({ session: session({ payment_status: "unpaid" }) }).run, (error) => error instanceof QuickAuditFulfillmentError && error.code === "QUICK_AUDIT_PAYMENT_UNSETTLED")
   await assert.rejects(processingFixture({ session: session({ status: "expired", payment_status: "unpaid", expires_at: 1 }) }).run, (error) => error instanceof QuickAuditFulfillmentError && error.code === "QUICK_AUDIT_PAYMENT_UNSETTLED")
