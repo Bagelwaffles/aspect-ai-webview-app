@@ -133,3 +133,51 @@ test('owner audit handoff rejects wrong metadata/session/owner without any datas
  }
  assert.equal(writes,0)
 })
+
+
+test('only matching owner-certified durable audit+outbox ack permits Stripe signed retry HTTP 200',async()=>{
+ const auditenv={...env,AMS_GATEWAY_AUDIT_HANDOFF_ENABLED:'true',
+   AMS_GATEWAY_SESSION_ID:'cs_test_ACKownercheckout123456789',
+   AMS_GATEWAY_AUDIT_RUN_ID:'audit-acceptance-owner-20261027',
+   AMS_GATEWAY_AUDIT_OWNER_EMAIL:'owner@example.com'}
+ const metadata={ams_offer:'quick-marketing-audit',ams_preview_run_id:auditenv.AMS_GATEWAY_AUDIT_RUN_ID,
+   ams_request_id:'quick-audit-'+'f'.repeat(32),
+   ams_business_name:'Aspect Marketing Solutions',
+   ams_website_url:'https://www.aspectmarketingsolutions.app',
+   ams_industry:'Marketing automation',
+   ams_goals:'Check real paid TEST fulfillment and branded owner-only report delivery'}
+ const testEvent={...event,data:{object:{...event.data.object,
+   id:auditenv.AMS_GATEWAY_SESSION_ID,status:'complete',
+   customer_details:{email:'owner@example.com'},metadata}}}
+ const signed=JSON.stringify(testEvent)
+ const r=req(signed,signature(signed))
+ const store=mockStore()
+ const first=await receive(r,{env:auditenv,nowMs,fetchFn:store})
+ assert.equal(first.status,503)
+ const key=auditenv.AMS_GATEWAY_REDIS_NAMESPACE+'event:'+testEvent.id
+ const persisted=await store('https://fixture',{body:JSON.stringify(['GET',key])})
+ const receipt=JSON.parse((await persisted.json()).result)
+ const ackKey=auditenv.AMS_GATEWAY_REDIS_NAMESPACE+'ack:'+testEvent.id
+ const ack={kind:'paid-owner-audit-queued-v1',eventId:testEvent.id,
+   sessionId:auditenv.AMS_GATEWAY_SESSION_ID,runId:auditenv.AMS_GATEWAY_AUDIT_RUN_ID,
+   requestId:metadata.ams_request_id,digest:receipt.digest,auditId:'audit_1234567890',
+   recordedAt:new Date(nowMs).toISOString()}
+ // Incomplete or incorrect owner attestation must never make Stripe believe
+ // that receiving a receipt alone finished the audit.
+ const wrongStore=mockStore()
+ await receive(req(signed,signature(signed)),{env:auditenv,nowMs,fetchFn:wrongStore})
+ await wrongStore('https://fixture',{body:JSON.stringify(['SET',ackKey,JSON.stringify({...ack,digest:'b'.repeat(64)})])})
+ const rejected=await receive(req(signed,signature(signed)),{env:auditenv,nowMs,fetchFn:wrongStore})
+ assert.equal(rejected.status,503)
+ const stillPending=await receive(req(signed,signature(signed)),{env:auditenv,nowMs,fetchFn:store})
+ assert.equal(stillPending.status,503)
+ await store('https://fixture',{body:JSON.stringify(['SET',ackKey,JSON.stringify(ack)])})
+ const approved=await receive(req(signed,signature(signed)),{env:auditenv,nowMs,fetchFn:store})
+ const response=await approved.json()
+ assert.equal(approved.status,200)
+ assert.equal(response.ok,true)
+ assert.equal(response.code,'PILOT_PAID_AUDIT_QUEUED_ACKNOWLEDGED')
+ assert.equal(response.fulfillmentEnabled,false)
+ assert.equal(response.sendEnabled,false)
+ assert.equal((await receive(req(signed,'incorrect'),{env:auditenv,nowMs,fetchFn:store})).status,400)
+})
