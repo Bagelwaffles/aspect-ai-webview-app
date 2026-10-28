@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions, isCustomerAuthConfigured } from "@/lib/auth"
 import { ResendPreviewControls } from "./resend-preview-controls"
 import { StripeReceiptControls } from "./stripe-receipt-controls"
+import { StripeAcceptanceControls } from "./stripe-acceptance-controls"
 import { ConnectivityControls } from "./connectivity-controls"
 import { DomainVerificationControls } from "./domain-verification-controls"
 import { ownerDomainVerificationEnabled } from "@/lib/server/quick-audit-resend-owner-verification"
@@ -33,14 +34,16 @@ export default async function ResendPreviewOwnerPage() {
           <h1 className="mt-3 text-2xl font-semibold">Resend owner verification</h1>
           <p className="mt-3 text-sm leading-relaxed text-slate-300">
             Inspect branch-isolated configuration or manually check one temporary
-            non-payment Redis key. No checkout, customer email, provider send,
-            or production write is performed. Temporary domain verification is available only during a separately approved owner window.
+            non-payment Redis key. Owner-triggered Stripe TEST acceptance is available only
+            during a separately authorized short sandbox window; opening this page
+            does not create a Checkout, perform a payment, or send an email.
           </p>
         </div>
         {authorized ? (
           <>
             <ResendPreviewControls />
             <StripeReceiptControls />
+            <StripeAcceptanceControls />
             <ConnectivityControls />
             {ownerDomainVerificationEnabled(process.env) && <DomainVerificationControls />}
           </>
