@@ -9,7 +9,8 @@ import { RESEND_PREVIEW_BRANCH } from "../lib/server/quick-audit-resend-preview-
 const origin = "https://aspect-ai-overlord-git-isolated-test.vercel.app"
 const now = Date.parse("2026-10-27T21:00:00Z")
 const owner = "owner@example.com"
-const priceId = "price_1234567890"
+const priceId = "price_1UTu1FGuhFCl8JHacYf5y5BL"
+const auditProductId = "prod_VUtosNXroc0LoZ"
 const valid: NodeJS.ProcessEnv = {
   NODE_ENV: "test",
   VERCEL_ENV: "preview",
@@ -44,6 +45,7 @@ function request(body: string = '{"confirm":"CREATE_ONE_STRIPE_TEST_CHECKOUT"}')
 }
 function fixture(overrides: Partial<NodeJS.ProcessEnv> = {}, opts: {
   account?: string; amount?: number; live?: boolean; priceActive?: boolean;
+  productId?: string; returnedPriceId?: string;
   sessionId?: string; sessionUrl?: string;
 } = {}) {
   const events: string[] = []
@@ -55,7 +57,8 @@ function fixture(overrides: Partial<NodeJS.ProcessEnv> = {}, opts: {
     prices: {
       retrieve: async (id: string) => {
         events.push("price-read:" + id)
-        return { id: priceId, livemode: opts.live ?? false, active: opts.priceActive ?? true,
+        return { id: opts.returnedPriceId ?? priceId, product: opts.productId ?? auditProductId,
+          livemode: opts.live ?? false, active: opts.priceActive ?? true,
           unit_amount: opts.amount ?? 4900, currency: "usd", type: "one_time", recurring: null }
       },
     },
@@ -148,6 +151,8 @@ test("wrong sandbox account, non-$49 price or wrong returned session fail withou
   for (const opt of [
     { account: "acct_wrong123" }, { amount: 500 }, { live: true },
     { priceActive: false },
+    { productId: "prod_VWJuXWa7oBNid9" }, // Real, equal-priced 300-credit pack
+    { returnedPriceId: "price_1UVHGYGuhFCl8JHaa9ou0jb6" },
   ]) {
     const f = fixture({}, opt)
     const response = await f.handler(request())
