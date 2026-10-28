@@ -15,6 +15,10 @@ import { authorizeOwnerApiRequest } from "./owner-api-auth"
 import { AMS_PILOT_STRIPE_ACCOUNT, pilotFulfillmentConfiguration } from "./quick-audit-isolated-stripe-pilot"
 
 const CONFIRMATION = "CREATE_ONE_STRIPE_TEST_CHECKOUT"
+// This sandbox has TWO active $49 products. Lock the audit flow to the audit
+// product and exact TEST price, not the separate 300-credit top-up.
+const AUDIT_TEST_PRICE_ID = "price_1UTu1FGuhFCl8JHacYf5y5BL"
+const AUDIT_TEST_PRODUCT_ID = "prod_VUtosNXroc0LoZ"
 type CheckoutStripe = Pick<Stripe, "accounts" | "prices" | "checkout">
 type Deps = {
   env: NodeJS.ProcessEnv
@@ -94,7 +98,8 @@ export function createOwnerPilotTestCheckoutHandler(overrides: Partial<Deps> = {
       if (account.id !== AMS_PILOT_STRIPE_ACCOUNT) return json("PILOT_ACCOUNT_MISMATCH", 503)
 
       const price = await stripe.prices.retrieve(priceId)
-      if (price.id !== priceId || price.livemode !== false ||
+      if (price.id !== priceId || price.id !== AUDIT_TEST_PRICE_ID ||
+          price.product !== AUDIT_TEST_PRODUCT_ID || price.livemode !== false ||
           price.active !== true || price.currency !== "usd" ||
           price.type !== "one_time" || price.recurring !== null ||
           price.unit_amount !== 4900) return json("PILOT_PRICE_MISMATCH", 503)
