@@ -130,6 +130,7 @@ test("owner-created TEST session carries exact audit metadata and deterministic 
   assert.equal(f.made.length, 1)
   const entry = f.made[0]
   assert.equal(entry.params.mode, "payment")
+  assert.equal(entry.params.payment_method_types, undefined, "Stripe Dashboard controls available TEST payment methods")
   assert.equal(entry.params.customer_email, owner)
   assert.equal(entry.params.line_items?.[0]?.price, priceId)
   assert.equal(entry.params.allow_promotion_codes, false)
