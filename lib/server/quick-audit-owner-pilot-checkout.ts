@@ -106,7 +106,7 @@ export function createOwnerPilotTestCheckoutHandler(overrides: Partial<Deps> = {
 
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
-        payment_method_types: ["card"],
+        // Stripe now selects enabled TEST payment methods from Dashboard settings.
         line_items: [{ price: priceId, quantity: 1 }],
         customer_email: owner,
         customer_creation: "always",
