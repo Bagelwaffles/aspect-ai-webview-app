@@ -9,6 +9,7 @@ import {
 import { createIsolatedPilotStores } from "../lib/server/quick-audit-isolated-pilot-stores"
 import { RESEND_PREVIEW_BRANCH } from "../lib/server/quick-audit-resend-preview-preflight"
 
+const testNow = Date.now()
 const safe: NodeJS.ProcessEnv = {
   NODE_ENV: "test",
   VERCEL_ENV: "preview",
@@ -20,18 +21,29 @@ const safe: NodeJS.ProcessEnv = {
   AMS_QUICK_AUDIT_RESEND_PROOF_REDIS_REST_URL: "https://accepted-quetzal-206056.upstash.io",
   AMS_STRIPE_PILOT_FULFILLMENT_ENABLED: "true",
   AMS_QUICK_AUDIT_PILOT_DISPATCH_ENABLED: "true",
+  AMS_QUICK_AUDIT_PILOT_DISPATCH_UNTIL: new Date(testNow + 8 * 60_000).toISOString(),
   AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED: "true",
   AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL: "owner@example.com",
 }
 
 test("manual owner dispatch is disabled until all independent switches and isolated datastore are configured", () => {
-  assert.equal(pilotDispatchConfiguration(safe).ready, true)
+  assert.equal(pilotDispatchConfiguration(safe, testNow).ready, true)
+  assert.equal(pilotDispatchConfiguration(safe, testNow + 8 * 60_000).ready, false)
+  assert.equal(pilotDispatchConfiguration(safe, testNow - 3 * 60_000).ready, false)
   for (const change of [
     { VERCEL_ENV: "production" },
     { VERCEL_GIT_COMMIT_REF: "main" },
     { AMS_STRIPE_PILOT_ACCOUNT_ID: "acct_other" },
     { AMS_STRIPE_PILOT_FULFILLMENT_ENABLED: "false" },
     { AMS_QUICK_AUDIT_PILOT_DISPATCH_ENABLED: "" },
+    { AMS_QUICK_AUDIT_PILOT_DISPATCH_UNTIL: "" },
+    { AMS_QUICK_AUDIT_PILOT_DISPATCH_UNTIL: "invalid" },
+    { AMS_QUICK_AUDIT_PILOT_DISPATCH_UNTIL: new Date(testNow + 11 * 60_000).toISOString() },
+    { AMS_QUICK_AUDIT_PILOT_DISPATCH_UNTIL: new Date(testNow - 1).toISOString() },
+    { AMS_STRIPE_PILOT_CHECKOUT_ENABLED: "true" },
+    { AMS_STRIPE_PILOT_HANDOFF_ENABLED: "true" },
+    { AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED: "true" },
+    { AMS_QUICK_AUDIT_DELIVERY_OUTBOX_ENABLED: "true" },
     { AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED: "false" },
     { AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL: "" },
     { AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL: "not-an-email" },
@@ -39,7 +51,7 @@ test("manual owner dispatch is disabled until all independent switches and isola
     { AMS_STRIPE_PILOT_REDIS_REST_URL: safe.AMS_QUICK_AUDIT_RESEND_PROOF_REDIS_REST_URL },
     { UPSTASH_REDIS_REST_URL: safe.AMS_STRIPE_PILOT_REDIS_REST_URL },
   ]) {
-    assert.equal(pilotDispatchConfiguration({ ...safe, ...change }).ready, false, JSON.stringify(change))
+    assert.equal(pilotDispatchConfiguration({ ...safe, ...change }, testNow).ready, false, JSON.stringify(change))
   }
 })
 

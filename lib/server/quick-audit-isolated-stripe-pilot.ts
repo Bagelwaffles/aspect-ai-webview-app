@@ -107,10 +107,17 @@ export function pilotIntakeConfiguration(env: NodeJS.ProcessEnv) {
  * fulfillment path, operational verification and explicit authorization must
  * all be present before this ever becomes true. Never infer it from intake.
  */
-export function pilotDispatchConfiguration(env: NodeJS.ProcessEnv) {
+export function pilotDispatchConfiguration(env: NodeJS.ProcessEnv, now = Date.now()) {
   const storage = pilotStorageConfiguration(env)
   if (!storage.ready) return storage
-  if (env.AMS_STRIPE_PILOT_FULFILLMENT_ENABLED !== "true" ||
+  // An independent <=10-minute Preview expiry is checked on EVERY request.
+  // Do not permit overlapping checkout, Stripe webhook, handoff or outbox creation.
+  const until = Date.parse(env.AMS_QUICK_AUDIT_PILOT_DISPATCH_UNTIL ?? "")
+  if (!Number.isFinite(until) || until <= now || until - now > 10 * 60_000 ||
+      ["AMS_STRIPE_PILOT_CHECKOUT_ENABLED", "AMS_STRIPE_PILOT_HANDOFF_ENABLED",
+        "AMS_STRIPE_PILOT_WEBHOOK_INTAKE_ENABLED",
+        "AMS_QUICK_AUDIT_DELIVERY_OUTBOX_ENABLED"].some(name => env[name] === "true") ||
+      env.AMS_STRIPE_PILOT_FULFILLMENT_ENABLED !== "true" ||
       env.AMS_QUICK_AUDIT_PILOT_DISPATCH_ENABLED !== "true" ||
       env.AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED !== "true" ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim() ?? "")) {
