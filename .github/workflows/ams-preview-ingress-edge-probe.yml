@@ -1,0 +1,61 @@
+name: AMS Preview Ingress Edge Probe
+
+on:
+  pull_request:
+    branches: [feat/ams-branded-audit-sender-20261023]
+    paths:
+      - .github/workflows/ams-preview-ingress-edge-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-alias:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify only the exact Stripe Preview alias, without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          HOST="aspect-ai-overlord-git-716b96-kimberleyaversbiz-4131s-projects.vercel.app"
+          BASE="https://$HOST"
+          req() {
+            local method="$1" path="$2"
+            local headers code
+            headers="$(mktemp)"
+            code="$(curl --silent --show-error --max-time 15 --retry 0 \
+              --path-as-is --globoff --request "$method" \
+              --dump-header "$headers" --output /dev/null \
+              --write-out '%{http_code}' "$BASE$path")"
+            printf 'EDGE_PROBE method=%s path=%s http=%s\n' "$method" "$path" "$code" >&2
+            REQ_HEADERS="$headers" REQ_STATUS="$code"
+          }
+          req GET /
+          if [[ "$REQ_STATUS" == "401" || "$REQ_STATUS" == "403" || "$REQ_STATUS" == "307" || "$REQ_STATUS" == "308" || "$REQ_STATUS" == "302" ]]; then
+            echo "EDGE_PROBE outcome=PROTECTED_NO_EXCEPTION" >&2
+            rm -f "$REQ_HEADERS"
+            exit 0
+          fi
+          test "$REQ_STATUS" = "404"
+          grep -Eqi '^x-robots-tag: noindex, nofollow' "$REQ_HEADERS"
+          rm -f "$REQ_HEADERS"
+          deny() {
+            req "$1" "$2"
+            test "$REQ_STATUS" = "404"
+            grep -Eqi '^x-robots-tag: noindex, nofollow' "$REQ_HEADERS"
+            rm -f "$REQ_HEADERS"
+          }
+          deny GET /owner/resend-preview
+          deny GET /api/auth/session
+          deny POST /api/internal/quick-audit-pilot-dispatch
+          deny GET /api/internal/quick-audit-stripe-pilot
+          deny POST '/api/internal/quick-audit-stripe-pilot?synthetic=1'
+          deny GET /_next/static/nonexistent.js
+          deny GET /favicon.ico
+          deny OPTIONS /api/internal/quick-audit-stripe-pilot
+          req POST /api/internal/quick-audit-stripe-pilot
+          test "$REQ_STATUS" = "503"
+          rm -f "$REQ_HEADERS"
+          echo "EDGE_PROBE outcome=PUBLIC_ALIAS_ROUTING_FAIL_CLOSED" >&2

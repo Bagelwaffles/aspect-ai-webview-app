@@ -161,9 +161,55 @@ test("durable completion atomically links the Checkout, event, request, and n8n 
   assert.equal(args[3], "cs_test_linked")
 })
 
-test("unpaid and expired Checkout Sessions fail closed", async () => {
+test("Redis reservation script claims by atomic NX before classifying concurrent or completed work", async () => {
+  const stored = new Map<string, string>()
+  const redis = {
+    async eval(script: string, keys: string[], args: unknown[]) {
+      // Enforce actual Lua operation order; do not just mock success.
+      assert.ok(script.includes("local claimed = redis.call('SET', KEYS[1]"))
+      assert.ok(script.includes("if claimed then return '' end"))
+      assert.ok(script.includes("return redis.call('GET', KEYS[1]) or ''"))
+      const existing = stored.get(keys[0])
+      if (existing) return existing
+      stored.set(keys[0], String(args[0]))
+      return ""
+    },
+  }
+  const store = new RedisQuickAuditStore(redis)
+  const input = {
+    checkoutSessionId: "cs_test_atomic123456789",
+    stripeEventId: "evt_atomic123456789",
+    requestId: "request-atomic123456789",
+  }
+  // The two callers must never both believe they own the same payment.
+  const [first, second] = await Promise.all([store.reserve(input), store.reserve(input)])
+  assert.equal(first.state, "reserved")
+  assert.equal(second.state, "processing")
+  const completed: QuickAuditRecord = {
+    status: "completed",
+    ...input,
+    n8nAuditId: "audit_atomic123456789",
+    completedAt: "2026-10-27T00:00:00.000Z",
+  }
+  stored.set("ams:quick-audit:session:" + input.checkoutSessionId, JSON.stringify(completed))
+  const third = await store.reserve(input)
+  assert.equal(third.state, "duplicate")
+  if (third.state === "duplicate") assert.equal(third.record.n8nAuditId, completed.n8nAuditId)
+})
+
+test("unpaid or truly expired sessions fail closed", async () => {
   await assert.rejects(processingFixture({ session: session({ payment_status: "unpaid" }) }).run, (error) => error instanceof QuickAuditFulfillmentError && error.code === "QUICK_AUDIT_PAYMENT_UNSETTLED")
-  await assert.rejects(processingFixture({ session: session({ expires_at: 1 }) }).run, (error) => error instanceof QuickAuditFulfillmentError && error.code === "QUICK_AUDIT_SESSION_EXPIRED")
+  await assert.rejects(processingFixture({ session: session({ status: "expired", payment_status: "unpaid", expires_at: 1 }) }).run, (error) => error instanceof QuickAuditFulfillmentError && error.code === "QUICK_AUDIT_PAYMENT_UNSETTLED")
+})
+
+test("settled completed Checkout remains eligible after its original open-session deadline", async () => {
+  const fixture = processingFixture({ session: session({ expires_at: 1 }) })
+  const result = await fixture.run()
+  assert.equal(result.reason, "QUICK_AUDIT_COMPLETED")
+  assert.equal(result.applied, true)
+  const replay = await fixture.run()
+  assert.equal(replay.duplicate, true)
+  assert.equal(fixture.audits(), 1)
 })
 
 test("unapproved one-time price is ignored without n8n execution", async () => {
@@ -428,4 +474,57 @@ test("Quick Audit webhook refuses to fall back to general Stripe webhook credent
   assert.equal(response, null)
   assert.equal(createStripeCalls, 0)
   assert.equal(claimCalls, 0)
+})
+
+for (const decoded of [false, true]) {
+  test(`Redis-backed paid audit replay accepts ${decoded ? "SDK-decoded" : "JSON string"} records without rerunning fulfillment`, async () => {
+    let persisted: QuickAuditRecord | null = null
+    let audits = 0
+    const redis = {
+      async eval(_script: string, keys: string[], args: unknown[]) {
+        if (keys.length === 4) {
+          persisted = JSON.parse(String(args[1])) as QuickAuditRecord
+          return 1
+        }
+        if (!persisted) return ""
+        return decoded ? persisted : JSON.stringify(persisted)
+      },
+    }
+    const checkout = session()
+    const store = new RedisQuickAuditStore(redis)
+    const run = () => processQuickAuditCheckout({
+      event: event(checkout),
+      expectedPriceId: priceId,
+      expectedLivemode: false,
+      store,
+      gateway: {
+        retrieveCheckoutSession: async () => checkout,
+        listLineItems: async () => lineItems(),
+      },
+      evidenceCollector: async () => ({ hasPrimaryCta: true }),
+      auditGateway: { run: async () => {
+        audits += 1
+        return { auditId: "audit_redis_replay_001" }
+      } },
+    })
+    const first = await run()
+    assert.equal(first.applied, true)
+    const original = JSON.stringify(persisted)
+    const replay = await run()
+    assert.equal(replay.duplicate, true)
+    assert.equal(replay.processed, true)
+    assert.equal(replay.applied, false)
+    assert.equal(replay.n8nAuditId, "audit_redis_replay_001")
+    assert.equal(audits, 1)
+    assert.equal(JSON.stringify(persisted), original)
+  })
+}
+
+test("SDK-decoded Redis reservations preserve processing and request conflict guards", async () => {
+  const input = { checkoutSessionId: "cs_test_guard", stripeEventId: "evt_guard", requestId: "request-guard" }
+  const store = new RedisQuickAuditStore({
+    eval: async () => ({ status: "processing", ...input, token: "existing-claim" }),
+  })
+  assert.equal((await store.reserve(input)).state, "processing")
+  assert.equal((await store.reserve({ ...input, requestId: "another-request" })).state, "conflict")
 })

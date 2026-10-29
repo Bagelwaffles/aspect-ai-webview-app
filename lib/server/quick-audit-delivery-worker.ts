@@ -11,10 +11,10 @@ import {
   QuickAuditDeliveryOutbox,
 } from "./quick-audit-delivery-outbox"
 import {
-  RedisQuickAuditResultStore,
   type NativeQuickAuditResult,
   type QuickAuditResultStore,
 } from "./quick-audit-native"
+import { RESEND_PREVIEW_BRANCH } from "./quick-audit-resend-preview-preflight"
 
 type PaidCompletion = {
   status: "completed"
@@ -139,15 +139,27 @@ export async function deliverQuickAuditOwnerPreview(input: {
   const env = input.env ?? process.env
   // Never infer a production customer-send permission from this owner test.
   if (env.VERCEL_ENV !== "preview" ||
+      env.VERCEL_GIT_COMMIT_REF !== RESEND_PREVIEW_BRANCH ||
       env.AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED !== "true") {
+    return { status: "disabled" }
+  }
+
+  // The generic Quick Audit outbox, paid proof and result-store constructors
+  // otherwise fall back to the application's default Redis credentials.
+  // Never let a future owner Preview dispatcher silently read those stores:
+  // it must inject all three independently provisioned and verified adapters.
+  // Injection alone is NOT proof of payment isolation; the caller must separately
+  // verify Stripe webhook destinations and the actual backing storage topology.
+  if (!input.outbox || !input.proof || !input.reports) {
     return { status: "disabled" }
   }
   const ownerEmail = env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim().toLowerCase() ?? ""
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) return { status: "disabled" }
 
-  const outbox = input.outbox ?? new QuickAuditDeliveryOutbox()
-  const proofStore = input.proof ?? new RedisPaidQuickAuditProof()
-  const reportStore = input.reports ?? new RedisQuickAuditResultStore()
+  // All three dependencies have already been required above.
+  const outbox = input.outbox
+  const proofStore = input.proof
+  const reportStore = input.reports
   const pending = await outbox.read(input.requestId)
   if (!pending) return { status: "held" }
   if (pending.state !== "queued") return { status: "duplicate" }
