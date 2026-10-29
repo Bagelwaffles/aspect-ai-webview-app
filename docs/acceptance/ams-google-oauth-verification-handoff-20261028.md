@@ -2,6 +2,12 @@
 
 **Checkpoint:** October 28, 2026 CDT (October 29 UTC). **Status: Google Console outcome UNVERIFIED. Draft/HOLD; no provider submission authorized by this document.** This is an execution handoff for the already existing Google project, not a request to rebuild Gmail OAuth, create an OAuth client, reauthorize accounts, or change Production.
 
+## Already published Google-facing site preparation — DO NOT REPEAT
+
+- [PR #271](https://github.com/Bagelwaffles/aspect-ai-webview-app/pull/271) **was already merged** into `main` and the public homepage now visibly includes the owner-only Gmail feature description with Privacy and Terms links. The prior submission packet `docs/AMS_GOOGLE_OAUTH_VERIFICATION_PACKET.md` is also **already on main**. Its October 10 heading is historical: recheck the actual published homepage before claiming the disclosure is still Draft.
+- The newer handoff in this document is a current-status and live-Console review supplement to that original packet, not a replacement or request to republish the same pages.
+- The live public homepage was independently accessible to a web reader on Oct 28; the `/privacy` URL was linked but this reader's cache lookup returned an error, **not** a demonstrated site 404. Confirm directly in the authorized owner browser.
+
 ## Project and independent completed work
 
 - Project: `aspect-marketing-solutions`, number `13801315898`. Existing `Aspect Marketing Solutions Web` OAuth client is reused; historical console audit also found a separate `YouTube Upload` client. Preserve both until reviewed.
