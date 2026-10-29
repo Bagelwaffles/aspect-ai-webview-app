@@ -1,0 +1,29 @@
+name: AMS Isolated Stripe Gateway CI
+
+on:
+  pull_request:
+    branches: [feat/ams-resend-transactional-preview-20261023]
+    paths:
+      - 'services/ams-stripe-ingress/**'
+      - '.github/workflows/ams-isolated-stripe-gateway-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Source and signature checks (no external services, no secrets)
+        working-directory: services/ams-stripe-ingress
+        run: |
+          npm run check
+          npm test

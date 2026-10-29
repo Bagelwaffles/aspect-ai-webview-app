@@ -1,0 +1,47 @@
+name: AMS Isolated Stripe Gateway Edge Probe
+
+on:
+  pull_request:
+    branches: [feat/ams-resend-transactional-preview-20261023]
+    paths:
+      - .github/workflows/ams-isolated-stripe-edge-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: External authentication and restricted-route check (NO SECRETS)
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://ams-stripe-ingress-sandbox-aug6bxph2.vercel.app"
+          status() {
+            local method="$1" path="$2"
+            local response
+            response="$(curl --silent --show-error --max-time 15 --retry 0 --path-as-is --globoff \
+              --output /dev/null --write-out '%{http_code}' \
+              --header 'Content-Type: application/json' \
+              --request "$method" "$BASE$path")"
+            printf 'GATEWAY_EDGE method=%s path=%s http=%s\n' "$method" "$path" "$response" >&2
+            LAST_STATUS="$response"
+          }
+          status GET /
+          if [[ "$LAST_STATUS" == "302" || "$LAST_STATUS" == "307" || "$LAST_STATUS" == "401" || "$LAST_STATUS" == "403" ]]; then
+            echo "GATEWAY_EDGE outcome=PROTECTION_ACTIVE" >&2
+            exit 0
+          fi
+          test "$LAST_STATUS" = "404"
+          status GET /owner/resend-preview
+          test "$LAST_STATUS" = "404"
+          status GET /api/auth/session
+          test "$LAST_STATUS" = "404"
+          status GET /api/stripe-webhook
+          test "$LAST_STATUS" = "405"
+          status POST /api/stripe-webhook
+          test "$LAST_STATUS" = "503"
+          echo "GATEWAY_EDGE outcome=ISOLATED_ROUTING_FAIL_CLOSED" >&2
