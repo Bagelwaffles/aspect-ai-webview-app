@@ -109,7 +109,8 @@ export class RedisQuickAuditStore implements QuickAuditStore {
       [JSON.stringify(pending), String(RECORD_TTL_SECONDS)],
     )
     if (!raw) return { state: "reserved" as const, token }
-    const existing = JSON.parse(String(raw)) as Partial<QuickAuditRecord> & { status?: string; token?: string }
+    // Upstash may deserialize a Lua GET result before returning it.
+    const existing = (typeof raw === "string" ? JSON.parse(raw) : raw) as Partial<QuickAuditRecord> & { status?: string; token?: string }
     if (existing.requestId !== input.requestId) return { state: "conflict" as const }
     if (existing.status === "completed") return { state: "duplicate" as const, record: existing as QuickAuditRecord }
     return { state: "processing" as const }

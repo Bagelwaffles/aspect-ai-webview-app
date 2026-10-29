@@ -475,3 +475,56 @@ test("Quick Audit webhook refuses to fall back to general Stripe webhook credent
   assert.equal(createStripeCalls, 0)
   assert.equal(claimCalls, 0)
 })
+
+for (const decoded of [false, true]) {
+  test(`Redis-backed paid audit replay accepts ${decoded ? "SDK-decoded" : "JSON string"} records without rerunning fulfillment`, async () => {
+    let persisted: QuickAuditRecord | null = null
+    let audits = 0
+    const redis = {
+      async eval(_script: string, keys: string[], args: unknown[]) {
+        if (keys.length === 4) {
+          persisted = JSON.parse(String(args[1])) as QuickAuditRecord
+          return 1
+        }
+        if (!persisted) return ""
+        return decoded ? persisted : JSON.stringify(persisted)
+      },
+    }
+    const checkout = session()
+    const store = new RedisQuickAuditStore(redis)
+    const run = () => processQuickAuditCheckout({
+      event: event(checkout),
+      expectedPriceId: priceId,
+      expectedLivemode: false,
+      store,
+      gateway: {
+        retrieveCheckoutSession: async () => checkout,
+        listLineItems: async () => lineItems(),
+      },
+      evidenceCollector: async () => ({ hasPrimaryCta: true }),
+      auditGateway: { run: async () => {
+        audits += 1
+        return { auditId: "audit_redis_replay_001" }
+      } },
+    })
+    const first = await run()
+    assert.equal(first.applied, true)
+    const original = JSON.stringify(persisted)
+    const replay = await run()
+    assert.equal(replay.duplicate, true)
+    assert.equal(replay.processed, true)
+    assert.equal(replay.applied, false)
+    assert.equal(replay.n8nAuditId, "audit_redis_replay_001")
+    assert.equal(audits, 1)
+    assert.equal(JSON.stringify(persisted), original)
+  })
+}
+
+test("SDK-decoded Redis reservations preserve processing and request conflict guards", async () => {
+  const input = { checkoutSessionId: "cs_test_guard", stripeEventId: "evt_guard", requestId: "request-guard" }
+  const store = new RedisQuickAuditStore({
+    eval: async () => ({ status: "processing", ...input, token: "existing-claim" }),
+  })
+  assert.equal((await store.reserve(input)).state, "processing")
+  assert.equal((await store.reserve({ ...input, requestId: "another-request" })).state, "conflict")
+})
