@@ -26,3 +26,8 @@ test("homepage links featured agents directly to their dedicated sales pages", (
   assert.match(homepage, /href: "\/agents\/nurture-agent"/)
   assert.match(homepage, /View sales page/)
 })
+
+test("homepage footer exposes the public privacy policy and terms", () => {
+  assert.match(homepage, /href="\/privacy"/)
+  assert.match(homepage, /href="\/terms"/)
+})

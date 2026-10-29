@@ -39,6 +39,7 @@ export type StructuredAgentDefinition<
   buildPrompt: (input: z.infer<TInputSchema>) => string
   temperature?: number
   maxOutputTokens?: number
+  timeoutMs?: number
 }
 
 function configuredBrowserOperatorFallbackModels(env: NodeJS.ProcessEnv = process.env): string[] {
@@ -87,6 +88,7 @@ export async function runStructuredAgent<
     prompt: definition.buildPrompt(parsedInput),
     temperature: definition.temperature ?? 0.4,
     maxOutputTokens: definition.maxOutputTokens ?? 1_200,
+    ...(definition.timeoutMs ? { abortSignal: AbortSignal.timeout(definition.timeoutMs) } : {}),
     ...(fallbackModels.length > 0
       ? {
           providerOptions: {
