@@ -105,7 +105,13 @@ test("internal TEST objectives never become customer-facing copy", () => {
     const result = buildNativeQuickAuditResult({
       ...nativeInput,
       goals,
-      evidence: {},
+      // Force strategic findings so the fallback observation is covered too.
+      evidence: {
+        hasClearValueProposition: true, hasPrimaryCta: true,
+        hasLeadCapture: true, hasTestimonials: true,
+        hasTitleAndMeta: true, hasContactInfo: true,
+        hasPrivacyPolicy: true, hasLocalBusinessSchema: true,
+      },
     })
     assert.equal(result.goalSource, "general")
     assert.equal(result.findings.length, 5)
