@@ -50,6 +50,16 @@ Draft #315 now includes `lib/server/quick-audit-buyer-delivery.ts` and dedicated
 
 **Gate dependency:** production `AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED` must not be enabled until the customer Resend link workflow is operational and tested; enabling it prematurely will block paid buyers from viewing their results. When the flag is absent/off, legacy session-ID-only access remains and should not be called fully private.
 
+## Verified-purchase delivery dispatch — Draft-only Preview integration (NOT ACTIVATED)
+
+PR #315 now has a **protected owner-only Preview dispatch core** in `lib/server/quick-audit-buyer-dispatch.ts` with synthetic regression tests; this composes the signed buyer-link email with the **same structural outbox and sender contracts** used by PR #300. It does not create a route, schedule, webhook, Redis database, provider credential, vendor or external send.
+
+This core requires all of: `VERCEL_ENV=preview`, the exact Draft branch, `AMS_QUICK_AUDIT_BUYER_DISPATCH_ENABLED=true`, `AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED=true`, `AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED=true`, an isolated TEST Price ID and an explicitly configured owner-pilot email. **Production is always disabled by this function.** The caller injects trusted isolated outbox, durable paid proof, report store, read-only Stripe verifier and verified business-domain Resend sender; none is instantiated implicitly.
+
+The routine holds without a queued exact **TEST session**, independent matching durable completion and audit IDs, verified $49/price and Stripe buyer equal to the owner-pilot email, or accepted business From/Reply-To identity. Only then does it atomically claim the existing outbox record and send one **prepared private report link**, marking `submitted` only when the sender returned a provider ID AND the durable outbox finish succeeded. Any ambiguous provider/send result marks `uncertain`; no automatic retry. Duplicate or already-claimed requests never send twice. Tests use fakes; **no provider email was sent**.
+
+**Integration still required:** PR #300 is on a separate Draft branch and has the actual owner-only Preview Resend sender/outbox. It must import/reconcile these exact helpers, wire a separately owner-authenticated protected Preview invocation, and pass strict test-storage and provider identity checks before any authorized end-to-end inbox test. Exact-branch CI, protected Preview visual QA, token renewal and session/link leakage review remain. This does **not** authorize any real customer or LIVE-mode dispatch. The production sender requires its own reviewed adapter, policy, approval, recipient safeguards and rollout.
+
 ## Go/no-go order — review, not an instruction to execute
 
 1. **Read-only discovery:** check final exact heads, CI, Vercel PREVIEW readiness, domain status, security gates, pending Stripe endpoint lists and rollout notes. Reuse existing asset registry `docs/acceptance/ams-launch-assets-registry-20261027.md` in Draft #300.
