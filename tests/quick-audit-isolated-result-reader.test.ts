@@ -68,7 +68,7 @@ function fixture(overrides: {
           payment_status: "paid",
           customer_details: { email: overrides.buyerEmail ?? email },
           metadata: { ams_offer: "quick-marketing-audit", ams_request_id: requestId },
-        } as Stripe.Checkout.Session
+        } as unknown as Stripe.Checkout.Session
       },
       listLineItems: async () => {
         stripeReads += 1
