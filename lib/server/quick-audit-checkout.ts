@@ -5,6 +5,7 @@ import Stripe from "stripe"
 import { z } from "zod"
 
 import { resolvePublicAppUrl } from "./stripe-entitlements"
+import { isQuickAuditPublicCheckoutEnabled } from "./quick-audit-runtime"
 
 const schema = z.object({
   businessName: z.string().trim().min(1).max(200),
@@ -37,6 +38,13 @@ function fulfillmentInterlockRequired(env: NodeJS.ProcessEnv) {
 export function createQuickAuditCheckoutHandler(overrides: Partial<Dependencies> = {}) {
   const dependencies = { ...defaults, ...overrides }
   return async (request: NextRequest) => {
+    if (!isQuickAuditPublicCheckoutEnabled(dependencies.env)) {
+      return NextResponse.json(
+        { ok: false, error: "Quick Audit checkout is temporarily paused", code: "QUICK_AUDIT_CHECKOUT_PAUSED" },
+        { status: 503, headers: { "Cache-Control": "no-store" } },
+      )
+    }
+
     const parsed = schema.safeParse(await request.json().catch(() => null))
     if (!parsed.success) return NextResponse.json({ ok: false, error: "Invalid Quick Audit request", code: "QUICK_AUDIT_REQUEST_INVALID" }, { status: 400, headers: { "Cache-Control": "no-store" } })
     if (!enabled(dependencies.env.AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED)) {
