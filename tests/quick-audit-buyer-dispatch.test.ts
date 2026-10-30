@@ -61,6 +61,8 @@ function fixture(options: {
     VERCEL_GIT_COMMIT_REF: "feat/quick-audit-executive-summary-20261029",
     VERCEL_URL: "aspect-ai-overlord-synthetic-kimberleyaversbiz-4131s-projects.vercel.app",
     AMS_QUICK_AUDIT_BUYER_DISPATCH_ENABLED: "true",
+    AMS_QUICK_AUDIT_BUYER_DISPATCH_UNTIL: new Date(now + 5 * 60_000).toISOString(),
+    AMS_STRIPE_PILOT_ACCOUNT_ID: "acct_1UTtFMGuhFCl8JHa",
     AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED: "true",
     AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED: "true",
     AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL: owner,
@@ -149,6 +151,10 @@ test("disabled by default and never dispatches from production", async () => {
     { AMS_QUICK_AUDIT_BUYER_DISPATCH_ENABLED: undefined },
     { AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED: undefined },
     { AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED: undefined },
+    { AMS_QUICK_AUDIT_BUYER_DISPATCH_UNTIL: undefined },
+    { AMS_QUICK_AUDIT_BUYER_DISPATCH_UNTIL: new Date(now - 1).toISOString() },
+    { AMS_QUICK_AUDIT_BUYER_DISPATCH_UNTIL: new Date(now + 11 * 60_000).toISOString() },
+    { AMS_STRIPE_PILOT_ACCOUNT_ID: "acct_1Smr2bGloGM6sjzB" },
     { VERCEL_ENV: "production" },
     { VERCEL_GIT_COMMIT_REF: "main" },
     { VERCEL_URL: "aspect-ai-overlord-synthetic-kimberleyaversbiz-4131s-projects.vercel.app", VERCEL_ENV: "production" },
@@ -198,4 +204,12 @@ test("Preview delivery refuses missing or untrusted Vercel URL before outbox cla
     assert.equal(f.counters().claims, 0)
     assert.equal(f.counters().sends, 0)
   }
+})
+
+test("owner-only dispatch window expires on every request; no late replay", async () => {
+  const f = fixture()
+  f.input.now = now + 6 * 60_000
+  assert.equal(await dispatchApprovedQuickAuditOwnerPreview(f.input), "disabled")
+  assert.equal(f.counters().claims, 0)
+  assert.equal(f.counters().sends, 0)
 })
