@@ -15,6 +15,25 @@ import {
 } from "./quick-audit-report-access"
 
 const CANONICAL_SITE = "https://www.aspectmarketingsolutions.app"
+const APPROVED_PREVIEW_HOST = /^aspect-ai-overlord-[a-z0-9]+-kimberleyaversbiz-4131s-projects\\.vercel\\.app$/u
+
+function verifiedReportOrigin(expectedLivemode: boolean, reportBaseUrl: string | undefined): string {
+  if (expectedLivemode) {
+    if (reportBaseUrl && reportBaseUrl !== CANONICAL_SITE) throw new Error("AUDIT_BUYER_REPORT_ORIGIN_INVALID")
+    return CANONICAL_SITE
+  }
+  if (!reportBaseUrl) throw new Error("AUDIT_BUYER_REPORT_ORIGIN_INVALID")
+  let url: URL
+  try { url = new URL(reportBaseUrl) } catch { throw new Error("AUDIT_BUYER_REPORT_ORIGIN_INVALID") }
+  if (url.protocol !== "https:" ||
+      url.username || url.password || url.port ||
+      url.pathname !== "/" || url.search || url.hash ||
+      !APPROVED_PREVIEW_HOST.test(url.hostname)) {
+    throw new Error("AUDIT_BUYER_REPORT_ORIGIN_INVALID")
+  }
+  return url.origin
+}
+
 const AUDIT_OFFER = "quick-marketing-audit"
 
 type StripeReader = {
@@ -44,6 +63,8 @@ export async function prepareVerifiedBuyerQuickAuditEmail(input: {
   expectedLivemode: boolean
   report: NativeQuickAuditResult
   signingSecret: string | undefined
+  /** Source-controlled production site or exact Vercel-provided protected Preview deployment URL. */
+  reportBaseUrl?: string
   stripe: StripeReader
   now?: number
 }): Promise<PreparedBuyerQuickAuditEmail> {
@@ -56,6 +77,9 @@ export async function prepareVerifiedBuyerQuickAuditEmail(input: {
   if (!isBuyerReportAccessConfigured(input.signingSecret)) {
     throw new Error("AUDIT_BUYER_DELIVERY_TOKEN_UNCONFIGURED")
   }
+  // Prevent a sandbox token or session ID from being delivered to the LIVE
+  // domain, and reject caller-supplied phishing/redirect origins.
+  const reportOrigin = verifiedReportOrigin(expectedLivemode, input.reportBaseUrl)
   const session = await stripe.retrieveCheckoutSession(sessionId)
   if (session.id !== sessionId ||
       session.livemode !== expectedLivemode ||
@@ -99,7 +123,7 @@ export async function prepareVerifiedBuyerQuickAuditEmail(input: {
     requestId,
     buyerEmail: recipient,
   }, input.signingSecret!, input.now)
-  const url = new URL("/quick-marketing-audit/thanks", CANONICAL_SITE)
+  const url = new URL("/quick-marketing-audit/thanks", reportOrigin)
   url.searchParams.set("session_id", sessionId)
   // The fragment does not reach the website in an HTTP request. The browser
   // transfers it to an Authorization header and promptly removes it from URL.
