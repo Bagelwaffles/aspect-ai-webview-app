@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 
 import {
+  bearerReportToken,
+  isBuyerReportAccessConfigured,
+  verifyBuyerReportAccessToken,
+} from "./quick-audit-report-access"
+
+import {
   RedisQuickAuditResultStore,
   type QuickAuditResultStore,
 } from "./quick-audit-native"
@@ -21,7 +27,11 @@ const defaults: Dependencies = {
 function noStoreJson(body: Record<string, unknown>, status: number) {
   return NextResponse.json(body, {
     status,
-    headers: { "Cache-Control": "no-store" },
+    headers: {
+      "Cache-Control": "no-store",
+      "Referrer-Policy": "no-referrer",
+      "X-Robots-Tag": "noindex, nofollow, noarchive",
+    },
   })
 }
 
@@ -95,11 +105,45 @@ export function createQuickAuditResultHandler(overrides: Partial<Dependencies> =
         )
       }
 
+      // When explicitly enabled at launch, a paid session ID alone is NOT
+      // sufficient to read the report. A signed token must be delivered to the
+      // address that Stripe recorded on the verified checkout.
+      if (dependencies.env.AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED?.trim().toLowerCase() === "true") {
+        const accessSecret = dependencies.env.AMS_QUICK_AUDIT_REPORT_ACCESS_SECRET
+        if (!isBuyerReportAccessConfigured(accessSecret)) {
+          return noStoreJson(
+            { ok: false, code: "QUICK_AUDIT_REPORT_ACCESS_UNCONFIGURED", error: "Secure report access is unavailable" },
+            503,
+          )
+        }
+        const buyerEmail = session.customer_details?.email ?? session.customer_email
+        const token = bearerReportToken(request.headers.get("authorization"))
+        if (!buyerEmail || !verifyBuyerReportAccessToken(token, {
+          checkoutSessionId: session.id,
+          requestId,
+          buyerEmail,
+        }, accessSecret!)) {
+          return noStoreJson(
+            { ok: false, code: "QUICK_AUDIT_REPORT_ACCESS_REQUIRED", error: "Open the private report link sent to your checkout email to view your audit" },
+            403,
+          )
+        }
+      }
+
       const result = await dependencies.store.getByRequestId(requestId)
       if (!result) {
         return noStoreJson(
           { ok: true, status: "processing" },
           202,
+        )
+      }
+
+      // A completed payment is not permission to read a different stored audit.
+      // Fail closed if the stored report and verified Stripe order disagree.
+      if (result.requestId !== requestId) {
+        return noStoreJson(
+          { ok: false, error: "Quick Audit result could not be matched to this order", code: "QUICK_AUDIT_RESULT_MISMATCH" },
+          403,
         )
       }
 
