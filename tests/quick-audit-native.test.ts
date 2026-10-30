@@ -95,6 +95,59 @@ test("native Quick Audit always produces the promised five findings and seven-da
   assert.equal(result.promotionalPost.includes(nativeInput.websiteUrl), true)
 })
 
+test("internal TEST objectives never become customer-facing copy", () => {
+  const internalGoals = [
+    "Check real paid TEST fulfillment and branded owner-only report delivery",
+    "Verify Stripe webhook replay and signed receipt before PR #316 acceptance",
+    "Validate sandbox payment and report delivery",
+  ]
+  for (const goals of internalGoals) {
+    const result = buildNativeQuickAuditResult({
+      ...nativeInput,
+      goals,
+      evidence: {},
+    })
+    assert.equal(result.goalSource, "general")
+    assert.equal(result.findings.length, 5)
+    assert.equal(result.sevenDayPlan.length, 7)
+    const customerFacingCopy = [
+      result.goal,
+      result.improvedHeadline,
+      result.improvedOffer,
+      result.promotionalPost,
+      ...result.findings.flatMap((finding) => [finding.title, finding.observation, finding.fix]),
+    ].join(" ")
+    assert.doesNotMatch(customerFacingCopy, /paid TEST|owner.only|webhook replay|Stripe webhook|sandbox payment|PR #316|report delivery/iu)
+    assert.match(result.improvedHeadline, /Explore Example Services/iu)
+    assert.match(result.promotionalPost, /https:\/\/example.com/u)
+    assert.match(result.findings[0].observation, /No customer marketing objective was supplied/iu)
+  }
+})
+
+test("real marketing goals and ordinary A/B testing remain customer-authored", () => {
+  for (const goals of [
+    "get more qualified leads",
+    "A/B test our landing page to increase booked appointments",
+  ]) {
+    const result = buildNativeQuickAuditResult({ ...nativeInput, goals, evidence: {} })
+    assert.equal(result.goalSource, "customer")
+    assert.equal(result.goal, goals)
+    assert.match(result.improvedHeadline, new RegExp(goals.replace(/[.*+?^${}()|[\]\\]/g, "\\test("native Quick Audit IDs are deterministic per request and gateway replay does not save twice", async () => {"), "iu"))
+  }
+})
+
+test("missing marketing goal uses disclosed generic objective without invented customer claims", () => {
+  const result = buildNativeQuickAuditResult({
+    ...nativeInput,
+    goals: "   ",
+    evidence: {},
+  })
+  assert.equal(result.goalSource, "general")
+  assert.match(result.goal, /website.s next step/iu)
+  assert.doesNotMatch(result.improvedHeadline, /qualified leads|guaranteed revenue/iu)
+  assert.equal(result.findings.length, 5)
+})
+
 test("native Quick Audit IDs are deterministic per request and gateway replay does not save twice", async () => {
   const store = new MemoryResultStore()
   const gateway = createNativeQuickAuditAuditGateway({
