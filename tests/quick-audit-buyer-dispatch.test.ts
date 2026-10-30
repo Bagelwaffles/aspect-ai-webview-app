@@ -59,6 +59,7 @@ function fixture(options: {
     NODE_ENV: "test",
     VERCEL_ENV: "preview",
     VERCEL_GIT_COMMIT_REF: "feat/quick-audit-executive-summary-20261029",
+    VERCEL_URL: "aspect-ai-overlord-synthetic-kimberleyaversbiz-4131s-projects.vercel.app",
     AMS_QUICK_AUDIT_BUYER_DISPATCH_ENABLED: "true",
     AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED: "true",
     AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED: "true",
@@ -150,6 +151,7 @@ test("disabled by default and never dispatches from production", async () => {
     { AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED: undefined },
     { VERCEL_ENV: "production" },
     { VERCEL_GIT_COMMIT_REF: "main" },
+    { VERCEL_URL: "aspect-ai-overlord-synthetic-kimberleyaversbiz-4131s-projects.vercel.app", VERCEL_ENV: "production" },
   ]) {
     const f = fixture()
     Object.assign(f.input.env, patch)
@@ -182,4 +184,18 @@ test("ambiguous send outcome stays uncertain and is never automatically replayed
   assert.equal(await dispatchApprovedQuickAuditOwnerPreview(f.input), "duplicate")
   assert.equal(f.counters().claims, 1)
   assert.equal(f.counters().sends, 1)
+})
+
+test("Preview delivery refuses missing or untrusted Vercel URL before outbox claim", async () => {
+  for (const hostname of [
+    undefined,
+    "www.aspectmarketingsolutions.app",
+    "aspect-ai-overlord-synthetic-kimberleyaversbiz-4131s-projects.vercel.app.evil.example",
+  ]) {
+    const f = fixture()
+    f.input.env.VERCEL_URL = hostname
+    assert.equal(await dispatchApprovedQuickAuditOwnerPreview(f.input), "held")
+    assert.equal(f.counters().claims, 0)
+    assert.equal(f.counters().sends, 0)
+  }
 })
