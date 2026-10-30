@@ -65,6 +65,7 @@ const input = (changes: Record<string, unknown> = {}) => ({
   expectedLivemode: false,
   report,
   signingSecret,
+  reportBaseUrl: "https://aspect-ai-overlord-synthetic-kimberleyaversbiz-4131s-projects.vercel.app",
   now,
   ...fixture(),
   ...changes,
@@ -75,7 +76,7 @@ test("prepares ONLY a verified paid audit email addressed to exact Stripe buyer"
   assert.equal(result.recipient, "buyer@example.com")
   assert.equal(result.auditId, report.auditId)
   const url = new URL(result.reportUrl)
-  assert.equal(url.origin, "https://www.aspectmarketingsolutions.app")
+  assert.equal(url.origin, "https://aspect-ai-overlord-synthetic-kimberleyaversbiz-4131s-projects.vercel.app")
   assert.equal(url.pathname, "/quick-marketing-audit/thanks")
   assert.equal(url.searchParams.get("session_id"), sessionId)
   assert.equal(url.searchParams.has("report_token"), false)
@@ -139,4 +140,23 @@ test("does not issue links for wrong session mode or price configuration", async
   await assert.rejects(prepareVerifiedBuyerQuickAuditEmail(input({
     expectedPriceId: "NOT_A_STRIPE_PRICE",
   })), /AUDIT_BUYER_DELIVERY_SCOPE_INVALID/)
+})
+
+test("sandbox report notification refuses LIVE domain, deceptive hosts and untrusted Preview", async () => {
+  for (const reportBaseUrl of [
+    undefined,
+    "https://www.aspectmarketingsolutions.app",
+    "http://aspect-ai-overlord-synthetic-kimberleyaversbiz-4131s-projects.vercel.app",
+    "https://aspect-ai-overlord-synthetic-kimberleyaversbiz-4131s-projects.vercel.app.attacker.example",
+    "https://evil.example",
+    "https://aspect-ai-overlord-synthetic-kimberleyaversbiz-4131s-projects.vercel.app/redirect",
+    "https://user:password@aspect-ai-overlord-synthetic-kimberleyaversbiz-4131s-projects.vercel.app",
+  ]) {
+    const f = fixture()
+    await assert.rejects(
+      prepareVerifiedBuyerQuickAuditEmail(input({ reportBaseUrl, stripe: f.stripe })),
+      /AUDIT_BUYER_REPORT_ORIGIN_INVALID/,
+    )
+    assert.equal(f.calls(), 0)
+  }
 })
