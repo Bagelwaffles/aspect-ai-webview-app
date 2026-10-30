@@ -13,6 +13,7 @@ import {
   printHtmlArtifact,
 } from "@/lib/client-artifacts"
 import type { NativeQuickAuditResult } from "@/lib/server/quick-audit-native"
+import { summarizeQuickAudit } from "@/lib/quick-audit-presentation"
 
 type ResultState =
   | { kind: "idle" }
@@ -24,11 +25,17 @@ type ResultState =
 const MAX_AUTOMATIC_CHECKS = 20
 
 function buildAuditArtifact(result: NativeQuickAuditResult): string {
+  const summary = summarizeQuickAudit(result)
   return buildBrandedHtmlArtifact({
     eyebrow: "$49 Quick Marketing Audit",
     title: `${result.businessName} — Marketing Audit`,
     subtitle: `${result.websiteUrl} · Generated ${new Date(result.generatedAt).toLocaleString()}`,
     sections: [
+      {
+        heading: "Executive Snapshot — Start Here",
+        text: `${summary.findingsCount} prioritized findings and ${summary.planDaysCount} day-by-day actions. Based on automated page observations; traffic, ROI, conversions and actual results were not measured.`,
+        orderedItems: summary.priorityActions.map((item) => `${item.title}\nSuggested action: ${item.fix}`),
+      },
       ...(result.strengths.length
         ? [{ heading: "What the Evidence Already Supports", items: result.strengths }]
         : []),
@@ -143,6 +150,7 @@ export function QuickAuditResultClient() {
   }
 
   const { result } = state
+  const summary = summarizeQuickAudit(result)
 
   function downloadAuditReport() {
     const html = buildAuditArtifact(result)
@@ -175,6 +183,46 @@ export function QuickAuditResultClient() {
         </div>
       </div>
 
+      <section aria-labelledby="audit-executive-title" className="space-y-5 rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-background to-background p-5 sm:p-7">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Your report at a glance</p>
+          <h2 id="audit-executive-title" className="text-2xl font-bold tracking-tight">Executive snapshot</h2>
+          <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+            Your report uses website observations to prioritize useful marketing changes.
+            Traffic, sales, conversion rates and return on investment were not measured.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border bg-background/85 p-4">
+            <p className="text-3xl font-semibold tabular-nums">{summary.findingsCount}</p>
+            <p className="mt-1 text-sm text-muted-foreground">Prioritized marketing findings</p>
+          </div>
+          <div className="rounded-xl border bg-background/85 p-4">
+            <p className="text-3xl font-semibold tabular-nums">{summary.planDaysCount}</p>
+            <p className="mt-1 text-sm text-muted-foreground">Actions in your day-by-day plan</p>
+          </div>
+        </div>
+        <nav aria-label="Jump to audit sections" className="flex flex-wrap gap-2 text-sm">
+          <a className="rounded-lg border bg-background px-3 py-2 underline-offset-4 hover:underline" href="#audit-findings">All findings</a>
+          <a className="rounded-lg border bg-background px-3 py-2 underline-offset-4 hover:underline" href="#audit-plan">7-day action plan</a>
+          <a className="rounded-lg border bg-background px-3 py-2 underline-offset-4 hover:underline" href="#audit-copy">Copy and offer recommendations</a>
+        </nav>
+        <div>
+          <h3 className="text-base font-semibold">Three actions to start with</h3>
+          <ol className="mt-3 space-y-3">
+            {summary.priorityActions.map((item) => (
+              <li key={item.priority} className="flex gap-3 rounded-xl border bg-background/85 p-3">
+                <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">{item.priority}</span>
+                <div>
+                  <p className="text-sm font-semibold">{item.title}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.fix}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
       {result.strengths.length ? (
         <Card>
           <CardHeader><CardTitle>What the evidence already supports</CardTitle></CardHeader>
@@ -186,7 +234,7 @@ export function QuickAuditResultClient() {
         </Card>
       ) : null}
 
-      <Card>
+      <Card id="audit-findings">
         <CardHeader><CardTitle>5 priority marketing problems and fixes</CardTitle></CardHeader>
         <CardContent className="space-y-5">
           {result.findings.map((finding, index) => (
@@ -199,7 +247,7 @@ export function QuickAuditResultClient() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div id="audit-copy" className="grid scroll-mt-6 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader><CardTitle>Improved headline</CardTitle></CardHeader>
           <CardContent><p className="text-sm leading-relaxed">{result.improvedHeadline}</p></CardContent>
@@ -215,7 +263,7 @@ export function QuickAuditResultClient() {
         <CardContent><p className="whitespace-pre-wrap text-sm leading-relaxed">{result.promotionalPost}</p></CardContent>
       </Card>
 
-      <Card>
+      <Card id="audit-plan">
         <CardHeader><CardTitle>7-day action plan</CardTitle></CardHeader>
         <CardContent>
           <ol className="space-y-3 text-sm text-muted-foreground">
