@@ -130,6 +130,8 @@ test("paid live Quick Audit session can retrieve only its durable native result"
   assert.equal(body.status, "completed")
   assert.equal(body.result.auditId, result.auditId)
   assert.equal(response.headers.get("cache-control"), "no-store")
+  assert.equal(response.headers.get("referrer-policy"), "no-referrer")
+  assert.match(response.headers.get("x-robots-tag") ?? "", /noindex/)
   assert.equal(JSON.stringify(body).includes("rk_live_fixture"), false)
 })
 
@@ -173,4 +175,35 @@ test("verified paid order returns processing without inventing a result", async 
   const body = await response.json()
   assert.equal(response.status, 202)
   assert.equal(body.status, "processing")
+})
+
+test("result endpoint fails closed if Stripe request ID disagrees with stored audit", async () => {
+  const store = new MemoryResultStore()
+  await store.save({
+    ...buildNativeQuickAuditResult(nativeInput),
+    requestId: "incorrect-other-order",
+  })
+
+  // Simulate a bad key / retrieval anomaly that returned an unrelated audit.
+  const handler = createQuickAuditResultHandler({
+    env: {
+      NODE_ENV: "test",
+      AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: "rk_live_fixture",
+      AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: "price_native",
+    },
+    createStripe: () => stripeFixture(),
+    store: {
+      getByRequestId: async () => buildNativeQuickAuditResult({
+        ...nativeInput, requestId: "incorrect-other-order",
+      }),
+      save: async () => undefined,
+    },
+  })
+  const response = await handler(new NextRequest("https://ams.example/api/quick-marketing-audit/result?session_id=cs_live_native123"))
+  const body = await response.json()
+  assert.equal(response.status, 403)
+  assert.equal(body.code, "QUICK_AUDIT_RESULT_MISMATCH")
+  assert.equal(body.result, undefined)
+  assert.equal(response.headers.get("cache-control"), "no-store")
+  assert.equal(response.headers.get("referrer-policy"), "no-referrer")
 })
