@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 
 import {
+  bearerReportToken,
+  isBuyerReportAccessConfigured,
+  verifyBuyerReportAccessToken,
+} from "./quick-audit-report-access"
+
+import {
   RedisQuickAuditResultStore,
   type QuickAuditResultStore,
 } from "./quick-audit-native"
@@ -97,6 +103,31 @@ export function createQuickAuditResultHandler(overrides: Partial<Dependencies> =
           { ok: false, error: "Quick Audit request was not verified", code: "QUICK_AUDIT_REQUEST_NOT_VERIFIED" },
           403,
         )
+      }
+
+      // When explicitly enabled at launch, a paid session ID alone is NOT
+      // sufficient to read the report. A signed token must be delivered to the
+      // address that Stripe recorded on the verified checkout.
+      if (dependencies.env.AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED?.trim().toLowerCase() === "true") {
+        const accessSecret = dependencies.env.AMS_QUICK_AUDIT_REPORT_ACCESS_SECRET
+        if (!isBuyerReportAccessConfigured(accessSecret)) {
+          return noStoreJson(
+            { ok: false, code: "QUICK_AUDIT_REPORT_ACCESS_UNCONFIGURED", error: "Secure report access is unavailable" },
+            503,
+          )
+        }
+        const buyerEmail = session.customer_details?.email ?? session.customer_email
+        const token = bearerReportToken(request.headers.get("authorization"))
+        if (!buyerEmail || !verifyBuyerReportAccessToken(token, {
+          checkoutSessionId: session.id,
+          requestId,
+          buyerEmail,
+        }, accessSecret!)) {
+          return noStoreJson(
+            { ok: false, code: "QUICK_AUDIT_REPORT_ACCESS_REQUIRED", error: "Open the private report link sent to your checkout email to view your audit" },
+            403,
+          )
+        }
       }
 
       const result = await dependencies.store.getByRequestId(requestId)
