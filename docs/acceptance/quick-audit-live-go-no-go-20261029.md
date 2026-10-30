@@ -29,6 +29,19 @@
 | Google | Branding verified but restricted Gmail scope verification incomplete | Keep Gmail owner-monitoring and restricted-scope send controls separate and OFF. Resend approved transactional domain is not a substitute for unverified Google permissions |
 | Mobile | Google Play track is not a dependency for first web revenue | Finish independently after core customer experience is proven |
 
+## Buyer report access — new isolated Draft implementation (NOT ENABLED)
+
+New source in Draft #315: `lib/server/quick-audit-report-access.ts`, result handler and customer result UI. A separately configured `AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED=true` can require a purpose-specific signed HMAC token bound to exact verified checkout session ID, request ID, and normalized buyer-email hash. Token lifetime: **14 days**. The UI extracts `#report_token=<opaque-token>` from the email link's **fragment** (not server query), removes it from history, and sends it in an Authorization Bearer header. Missing/mismatched/expired/tampered tokens fail closed. A missing or short `AMS_QUICK_AUDIT_REPORT_ACCESS_SECRET` fails closed with 503. Neither signing secret nor link is created automatically; code mints tokens **only through an internal trusted helper**, never a public mint endpoint.
+
+**Still NOT complete:** #300's proven sender is owner-only Preview and currently sends the report *body*, not a signed link to real buyers. Before activating this gate, integrate token generation *after* the verified paid live order with the production-authorized Resend transactional sender, and deliver to the **same Stripe checkout email** only. Protect secure-link message content from logs; independently test the actual recipient and wrong-buyer denial. Ensure customers can retrieve the report after token expiration via a safe reissue process; verify security for browser back/refresh/cross-device, and support. Do not set either gate/secret in live Production or claim launch-ready without these proofs. When gate is OFF, legacy session-ID access remains for compatibility and is not fully buyer-bound.
+
+## LIVE Stripe read-only identity proof
+
+Official connected main LIVE account: `acct_1Smr2bGloGM6sjzB`, distinct from isolated TEST sandbox. Two active LIVE one-time **$49** prices exist and must NOT be mixed:
+- Quick Marketing Audit: `price_1U0wqxGloGM6sjzBGDu7MhHR`, product `prod_V0yop4P1DLZZDH`.
+- Unrelated subscriber 300-credit top-up: `price_1U8XfmGloGM6sjzBgXQbvpGy`, product `prod_V8pKAwcWMGb6br`.
+The original main LIVE Stripe webhook `we_1U2Z2UGloGM6sjzBMzAIZJT6` is enabled for `https://www.aspectmarketingsolutions.app/api/webhooks/stripe`; two other historical LIVE destinations were disabled at last read. These are provider configuration facts, NOT proof the native audit/email release is wired in Production. Verify actual environment variable binding and product ownership, not just matching price amount.
+
 ## Go/no-go order — review, not an instruction to execute
 
 1. **Read-only discovery:** check final exact heads, CI, Vercel PREVIEW readiness, domain status, security gates, pending Stripe endpoint lists and rollout notes. Reuse existing asset registry `docs/acceptance/ams-launch-assets-registry-20261027.md` in Draft #300.
