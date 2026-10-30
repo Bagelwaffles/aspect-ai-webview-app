@@ -66,6 +66,7 @@ export function QuickAuditResultClient() {
   const sessionId = searchParams.get("session_id")?.trim() ?? ""
   const [state, setState] = useState<ResultState>({ kind: "idle" })
   const checks = useRef(0)
+  const privateReportToken = useRef("")
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const checkResult = useCallback(async (manual = false) => {
@@ -78,6 +79,7 @@ export function QuickAuditResultClient() {
     try {
       const response = await fetch(`/api/quick-marketing-audit/result?session_id=${encodeURIComponent(sessionId)}`, {
         cache: "no-store",
+        headers: privateReportToken.current ? { Authorization: `Bearer ${privateReportToken.current}` } : {},
       })
       const body = await response.json().catch(() => null) as {
         ok?: boolean
@@ -107,6 +109,15 @@ export function QuickAuditResultClient() {
   }, [sessionId])
 
   useEffect(() => {
+    // The buyer-only access token arrives as a fragment from a transactional
+    // email, not as an HTTP request/query parameter. Strip it immediately after
+    // capture so it is not retained in browser history or copied links.
+    const fragment = window.location.hash
+    if (fragment.startsWith("#report_token=")) {
+      const token = new URLSearchParams(fragment.slice(1)).get("report_token")
+      if (token && token.length <= 2048) privateReportToken.current = token
+      window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search)
+    }
     void checkResult(false)
     return () => {
       if (timer.current) clearTimeout(timer.current)
