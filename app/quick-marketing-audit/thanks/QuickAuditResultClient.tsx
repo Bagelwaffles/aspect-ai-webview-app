@@ -34,7 +34,7 @@ function buildAuditArtifact(result: NativeQuickAuditResult): string {
     sections: [
       {
         heading: "Executive Snapshot — Start Here",
-        text: `${summary.findingsCount} prioritized findings and ${summary.planDaysCount} day-by-day actions. Based on automated page observations; traffic, ROI, conversions and actual results were not measured.`,
+        text: `${summary.findingsCount} prioritized findings and ${summary.planDaysCount} day-by-day actions. Based on automated page observations; traffic, ROI, conversions and actual results were not measured.${result.goalSource === "general" ? " No customer marketing objective was provided. The headline, offer and promotional post are illustrative drafts and must be tailored before publication." : ""}`,
         orderedItems: summary.priorityActions.map((item) => `${item.title}\nSuggested action: ${item.fix}`),
       },
       {
@@ -209,6 +209,12 @@ export function QuickAuditResultClient() {
             Your report uses website observations to prioritize useful marketing changes.
             Traffic, sales, conversion rates and return on investment were not measured.
           </p>
+          {result.goalSource === "general" ? (
+            <p className="max-w-3xl rounded-lg border px-3 py-2 text-sm leading-relaxed text-muted-foreground">
+              No customer marketing objective was provided. This report uses a general conversion objective;
+              its example headline and promotional copy should be tailored before publishing.
+            </p>
+          ) : null}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border bg-background/85 p-4">
