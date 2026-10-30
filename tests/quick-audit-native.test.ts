@@ -132,7 +132,7 @@ test("real marketing goals and ordinary A/B testing remain customer-authored", (
     const result = buildNativeQuickAuditResult({ ...nativeInput, goals, evidence: {} })
     assert.equal(result.goalSource, "customer")
     assert.equal(result.goal, goals)
-    assert.match(result.improvedHeadline, new RegExp(goals.replace(/[.*+?^${}()|[\]\\]/g, "\\test("native Quick Audit IDs are deterministic per request and gateway replay does not save twice", async () => {"), "iu"))
+    assert.equal(result.improvedHeadline.includes(goals.charAt(0).toUpperCase() + goals.slice(1)), true)
   }
 })
 
