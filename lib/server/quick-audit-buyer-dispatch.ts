@@ -84,7 +84,6 @@ export async function dispatchApprovedQuickAuditOwnerPreview(input: {
       env.AMS_QUICK_AUDIT_BUYER_DISPATCH_ENABLED !== "true" ||
       env.AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED !== "true" ||
       env.AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED !== "true" ||
-      !/^cs_test_/.test(env.AMS_QUICK_AUDIT_OWNER_PILOT_SESSION_PREFIX ?? "cs_test_") ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(owner) ||
       !/^price_[A-Za-z0-9]+$/.test(env.AMS_STRIPE_PILOT_PRICE_ID ?? "")) {
     return "disabled"
