@@ -106,7 +106,7 @@ function fixture(options: {
       currency: "usd",
       metadata: { ams_offer: "quick-marketing-audit", ams_request_id: requestId },
       customer_details: { email: options.stripeEmail ?? owner },
-    }) as Stripe.Checkout.Session,
+    }) as unknown as Stripe.Checkout.Session,
     listLineItems: async (_id: string) => ({
       object: "list",
       data: [{ id: "li_test", object: "item", quantity: 1, price: { id: options.price ?? priceId } as Stripe.Price } as Stripe.LineItem],
