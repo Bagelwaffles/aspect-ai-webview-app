@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import { buildBrandedHtmlArtifact } from "../lib/client-artifacts"
-import { summarizeQuickAudit } from "../lib/quick-audit-presentation"
+import { auditEvidenceStatusLabel, summarizeQuickAudit, summarizeQuickAuditEvidence } from "../lib/quick-audit-presentation"
 
 test("audit executive summary reuses the ordered findings without inventing data", () => {
   const findings = Array.from({ length: 5 }, (_, index) => ({
@@ -45,4 +45,28 @@ test("report export HTML escapes dynamic finding text", () => {
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/)
   assert.equal(html.includes("<script>"), false)
   assert.equal(html.includes("<img"), false)
+})
+
+test("page check evidence distinguishes detected, not detected and unknown without false certainty", () => {
+  const coverage = summarizeQuickAuditEvidence({
+    hasClearValueProposition: true,
+    hasPrimaryCta: false,
+    hasLeadCapture: null,
+    hasTestimonials: true,
+    hasTitleAndMeta: false,
+  })
+  assert.equal(coverage.rows.length, 8)
+  assert.equal(coverage.detectedCount, 2)
+  assert.equal(coverage.notDetectedCount, 2)
+  assert.equal(coverage.notVerifiedCount, 4)
+  assert.equal(coverage.rows.find((row) => row.key === "hasLeadCapture")?.status, "not-verified")
+  assert.equal(coverage.rows.find((row) => row.key === "hasPrimaryCta")?.status, "not-detected")
+  assert.match(auditEvidenceStatusLabel("not-detected"), /Not detected/)
+})
+
+test("older audit record missing evidence cannot fabricate detected signals", () => {
+  const coverage = summarizeQuickAuditEvidence(undefined)
+  assert.equal(coverage.detectedCount, 0)
+  assert.equal(coverage.notDetectedCount, 0)
+  assert.equal(coverage.notVerifiedCount, coverage.rows.length)
 })
