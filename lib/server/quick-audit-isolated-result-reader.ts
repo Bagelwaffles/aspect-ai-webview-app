@@ -53,7 +53,7 @@ export function createIsolatedPilotBuyerResultHandler(overrides: Partial<Deps> =
         deps.env.AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED !== "true" ||
         !pilotStorageConfiguration(deps.env).ready ||
         deps.env.AMS_STRIPE_PILOT_ACCOUNT_ID !== AMS_PILOT_STRIPE_ACCOUNT ||
-        !/^sk_test_[A-Za-z0-9_]{8,}$/.test(deps.env.AMS_STRIPE_PILOT_TEST_SECRET_KEY ?? "") ||
+        !/^(?:sk|rk)_test_[A-Za-z0-9_]{8,}$/.test(deps.env.AMS_STRIPE_PILOT_TEST_SECRET_KEY ?? "") ||
         !/^price_[A-Za-z0-9]{8,200}$/.test(deps.env.AMS_STRIPE_PILOT_PRICE_ID ?? "") ||
         !deps.env.AMS_QUICK_AUDIT_REPORT_ACCESS_SECRET ||
         deps.env.AMS_QUICK_AUDIT_REPORT_ACCESS_SECRET.trim().length < 32) {
