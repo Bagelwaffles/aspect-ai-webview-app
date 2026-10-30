@@ -77,6 +77,8 @@ export async function dispatchApprovedQuickAuditOwnerPreview(input: {
 }): Promise<BuyerDispatchResult> {
   const { env, requestId } = input
   const owner = env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim().toLowerCase() ?? ""
+  const now = input.now ?? Date.now()
+  const expiresAt = Date.parse(env.AMS_QUICK_AUDIT_BUYER_DISPATCH_UNTIL ?? "")
   // This is deliberately NOT a live-customer-sending path. Production must
   // have a separately reviewed and authorized delivery adapter.
   if (env.VERCEL_ENV !== "preview" ||
@@ -84,6 +86,8 @@ export async function dispatchApprovedQuickAuditOwnerPreview(input: {
       env.AMS_QUICK_AUDIT_BUYER_DISPATCH_ENABLED !== "true" ||
       env.AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED !== "true" ||
       env.AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED !== "true" ||
+      env.AMS_STRIPE_PILOT_ACCOUNT_ID !== "acct_1UTtFMGuhFCl8JHa" ||
+      !Number.isFinite(expiresAt) || expiresAt <= now || expiresAt - now > 10 * 60_000 ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(owner) ||
       !/^price_[A-Za-z0-9]+$/.test(env.AMS_STRIPE_PILOT_PRICE_ID ?? "")) {
     return "disabled"
