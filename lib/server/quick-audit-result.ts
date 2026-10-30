@@ -21,7 +21,11 @@ const defaults: Dependencies = {
 function noStoreJson(body: Record<string, unknown>, status: number) {
   return NextResponse.json(body, {
     status,
-    headers: { "Cache-Control": "no-store" },
+    headers: {
+      "Cache-Control": "no-store",
+      "Referrer-Policy": "no-referrer",
+      "X-Robots-Tag": "noindex, nofollow, noarchive",
+    },
   })
 }
 
@@ -100,6 +104,15 @@ export function createQuickAuditResultHandler(overrides: Partial<Dependencies> =
         return noStoreJson(
           { ok: true, status: "processing" },
           202,
+        )
+      }
+
+      // A completed payment is not permission to read a different stored audit.
+      // Fail closed if the stored report and verified Stripe order disagree.
+      if (result.requestId !== requestId) {
+        return noStoreJson(
+          { ok: false, error: "Quick Audit result could not be matched to this order", code: "QUICK_AUDIT_RESULT_MISMATCH" },
+          403,
         )
       }
 
