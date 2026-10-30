@@ -115,6 +115,7 @@ export async function dispatchApprovedQuickAuditOwnerPreview(input: {
       expectedPriceId: env.AMS_STRIPE_PILOT_PRICE_ID!,
       expectedLivemode: false,
       signingSecret: env.AMS_QUICK_AUDIT_REPORT_ACCESS_SECRET,
+      reportBaseUrl: env.VERCEL_URL ? `https://${env.VERCEL_URL}` : undefined,
       report,
       stripe: input.stripe,
       now: input.now,
