@@ -15,7 +15,7 @@ import {
 } from "./quick-audit-report-access"
 
 const CANONICAL_SITE = "https://www.aspectmarketingsolutions.app"
-const APPROVED_PREVIEW_HOST = /^aspect-ai-overlord-[a-z0-9]+-kimberleyaversbiz-4131s-projects\\.vercel\\.app$/u
+const APPROVED_PREVIEW_HOST = /^aspect-ai-overlord-[a-z0-9]+-kimberleyaversbiz-4131s-projects\.vercel\.app$/u
 
 function verifiedReportOrigin(expectedLivemode: boolean, reportBaseUrl: string | undefined): string {
   if (expectedLivemode) {
