@@ -114,7 +114,7 @@ test("wrong Stripe price, duplicate line items, and pagination fail closed", asy
 
 test("requires one unambiguous buyer email and the exact persisted report", async () => {
   await assert.rejects(prepareVerifiedBuyerQuickAuditEmail(input({
-    stripe: fixture({ session: paidSession({ customer_details: { email: "one@example.com" } as Stripe.Checkout.Session.CustomerDetails, customer_email: "two@example.com" }) }).stripe,
+    stripe: fixture({ session: paidSession({ customer_details: { email: "one@example.com" } as NonNullable<Stripe.Checkout.Session["customer_details"]>, customer_email: "two@example.com" }) }).stripe,
   })), /AUDIT_BUYER_DELIVERY_RECIPIENT_CONFLICT/)
   await assert.rejects(prepareVerifiedBuyerQuickAuditEmail(input({
     stripe: fixture({ session: paidSession({ customer_details: null, customer_email: null }) }).stripe,
