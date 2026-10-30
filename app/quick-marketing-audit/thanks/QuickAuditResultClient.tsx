@@ -13,7 +13,7 @@ import {
   printHtmlArtifact,
 } from "@/lib/client-artifacts"
 import type { NativeQuickAuditResult } from "@/lib/server/quick-audit-native"
-import { summarizeQuickAudit } from "@/lib/quick-audit-presentation"
+import { auditEvidenceStatusLabel, summarizeQuickAudit, summarizeQuickAuditEvidence } from "@/lib/quick-audit-presentation"
 
 type ResultState =
   | { kind: "idle" }
@@ -26,6 +26,7 @@ const MAX_AUTOMATIC_CHECKS = 20
 
 function buildAuditArtifact(result: NativeQuickAuditResult): string {
   const summary = summarizeQuickAudit(result)
+  const evidence = summarizeQuickAuditEvidence(result.evidence)
   return buildBrandedHtmlArtifact({
     eyebrow: "$49 Quick Marketing Audit",
     title: `${result.businessName} — Marketing Audit`,
@@ -35,6 +36,11 @@ function buildAuditArtifact(result: NativeQuickAuditResult): string {
         heading: "Executive Snapshot — Start Here",
         text: `${summary.findingsCount} prioritized findings and ${summary.planDaysCount} day-by-day actions. Based on automated page observations; traffic, ROI, conversions and actual results were not measured.`,
         orderedItems: summary.priorityActions.map((item) => `${item.title}\nSuggested action: ${item.fix}`),
+      },
+      {
+        heading: "What the Automated Page Checks Could Confirm",
+        text: `${evidence.detectedCount} signals detected, ${evidence.notDetectedCount} not detected, ${evidence.notVerifiedCount} not verified. These are page-content signals, not independently verified business outcomes or performance metrics. Not detected does not prove absent.`,
+        items: evidence.rows.map((item) => `${item.label}: ${auditEvidenceStatusLabel(item.status)}`),
       },
       ...(result.strengths.length
         ? [{ heading: "What the Evidence Already Supports", items: result.strengths }]
@@ -151,6 +157,7 @@ export function QuickAuditResultClient() {
 
   const { result } = state
   const summary = summarizeQuickAudit(result)
+  const evidence = summarizeQuickAuditEvidence(result.evidence)
 
   function downloadAuditReport() {
     const html = buildAuditArtifact(result)
@@ -203,6 +210,7 @@ export function QuickAuditResultClient() {
           </div>
         </div>
         <nav aria-label="Jump to audit sections" className="flex flex-wrap gap-2 text-sm">
+          <a className="rounded-lg border bg-background px-3 py-2 underline-offset-4 hover:underline" href="#audit-evidence">Check evidence</a>
           <a className="rounded-lg border bg-background px-3 py-2 underline-offset-4 hover:underline" href="#audit-findings">All findings</a>
           <a className="rounded-lg border bg-background px-3 py-2 underline-offset-4 hover:underline" href="#audit-plan">7-day action plan</a>
           <a className="rounded-lg border bg-background px-3 py-2 underline-offset-4 hover:underline" href="#audit-copy">Copy and offer recommendations</a>
@@ -221,6 +229,36 @@ export function QuickAuditResultClient() {
             ))}
           </ol>
         </div>
+      </section>
+
+      <section aria-labelledby="audit-evidence-title" className="scroll-mt-6 rounded-2xl border p-5 sm:p-7" id="audit-evidence">
+        <h2 id="audit-evidence-title" className="text-xl font-semibold">What the automated checks detected</h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          These checks examine page signals, not actual visitor behavior or business results.
+          A feature marked not detected may still exist on an interactive page; verify it manually before making changes.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3" aria-label="Automated check coverage">
+          <div className="rounded-lg border p-3">
+            <p className="text-2xl font-semibold tabular-nums">{evidence.detectedCount}</p>
+            <p className="text-sm text-muted-foreground">Detected</p>
+          </div>
+          <div className="rounded-lg border p-3">
+            <p className="text-2xl font-semibold tabular-nums">{evidence.notDetectedCount}</p>
+            <p className="text-sm text-muted-foreground">Not detected</p>
+          </div>
+          <div className="rounded-lg border p-3">
+            <p className="text-2xl font-semibold tabular-nums">{evidence.notVerifiedCount}</p>
+            <p className="text-sm text-muted-foreground">Not verified</p>
+          </div>
+        </div>
+        <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+          {evidence.rows.map((item) => (
+            <li key={item.key} className="rounded-lg border p-3 text-sm">
+              <p className="font-medium">{item.label}</p>
+              <p className="mt-1 text-muted-foreground">{auditEvidenceStatusLabel(item.status)}</p>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {result.strengths.length ? (
