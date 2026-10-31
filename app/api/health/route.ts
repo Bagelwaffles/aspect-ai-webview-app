@@ -41,6 +41,11 @@ export async function GET() {
           configured: redis.configured,
           checked: redis.checked,
           latencyMs: redis.latencyMs,
+          // Only this isolated, owner-controlled Preview exposes a generic diagnostic category.
+          // Do not expose the exception message, Redis URL, or credentials.
+          ...(environment === "preview" && process.env.VERCEL_GIT_COMMIT_REF === "feat/ams-audit-buyer-link-integration-20261029" && redis.failureCategory
+            ? { failureCategory: redis.failureCategory }
+            : {}),
         },
         relationalDatabase: "not_approved",
       },
