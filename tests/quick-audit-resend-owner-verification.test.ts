@@ -127,3 +127,54 @@ test("proof write/read failures never report success, and existing store rejects
     verifiedAt: new Date(now.getTime() - 901_000).toISOString() }))
   assert.equal(await store.readDomainProof(), null)
 })
+
+
+test("no-key owner browser preflight validates request and consumes no attempts or Redis access", async () => {
+  const f = fixture()
+  const response = await handleOwnerDomainVerification(request({ checkOnly: true }), f.input)
+  assert.equal(response.status, 200)
+  const body = await response.json()
+  assert.equal(body.code, "OWNER_DOMAIN_VERIFY_PREFLIGHT_READY")
+  assert.equal(body.proofWrittenAndRead, false)
+  assert.equal(body.emailSent, false)
+  assert.equal(body.paymentPerformed, false)
+  assert.equal(f.clients, 0)
+  assert.equal(f.requests, 0)
+  assert.equal(f.writes.length, 0)
+  const accepted = await handleOwnerDomainVerification(request(), f.input)
+  assert.equal(accepted.status, 200, "diagnostic must not use the one real verification attempt")
+  assert.equal(f.requests, 1)
+})
+
+test("no-key preflight fails closed for cross-origin, owner-denied and expired windows", async () => {
+  const f = fixture()
+  for (const [inputRequest, input] of [
+    [request({ checkOnly: true }, { "sec-fetch-site": "cross-site" }), f.input],
+    [request({ checkOnly: true }, { origin: "https://evil.example.test" }), f.input],
+    [request({ checkOnly: true }), { ...f.input, authorize: async () => ({ ok: false, status: 401 }) }],
+    [request({ checkOnly: true }), { ...f.input, env: { ...env, AMS_RESEND_OWNER_VERIFY_UNTIL: now.toISOString() } }],
+  ] as const) {
+    const response = await handleOwnerDomainVerification(inputRequest, input)
+    assert.ok(response.status === 401 || response.status === 403)
+    assert.equal((await response.json()).proofWrittenAndRead, false)
+  }
+  assert.equal(f.clients, 0)
+  assert.equal(f.requests, 0)
+  assert.equal(f.writes.length, 0)
+})
+
+test("no-key preflight requires exact shape and cannot make a claim through invalid payload", async () => {
+  const f = fixture()
+  for (const input of [
+    { checkOnly: true, fullAccessKey: key },
+    { checkOnly: "true" },
+    { checkOnly: false },
+  ]) {
+    const response = await handleOwnerDomainVerification(request(input), f.input)
+    assert.equal(response.status, 400)
+    assert.equal((await response.json()).proofWrittenAndRead, false)
+  }
+  assert.equal(f.clients, 0)
+  assert.equal(f.requests, 0)
+  assert.equal(f.writes.length, 0)
+})
