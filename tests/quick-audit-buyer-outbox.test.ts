@@ -19,7 +19,7 @@ function memoryRedis() {
   const data = new Map<string, string>()
   return {
     data,
-    async get(key: string) { return data.has(key) ? data.get(key)! : null },
+    async get<T=unknown>(key: string): Promise<T | null> { return data.has(key) ? data.get(key)! as unknown as T : null },
     async set(key: string, value: string, opts: { nx: true; ex: number }) {
       assert.equal(opts.nx, true)
       if (data.has(key)) return null
