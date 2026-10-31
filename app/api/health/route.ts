@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { isInternalApiConfigured } from "@/lib/server/internal-api-auth"
-import { checkRedisReadiness } from "@/lib/server/redis-readiness"
+import { checkRedisReadiness, probeRedisRestTransport } from "@/lib/server/redis-readiness"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -22,6 +22,11 @@ export async function GET() {
   const environment = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown"
   const redis = await checkRedisReadiness()
   const ready = redis.state === "ready"
+  const diagnosticPreview = environment === "preview" &&
+    process.env.VERCEL_GIT_COMMIT_REF === "feat/ams-audit-buyer-link-integration-20261029"
+  const transportCategory = diagnosticPreview && redis.failureCategory === "unknown"
+    ? await probeRedisRestTransport()
+    : null
   const aiGatewayConfigured =
     configuredAny("AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN") ||
     nativeVercelGatewayAuthAvailable()
@@ -43,9 +48,10 @@ export async function GET() {
           latencyMs: redis.latencyMs,
           // Only this isolated, owner-controlled Preview exposes a generic diagnostic category.
           // Do not expose the exception message, Redis URL, or credentials.
-          ...(environment === "preview" && process.env.VERCEL_GIT_COMMIT_REF === "feat/ams-audit-buyer-link-integration-20261029" && redis.failureCategory
+          ...(diagnosticPreview && redis.failureCategory
             ? { failureCategory: redis.failureCategory }
             : {}),
+          ...(transportCategory ? { transportCategory } : {}),
         },
         relationalDatabase: "not_approved",
       },
