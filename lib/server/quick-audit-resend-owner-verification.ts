@@ -19,7 +19,7 @@ export function ownerDomainVerificationEnabled(env: NodeJS.ProcessEnv, now = Dat
 
 function reply(code: string, status: number) {
   return Response.json({ ok: status === 200, code, emailSent: false, paymentPerformed: false,
-    proofWrittenAndRead: status === 200 }, {
+    proofWrittenAndRead: status === 200 && code === "OWNER_DOMAIN_VERIFY_PROOF_WRITTEN_AND_READ" }, {
     status, headers: { "Cache-Control": "no-store, max-age=0", "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff" },
   })
@@ -67,10 +67,28 @@ export async function handleOwnerDomainVerification(request: Request, input: {
   try {
     const url = new URL(request.url)
     const expected = new URL(input.env.PUBLIC_APP_URL ?? input.env.NEXTAUTH_URL ?? "")
-    if (url.protocol !== "https:" || expected.protocol !== "https:" || url.search ||
-        request.headers.get("origin") !== url.origin || url.origin !== expected.origin ||
-        request.headers.get("sec-fetch-site") !== "same-origin") {
-      return reply("OWNER_DOMAIN_VERIFY_ORIGIN_DENIED", 403)
+    // Distinguish origin failures without exposing hosts, request headers or
+    // changing any of the existing authorization requirements.
+    if (url.protocol !== "https:" || expected.protocol !== "https:" || url.search) {
+      return reply("OWNER_DOMAIN_VERIFY_ORIGIN_URL_DENIED", 403)
+    }
+    if (request.headers.get("origin") !== url.origin) {
+      return reply("OWNER_DOMAIN_VERIFY_ORIGIN_HEADER_DENIED", 403)
+    }
+    // The immutable deployment hostname is a Vercel-managed alternate for the
+    // signed-in Preview branch alias. Accept ONLY the platform-supplied hostname
+    // for this exact project/team while preserving same-origin fetch, HTTPS,
+    // owner session, and the configured branch-alias requirements.
+    const platformHost = input.env.VERCEL_ENV === "preview" &&
+      input.env.VERCEL_GIT_COMMIT_REF === "feat/ams-audit-buyer-link-integration-20261029" &&
+      /^aspect-ai-overlord-[a-z0-9]{8,15}-kimberleyaversbiz-4131s-projects\.vercel\.app$/.test(
+        input.env.VERCEL_URL ?? ""
+      ) ? `https://${input.env.VERCEL_URL}` : null
+    if (url.origin !== expected.origin && url.origin !== platformHost) {
+      return reply("OWNER_DOMAIN_VERIFY_ORIGIN_EXPECTED_DENIED", 403)
+    }
+    if (request.headers.get("sec-fetch-site") !== "same-origin") {
+      return reply("OWNER_DOMAIN_VERIFY_ORIGIN_FETCH_SITE_DENIED", 403)
     }
     const auth = await input.authorize()
     if (!auth.ok) return reply("OWNER_DOMAIN_VERIFY_OWNER_REQUIRED", auth.status === 403 ? 403 : 401)
@@ -84,6 +102,12 @@ export async function handleOwnerDomainVerification(request: Request, input: {
     try { payload = JSON.parse(await boundedBody(request)) } catch {
       return reply("OWNER_DOMAIN_VERIFY_INVALID_REQUEST", 400)
     }
+    // Read-only owner/browser diagnostic: validates the exact POST origin,
+    // session, expiry and content-type WITHOUT a key, Redis access, proof
+    // write, attempt consumption, or provider request.
+    if (payload && typeof payload === "object" && !Array.isArray(payload) &&
+        Object.keys(payload).length === 1 && "checkOnly" in payload &&
+        payload.checkOnly === true) return reply("OWNER_DOMAIN_VERIFY_PREFLIGHT_READY", 200)
     if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
         Object.keys(payload).length !== 1 || !("fullAccessKey" in payload) ||
         typeof payload.fullAccessKey !== "string" ||
