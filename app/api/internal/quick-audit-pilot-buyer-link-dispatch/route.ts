@@ -6,6 +6,7 @@
 import { Redis } from "@upstash/redis"
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
+import { isStripeSandboxTestKey } from "@/lib/server/quick-audit-stripe-test-key"
 
 import { authorizeOwnerApiRequest } from "@/lib/server/owner-api-auth"
 import { dispatchApprovedQuickAuditOwnerPreview } from "@/lib/server/quick-audit-buyer-dispatch"
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
       env.AMS_QUICK_AUDIT_BUYER_DISPATCH_ENABLED !== "true" ||
       env.AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED !== "true" ||
       env.AMS_QUICK_AUDIT_PILOT_BUYER_RESULT_ENABLED !== "true" ||
-      !env.AMS_STRIPE_PILOT_TEST_SECRET_KEY?.startsWith("sk_test_")) {
+      !isStripeSandboxTestKey(env.AMS_STRIPE_PILOT_TEST_SECRET_KEY)) {
     return json("PILOT_BUYER_LINK_DISPATCH_DISABLED", 503)
   }
 

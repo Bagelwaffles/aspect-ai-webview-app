@@ -1,3 +1,4 @@
+import { isStripeSandboxTestKey } from "./quick-audit-stripe-test-key"
 /** Pure, no-I/O inspection. Never returns credentials, addresses or datastore URLs. */
 type Env = Readonly<Record<string, string | undefined>>
 type Pilot = { ready: boolean; code: string }
@@ -20,7 +21,7 @@ export function inspectBuyerLinkGate(env: Env, pilot: Pilot, now = Date.now()) {
     buyerWindowValid: windowState(env.AMS_QUICK_AUDIT_BUYER_DISPATCH_UNTIL) === "valid",
     reportAccessRequired: env.AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED === "true",
     buyerResultEnabled: env.AMS_QUICK_AUDIT_PILOT_BUYER_RESULT_ENABLED === "true",
-    stripeTestKeyAccepted: key.startsWith("sk_test_"),
+    stripeTestKeyAccepted: isStripeSandboxTestKey(key),
     isolatedStripeAccount: env.AMS_STRIPE_PILOT_ACCOUNT_ID === "acct_1UTtFMGuhFCl8JHa",
     ownerRecipientMatches: Boolean(env.AMS_OWNER_EMAIL?.trim()) &&
       env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim().toLowerCase() === env.AMS_OWNER_EMAIL?.trim().toLowerCase(),

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { inspectBuyerLinkGate, buyerLinkRehearsalEnvironment } from "../lib/server/quick-audit-buyer-link-gate-diagnostic"
+import { isStripeSandboxTestKey } from "../lib/server/quick-audit-stripe-test-key"
 const now = Date.parse("2026-10-31T00:00:00Z")
 const base = {
  VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "feat/ams-audit-buyer-link-integration-20261029",
@@ -26,7 +27,8 @@ test("no key or recipient leaks in output and restricted TEST format is diagnose
  const env=buyerLinkRehearsalEnvironment({...base,AMS_STRIPE_PILOT_TEST_SECRET_KEY:"rk_test_synthetic_private"},now)
  const result=inspectBuyerLinkGate(env,{ready:true,code:"PILOT_DISPATCH_ARMED"},now)
  assert.equal(result.stripeKeyKind,"restricted-test")
- assert.equal(result.checks.stripeTestKeyAccepted,false)
+ assert.equal(result.checks.stripeTestKeyAccepted,true)
+ assert.equal(result.ready,true)
  assert.ok(!JSON.stringify(result).includes("synthetic_private"))
  assert.ok(!JSON.stringify(result).includes("owner@example.com"))
 })
@@ -35,4 +37,10 @@ test("wrong branch, owner, live key, public checkout or unisolated pilot fails",
   assert.equal(inspectBuyerLinkGate(buyerLinkRehearsalEnvironment({...base,...patch},now),{ready:true,code:"PILOT_DISPATCH_ARMED"},now).ready,false)
  }
  assert.equal(inspectBuyerLinkGate(buyerLinkRehearsalEnvironment(base,now),{ready:false,code:"PILOT_STORAGE_NOT_ISOLATED"},now).ready,false)
+})
+
+test("restricted TEST key regression: accept sandbox prefixes, reject live and missing credentials", () => {
+ assert.equal("rk_test_synthetic".startsWith("sk_test_"),false)
+ for(const value of ["sk_test_synthetic","rk_test_synthetic"]) assert.equal(isStripeSandboxTestKey(value),true)
+ for(const value of [undefined,"","sk_live_synthetic","rk_live_synthetic","pk_test_synthetic","rk_test"]) assert.equal(isStripeSandboxTestKey(value),false)
 })
