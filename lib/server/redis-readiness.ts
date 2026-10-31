@@ -42,6 +42,41 @@ function redisConfiguration(): { url: string; token: string } | null {
   return url && token ? { url, token } : null
 }
 
+/**
+ * Direct REST transport probe for an explicitly isolated Preview diagnosis only.
+ * No raw errors, headers, response bodies, URLs, or credentials are returned.
+ * This does not override the normal Redis client health result.
+ */
+export async function probeRedisRestTransport(
+  configuration: { url: string; token: string } | null = redisConfiguration(),
+  request: typeof fetch = fetch,
+): Promise<RedisFailureCategory | "transport_ok" | "not_configured"> {
+  if (!configuration) return "not_configured"
+  try {
+    const response = await request(configuration.url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${configuration.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(["PING"]),
+      signal: AbortSignal.timeout(1_500),
+      cache: "no-store",
+    })
+    if (response.status === 401 || response.status === 403) return "auth"
+    if (response.status === 404) return "endpoint"
+    if (response.status === 429) return "rate_limited"
+    if (!response.ok) return "unknown"
+    const body: unknown = await response.json().catch(() => null)
+    if (body && typeof body === "object" && "result" in body && String(body.result).toUpperCase() === "PONG") {
+      return "transport_ok"
+    }
+    return "unexpected_response"
+  } catch (error) {
+    return classifyRedisFailure(error)
+  }
+}
+
 export function isRedisPersistenceConfigured(): boolean {
   return redisConfiguration() !== null
 }
