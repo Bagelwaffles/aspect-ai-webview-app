@@ -16,7 +16,7 @@ import {
 
 export interface ResendDomainProofRedis {
   get<T = unknown>(key: string): Promise<T | null>
-  ttl(key: string): Promise<number>
+  ttl?(key: string): Promise<number>
   set(key: string, value: string, options: { ex: number }): Promise<unknown>
 }
 
@@ -48,7 +48,7 @@ export class PreviewResendDomainProofStore {
 
   /** Read-only owner diagnostic; exposes timestamp and TTL, never the proof object. */
   async inspectDomainProofStatus(): Promise<{ status: "current" | "expired" | "missing" | "invalid"; verifiedAt: string | null; remainingSeconds: number }> {
-    const [raw, ttl] = await Promise.all([this.redis.get<unknown>(this.key), this.redis.ttl(this.key)])
+    const [raw, ttl] = await Promise.all([this.redis.get<unknown>(this.key), this.redis.ttl ? this.redis.ttl(this.key) : Promise.resolve(-1)])
     if (raw === null || raw === undefined || ttl === -2) return { status: "missing", verifiedAt: null, remainingSeconds: 0 }
     let value: unknown = raw
     if (typeof raw === "string") { try { value = JSON.parse(raw) } catch { return { status: "invalid", verifiedAt: null, remainingSeconds: 0 } } }
@@ -56,8 +56,9 @@ export class PreviewResendDomainProofStore {
     const verifiedAt = (value as { verifiedAt?: unknown }).verifiedAt
     if (typeof verifiedAt !== "string" || !Number.isFinite(Date.parse(verifiedAt))) return { status: "invalid", verifiedAt: null, remainingSeconds: 0 }
     const age = this.now().getTime() - Date.parse(verifiedAt)
-    const remainingSeconds = Math.max(0, Math.min(ttl, Math.floor((15 * 60_000 - age) / 1000)))
-    const current = hasCurrentResendDomainProof(value, this.now()) && ttl > 0 && remainingSeconds > 0
+    const calculated = Math.floor((15 * 60_000 - age) / 1000)
+    const remainingSeconds = Math.max(0, Math.min(ttl > 0 ? ttl : calculated, calculated))
+    const current = hasCurrentResendDomainProof(value, this.now()) && ttl !== -2 && remainingSeconds > 0
     return { status: current ? "current" : "expired", verifiedAt, remainingSeconds: current ? remainingSeconds : 0 }
   }
 
