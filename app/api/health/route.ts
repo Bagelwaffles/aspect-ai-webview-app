@@ -43,7 +43,7 @@ export async function GET() {
   const transportCategory = diagnosticPreview && redis.failureCategory === "unknown"
     ? await probeRedisRestTransport()
     : null
-  const redisHostFingerprint = diagnosticPreview && transportCategory === "auth"
+  const redisHostFingerprint = diagnosticPreview && (transportCategory === "auth" || redis.failureCategory === "auth")
     ? genericRedisHostFingerprint()
     : null
   const aiGatewayConfigured =
