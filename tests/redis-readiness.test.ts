@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { checkRedisReadiness } from "../lib/server/redis-readiness"
+import { checkRedisReadiness, probeRedisRestTransport } from "../lib/server/redis-readiness"
 
 test("readiness fails closed when Redis is not configured", async () => {
   const result = await checkRedisReadiness(null)
@@ -81,4 +81,28 @@ test("readiness fails closed when Redis exceeds the timeout", async () => {
   assert.equal(result.configured, true)
   assert.equal(result.checked, true)
   assert.equal(result.failureCategory, "timeout")
+})
+
+test("direct REST probe returns only fixed category, not the supplied secret", async () => {
+  const configuration = { url: "https://test-only.upstash.io", token: "SECRET_DO_NOT_LEAK" }
+  const response = await probeRedisRestTransport(configuration, (async () => new Response("", { status: 401 })) as typeof fetch)
+  assert.equal(response, "auth")
+  assert.equal(JSON.stringify(response).includes("SECRET_DO_NOT_LEAK"), false)
+})
+
+test("direct REST probe diagnoses unreachable endpoint versus successful PONG", async () => {
+  const configuration = { url: "https://test-only.upstash.io", token: "SECRET_DO_NOT_LEAK" }
+  const missing = await probeRedisRestTransport(configuration, (async () => new Response("", { status: 404 })) as typeof fetch)
+  const healthy = await probeRedisRestTransport(configuration, (async () =>
+    new Response(JSON.stringify({ result: "PONG" }), { status: 200 })) as typeof fetch)
+  assert.equal(missing, "endpoint")
+  assert.equal(healthy, "transport_ok")
+})
+
+test("direct REST probe returns a fixed failure on non-JSON body", async () => {
+  const category = await probeRedisRestTransport(
+    { url: "https://test-only.upstash.io", token: "SECRET_DO_NOT_LEAK" },
+    (async () => new Response("not-json", { status: 200 })) as typeof fetch,
+  )
+  assert.equal(category, "unexpected_response")
 })
