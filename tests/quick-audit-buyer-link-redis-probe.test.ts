@@ -4,6 +4,7 @@ import { probeBuyerLinkRedisWrite, type BuyerLinkWriteProbeRedis } from "../lib/
 
 function safeEnv(): NodeJS.ProcessEnv {
   return {
+    NODE_ENV: "test",
     VERCEL_ENV: "preview",
     VERCEL_GIT_COMMIT_REF: "feat/ams-audit-buyer-link-integration-20261029",
     AMS_STRIPE_PILOT_ACCOUNT_ID: "acct_1UTtFMGuhFCl8JHa",
