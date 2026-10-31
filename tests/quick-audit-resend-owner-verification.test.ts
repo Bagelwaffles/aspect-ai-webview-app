@@ -178,3 +178,41 @@ test("no-key preflight requires exact shape and cannot make a claim through inva
   assert.equal(f.requests, 0)
   assert.equal(f.writes.length, 0)
 })
+
+test("Vercel deployment host is accepted only when it exactly matches the server-issued project deployment hostname", async () => {
+  const host = "aspect-ai-overlord-8erod78qm-kimberleyaversbiz-4131s-projects.vercel.app"
+  const deployedOrigin = `https://${host}`
+  const deployedRequest = (headers: Record<string, string> = {}) => new Request(
+    deployedOrigin + "/api/internal/quick-audit-resend-domain-verify", {
+      method: "POST",
+      headers: { origin: deployedOrigin, "sec-fetch-site": "same-origin", "content-type": "application/json", ...headers },
+      body: JSON.stringify({ checkOnly: true }),
+    }
+  )
+  const f = fixture()
+  const safeEnv = { ...env, VERCEL_URL: host }
+  const accepted = await handleOwnerDomainVerification(deployedRequest(), { ...f.input, env: safeEnv })
+  assert.equal(accepted.status, 200)
+  assert.equal((await accepted.json()).code, "OWNER_DOMAIN_VERIFY_PREFLIGHT_READY")
+  for (const alternate of [
+    { VERCEL_URL: "evil.example.test" },
+    { VERCEL_URL: "other-project-8erod78qm-kimberleyaversbiz-4131s-projects.vercel.app" },
+    { VERCEL_URL: undefined },
+    { VERCEL_GIT_COMMIT_REF: "main" },
+    { VERCEL_ENV: "production" },
+  ]) {
+    const reply = await handleOwnerDomainVerification(deployedRequest(), {
+      ...f.input, env: { ...safeEnv, ...alternate },
+    })
+    assert.equal(reply.status, 403)
+  }
+  assert.equal((await handleOwnerDomainVerification(
+    deployedRequest({ origin: "https://hostile.example.test" }), { ...f.input, env: safeEnv }
+  )).status, 403)
+  assert.equal((await handleOwnerDomainVerification(
+    deployedRequest({ "sec-fetch-site": "cross-site" }), { ...f.input, env: safeEnv }
+  )).status, 403)
+  assert.equal(f.clients, 0)
+  assert.equal(f.requests, 0)
+  assert.equal(f.writes.length, 0)
+})
