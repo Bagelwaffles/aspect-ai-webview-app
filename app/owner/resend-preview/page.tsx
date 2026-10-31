@@ -11,6 +11,7 @@ import { ConnectivityControls } from "./connectivity-controls"
 import { DomainVerificationControls } from "./domain-verification-controls"
 import { ManualResendDispatchControls } from "./manual-resend-dispatch-controls"
 import { BuyerLinkDispatchControls } from "./buyer-link-dispatch-controls"
+import { BuyerLinkRedisProbeControls } from "./buyer-link-redis-probe-controls"
 import { ownerDomainVerificationEnabled } from "@/lib/server/quick-audit-resend-owner-verification"
 
 export const runtime = "nodejs"
@@ -74,6 +75,7 @@ export default async function ResendPreviewOwnerPage() {
             <ConnectivityControls />
             {ownerDomainVerificationEnabled(process.env) && <DomainVerificationControls />}
             <ManualResendDispatchControls />
+            <BuyerLinkRedisProbeControls />
             <BuyerLinkDispatchControls />
           </>
         ) : (
