@@ -7,6 +7,7 @@ import { StripeAcceptanceControls } from "./stripe-acceptance-controls"
 import { ConnectivityControls } from "./connectivity-controls"
 import { DomainVerificationControls } from "./domain-verification-controls"
 import { ManualResendDispatchControls } from "./manual-resend-dispatch-controls"
+import { BuyerLinkDispatchControls } from "./buyer-link-dispatch-controls"
 import { ownerDomainVerificationEnabled } from "@/lib/server/quick-audit-resend-owner-verification"
 
 export const runtime = "nodejs"
@@ -48,6 +49,7 @@ export default async function ResendPreviewOwnerPage() {
             <ConnectivityControls />
             {ownerDomainVerificationEnabled(process.env) && <DomainVerificationControls />}
             <ManualResendDispatchControls />
+            <BuyerLinkDispatchControls />
           </>
         ) : (
           <section className="rounded-xl border border-amber-500/40 bg-amber-950/25 p-5">
