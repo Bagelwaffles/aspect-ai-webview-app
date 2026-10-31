@@ -8,7 +8,7 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
-  const auth = await authorizeOwnerApiRequest(request, { requireTrustedOrigin: true })
+  const auth = await authorizeOwnerApiRequest(request)
   if (!auth.ok) return NextResponse.json({ ok: false, code: auth.code }, { status: auth.status, headers: { "Cache-Control": "no-store" } })
   const env = process.env
   if (env.VERCEL_ENV !== "preview" || env.VERCEL_GIT_COMMIT_REF !== RESEND_PREVIEW_BRANCH) {
