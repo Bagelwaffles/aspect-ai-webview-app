@@ -27,6 +27,7 @@ type DeliveryRecord = {
 }
 type Outbox = {
   read(requestId: string): Promise<DeliveryRecord | null>
+  enqueue?(input: {auditId: string; requestId: string; checkoutSessionId: string; recipient: string; paidAndPersisted: boolean}): Promise<DeliveryRecord>
   claim(requestId: string, flags: { enabled: boolean; ownerOnly: boolean; ownerEmail: string }): Promise<DeliveryRecord | null>
   finish(
     claim: DeliveryRecord,
@@ -70,6 +71,8 @@ export async function dispatchApprovedQuickAuditOwnerPreview(input: {
   env: NodeJS.ProcessEnv
   proof: PaidProof
   outbox: Outbox
+  /** Original owner-only audit receipt; read-only, never re-claimed or modified. */
+  originalOutbox?: Pick<Outbox, "read">
   reports: Pick<QuickAuditResultStore, "getByRequestId">
   stripe: StripeReader
   sender: TransactionalSender
@@ -94,9 +97,21 @@ export async function dispatchApprovedQuickAuditOwnerPreview(input: {
   }
   if (!/^[A-Za-z0-9_-]{8,200}$/.test(requestId)) return "held"
 
-  const record = await input.outbox.read(requestId)
+  // The first audit email has already been submitted. A distinct buyer-link
+  // delivery can only be initialized from that verified, immutable receipt.
+  // The original key is never reset from submitted/delivered to queued.
+  const original = input.originalOutbox ? await input.originalOutbox.read(requestId) : null
+  if (input.originalOutbox && (!original ||
+      (original.state !== "submitted" && original.state !== "delivered") ||
+      !original.providerMessageId?.trim())) return "held"
+  let record = await input.outbox.read(requestId)
+  const stageBuyerLink = !record && Boolean(original)
+  if (!record) record = original
   if (!record) return "held"
-  if (record.state !== "queued") return "duplicate"
+  if (!stageBuyerLink && record.state !== "queued") return "duplicate"
+  if (original && (record.auditId !== original.auditId ||
+      record.checkoutSessionId !== original.checkoutSessionId ||
+      record.recipient !== original.recipient)) return "held"
   if (record.requestId !== requestId ||
       record.recipient !== owner ||
       !/^cs_test_[A-Za-z0-9]{8,200}$/.test(record.checkoutSessionId)) return "held"
@@ -143,8 +158,19 @@ export async function dispatchApprovedQuickAuditOwnerPreview(input: {
     return "held"
   }
 
-  // The existing #300 outbox implements Redis compare-and-set. A claimed or
-  // uncertain send must never be automatically replayed by this function.
+  // Only after verifying payment, report, purchaser and sender may an
+  // independent buyer-link record be created. Redis NX/CAS guarantees at
+  // most one claim; submitted/uncertain records are never automatically reset.
+  if (stageBuyerLink) {
+    if (!input.outbox.enqueue) return "held"
+    try {
+      record = await input.outbox.enqueue({
+        auditId: record.auditId, requestId, checkoutSessionId: record.checkoutSessionId,
+        recipient: owner, paidAndPersisted: true,
+      })
+    } catch { return "held" }
+    if (record.state !== "queued") return "duplicate"
+  }
   const claim = await input.outbox.claim(requestId, { enabled: true, ownerOnly: true, ownerEmail: owner })
   if (!claim) return "duplicate"
   if (claim.state !== "sending" ||
