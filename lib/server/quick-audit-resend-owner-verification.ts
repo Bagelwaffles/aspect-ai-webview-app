@@ -75,7 +75,16 @@ export async function handleOwnerDomainVerification(request: Request, input: {
     if (request.headers.get("origin") !== url.origin) {
       return reply("OWNER_DOMAIN_VERIFY_ORIGIN_HEADER_DENIED", 403)
     }
-    if (url.origin !== expected.origin) {
+    // The immutable deployment hostname is a Vercel-managed alternate for the
+    // signed-in Preview branch alias. Accept ONLY the platform-supplied hostname
+    // for this exact project/team while preserving same-origin fetch, HTTPS,
+    // owner session, and the configured branch-alias requirements.
+    const platformHost = input.env.VERCEL_ENV === "preview" &&
+      input.env.VERCEL_GIT_COMMIT_REF === "feat/ams-audit-buyer-link-integration-20261029" &&
+      /^aspect-ai-overlord-[a-z0-9]{8,15}-kimberleyaversbiz-4131s-projects\.vercel\.app$/.test(
+        input.env.VERCEL_URL ?? ""
+      ) ? `https://${input.env.VERCEL_URL}` : null
+    if (url.origin !== expected.origin && url.origin !== platformHost) {
       return reply("OWNER_DOMAIN_VERIFY_ORIGIN_EXPECTED_DENIED", 403)
     }
     if (request.headers.get("sec-fetch-site") !== "same-origin") {
