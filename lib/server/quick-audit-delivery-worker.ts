@@ -1,0 +1,228 @@
+/**
+ * Preview-only Quick Audit transactional delivery worker core.
+ *
+ * This module NEVER owns Gmail credentials, registers a Cron job, or sends
+ * customer emails. An approved authenticated owner-only Preview adapter must
+ * provide the sender. The default policy is disabled.
+ */
+import { Redis } from "@upstash/redis"
+
+import {
+  QuickAuditDeliveryOutbox,
+} from "./quick-audit-delivery-outbox"
+import {
+  type NativeQuickAuditResult,
+  type QuickAuditResultStore,
+} from "./quick-audit-native"
+import { RESEND_PREVIEW_BRANCH } from "./quick-audit-resend-preview-preflight"
+
+type PaidCompletion = {
+  status: "completed"
+  checkoutSessionId: string
+  requestId: string
+  n8nAuditId: string
+}
+
+export interface PaidQuickAuditProof {
+  readSession(checkoutSessionId: string): Promise<PaidCompletion | null>
+}
+/**
+ * The address presently used for AMS customer correspondence. It receives
+ * incoming messages through the company's existing forwarding rule, but that
+ * DOES NOT establish outbound send-as authorization.
+ */
+export const AMS_CUSTOMER_FROM_ADDRESS = "kimberley@aspectmarketingsolutions.app" as const
+export const AMS_CUSTOMER_FROM_NAME = "Aspect Marketing Solutions" as const
+
+export interface QuickAuditTransactionalSender {
+  /**
+   * Read the provider's ACTUAL authorized sender identity (e.g. Gmail sendAs
+   * with verificationStatus=accepted). Never infer this from an env variable,
+   * an incoming-forwarding rule, or the authenticated Gmail account alone.
+   */
+  inspectSender(address: string): Promise<{
+    address: string
+    displayName: string
+    replyToAddress: string
+    verificationStatus: "accepted" | "pending" | "missing"
+  } | null>
+  /**
+   * Set actual RFC 5322 From and Reply-To headers, never Gmail's implicit
+   * personal-account default. An acceptance ID is not inbox delivery proof.
+   */
+  send(input: {
+    recipient: string
+    fromAddress: string
+    fromName: string
+    replyToAddress: string
+    subject: string
+    plainText: string
+  }): Promise<{ messageId: string; fromAddress: string }>
+}
+export type QuickAuditDeliveryOutcome =
+  | { status: "disabled" | "held" | "duplicate" | "submitted" | "uncertain" }
+
+type StoreReader = { get<T = unknown>(key: string): Promise<T | null> }
+function createRedis(): StoreReader | null {
+  const url = (process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL)?.trim()
+  const token = (process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN)?.trim()
+  return url && token ? new Redis({ url, token }) : null
+}
+export class RedisPaidQuickAuditProof implements PaidQuickAuditProof {
+  constructor(private readonly redis: StoreReader | null = createRedis()) {}
+  async readSession(id: string): Promise<PaidCompletion | null> {
+    if (!/^cs_test_[A-Za-z0-9]{8,200}$/.test(id)) return null
+    if (!this.redis) throw new Error("QUICK_AUDIT_DELIVERY_STORE_UNAVAILABLE")
+    const raw = await this.redis.get<unknown>(`ams:quick-audit:session:${id}`)
+    let parsed: unknown = raw
+    if (typeof raw === "string") {
+      try { parsed = JSON.parse(raw) } catch { return null }
+    }
+    if (!parsed || typeof parsed !== "object") return null
+    const candidate = parsed as Partial<PaidCompletion>
+    return candidate.status === "completed" &&
+      candidate.checkoutSessionId === id &&
+      typeof candidate.requestId === "string" &&
+      typeof candidate.n8nAuditId === "string"
+      ? candidate as PaidCompletion
+      : null
+  }
+}
+
+/** Text-only delivery: no HTML injection, external image tracking, or insecure report URL. */
+export function renderQuickAuditPlainText(result: NativeQuickAuditResult): string {
+  const findingLines = result.findings.map((finding, index) =>
+    `${index + 1}. ${finding.title}\nObservation: ${finding.observation}\nRecommended fix: ${finding.fix}`
+  )
+  const planLines = result.sevenDayPlan.map(day => `Day ${day.day}: ${day.action}`)
+  return [
+    "ASPECT MARKETING SOLUTIONS — QUICK MARKETING AUDIT",
+    `Business: ${result.businessName}`,
+    `Website: ${result.websiteUrl}`,
+    `Industry: ${result.industry}`,
+    `Business goal: ${result.goal}`,
+    `Audit reference: ${result.auditId}`,
+    `Generated: ${result.generatedAt}`,
+    "",
+    "WHAT'S WORKING",
+    ...(result.strengths.length ? result.strengths : ["No strengths were automatically confirmed by this website scan."]),
+    "",
+    "FIVE PRIORITY FINDINGS AND RECOMMENDED FIXES",
+    ...findingLines,
+    "",
+    "SUGGESTED HEADLINE",
+    result.improvedHeadline,
+    "",
+    "SUGGESTED OFFER",
+    result.improvedOffer,
+    "",
+    "SUGGESTED PROMOTIONAL POST",
+    result.promotionalPost,
+    "",
+    "YOUR SEVEN-DAY ACTION PLAN",
+    ...planLines,
+    "",
+    "Note: Automated website checks are limited signals, not a complete human review or a guarantee of results.",
+    "Reply to this message if you need help understanding your audit.",
+    "Aspect Marketing Solutions",
+  ].join("\n\n")
+}
+
+export async function deliverQuickAuditOwnerPreview(input: {
+  requestId: string
+  sender: QuickAuditTransactionalSender
+  env?: NodeJS.ProcessEnv
+  outbox?: QuickAuditDeliveryOutbox
+  proof?: PaidQuickAuditProof
+  reports?: QuickAuditResultStore
+}): Promise<QuickAuditDeliveryOutcome> {
+  const env = input.env ?? process.env
+  // Never infer a production customer-send permission from this owner test.
+  if (env.VERCEL_ENV !== "preview" ||
+      env.VERCEL_GIT_COMMIT_REF !== RESEND_PREVIEW_BRANCH ||
+      env.AMS_QUICK_AUDIT_DELIVERY_SEND_ENABLED !== "true") {
+    return { status: "disabled" }
+  }
+
+  // The generic Quick Audit outbox, paid proof and result-store constructors
+  // otherwise fall back to the application's default Redis credentials.
+  // Never let a future owner Preview dispatcher silently read those stores:
+  // it must inject all three independently provisioned and verified adapters.
+  // Injection alone is NOT proof of payment isolation; the caller must separately
+  // verify Stripe webhook destinations and the actual backing storage topology.
+  if (!input.outbox || !input.proof || !input.reports) {
+    return { status: "disabled" }
+  }
+  const ownerEmail = env.AMS_QUICK_AUDIT_OWNER_PILOT_EMAIL?.trim().toLowerCase() ?? ""
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) return { status: "disabled" }
+
+  // All three dependencies have already been required above.
+  const outbox = input.outbox
+  const proofStore = input.proof
+  const reportStore = input.reports
+  const pending = await outbox.read(input.requestId)
+  if (!pending) return { status: "held" }
+  if (pending.state !== "queued") return { status: "duplicate" }
+  if (pending.recipient !== ownerEmail || !pending.checkoutSessionId.startsWith("cs_test_")) {
+    return { status: "held" }
+  }
+
+  // Independent durable evidence: Stripe webhook completion record PLUS report.
+  const settled = await proofStore.readSession(pending.checkoutSessionId)
+  if (!settled || settled.status !== "completed" ||
+      settled.checkoutSessionId !== pending.checkoutSessionId ||
+      settled.requestId !== pending.requestId ||
+      settled.n8nAuditId !== pending.auditId) {
+    return { status: "held" }
+  }
+  const report = await reportStore.getByRequestId(pending.requestId)
+  if (!report || report.requestId !== pending.requestId ||
+      report.auditId !== pending.auditId || report.version !== "native-v1" ||
+      report.findings.length !== 5 || report.sevenDayPlan.length !== 7) {
+    return { status: "held" }
+  }
+
+  // Identity must be verified by the outbound provider BEFORE the durable
+  // one-time delivery claim. Pending/unverified aliases remain queued.
+  // This prevents silent fallback to an @gmail.com From identity.
+  try {
+    const identity = await input.sender.inspectSender(AMS_CUSTOMER_FROM_ADDRESS)
+    if (!identity ||
+        identity.address.trim().toLowerCase() !== AMS_CUSTOMER_FROM_ADDRESS ||
+        identity.verificationStatus !== "accepted" ||
+        identity.displayName.trim() !== AMS_CUSTOMER_FROM_NAME ||
+        identity.replyToAddress.trim().toLowerCase() !== AMS_CUSTOMER_FROM_ADDRESS) {
+      return { status: "held" }
+    }
+  } catch {
+    return { status: "held" }
+  }
+
+  const claim = await outbox.claim(pending.requestId, {
+    enabled: true, ownerOnly: true, ownerEmail,
+  })
+  if (!claim) return { status: "duplicate" }
+  try {
+    const response = await input.sender.send({
+      recipient: ownerEmail,
+      fromAddress: AMS_CUSTOMER_FROM_ADDRESS,
+      fromName: AMS_CUSTOMER_FROM_NAME,
+      replyToAddress: AMS_CUSTOMER_FROM_ADDRESS,
+      subject: `Your AMS Quick Marketing Audit — ${report.auditId}`,
+      plainText: renderQuickAuditPlainText(report),
+    })
+    if (!response.messageId?.trim() ||
+        response.fromAddress?.trim().toLowerCase() !== AMS_CUSTOMER_FROM_ADDRESS) {
+      throw new Error("BUSINESS_FROM_IDENTITY_UNCONFIRMED")
+    }
+    const persisted = await outbox.finish(claim, {
+      state: "submitted", providerMessageId: response.messageId,
+    })
+    return { status: persisted ? "submitted" : "uncertain" }
+  } catch {
+    // An ambiguous provider response must NEVER cause a second automatic email.
+    await outbox.finish(claim, { state: "uncertain", code: "SEND_OUTCOME_UNKNOWN" })
+      .catch(() => undefined)
+    return { status: "uncertain" }
+  }
+}

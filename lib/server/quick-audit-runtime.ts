@@ -21,6 +21,14 @@ function trimmed(value: string | undefined) {
   return result || null
 }
 
+/**
+ * Separate public release interlock. Redis readiness alone must never expose
+ * checkout; an owner must explicitly opt the public offer in after acceptance.
+ */
+export function isQuickAuditPublicCheckoutEnabled(env: NodeJS.ProcessEnv = process.env) {
+  return env.AMS_QUICK_AUDIT_PUBLIC_CHECKOUT_ENABLED?.trim().toLowerCase() === "true"
+}
+
 export function resolveQuickAuditRedisConfig(env: NodeJS.ProcessEnv = process.env): RedisConfig | null {
   const upstashUrl = trimmed(env.UPSTASH_REDIS_REST_URL)
   const upstashToken = trimmed(env.UPSTASH_REDIS_REST_TOKEN)

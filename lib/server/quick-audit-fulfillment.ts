@@ -77,10 +77,11 @@ function redisClient(): RedisClient | null {
 }
 
 const RESERVE_SCRIPT = `
-local existing = redis.call('GET', KEYS[1])
-if existing then return existing end
-redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2], 'NX')
-return ''
+-- The claim and its outcome must be decided atomically inside one script.
+-- Never return "reserved" after an NX SET that lost a concurrent race.
+local claimed = redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2], 'NX')
+if claimed then return '' end
+return redis.call('GET', KEYS[1]) or ''
 `
 
 const COMPLETE_SCRIPT = `
@@ -108,7 +109,8 @@ export class RedisQuickAuditStore implements QuickAuditStore {
       [JSON.stringify(pending), String(RECORD_TTL_SECONDS)],
     )
     if (!raw) return { state: "reserved" as const, token }
-    const existing = JSON.parse(String(raw)) as Partial<QuickAuditRecord> & { status?: string; token?: string }
+    // Upstash may deserialize a Lua GET result before returning it.
+    const existing = (typeof raw === "string" ? JSON.parse(raw) : raw) as Partial<QuickAuditRecord> & { status?: string; token?: string }
     if (existing.requestId !== input.requestId) return { state: "conflict" as const }
     if (existing.status === "completed") return { state: "duplicate" as const, record: existing as QuickAuditRecord }
     return { state: "processing" as const }
@@ -310,6 +312,7 @@ export async function processQuickAuditCheckout(input: {
   evidenceCollector?: (url: string) => Promise<QuickAuditEvidence>
   expectedPriceId: string
   expectedLivemode: boolean
+  onFulfilled?: (record: { auditId: string; requestId: string; checkoutSessionId: string; recipient: string }) => Promise<void>
 }): Promise<QuickAuditProcessingResult> {
   const eventSession = input.event.data.object as Stripe.Checkout.Session
   if (eventSession.mode !== "payment") return { processed: false, applied: false, reason: "NON_PAYMENT_CHECKOUT_IGNORED" }
@@ -318,9 +321,10 @@ export async function processQuickAuditCheckout(input: {
   if (session.mode !== "payment" || session.status !== "complete" || session.payment_status !== "paid") {
     throw new QuickAuditFulfillmentError("QUICK_AUDIT_PAYMENT_UNSETTLED", "Quick Audit Checkout Session is not paid and complete", 400)
   }
-  if (session.expires_at && session.expires_at <= Math.floor(Date.now() / 1000)) {
-    throw new QuickAuditFulfillmentError("QUICK_AUDIT_SESSION_EXPIRED", "Quick Audit Checkout Session is expired", 400)
-  }
+  // expires_at controls how long an OPEN Checkout Session accepts payment.
+  // Stripe can legitimately retry a webhook after that timestamp. For an
+  // independently retrieved session already COMPLETE and PAID, checking the
+  // old checkout deadline would incorrectly reject a settled order.
   const lineItems = await input.gateway.listLineItems(session.id)
   const matching = lineItems.data.filter((item) => item.price?.id === input.expectedPriceId && item.quantity === 1)
   if (matching.length !== 1 || lineItems.data.length !== 1) return { processed: false, applied: false, reason: "UNAPPROVED_ONE_TIME_PRODUCT" }
@@ -342,6 +346,13 @@ export async function processQuickAuditCheckout(input: {
       evidence: await (input.evidenceCollector ?? collectQuickAuditEvidence)(websiteUrl),
     })
     await input.store.complete({ status: "completed", checkoutSessionId: session.id, stripeEventId: input.event.id, requestId, n8nAuditId: result.auditId, completedAt: new Date().toISOString(), token: reservation.token })
+    // This runs only AFTER the native result and paid fulfillment record are durable.
+    // Outbox failures must not reverse a completed payment or cause a second fulfillment.
+    if (input.onFulfilled && session.customer_details?.email) {
+      await input.onFulfilled({auditId:result.auditId,requestId,checkoutSessionId:session.id,recipient:session.customer_details.email}).catch(() => {
+        console.warn("[QuickAudit] Delivery outbox unavailable; paid result retained")
+      })
+    }
     return { processed: true, applied: true, reason: "QUICK_AUDIT_COMPLETED", requestId, n8nAuditId: result.auditId }
   } catch (error) {
     await input.store.release({ checkoutSessionId: session.id, token: reservation.token }).catch(() => undefined)

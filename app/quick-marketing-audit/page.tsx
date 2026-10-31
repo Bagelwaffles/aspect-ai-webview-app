@@ -7,14 +7,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { QuickAuditCheckoutForm } from "@/components/quick-audit-checkout-form"
 import { QUICK_MARKETING_AUDIT } from "@/lib/quick-marketing-audit"
-import { isQuickAuditRuntimeLaunchEnabled } from "@/lib/server/quick-audit-runtime"
+import { isQuickAuditPublicCheckoutEnabled, isQuickAuditRuntimeLaunchEnabled } from "@/lib/server/quick-audit-runtime"
 
 export const dynamic = "force-dynamic"
 
 export const metadata = {
   title: "AMS Quick Marketing Audit | Aspect Marketing Solutions",
   description:
-    "Get a focused $49 marketing audit with specific fixes, an improved headline and offer, a promotional post, and a 7-day action plan delivered within 48 hours.",
+    "The planned $49 AMS Quick Marketing Audit includes specific fixes, an improved headline and offer, a promotional post, and a 7-day action plan. Checkout is temporarily paused while final launch checks are completed.",
 }
 
 const idealFor = [
@@ -24,7 +24,7 @@ const idealFor = [
 ]
 
 export default async function QuickMarketingAuditPage() {
-  const checkoutReady = await isQuickAuditRuntimeLaunchEnabled()
+  const checkoutReady = isQuickAuditPublicCheckoutEnabled() && await isQuickAuditRuntimeLaunchEnabled()
 
   return (
     <>
@@ -79,7 +79,7 @@ export default async function QuickMarketingAuditPage() {
 
           <Card className="border-primary/30" id="quick-audit-status">
             <CardHeader>
-              <CardDescription>Launch price</CardDescription>
+              <CardDescription>{checkoutReady ? "Launch price" : "Planned launch price"}</CardDescription>
               <CardTitle className="text-4xl">{QUICK_MARKETING_AUDIT.priceLabel}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -103,7 +103,7 @@ export default async function QuickMarketingAuditPage() {
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
                   <p className="font-medium">Checkout is temporarily paused.</p>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    AMS is upgrading the fulfillment path for this offer. We are not accepting payment until the delivery system is verified again.
+                    AMS is completing its final launch, business-registration, and customer-delivery checks. Orders and payments are not being accepted yet. Please check back after the launch is announced.
                   </p>
                 </div>
               )}
@@ -128,8 +128,8 @@ export default async function QuickMarketingAuditPage() {
         <section className="grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>What happens after you buy</CardTitle>
-              <CardDescription>A simple delivery process with no fake automation claims.</CardDescription>
+              <CardTitle>How the audit will work after launch</CardTitle>
+              <CardDescription>Our planned delivery process. Checkout is not currently available.</CardDescription>
             </CardHeader>
             <CardContent>
               <ol className="space-y-4 text-sm text-muted-foreground">
