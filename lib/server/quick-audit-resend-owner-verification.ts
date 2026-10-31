@@ -19,7 +19,7 @@ export function ownerDomainVerificationEnabled(env: NodeJS.ProcessEnv, now = Dat
 
 function reply(code: string, status: number) {
   return Response.json({ ok: status === 200, code, emailSent: false, paymentPerformed: false,
-    proofWrittenAndRead: status === 200 }, {
+    proofWrittenAndRead: status === 200 && code === "OWNER_DOMAIN_VERIFY_PROOF_WRITTEN_AND_READ" }, {
     status, headers: { "Cache-Control": "no-store, max-age=0", "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff" },
   })
@@ -84,6 +84,12 @@ export async function handleOwnerDomainVerification(request: Request, input: {
     try { payload = JSON.parse(await boundedBody(request)) } catch {
       return reply("OWNER_DOMAIN_VERIFY_INVALID_REQUEST", 400)
     }
+    // Read-only owner/browser diagnostic: validates the exact POST origin,
+    // session, expiry and content-type WITHOUT a key, Redis access, proof
+    // write, attempt consumption, or provider request.
+    if (payload && typeof payload === "object" && !Array.isArray(payload) &&
+        Object.keys(payload).length === 1 && "checkOnly" in payload &&
+        payload.checkOnly === true) return reply("OWNER_DOMAIN_VERIFY_PREFLIGHT_READY", 200)
     if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
         Object.keys(payload).length !== 1 || !("fullAccessKey" in payload) ||
         typeof payload.fullAccessKey !== "string" ||
