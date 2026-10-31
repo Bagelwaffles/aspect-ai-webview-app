@@ -67,10 +67,19 @@ export async function handleOwnerDomainVerification(request: Request, input: {
   try {
     const url = new URL(request.url)
     const expected = new URL(input.env.PUBLIC_APP_URL ?? input.env.NEXTAUTH_URL ?? "")
-    if (url.protocol !== "https:" || expected.protocol !== "https:" || url.search ||
-        request.headers.get("origin") !== url.origin || url.origin !== expected.origin ||
-        request.headers.get("sec-fetch-site") !== "same-origin") {
-      return reply("OWNER_DOMAIN_VERIFY_ORIGIN_DENIED", 403)
+    // Distinguish origin failures without exposing hosts, request headers or
+    // changing any of the existing authorization requirements.
+    if (url.protocol !== "https:" || expected.protocol !== "https:" || url.search) {
+      return reply("OWNER_DOMAIN_VERIFY_ORIGIN_URL_DENIED", 403)
+    }
+    if (request.headers.get("origin") !== url.origin) {
+      return reply("OWNER_DOMAIN_VERIFY_ORIGIN_HEADER_DENIED", 403)
+    }
+    if (url.origin !== expected.origin) {
+      return reply("OWNER_DOMAIN_VERIFY_ORIGIN_EXPECTED_DENIED", 403)
+    }
+    if (request.headers.get("sec-fetch-site") !== "same-origin") {
+      return reply("OWNER_DOMAIN_VERIFY_ORIGIN_FETCH_SITE_DENIED", 403)
     }
     const auth = await input.authorize()
     if (!auth.ok) return reply("OWNER_DOMAIN_VERIFY_OWNER_REQUIRED", auth.status === 403 ? 403 : 401)
