@@ -30,7 +30,7 @@ export default async function ResendPreviewOwnerPage() {
 
   const now = Date.now()
   const inspected = inspectBuyerLinkGate(process.env, pilotDispatchConfiguration(process.env, now), now)
-  const rehearsalEnv = buyerLinkRehearsalEnvironment(process.env, now)
+  const rehearsalEnv = { ...buyerLinkRehearsalEnvironment(process.env, now), NODE_ENV: process.env.NODE_ENV }
   const rehearsal = inspectBuyerLinkGate(rehearsalEnv, pilotDispatchConfiguration(rehearsalEnv, now), now)
   const diagnosticAllowed = authorized && inspected.checks.previewEnvironment && inspected.checks.expectedBranch
 
