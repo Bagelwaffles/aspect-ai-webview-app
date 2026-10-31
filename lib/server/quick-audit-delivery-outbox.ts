@@ -8,6 +8,9 @@ import { Redis } from "@upstash/redis"
 
 const TTL = 60 * 60 * 24 * 90
 const KEY_PREFIX = "ams:quick-audit:delivery:"
+/** Separate one-time receipt namespace; never recycle the original audit email claim. */
+export const BUYER_LINK_DELIVERY_PREFIX = "ams:quick-audit:buyer-link:delivery:"
+type DeliveryPrefix = typeof KEY_PREFIX | typeof BUYER_LINK_DELIVERY_PREFIX
 export type AuditDeliveryState = "queued" | "sending" | "submitted" | "delivered" | "failed" | "uncertain"
 export type AuditDeliveryRecord = {
   auditId: string
@@ -33,13 +36,14 @@ function runtimeRedis(): OutboxRedis | null {
 function assertId(value: string, label: string) {
   if (!/^[A-Za-z0-9_-]{8,200}$/.test(value)) throw new Error(`${label}_INVALID`)
 }
-function key(requestId: string) { assertId(requestId, "REQUEST_ID"); return KEY_PREFIX + requestId }
+function key(requestId: string, prefix: DeliveryPrefix) { assertId(requestId, "REQUEST_ID"); return prefix + requestId }
 const CAS = "if redis.call('get',KEYS[1])==ARGV[1] then redis.call('set',KEYS[1],ARGV[2],'EX',ARGV[3]); return 1 end return 0"
 export class QuickAuditDeliveryOutbox {
-  constructor(private readonly redis: OutboxRedis | null = runtimeRedis()) {}
+  constructor(private readonly redis: OutboxRedis | null = runtimeRedis(), private readonly prefix: DeliveryPrefix = KEY_PREFIX) {}
+  private recordKey(requestId: string) { return key(requestId, this.prefix) }
   private client() { if (!this.redis) throw new Error("QUICK_AUDIT_DELIVERY_STORE_UNAVAILABLE"); return this.redis }
   async read(requestId: string): Promise<AuditDeliveryRecord | null> {
-    const raw = await this.client().get<unknown>(key(requestId))
+    const raw = await this.client().get<unknown>(this.recordKey(requestId))
     if (!raw) return null
     const item: AuditDeliveryRecord = typeof raw === "string" ? JSON.parse(raw) : raw as AuditDeliveryRecord
     if (item.requestId !== requestId) throw new Error("QUICK_AUDIT_DELIVERY_RECORD_CORRUPT")
@@ -52,7 +56,7 @@ export class QuickAuditDeliveryOutbox {
     const recipient=input.recipient.trim().toLowerCase()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient) || recipient.length > 254) throw new Error("QUICK_AUDIT_DELIVERY_RECIPIENT_INVALID")
     const record: AuditDeliveryRecord={auditId:input.auditId,requestId:input.requestId,checkoutSessionId:input.checkoutSessionId,recipient,state:"queued",createdAt:new Date().toISOString()}
-    const created=await this.client().set(key(input.requestId),JSON.stringify(record),{nx:true,ex:TTL})
+    const created=await this.client().set(this.recordKey(input.requestId),JSON.stringify(record),{nx:true,ex:TTL})
     if (created === "OK" || created === true) return record
     const existing=await this.read(input.requestId)
     if (!existing || existing.auditId !== record.auditId || existing.checkoutSessionId !== record.checkoutSessionId || existing.recipient !== record.recipient) throw new Error("QUICK_AUDIT_DELIVERY_CONFLICT")
@@ -65,13 +69,13 @@ export class QuickAuditDeliveryOutbox {
     if (!original || original.state !== "queued") return null
     if (flags.ownerOnly && original.recipient !== flags.ownerEmail.trim().toLowerCase()) throw new Error("QUICK_AUDIT_DELIVERY_OWNER_ONLY")
     const next: AuditDeliveryRecord={...original,state:"sending",attemptId:randomUUID()}
-    const ok=await this.client().eval(CAS,[key(requestId)],[JSON.stringify(original),JSON.stringify(next),String(TTL)])
+    const ok=await this.client().eval(CAS,[this.recordKey(requestId)],[JSON.stringify(original),JSON.stringify(next),String(TTL)])
     return Number(ok)===1?next:null
   }
   /** Store definite send outcome; a network timeout stays uncertain and never auto-retries. */
   async finish(claim:AuditDeliveryRecord,outcome:{state:"submitted"|"delivered"|"failed"|"uncertain";providerMessageId?:string;code?:string}):Promise<boolean> {
     if (claim.state!=="sending" || !claim.attemptId) throw new Error("QUICK_AUDIT_DELIVERY_CLAIM_INVALID")
     const updated:AuditDeliveryRecord={...claim,state:outcome.state,providerMessageId:outcome.providerMessageId,lastErrorCode:outcome.code}
-    return Number(await this.client().eval(CAS,[key(claim.requestId)],[JSON.stringify(claim),JSON.stringify(updated),String(TTL)]))===1
+    return Number(await this.client().eval(CAS,[this.recordKey(claim.requestId)],[JSON.stringify(claim),JSON.stringify(updated),String(TTL)]))===1
   }
 }
