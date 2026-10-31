@@ -213,3 +213,82 @@ test("owner-only dispatch window expires on every request; no late replay", asyn
   assert.equal(f.counters().claims, 0)
   assert.equal(f.counters().sends, 0)
 })
+
+
+function previouslySubmittedFixture(options: { paid?: boolean; senderVerified?: boolean } = {}) {
+  const f = fixture(options)
+  const submitted: FakeRecord = {
+    auditId: report.auditId, requestId, checkoutSessionId: sessionId,
+    recipient: owner, state: "submitted", createdAt: new Date(now).toISOString(),
+    providerMessageId: "existing-owner-audit-email",
+  }
+  const data = { buyer: null as FakeRecord | null, staged: 0, claims: 0 }
+  const buyerOutbox = {
+    read: async (_id: string) => data.buyer ? { ...data.buyer } : null,
+    enqueue: async (input: {auditId: string; requestId: string; checkoutSessionId: string; recipient: string; paidAndPersisted: boolean}) => {
+      assert.equal(input.paidAndPersisted, true)
+      assert.equal(input.auditId, submitted.auditId)
+      assert.equal(input.checkoutSessionId, submitted.checkoutSessionId)
+      assert.equal(input.recipient, owner)
+      if (!data.buyer) {
+        data.staged += 1
+        data.buyer = { ...submitted, state: "queued", attemptId: undefined, providerMessageId: undefined }
+      }
+      return { ...data.buyer }
+    },
+    claim: async (_id: string, flags: {enabled: boolean; ownerOnly: boolean; ownerEmail: string}) => {
+      if (data.buyer?.state !== "queued" || !flags.enabled || !flags.ownerOnly || flags.ownerEmail !== owner) return null
+      data.claims += 1
+      data.buyer = { ...data.buyer, state: "sending", attemptId: "buyer-link-claim" }
+      return { ...data.buyer }
+    },
+    finish: async (_claim: FakeRecord, outcome: {state: "submitted" | "delivered" | "failed" | "uncertain"; providerMessageId?: string; code?: string}) => {
+      if (data.buyer?.state !== "sending") return false
+      data.buyer = { ...data.buyer, state: outcome.state, providerMessageId: outcome.providerMessageId, lastErrorCode: outcome.code }
+      return true
+    },
+  }
+  const originalOutbox = { read: async (_id: string) => ({ ...submitted }) }
+  return {
+    input: { ...f.input, outbox: buyerOutbox, originalOutbox },
+    counters: () => ({ ...f.counters(), staged: data.staged, buyerClaims: data.claims, buyerState: data.buyer?.state ?? "missing", sourceState: submitted.state }),
+  }
+}
+
+test("submitted audit email is preserved while exactly one independent buyer-link notification is staged and sent", async () => {
+  const f = previouslySubmittedFixture()
+  assert.equal(await dispatchApprovedQuickAuditOwnerPreview(f.input), "submitted")
+  const once = f.counters()
+  assert.equal(once.staged, 1)
+  assert.equal(once.buyerClaims, 1)
+  assert.equal(once.buyerState, "submitted")
+  assert.equal(once.sourceState, "submitted")
+  assert.equal(once.sends, 1)
+  assert.equal(await dispatchApprovedQuickAuditOwnerPreview(f.input), "duplicate")
+  assert.deepEqual(f.counters(), once)
+})
+
+test("cannot stage buyer notification from unpaid Stripe order", async () => {
+  const f = previouslySubmittedFixture({ paid: false })
+  assert.equal(await dispatchApprovedQuickAuditOwnerPreview(f.input), "held")
+  assert.equal(f.counters().staged, 0)
+  assert.equal(f.counters().buyerClaims, 0)
+  assert.equal(f.counters().sends, 0)
+  assert.equal(f.counters().sourceState, "submitted")
+})
+
+test("cannot stage buyer notification when Resend sender verification fails", async () => {
+  const f = previouslySubmittedFixture({ senderVerified: false })
+  assert.equal(await dispatchApprovedQuickAuditOwnerPreview(f.input), "held")
+  assert.equal(f.counters().staged, 0)
+  assert.equal(f.counters().buyerClaims, 0)
+  assert.equal(f.counters().sends, 0)
+})
+
+test("no new buyer link is staged unless original owner email was submitted", async () => {
+  const f = previouslySubmittedFixture()
+  const source = { read: async (_id: string) => ({ auditId: report.auditId, requestId, checkoutSessionId: sessionId, recipient: owner, state: "queued" as const, createdAt: new Date(now).toISOString() }) }
+  assert.equal(await dispatchApprovedQuickAuditOwnerPreview({ ...f.input, originalOutbox: source }), "held")
+  assert.equal(f.counters().staged, 0)
+  assert.equal(f.counters().sends, 0)
+})
