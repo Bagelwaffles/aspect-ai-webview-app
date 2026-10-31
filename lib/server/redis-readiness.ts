@@ -24,12 +24,12 @@ function classifyRedisFailure(error: unknown): RedisFailureCategory {
   const code = typeof candidate.code === "string" ? candidate.code : ""
   const message = typeof candidate.message === "string" ? candidate.message : ""
   if (message === "REDIS_READINESS_TIMEOUT") return "timeout"
-  if (status === 401 || status === 403 || /\\b(?:NOAUTH|WRONGPASS|unauthoriz(?:ed)?|forbidden|invalid token)\\b/iu.test(message)) {
+  if (status === 401 || status === 403 || /\b(?:NOAUTH|WRONGPASS|unauthoriz(?:ed)?|forbidden|invalid token)\b/iu.test(message)) {
     return "auth"
   }
-  if (status === 404 || /\\b(?:not found|unknown endpoint)\\b/iu.test(message)) return "endpoint"
-  if (status === 429 || /\\b(?:rate limit|too many requests)\\b/iu.test(message)) return "rate_limited"
-  if (/\\b(?:ENOTFOUND|ECONNREFUSED|ETIMEDOUT|ENETUNREACH|EAI_AGAIN|fetch failed|network error|certificate)\\b/iu.test(code + " " + message)) {
+  if (status === 404 || /\b(?:not found|unknown endpoint)\b/iu.test(message)) return "endpoint"
+  if (status === 429 || /\b(?:rate limit|too many requests)\b/iu.test(message)) return "rate_limited"
+  if (/\b(?:ENOTFOUND|ECONNREFUSED|ETIMEDOUT|ENETUNREACH|EAI_AGAIN|fetch failed|network error|certificate)\b/iu.test(code + " " + message)) {
     return "network"
   }
   return "unknown"
