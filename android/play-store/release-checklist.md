@@ -30,6 +30,7 @@ For personal Play developer accounts created after November 13, 2023, production
 - [x] Consumption-only Play v2.0.0 boundary
 - [x] CI verifies package identity, API 36, app label, APK generation, and AAB generation
 - [x] CI deliberately keeps repository artifacts unsigned so private signing material never enters GitHub
+- [x] Android CI uploads the unsigned release bundle as `ams-android-play-v1-unsigned` for 14 days; retrieve a fresh artifact from the latest successful `AMS Android Play CI` run on this PR branch (older run artifacts expire)
 - [ ] Produce a fresh signed release AAB with the replacement upload key
 - [ ] Install-test a release candidate on a physical Android device
 
@@ -50,7 +51,8 @@ The helper fails closed unless the unsigned AAB has the exact AMS package/versio
 - [ ] On the Windows machine, confirm the keystore file exists at the expected path
 - [ ] Confirm the Windows Credential Manager entry still exists; do not copy the secret into chat or GitHub
 - [ ] In Play Console > App integrity / App signing, confirm the active upload-key SHA-1 matches the expected SHA-1 above
-- [ ] Download/copy the fresh unsigned API-36 AAB to `AMS-Signing` or Downloads as `AMS-Android-2.0.0-target36-UNSIGNED.aab`
+- [ ] Download the latest `ams-android-play-v1-unsigned` workflow artifact and extract `android/app/build/outputs/bundle/release/app-release.aab`
+- [ ] Copy the extracted AAB to `C:\\Users\\white\\Documents\\AMS-Signing\\AMS-Android-2.0.0-target36-UNSIGNED.aab` (or Downloads using the same filename)
 - [ ] Run the signing helper from PowerShell
 - [ ] Confirm the generated verification report says `Cryptographic verification: PASSED`
 - [ ] Keep the private `.jks` and password off GitHub, chat, Drive shares, and public file stores
