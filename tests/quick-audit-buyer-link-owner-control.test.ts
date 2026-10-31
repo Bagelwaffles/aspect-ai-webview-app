@@ -55,7 +55,7 @@ test("buyer-link endpoint keeps independent server-side owner, scope and TEST pa
   assert.match(route, /authorizeOwnerApiRequest\(request, \{ requireTrustedOrigin: true \}\)/)
   assert.match(route, /env\.AMS_QUICK_AUDIT_BUYER_DISPATCH_ENABLED !== "true"/)
   assert.match(route, /env\.AMS_QUICK_AUDIT_PILOT_BUYER_RESULT_ENABLED !== "true"/)
-  assert.match(route, /env\.AMS_STRIPE_PILOT_TEST_SECRET_KEY\?\.startsWith\("sk_test_"\)/)
+  assert.match(route, /isStripeSandboxTestKey\(env\.AMS_STRIPE_PILOT_TEST_SECRET_KEY\)/)
   assert.match(route, /stores\.buyerLinkOutbox/)
   assert.match(route, /originalOutbox: stores\.outbox/)
   assert.match(route, /"PILOT_BUYER_LINK_POST_ONLY"/)
