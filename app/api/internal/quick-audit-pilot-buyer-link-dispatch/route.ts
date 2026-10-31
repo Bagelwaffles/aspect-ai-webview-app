@@ -57,7 +57,9 @@ export async function POST(request: NextRequest) {
     return json("PILOT_BUYER_LINK_DISPATCH_DISABLED", 503)
   }
 
-  // Body is the ID of an *existing* queued owner TEST audit only. No incoming
+  // Body identifies one previously submitted owner TEST audit. A separate
+  // buyer-link outbox key is created only after independent payment proof.
+  // No incoming
   // recipient, session ID, price, token, sender or message content is allowed.
   const raw = await request.text().catch(() => "")
   if (!raw || Buffer.byteLength(raw, "utf8") > 256) {
@@ -88,7 +90,8 @@ export async function POST(request: NextRequest) {
     const status = await dispatchApprovedQuickAuditOwnerPreview({
       requestId: body.requestId,
       env,
-      outbox: stores.outbox,
+      outbox: stores.buyerLinkOutbox,
+      originalOutbox: stores.outbox,
       reports: stores.reports,
       proof: stores.paymentProof,
       stripe: {
