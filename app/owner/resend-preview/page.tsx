@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { isBuyerReportAccessConfigured } from "@/lib/server/quick-audit-report-access"
 import { inspectBuyerLinkGate, buyerLinkRehearsalEnvironment } from "@/lib/server/quick-audit-buyer-link-gate-diagnostic"
 import { pilotDispatchConfiguration, pilotStorageConfiguration } from "@/lib/server/quick-audit-isolated-stripe-pilot"
 import { getServerSession } from "next-auth"
@@ -58,6 +59,9 @@ export default async function ResendPreviewOwnerPage() {
               <p>Actual gate: {inspected.ready ? "armed" : "blocked"}; pilot check: {inspected.pilotCode}</p>
               <p>Isolated TEST storage configuration: {pilotStorageConfiguration(process.env).ready ? "PASS" : "FAIL"}</p>
               <p>Stripe key category: {inspected.stripeKeyKind}</p>
+              <p>Report-access secret present: {String(Boolean(process.env.AMS_QUICK_AUDIT_REPORT_ACCESS_SECRET))}</p>
+              <p>Report-access secret trimmed length: {process.env.AMS_QUICK_AUDIT_REPORT_ACCESS_SECRET?.trim().length ?? 0}; minimum: 32</p>
+              <p>Report-access secret predicate: {isBuyerReportAccessConfigured(process.env.AMS_QUICK_AUDIT_REPORT_ACCESS_SECRET) ? "PASS" : "REPORT_ACCESS_SECRET_INVALID"}</p>
               <p>Pilot window: {inspected.pilotWindow}; buyer window: {inspected.buyerWindow}</p>
               <ul>{Object.entries(inspected.checks).map(([name, pass]) => <li key={name}>{name}: {String(pass)}</li>)}</ul>
               <p>In-memory armed-configuration rehearsal: {rehearsal.ready ? "PASS" : "FAIL"}. Actual flags remain unchanged.</p>
