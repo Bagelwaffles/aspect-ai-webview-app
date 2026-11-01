@@ -11,7 +11,7 @@ import { Redis } from "@upstash/redis"
 
 import { RedisQuickAuditStore } from "./quick-audit-fulfillment"
 import { RedisQuickAuditResultStore, createNativeQuickAuditAuditGateway } from "./quick-audit-native"
-import { QuickAuditDeliveryOutbox } from "./quick-audit-delivery-outbox"
+import { QuickAuditDeliveryOutbox, BUYER_LINK_DELIVERY_PREFIX } from "./quick-audit-delivery-outbox"
 import { RedisPaidQuickAuditProof } from "./quick-audit-delivery-worker"
 import { pilotIntakeConfiguration, pilotDispatchConfiguration, pilotFulfillmentConfiguration } from "./quick-audit-isolated-stripe-pilot"
 
@@ -41,6 +41,7 @@ export function createIsolatedPilotStores(
     paymentProof: new RedisPaidQuickAuditProof(redis),
     reports: results,
     outbox: new QuickAuditDeliveryOutbox(redis),
+    buyerLinkOutbox: new QuickAuditDeliveryOutbox(redis, BUYER_LINK_DELIVERY_PREFIX),
     auditGateway: createNativeQuickAuditAuditGateway({ store: results }),
   }
 }

@@ -280,7 +280,7 @@ test("Quick Audit webhook verifies its own test signature and rejects malformed 
 test("checkout route creates only a live one-time session after public sales approval and returns no secrets", async () => {
   let params: Stripe.Checkout.SessionCreateParams | null = null
   const handler = createQuickAuditCheckoutHandler({
-    env: { ...process.env, AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED: "true", AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: liveSecretKey, AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: priceId, PUBLIC_APP_URL: "https://www.aspectmarketingsolutions.app" },
+    env: { ...process.env, AMS_QUICK_AUDIT_PUBLIC_CHECKOUT_ENABLED: "true", AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED: "true", AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: liveSecretKey, AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: priceId, PUBLIC_APP_URL: "https://www.aspectmarketingsolutions.app" },
     idFactory: () => "request-fixed",
     createSession: async (_key, input) => { params = input; return { id: "cs_test_created", url: "https://checkout.stripe.test/session" } },
   })
@@ -300,7 +300,7 @@ test("checkout route creates only a live one-time session after public sales app
 test("checkout route rejects malformed URLs and oversized intake before Stripe work", async () => {
   let createCalls = 0
   const handler = createQuickAuditCheckoutHandler({
-    env: { ...process.env, AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED: "true", AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: liveSecretKey, AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: priceId, PUBLIC_APP_URL: "https://www.aspectmarketingsolutions.app" },
+    env: { ...process.env, AMS_QUICK_AUDIT_PUBLIC_CHECKOUT_ENABLED: "true", AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED: "true", AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: liveSecretKey, AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: priceId, PUBLIC_APP_URL: "https://www.aspectmarketingsolutions.app" },
     createSession: async () => { createCalls += 1; return { id: "unexpected", url: "https://checkout.stripe.test/unexpected" } },
   })
   for (const input of [
@@ -318,7 +318,7 @@ test("checkout route rejects malformed URLs and oversized intake before Stripe w
 test("checkout route creates no Stripe session while public sales are disabled", async () => {
   let createCalls = 0
   const handler = createQuickAuditCheckoutHandler({
-    env: { ...process.env, AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED: "false", AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: liveSecretKey, AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: priceId },
+    env: { ...process.env, AMS_QUICK_AUDIT_PUBLIC_CHECKOUT_ENABLED: "true", AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED: "false", AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: liveSecretKey, AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: priceId },
     createSession: async () => { createCalls += 1; return { id: "unexpected", url: "https://checkout.stripe.test/unexpected" } },
   })
   const response = await handler(new NextRequest("https://www.aspectmarketingsolutions.app/api/quick-marketing-audit/checkout", {
@@ -392,7 +392,7 @@ test("Quick Audit checkout refuses to fall back to the general Stripe secret", a
   const handler = createQuickAuditCheckoutHandler({
     env: {
       NODE_ENV: "test",
-      AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED: "true",
+      AMS_QUICK_AUDIT_PUBLIC_CHECKOUT_ENABLED: "true", AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED: "true",
       STRIPE_SECRET_KEY: liveSecretKey,
       AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: priceId,
       PUBLIC_APP_URL: "https://www.aspectmarketingsolutions.app",

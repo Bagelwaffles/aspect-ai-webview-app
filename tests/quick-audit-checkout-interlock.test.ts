@@ -21,11 +21,37 @@ function request() {
   })
 }
 
+test("production Quick Audit checkout stays paused unless the separate public release gate is enabled", async () => {
+  let createCalls = 0
+  const handler = createQuickAuditCheckoutHandler({
+    env: {
+      NODE_ENV: "production",
+      AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED: "true",
+      AMS_QUICK_AUDIT_FULFILLMENT_READY: "true",
+      AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: "rk_live_fixture",
+      AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: "price_fixture",
+      PUBLIC_APP_URL: "https://www.aspectmarketingsolutions.app",
+    },
+    createSession: async () => {
+      createCalls += 1
+      return { id: "unexpected", url: "https://checkout.stripe.test/unexpected" }
+    },
+  })
+
+  const response = await handler(request())
+  const body = await response.json()
+
+  assert.equal(response.status, 503)
+  assert.equal(body.code, "QUICK_AUDIT_CHECKOUT_PAUSED")
+  assert.equal(createCalls, 0)
+})
+
 test("production Quick Audit checkout fails closed when fulfillment is not explicitly ready", async () => {
   let createCalls = 0
   const handler = createQuickAuditCheckoutHandler({
     env: {
       NODE_ENV: "production",
+      AMS_QUICK_AUDIT_PUBLIC_CHECKOUT_ENABLED: "true",
       AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED: "true",
       AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: "rk_live_fixture",
       AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: "price_fixture",
@@ -50,6 +76,7 @@ test("production Quick Audit checkout proceeds only after fulfillment readiness 
   const handler = createQuickAuditCheckoutHandler({
     env: {
       NODE_ENV: "production",
+      AMS_QUICK_AUDIT_PUBLIC_CHECKOUT_ENABLED: "true",
       AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED: "true",
       AMS_QUICK_AUDIT_FULFILLMENT_READY: "true",
       AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: "rk_live_fixture",

@@ -7,7 +7,7 @@
  */
 import { AMS_RESEND_DOMAIN_ID } from "./quick-audit-resend-domain-proof"
 
-export const RESEND_PREVIEW_BRANCH = "feat/ams-resend-transactional-preview-20261023"
+export const RESEND_PREVIEW_BRANCH = "feat/ams-audit-buyer-link-integration-20261029"
 export const RESEND_PREVIEW_REDIS_HOST = "accepted-quetzal-206056.upstash.io"
 const scopedNamespace = /^ams:preview:quick-audit:[a-z0-9-]{8,80}:$/u
 

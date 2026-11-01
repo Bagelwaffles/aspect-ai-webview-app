@@ -3,6 +3,7 @@ import test from "node:test"
 
 import {
   ensureQuickAuditRuntimeLaunchState,
+  isQuickAuditPublicCheckoutEnabled,
   isQuickAuditRuntimeLaunchEnabled,
   quickAuditInfrastructureReady,
   resolveQuickAuditRedisConfig,
@@ -20,6 +21,13 @@ function env(overrides: Partial<NodeJS.ProcessEnv> = {}): NodeJS.ProcessEnv {
     ...overrides,
   }
 }
+
+test("public Quick Audit checkout defaults off and requires an explicit true opt-in", () => {
+  assert.equal(isQuickAuditPublicCheckoutEnabled(env()), false)
+  assert.equal(isQuickAuditPublicCheckoutEnabled(env({ AMS_QUICK_AUDIT_PUBLIC_CHECKOUT_ENABLED: "false" })), false)
+  assert.equal(isQuickAuditPublicCheckoutEnabled(env({ AMS_QUICK_AUDIT_PUBLIC_CHECKOUT_ENABLED: "1" })), false)
+  assert.equal(isQuickAuditPublicCheckoutEnabled(env({ AMS_QUICK_AUDIT_PUBLIC_CHECKOUT_ENABLED: "true" })), true)
+})
 
 function fakeRedis(initial: unknown) {
   let value = initial

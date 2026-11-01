@@ -74,8 +74,15 @@ test("production, wrong branch, expired/absent/overlong windows and enabled oper
 })
 test("malformed or oversized input and query credentials are rejected without any provider/store access", async () => {
   const f = fixture()
-  for (const body of [{}, [], null, { fullAccessKey: "invalid" }, { fullAccessKey: key, extra: true }]) {
-    assert.equal((await handleOwnerDomainVerification(request(body), f.input)).status, 400)
+  for (const body of [{}, [], null, { fullAccessKey: key, extra: true }]) {
+    const response = await handleOwnerDomainVerification(request(body), f.input)
+    assert.equal(response.status, 400)
+    assert.equal((await response.json()).code, "OWNER_DOMAIN_VERIFY_INVALID_REQUEST_SHAPE")
+  }
+  for (const value of ["invalid", "re_short", "re_" + "x".repeat(201), 42, null]) {
+    const response = await handleOwnerDomainVerification(request({ fullAccessKey: value }), f.input)
+    assert.equal(response.status, 400)
+    assert.equal((await response.json()).code, "OWNER_DOMAIN_VERIFY_INVALID_CREDENTIAL_FORMAT")
   }
   assert.equal((await handleOwnerDomainVerification(request({ fullAccessKey: "x".repeat(1500) }), f.input)).status, 400)
   assert.equal((await handleOwnerDomainVerification(request(undefined, { "content-length": "1025" }), f.input)).status, 413)
@@ -126,4 +133,93 @@ test("proof write/read failures never report success, and existing store rejects
     domainName: AMS_RESEND_DOMAIN, status: "verified", sending: "enabled", source: "resend-domain-api",
     verifiedAt: new Date(now.getTime() - 901_000).toISOString() }))
   assert.equal(await store.readDomainProof(), null)
+})
+
+
+test("no-key owner browser preflight validates request and consumes no attempts or Redis access", async () => {
+  const f = fixture()
+  const response = await handleOwnerDomainVerification(request({ checkOnly: true }), f.input)
+  assert.equal(response.status, 200)
+  const body = await response.json()
+  assert.equal(body.code, "OWNER_DOMAIN_VERIFY_PREFLIGHT_READY")
+  assert.equal(body.proofWrittenAndRead, false)
+  assert.equal(body.emailSent, false)
+  assert.equal(body.paymentPerformed, false)
+  assert.equal(f.clients, 0)
+  assert.equal(f.requests, 0)
+  assert.equal(f.writes.length, 0)
+  const accepted = await handleOwnerDomainVerification(request(), f.input)
+  assert.equal(accepted.status, 200, "diagnostic must not use the one real verification attempt")
+  assert.equal(f.requests, 1)
+})
+
+test("no-key preflight fails closed for cross-origin, owner-denied and expired windows", async () => {
+  const f = fixture()
+  for (const [inputRequest, input] of [
+    [request({ checkOnly: true }, { "sec-fetch-site": "cross-site" }), f.input],
+    [request({ checkOnly: true }, { origin: "https://evil.example.test" }), f.input],
+    [request({ checkOnly: true }), { ...f.input, authorize: async () => ({ ok: false, status: 401 }) }],
+    [request({ checkOnly: true }), { ...f.input, env: { ...env, AMS_RESEND_OWNER_VERIFY_UNTIL: now.toISOString() } }],
+  ] as const) {
+    const response = await handleOwnerDomainVerification(inputRequest, input)
+    assert.ok(response.status === 401 || response.status === 403)
+    assert.equal((await response.json()).proofWrittenAndRead, false)
+  }
+  assert.equal(f.clients, 0)
+  assert.equal(f.requests, 0)
+  assert.equal(f.writes.length, 0)
+})
+
+test("no-key preflight requires exact shape and cannot make a claim through invalid payload", async () => {
+  const f = fixture()
+  for (const input of [
+    { checkOnly: true, fullAccessKey: key },
+    { checkOnly: "true" },
+    { checkOnly: false },
+  ]) {
+    const response = await handleOwnerDomainVerification(request(input), f.input)
+    assert.equal(response.status, 400)
+    assert.equal((await response.json()).proofWrittenAndRead, false)
+  }
+  assert.equal(f.clients, 0)
+  assert.equal(f.requests, 0)
+  assert.equal(f.writes.length, 0)
+})
+
+test("Vercel deployment host is accepted only when it exactly matches the server-issued project deployment hostname", async () => {
+  const host = "aspect-ai-overlord-8erod78qm-kimberleyaversbiz-4131s-projects.vercel.app"
+  const deployedOrigin = `https://${host}`
+  const deployedRequest = (headers: Record<string, string> = {}) => new Request(
+    deployedOrigin + "/api/internal/quick-audit-resend-domain-verify", {
+      method: "POST",
+      headers: { origin: deployedOrigin, "sec-fetch-site": "same-origin", "content-type": "application/json", ...headers },
+      body: JSON.stringify({ checkOnly: true }),
+    }
+  )
+  const f = fixture()
+  const safeEnv = { ...env, VERCEL_URL: host }
+  const accepted = await handleOwnerDomainVerification(deployedRequest(), { ...f.input, env: safeEnv })
+  assert.equal(accepted.status, 200)
+  assert.equal((await accepted.json()).code, "OWNER_DOMAIN_VERIFY_PREFLIGHT_READY")
+  for (const alternate of [
+    { VERCEL_URL: "evil.example.test" },
+    { VERCEL_URL: "other-project-8erod78qm-kimberleyaversbiz-4131s-projects.vercel.app" },
+    { VERCEL_URL: undefined },
+    { VERCEL_GIT_COMMIT_REF: "main" },
+    { VERCEL_ENV: "production" },
+  ]) {
+    const reply = await handleOwnerDomainVerification(deployedRequest(), {
+      ...f.input, env: { ...safeEnv, ...alternate },
+    })
+    assert.equal(reply.status, 403)
+  }
+  assert.equal((await handleOwnerDomainVerification(
+    deployedRequest({ origin: "https://hostile.example.test" }), { ...f.input, env: safeEnv }
+  )).status, 403)
+  assert.equal((await handleOwnerDomainVerification(
+    deployedRequest({ "sec-fetch-site": "cross-site" }), { ...f.input, env: safeEnv }
+  )).status, 403)
+  assert.equal(f.clients, 0)
+  assert.equal(f.requests, 0)
+  assert.equal(f.writes.length, 0)
 })

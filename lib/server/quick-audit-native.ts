@@ -28,6 +28,8 @@ export type NativeQuickAuditResult = {
   websiteUrl: string
   industry: string
   goal: string
+  /** The fallback objective is not a goal supplied by the customer. */
+  goalSource?: "customer" | "general"
   generatedAt: string
   strengths: string[]
   findings: NativeQuickAuditFinding[]
@@ -112,6 +114,23 @@ function cleanSentence(value: string, max = 120) {
 function lowerLead(value: string) {
   if (!value) return value
   return value.charAt(0).toLowerCase() + value.slice(1)
+}
+
+/** Never turn QA/payment infrastructure instructions into a buyer's marketing objective. */
+const GENERAL_MARKETING_GOAL = "make the website's next step clearer for visitors"
+
+function marketingGoal(raw: string): { goal: string; source: "customer" | "general" } {
+  const goal = cleanSentence(raw, 140)
+  // Narrow markers for internal acceptance work; ordinary marketing experiments
+  // (e.g. A/B testing a landing page) remain valid customer goals.
+  const internalTestMarkers = [
+    /\b(?:paid[\s-]+test|owner[\s-]+only|sandbox|preview[\s-]+only|stripe[\s-]+origin|pr\s*#?\d{2,})\b/iu,
+    /\b(?:test|check|verify|validate|replay|simulate)\b.{0,110}\b(?:fulfil(?:l)?ment|webhook|stripe[\s-]+signature|signed[\s-]+receipt|report[\s-]+delivery)\b/iu,
+    /\b(?:fulfil(?:l)?ment|webhook|report[\s-]+delivery)\b.{0,90}\b(?:test|replay|sandbox|acceptance|verification)\b/iu,
+  ]
+  return goal && !internalTestMarkers.some((pattern) => pattern.test(raw))
+    ? { goal, source: "customer" }
+    : { goal: GENERAL_MARKETING_GOAL, source: "general" }
 }
 
 function evidenceObservation(
@@ -215,13 +234,16 @@ function strategicFallbacks(input: {
   businessName: string
   industry: string
   goals: string
+  goalSource: "customer" | "general"
 }): Array<NativeQuickAuditFinding & { key: string }> {
-  const goal = cleanSentence(input.goals, 140)
+  const goal = input.goals
   return [
     {
       key: "goal-conversion",
       title: "The stated goal needs one measurable conversion event",
-      observation: `The intake prioritizes “${goal},” but that goal becomes actionable only when one visitor action is treated as the primary conversion.`,
+      observation: input.goalSource === "customer"
+        ? `The intake prioritizes “${goal},” but that goal becomes actionable only when one visitor action is treated as the primary conversion.`
+        : "No customer marketing objective was supplied, so this review uses a general website-conversion objective and recommends measuring one real visitor action.",
       fix: "Pick one weekly conversion metric—qualified inquiry, booked call, quote request, purchase, or another real business event—and make the page work toward it.",
     },
     {
@@ -281,12 +303,12 @@ export function buildNativeQuickAuditResult(input: {
 }): NativeQuickAuditResult {
   const businessName = cleanSentence(input.businessName, 100)
   const industry = cleanSentence(input.industry, 80)
-  const goal = cleanSentence(input.goals, 140)
+  const { goal, source: goalSource } = marketingGoal(input.goals)
   const auditId = `audit_${createHash("sha256").update(input.requestId).digest("hex").slice(0, 24)}`
 
   const selected = evidenceCandidates(input.evidence).map(({ key: _key, priority: _priority, ...finding }) => finding)
   const usedTitles = new Set(selected.map((finding) => finding.title))
-  for (const { key: _key, ...fallback } of strategicFallbacks({ businessName, industry, goals: input.goals })) {
+  for (const { key: _key, ...fallback } of strategicFallbacks({ businessName, industry, goals: goal, goalSource })) {
     if (selected.length >= 5) break
     if (!usedTitles.has(fallback.title)) {
       selected.push(fallback)
@@ -294,9 +316,13 @@ export function buildNativeQuickAuditResult(input: {
     }
   }
 
-  const improvedHeadline = `${businessName}: ${goal.charAt(0).toUpperCase()}${goal.slice(1)} — with a clearer path from interest to action.`
+  const improvedHeadline = goalSource === "customer"
+    ? `${businessName}: ${goal.charAt(0).toUpperCase()}${goal.slice(1)} — with a clearer path from interest to action.`
+    : `Explore ${businessName} — and find a clear next step that fits your needs.`
   const improvedOffer = `Make the first step easy to understand: a clearly scoped ${lowerLead(industry)} solution from ${businessName}, one expected outcome, one primary next step, and a stated response or delivery expectation.`
-  const promotionalPost = `Trying to ${lowerLead(goal)}? ${businessName} is making the next step simpler. See what we offer, decide whether it fits your situation, and take one clear next action here: ${input.websiteUrl}`
+  const promotionalPost = goalSource === "customer"
+    ? `Trying to ${lowerLead(goal)}? ${businessName} is making the next step simpler. See what we offer, decide whether it fits your situation, and take one clear next action here: ${input.websiteUrl}`
+    : `Explore ${businessName} and see whether our offering fits what you need. Find out more at ${input.websiteUrl}`
 
   return {
     version: "native-v1",
@@ -306,6 +332,7 @@ export function buildNativeQuickAuditResult(input: {
     websiteUrl: input.websiteUrl,
     industry,
     goal,
+    goalSource,
     generatedAt: (input.now ?? (() => new Date()))().toISOString(),
     strengths: strengthsFromEvidence(input.evidence),
     findings: selected.slice(0, 5),
