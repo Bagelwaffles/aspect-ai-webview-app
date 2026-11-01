@@ -74,8 +74,15 @@ test("production, wrong branch, expired/absent/overlong windows and enabled oper
 })
 test("malformed or oversized input and query credentials are rejected without any provider/store access", async () => {
   const f = fixture()
-  for (const body of [{}, [], null, { fullAccessKey: "invalid" }, { fullAccessKey: key, extra: true }]) {
-    assert.equal((await handleOwnerDomainVerification(request(body), f.input)).status, 400)
+  for (const body of [{}, [], null, { fullAccessKey: key, extra: true }]) {
+    const response = await handleOwnerDomainVerification(request(body), f.input)
+    assert.equal(response.status, 400)
+    assert.equal((await response.json()).code, "OWNER_DOMAIN_VERIFY_INVALID_REQUEST_SHAPE")
+  }
+  for (const value of ["invalid", "re_short", "re_" + "x".repeat(201), 42, null]) {
+    const response = await handleOwnerDomainVerification(request({ fullAccessKey: value }), f.input)
+    assert.equal(response.status, 400)
+    assert.equal((await response.json()).code, "OWNER_DOMAIN_VERIFY_INVALID_CREDENTIAL_FORMAT")
   }
   assert.equal((await handleOwnerDomainVerification(request({ fullAccessKey: "x".repeat(1500) }), f.input)).status, 400)
   assert.equal((await handleOwnerDomainVerification(request(undefined, { "content-length": "1025" }), f.input)).status, 413)
