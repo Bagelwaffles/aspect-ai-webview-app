@@ -109,10 +109,14 @@ export async function handleOwnerDomainVerification(request: Request, input: {
         Object.keys(payload).length === 1 && "checkOnly" in payload &&
         payload.checkOnly === true) return reply("OWNER_DOMAIN_VERIFY_PREFLIGHT_READY", 200)
     if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
-        Object.keys(payload).length !== 1 || !("fullAccessKey" in payload) ||
-        typeof payload.fullAccessKey !== "string" ||
+        Object.keys(payload).length !== 1 || !("fullAccessKey" in payload)) {
+      return reply("OWNER_DOMAIN_VERIFY_INVALID_REQUEST_SHAPE", 400)
+    }
+    if (typeof payload.fullAccessKey !== "string" ||
         !/^re_[A-Za-z0-9_-]{20,200}$/.test(payload.fullAccessKey)) {
-      return reply("OWNER_DOMAIN_VERIFY_INVALID_CREDENTIAL", 400)
+      // Format-only failure: do not construct Redis, consume the one-attempt
+      // guard, or contact Resend. Never echo or log the submitted value.
+      return reply("OWNER_DOMAIN_VERIFY_INVALID_CREDENTIAL_FORMAT", 400)
     }
     const redis = input.redis()
     const namespace = input.env.AMS_QUICK_AUDIT_RESEND_PROOF_NAMESPACE!
