@@ -5,6 +5,7 @@
  */
 import { randomUUID } from "node:crypto"
 import { Redis } from "@upstash/redis"
+import { QuickAuditDeliveryOutbox, BUYER_LINK_DELIVERY_PREFIX } from "./quick-audit-delivery-outbox"
 import { pilotStorageConfiguration } from "./quick-audit-isolated-stripe-pilot"
 
 const TARGET_HOST = "internal-chicken-238070.upstash.io"
@@ -24,6 +25,7 @@ export type BuyerLinkWriteProbeRedis = {
   set(key: string, value: string, options: { nx: true; ex: number }): Promise<unknown>
   get(key: string): Promise<unknown>
   del(key: string): Promise<unknown>
+  eval(script: string, keys: string[], args: string[]): Promise<unknown>
 }
 export type BuyerLinkWriteProbeResult = { ok: boolean; code: string }
 
@@ -61,27 +63,66 @@ export async function probeBuyerLinkRedisWrite(input: {
   }
 
   const redis: BuyerLinkWriteProbeRedis = input.redis ?? new Redis({ url, token })
-  // 'probe-' cannot match any real Quick Audit requestId at the dispatch API.
-  const nonce = randomUUID().replace(/-/g, "")
-  const key = "ams:quick-audit:buyer-link:delivery:probe-" + nonce
-  const value = "write-test-" + nonce
+  const requestId = "probe-" + randomUUID().replace(/-/g, "")
+  const key = BUYER_LINK_DELIVERY_PREFIX + requestId
+  // Exercise the actual adapter, but confine every operation to this disposable
+  // key and override its normal retention with a 45-second failsafe.
+  const assertKey = (candidate: string) => {
+    if (candidate !== key) throw new Error("PROBE_KEY_SCOPE_DENIED")
+  }
   let created = false
+  let phase = "WRITE"
   let code = "BUYER_LINK_REDIS_WRITE_FAILED"
-  try {
-    const acknowledged = await redis.set(key, value, { nx: true, ex: 45 })
-    if (acknowledged === "OK" || acknowledged === true) {
+  const outbox = new QuickAuditDeliveryOutbox({
+    get: async <T = unknown>(candidate: string): Promise<T | null> => {
+      assertKey(candidate)
+      return await redis.get(candidate) as T | null
+    },
+    set: async (candidate, value, options) => {
+      assertKey(candidate)
+      // Cleanup even if SET succeeds but its response is lost.
       created = true
-      code = await redis.get(key) === value
-        ? "BUYER_LINK_REDIS_PROBE_PASS" : "BUYER_LINK_REDIS_READBACK_FAILED"
+      return redis.set(candidate, value, { ...options, ex: 45 })
+    },
+    eval: async (script, keys, args) => {
+      if (keys.length !== 1 || args.length !== 3) throw new Error("PROBE_KEY_SCOPE_DENIED")
+      assertKey(keys[0])
+      phase = "CAS"
+      return redis.eval(script, keys, [args[0], args[1], "45"])
+    },
+  }, BUYER_LINK_DELIVERY_PREFIX)
+  try {
+    const recipient = "redis-probe@example.invalid"
+    await outbox.enqueue({
+      auditId: requestId, requestId, checkoutSessionId: requestId,
+      recipient, paidAndPersisted: true,
+    })
+    if ((await outbox.read(requestId))?.state !== "queued") {
+      code = "BUYER_LINK_REDIS_READBACK_FAILED"
     } else {
-      code = "BUYER_LINK_REDIS_WRITE_NOT_ACKNOWLEDGED"
+      const claim = await outbox.claim(requestId, {
+        enabled: true, ownerOnly: true, ownerEmail: recipient,
+      })
+      if (!claim || (await outbox.read(requestId))?.state !== "sending") {
+        code = "BUYER_LINK_REDIS_CAS_CLAIM_FAILED"
+      } else if (!await outbox.finish(claim, { state: "failed", code: "DISPOSABLE_PROBE_ONLY" }) ||
+                 (await outbox.read(requestId))?.state !== "failed") {
+        code = "BUYER_LINK_REDIS_CAS_FINISH_FAILED"
+      } else if (await outbox.finish(claim, { state: "failed", code: "DISPOSABLE_PROBE_ONLY" })) {
+        code = "BUYER_LINK_REDIS_CAS_REPLAY_ACCEPTED"
+      } else {
+        code = "BUYER_LINK_REDIS_PROBE_PASS"
+      }
     }
   } catch (error: unknown) {
     code = classifyWriteError(error)
+    if (phase === "CAS" && code === "BUYER_LINK_REDIS_WRITE_FORBIDDEN") {
+      code = "BUYER_LINK_REDIS_CAS_FORBIDDEN"
+    }
   }
   if (created) {
     try {
-      if (Number(await redis.del(key)) !== 1) {
+      if (Number(await redis.del(key)) !== 1 || await redis.get(key) !== null) {
         code = "BUYER_LINK_REDIS_CLEANUP_UNCONFIRMED"
       }
     } catch {
