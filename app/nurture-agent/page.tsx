@@ -152,6 +152,9 @@ export default function NurtureAgentPage() {
             <Button asChild variant="outline" className="h-11 w-full sm:w-auto">
               <Link href="/content-agent">Content history</Link>
             </Button>
+            <Button asChild variant="outline" className="h-11 w-full sm:w-auto">
+              <Link href="/campaign-automations">Review-only automation plan</Link>
+            </Button>
           </div>
         </header>
 
