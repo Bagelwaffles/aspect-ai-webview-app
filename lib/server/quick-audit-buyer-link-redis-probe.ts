@@ -81,8 +81,16 @@ export async function probeBuyerLinkRedisWrite(input: {
     set: async (candidate, value, options) => {
       assertKey(candidate)
       // Cleanup even if SET succeeds but its response is lost.
-      created = true
-      return redis.set(candidate, value, { ...options, ex: 45 })
+      try {
+        const result = await redis.set(candidate, value, { ...options, ex: 45 })
+        created = result === "OK" || result === true
+        return result
+      } catch (error) {
+        const classification = classifyWriteError(error)
+        created = classification !== "BUYER_LINK_REDIS_WRITE_FORBIDDEN" &&
+          classification !== "BUYER_LINK_REDIS_TOKEN_REJECTED"
+        throw error
+      }
     },
     eval: async (script, keys, args) => {
       if (keys.length !== 1 || args.length !== 3) throw new Error("PROBE_KEY_SCOPE_DENIED")
@@ -122,7 +130,8 @@ export async function probeBuyerLinkRedisWrite(input: {
   }
   if (created) {
     try {
-      if (Number(await redis.del(key)) !== 1 || await redis.get(key) !== null) {
+      const deleted = Number(await redis.del(key))
+      if ((deleted !== 0 && deleted !== 1) || await redis.get(key) !== null) {
         code = "BUYER_LINK_REDIS_CLEANUP_UNCONFIRMED"
       }
     } catch {
