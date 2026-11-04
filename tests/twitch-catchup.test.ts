@@ -254,7 +254,7 @@ test("November 2026 YouTube public-default change cannot silently publish new VO
       assert.equal(url.searchParams.get("uploadType"), "resumable")
       assert.equal(url.searchParams.get("notifySubscribers"), "false")
       assert.ok(url.searchParams.get("part")?.split(",").includes("status"))
-      const payload = JSON.parse(String(init.body))
+      const payload = JSON.parse(String(init?.body))
       assert.equal(payload.status?.privacyStatus, "private")
       assert.equal(payload.status?.selfDeclaredMadeForKids, false)
       assert.equal(payload.status?.publishAt, undefined)
