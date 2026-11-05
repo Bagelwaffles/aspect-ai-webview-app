@@ -12,6 +12,7 @@ import {
   type QuickAuditStripeGateway,
 } from "./quick-audit-fulfillment"
 import { createNativeQuickAuditAuditGateway } from "./quick-audit-native"
+import { QuickAuditDeliveryOutbox } from "./quick-audit-delivery-outbox"
 
 type Dependencies = {
   env: NodeJS.ProcessEnv
@@ -22,6 +23,7 @@ type Dependencies = {
   store: QuickAuditStore
   auditGateway: QuickAuditAuditGateway
   evidenceCollector?: (url: string) => Promise<QuickAuditEvidence>
+  deliveryOutbox?: QuickAuditDeliveryOutbox
 }
 
 export function createQuickAuditWebhookHandler(dependencies: Dependencies) {
@@ -89,6 +91,10 @@ export function createQuickAuditWebhookHandler(dependencies: Dependencies) {
       const result = await processQuickAuditCheckout({
         event, gateway, store: dependencies.store, auditGateway: dependencies.auditGateway,
         evidenceCollector: dependencies.evidenceCollector, expectedPriceId: matched.priceId!, expectedLivemode: matched.livemode,
+        // Default OFF. This only queues a receipt; it never sends Gmail in a Stripe webhook.
+        onFulfilled: dependencies.env.AMS_QUICK_AUDIT_DELIVERY_OUTBOX_ENABLED === "true" && dependencies.deliveryOutbox
+          ? async (record) => { await dependencies.deliveryOutbox!.enqueue({...record,paidAndPersisted:true}) }
+          : undefined,
       })
       await dependencies.completeEvent(event.id, claim.token)
       console.info(`[Stripe] Processed ${event.type} for Quick Audit`)
@@ -114,5 +120,6 @@ export function defaultQuickAuditWebhookDependencies(input: {
     createStripe: (key) => new Stripe(key),
     store: new RedisQuickAuditStore(),
     auditGateway: createNativeQuickAuditAuditGateway(),
+    deliveryOutbox: new QuickAuditDeliveryOutbox(),
   }
 }
