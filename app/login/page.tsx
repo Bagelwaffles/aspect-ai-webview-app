@@ -62,14 +62,20 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
               <p className="font-semibold">Google sign-in is disabled on this preview deployment.</p>
               <p className="mt-2 text-amber-100/80">
-                This preview is configured to return OAuth callbacks to the production AMS site, so starting sign-in here would lose the OAuth state cookie.
+                This preview points Google OAuth callbacks at another AMS origin.
+                A login on the production site cannot sign you into this preview.
+              </p>
+              <p className="mt-2 text-amber-100/80">
+                The owner-only campaign pilot is available only in this Draft preview, not on production.
+                Preview-specific OAuth settings and the exact callback URL must be authorized before signing in here.
+                No Gmail reconnection is required.
               </p>
               {authOrigin.configuredOrigin ? (
                 <a
                   className="mt-3 inline-block font-semibold underline"
-                  href={`${authOrigin.configuredOrigin}/login?next=${encodeURIComponent(callbackUrl)}`}
+                  href={`${authOrigin.configuredOrigin}/login`}
                 >
-                  Continue on the production sign-in page
+                  Open normal production sign-in (not the campaign pilot)
                 </a>
               ) : null}
             </div>

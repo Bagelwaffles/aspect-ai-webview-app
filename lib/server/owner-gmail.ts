@@ -34,7 +34,14 @@ export function ownerGmailContext(input: GmailContext = {}) {
   const redis = input.redis ?? (url && token ? new Redis({ url, token }) : null)
   if (!key || !redis || !env.AMS_OWNER_EMAIL) throw new Error("GMAIL_VAULT_REQUIRED")
   const owner = createHash("sha256").update(env.AMS_OWNER_EMAIL.trim().toLowerCase()).digest("hex")
-  return { env, key, redis, owner, prefix: `ams:owner-gmail:v1:${owner}:`, fetcher: input.fetcher ?? fetch, now: input.now ?? Date.now() }
+  // A branch-scoped Preview shares only the free Redis *server*, never another
+  // Preview's encrypted OAuth grants, campaign receipts or owner task cursors.
+  const namespace = env.AMS_OWNER_GMAIL_PREVIEW_NAMESPACE?.trim() ?? ""
+  if (namespace && (env.VERCEL_ENV !== "preview" || !/^[a-z][a-z0-9_-]{2,39}$/.test(namespace))) {
+    throw new Error("GMAIL_PREVIEW_NAMESPACE_INVALID")
+  }
+  const prefix = `ams:owner-gmail:v1:${owner}:${namespace ? `preview:${namespace}:` : ""}`
+  return { env, key, redis, owner, prefix, fetcher: input.fetcher ?? fetch, now: input.now ?? Date.now() }
 }
 export async function beginGmailConnection(slot: GmailSlot, subject: string, input: GmailContext = {}) {
   const c = ownerGmailContext(input), config = gmailConfig(slot, c.env)

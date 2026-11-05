@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { authorizeOwnerApiRequest } from "@/lib/server/owner-api-auth"
 import { gmailConnectionStatus, gmailSlots, ownerGmailContext } from "@/lib/server/owner-gmail"
 import { readOwnerAlertReceiptProof } from "@/lib/server/owner-gmail-send-evidence"
+import { ownerGmailPreviewReadiness } from "@/lib/server/owner-gmail-readiness"
 
 export const runtime = "nodejs"
 export async function GET(request: NextRequest) {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     }
   }
   return NextResponse.json({
-    ok: true, accounts, refreshVerificationAvailable: process.env.VERCEL_ENV === "preview",
+    ok: true, accounts, readiness: ownerGmailPreviewReadiness(process.env, primary?.connected === true), refreshVerificationAvailable: process.env.VERCEL_ENV === "preview",
     autoReply: {
       armed: process.env.AMS_GMAIL_AUTOREPLY_ENABLED === "true" && process.env.AMS_GMAIL_SEND_ENABLED === "true",
       mode: "first-contact-acknowledgements-only",
