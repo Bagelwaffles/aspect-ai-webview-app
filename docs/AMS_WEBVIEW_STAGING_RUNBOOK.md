@@ -8,7 +8,7 @@ This stack is for isolated, test-mode staging only.
 
 | Service | Exact version | Host exposure | Purpose |
 |---|---|---|---|
-| Web | `node:22.22.1-alpine3.23` at pinned multi-platform digest | Loopback web port only | Next.js application |
+| Web | `node:24.21.0-alpine3.23` at pinned multi-platform digest | Loopback web port only | Next.js application |
 | Redis | `redis:7.4.10-alpine3.21` | None | Persistent AMS state |
 | Redis REST | `hiett/serverless-redis-http:0.0.10` | None | Existing `@upstash/redis` compatibility |
 

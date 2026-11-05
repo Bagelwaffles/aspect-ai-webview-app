@@ -18,7 +18,7 @@ PostgreSQL and Neon wsproxy are intentionally excluded. AMS has not approved a r
 
 Requirements:
 
-- Node.js 22
+- Node.js 24
 - pnpm 10.28.0
 
 ```bash
