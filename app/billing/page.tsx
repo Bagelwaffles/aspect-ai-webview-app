@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { authOptions, isCustomerAuthConfigured } from "@/lib/auth"
-import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
+import { isSubscriptionCheckoutAvailable } from "@/lib/server/subscription-checkout-availability"
 import { getEntitlementSnapshot, monthlyCreditsForPlan } from "@/lib/server/entitlements"
 
 export const dynamic = "force-dynamic"
@@ -38,7 +38,7 @@ export default async function BillingPage() {
   const snapshot = await getEntitlementSnapshot(subject).catch(() => null)
   const configured = Boolean(snapshot?.configured)
   const status = snapshot?.subscriptionStatus ?? "inactive"
-  const contentAgentLive = isContentAgentLaunchEnabled()
+  const contentAgentLive = isSubscriptionCheckoutAvailable()
   const subscriptionActive = status === "active" || status === "trialing"
   const monthlyAllowance = snapshot?.plan ? monthlyCreditsForPlan(snapshot.plan) : 0
   const creditsRemaining = snapshot?.totalCredits ?? 0
@@ -65,7 +65,7 @@ export default async function BillingPage() {
             <CardHeader>
               <CardTitle>New paid AI subscriptions are paused</CardTitle>
               <CardDescription>
-                Content Agent has passed controlled provider testing but remains behind the production launch gate. Existing subscribers can still manage their subscription, and no new paid checkout opens while the gate is disabled.
+                AMS cannot offer new paid AI subscriptions while the AI execution runtime is disabled or unconfigured. Existing subscribers can still manage their subscription, and no new paid checkout opens while the gate is disabled.
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -6,7 +6,7 @@ import { ArrowRight, Bot, CreditCard, Sparkles } from "lucide-react"
 import { BillingActionButton } from "@/components/billing-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
+import { isSubscriptionCheckoutAvailable } from "@/lib/server/subscription-checkout-availability"
 import { CREDIT_TOPUP_PACKS } from "@/lib/credit-topups"
 import { QUICK_MARKETING_AUDIT } from "@/lib/quick-marketing-audit"
 import { monthlyCreditsForPlan } from "@/lib/server/entitlements"
@@ -103,7 +103,7 @@ const REQUEST_OFFERS = [
 ]
 
 export default function PricingPage() {
-  const contentAgentLive = isContentAgentLaunchEnabled()
+  const contentAgentLive = isSubscriptionCheckoutAvailable()
 
   return (
     <>

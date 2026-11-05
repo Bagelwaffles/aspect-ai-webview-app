@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 
-import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
+import { isSubscriptionCheckoutAvailable } from "@/lib/server/subscription-checkout-availability"
 import { authorizePaidApiRequest } from "@/lib/server/customer-api-auth"
 import { getEntitlementSnapshot, type PlanSlug } from "@/lib/server/entitlements"
 import {
@@ -29,7 +29,7 @@ type CheckoutDependencies = {
   claimIntent: typeof claimStripeCheckoutIntent
   completeIntent: typeof completeStripeCheckoutIntent
   releaseIntent: typeof releaseStripeCheckoutIntent
-  launchEnabled: typeof isContentAgentLaunchEnabled
+  launchEnabled: typeof isSubscriptionCheckoutAvailable
   env: NodeJS.ProcessEnv
   now: () => number
   createSession: (
@@ -45,7 +45,7 @@ const defaultDependencies: CheckoutDependencies = {
   claimIntent: claimStripeCheckoutIntent,
   completeIntent: completeStripeCheckoutIntent,
   releaseIntent: releaseStripeCheckoutIntent,
-  launchEnabled: isContentAgentLaunchEnabled,
+  launchEnabled: isSubscriptionCheckoutAvailable,
   env: process.env,
   now: Date.now,
   createSession: async (secretKey, params, options) => {
@@ -108,7 +108,7 @@ function createCheckoutHandler(overrides: Partial<CheckoutDependencies> = {}) {
       return noStoreJson(
         {
           ok: false,
-          error: "Paid AI subscriptions are paused while Content Agent remains in private beta. No charge was created.",
+          error: "Paid AI subscriptions are temporarily unavailable while AMS AI execution is disabled or unconfigured. No charge was created.",
           code: "SUBSCRIPTION_CHECKOUT_PAUSED",
         },
         503,
