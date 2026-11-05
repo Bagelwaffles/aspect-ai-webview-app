@@ -28,6 +28,7 @@ test("paid Quick Audit exposes a durable downloadable report without changing ch
   assert.match(page, /Download report/)
   assert.match(page, /Print \/ Save PDF/)
   assert.match(page, /buildAuditArtifact/)
-  assert.match(page, /5 Priority Marketing Problems and Fixes/i)
+  assert.match(page, /Five Priority Findings and Fixes/i)
+  assert.match(page, /Strategic recommendation/i)
   assert.match(page, /7-Day Action Plan/)
 })

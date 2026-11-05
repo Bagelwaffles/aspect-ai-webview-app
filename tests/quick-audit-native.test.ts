@@ -94,6 +94,54 @@ test("native Quick Audit always produces the promised five findings and seven-da
   assert.equal(result.promotionalPost.includes(nativeInput.websiteUrl), true)
 })
 
+test("automatic page signals carry source attribution, while strategy is explicitly not a verified defect", () => {
+  const report = buildNativeQuickAuditResult({
+    ...nativeInput,
+    evidence: {
+      ...nativeInput.evidence,
+      hasClearValueProposition: false,
+      hasPrimaryCta: true,
+      hasLeadCapture: true,
+      hasTestimonials: true,
+      hasLocalBusinessSchema: null,
+    },
+    now: () => new Date("2026-10-21T12:00:00.000Z"),
+  })
+  assert.equal(report.findings.length, 5)
+  assert.equal(report.findings[0].basis, "automated-signal")
+  assert.equal(report.findings[0].sourceUrl, "https://example.com")
+  assert.equal(report.findings[0].reviewedAt, "2026-10-21T12:00:00.000Z")
+  assert.ok(report.findings.some(f => f.basis === "strategic-recommendation"))
+  assert.ok(report.findings.filter(f => f.basis === "strategic-recommendation").every(f => !f.sourceUrl))
+})
+
+test("national SaaS is not incorrectly faulted for missing LocalBusiness schema", () => {
+  const report = buildNativeQuickAuditResult({
+    ...nativeInput,
+    industry: "AI marketing SaaS and business services",
+    evidence: {
+      ...nativeInput.evidence,
+      hasLocalBusinessSchema: false,
+      hasClearValueProposition: true,
+      hasPrimaryCta: true,
+      hasLeadCapture: true,
+      hasTestimonials: true,
+    },
+  })
+  assert.equal(report.findings.some(f => f.title.includes("Local discovery")), false)
+  assert.equal(report.findings.length, 5)
+})
+
+test("unknown page signals never become confirmed evidence problems", () => {
+  const report = buildNativeQuickAuditResult({
+    ...nativeInput,
+    evidence: Object.fromEntries(Object.keys(nativeInput.evidence).map(key => [key, null])),
+  })
+  assert.equal(report.findings.length, 5)
+  assert.ok(report.findings.every(f => f.basis === "strategic-recommendation"))
+  assert.ok(report.findings.every(f => !f.sourceUrl))
+})
+
 test("native Quick Audit IDs are deterministic per request and gateway replay does not save twice", async () => {
   const store = new MemoryResultStore()
   const gateway = createNativeQuickAuditAuditGateway({

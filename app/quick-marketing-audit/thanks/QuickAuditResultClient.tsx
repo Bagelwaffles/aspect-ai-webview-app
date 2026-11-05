@@ -33,8 +33,8 @@ function buildAuditArtifact(result: NativeQuickAuditResult): string {
         ? [{ heading: "What the Evidence Already Supports", items: result.strengths }]
         : []),
       {
-        heading: "5 Priority Marketing Problems and Fixes",
-        orderedItems: result.findings.map((finding) => `${finding.title}\nObservation: ${finding.observation}\nFix: ${finding.fix}`),
+        heading: "Five Priority Findings and Fixes",
+        orderedItems: result.findings.map((finding) => `${finding.title}\nAssessment: ${finding.basis === "automated-signal" ? "Automated website signal (verify visually)" : "Strategic recommendation (not a verified defect)"}\nObservation: ${finding.observation}\nFix: ${finding.fix}${finding.sourceUrl ? `\nInspected page: ${finding.sourceUrl}` : ""}${finding.reviewedAt ? `\nReview timestamp: ${finding.reviewedAt}` : ""}`),
       },
       { heading: "Improved Headline", text: result.improvedHeadline },
       { heading: "Improved Offer Direction", text: result.improvedOffer },
@@ -187,12 +187,23 @@ export function QuickAuditResultClient() {
       ) : null}
 
       <Card>
-        <CardHeader><CardTitle>5 priority marketing problems and fixes</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Five priority findings and fixes</CardTitle></CardHeader>
         <CardContent className="space-y-5">
           {result.findings.map((finding, index) => (
             <div className="border-b pb-5 last:border-b-0 last:pb-0" key={`${index}-${finding.title}`}>
               <p className="font-medium">{index + 1}. {finding.title}</p>
+              <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-primary">
+                {finding.basis === "automated-signal" ? "Automated website signal — visually verify" :
+                  finding.basis === "strategic-recommendation" ? "Strategic recommendation — not a verified problem" :
+                    "Legacy finding — review evidence"}
+              </p>
               <p className="mt-2 text-sm text-muted-foreground">{finding.observation}</p>
+              {finding.sourceUrl && (finding.sourceUrl.startsWith("https://") || finding.sourceUrl.startsWith("http://")) ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Source: <a href={finding.sourceUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">Audited public website</a>
+                  {finding.reviewedAt ? ` · Checked ${new Date(finding.reviewedAt).toLocaleDateString()}` : ""}
+                </p>
+              ) : null}
               <p className="mt-2 text-sm"><strong>Fix:</strong> {finding.fix}</p>
             </div>
           ))}
