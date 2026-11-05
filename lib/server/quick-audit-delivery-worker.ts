@@ -26,9 +26,38 @@ type PaidCompletion = {
 export interface PaidQuickAuditProof {
   readSession(checkoutSessionId: string): Promise<PaidCompletion | null>
 }
+/**
+ * The address presently used for AMS customer correspondence. It receives
+ * incoming messages through the company's existing forwarding rule, but that
+ * DOES NOT establish outbound send-as authorization.
+ */
+export const AMS_CUSTOMER_FROM_ADDRESS = "kimberley@aspectmarketingsolutions.app" as const
+export const AMS_CUSTOMER_FROM_NAME = "Aspect Marketing Solutions" as const
+
 export interface QuickAuditTransactionalSender {
-  /** Provider acceptance ID is not proof of recipient inbox delivery. */
-  send(input: { recipient: string; subject: string; plainText: string }): Promise<{ messageId: string }>
+  /**
+   * Read the provider's ACTUAL authorized sender identity (e.g. Gmail sendAs
+   * with verificationStatus=accepted). Never infer this from an env variable,
+   * an incoming-forwarding rule, or the authenticated Gmail account alone.
+   */
+  inspectSender(address: string): Promise<{
+    address: string
+    displayName: string
+    replyToAddress: string
+    verificationStatus: "accepted" | "pending" | "missing"
+  } | null>
+  /**
+   * Set actual RFC 5322 From and Reply-To headers, never Gmail's implicit
+   * personal-account default. An acceptance ID is not inbox delivery proof.
+   */
+  send(input: {
+    recipient: string
+    fromAddress: string
+    fromName: string
+    replyToAddress: string
+    subject: string
+    plainText: string
+  }): Promise<{ messageId: string; fromAddress: string }>
 }
 export type QuickAuditDeliveryOutcome =
   | { status: "disabled" | "held" | "duplicate" | "submitted" | "uncertain" }
@@ -141,6 +170,22 @@ export async function deliverQuickAuditOwnerPreview(input: {
     return { status: "held" }
   }
 
+  // Identity must be verified by the outbound provider BEFORE the durable
+  // one-time delivery claim. Pending/unverified aliases remain queued.
+  // This prevents silent fallback to an @gmail.com From identity.
+  try {
+    const identity = await input.sender.inspectSender(AMS_CUSTOMER_FROM_ADDRESS)
+    if (!identity ||
+        identity.address.trim().toLowerCase() !== AMS_CUSTOMER_FROM_ADDRESS ||
+        identity.verificationStatus !== "accepted" ||
+        identity.displayName.trim() !== AMS_CUSTOMER_FROM_NAME ||
+        identity.replyToAddress.trim().toLowerCase() !== AMS_CUSTOMER_FROM_ADDRESS) {
+      return { status: "held" }
+    }
+  } catch {
+    return { status: "held" }
+  }
+
   const claim = await outbox.claim(pending.requestId, {
     enabled: true, ownerOnly: true, ownerEmail,
   })
@@ -148,10 +193,16 @@ export async function deliverQuickAuditOwnerPreview(input: {
   try {
     const response = await input.sender.send({
       recipient: ownerEmail,
+      fromAddress: AMS_CUSTOMER_FROM_ADDRESS,
+      fromName: AMS_CUSTOMER_FROM_NAME,
+      replyToAddress: AMS_CUSTOMER_FROM_ADDRESS,
       subject: `Your AMS Quick Marketing Audit — ${report.auditId}`,
       plainText: renderQuickAuditPlainText(report),
     })
-    if (!response.messageId?.trim()) throw new Error("PROVIDER_ACCEPTANCE_UNKNOWN")
+    if (!response.messageId?.trim() ||
+        response.fromAddress?.trim().toLowerCase() !== AMS_CUSTOMER_FROM_ADDRESS) {
+      throw new Error("BUSINESS_FROM_IDENTITY_UNCONFIRMED")
+    }
     const persisted = await outbox.finish(claim, {
       state: "submitted", providerMessageId: response.messageId,
     })
