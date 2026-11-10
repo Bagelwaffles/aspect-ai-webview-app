@@ -3,7 +3,7 @@ import test from "node:test"
 
 import { NextRequest } from "next/server"
 
-import { handleAciReferenceGet } from "../app/api/internal/aci/references/route"
+import { handleAciReferenceGet } from "../lib/aci/owner-references"
 
 const sourceRepoSha = "d6e7f98720ef9d96ab89906e1828187b36048659"
 const preview = { VERCEL_ENV: "preview" } as unknown as NodeJS.ProcessEnv
