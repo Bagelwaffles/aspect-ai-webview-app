@@ -25,31 +25,31 @@ as operating.** No new channel, retry, post, visibility change, OAuth action or 
 ## What this branch actually adds
 
 1. Pure, offline validation for **public-only, attributed research claims**, with source
-   URL, publisher, original publication/retrieval time, official corroboration URL(s),
+   URL, publisher, original publication/retrieval time, caller-supplied corroboration links,
    repo SHA, affected agent ID, stable source/claim fingerprint and distinct status.
-   This is not independent verification of the claim: every accepted record stays
-   \`research_only\`, \`verified=false\`, \`trustedInstructions=false\`, \`mayExecute=false\`.
+   These links are not fetched or independently verified: every accepted record stays
+   `research_only`, `verified=false`, `trustedInstructions=false`, `mayExecute=false`.
 2. An offline **before/after fixture evaluation**, requiring identical labeled cases,
    schema-valid decisions, evidence for evidence-dependent decisions, critical-safety
    case results, zero unauthorized simulated actions, billed-cost telemetry and timing.
    It rejects missing, invalid, duplicative, or unregistered observations, safety
-   regressions and missed critical events. Improvements yield \`candidate_for_review\`
-   only, with \`productionApproved=false\`.
+   regressions and missed critical events. Improvements yield `candidate_for_review`
+   only, with `productionApproved=false`.
 3. Regression tests for public/private boundaries, source freshness/deduplication,
    external prompt injection treated as untrusted data, missing/outdated evidence,
    regressed critical decisions, dangerous actions and invalid cost telemetry.
 
 Reproduce in a checked-out branch with the repository's existing dependencies:
 
-\`\`\`sh
+```sh
 node --import tsx --test tests/aci-evidence-evaluation.test.ts
 pnpm test
-\`\`\`
+```
 
 **Interpretation:** Synthetic fixture scores are engineering checks, **not** actual agent
 quality, platform access, customer value, live profitability or authorized real-world
 safety results. The supplied cost is fixture telemetry; it is not provider-invoiced proof.
-An accepted research candidate's \`dataClassification="public"\` is a caller assertion,
+An accepted research candidate's `dataClassification="public"` is a caller assertion,
 not privacy inspection. Do not ingest customer/inbox/private information. URL validation
 is not an SSRF barrier for future fetchers; add DNS/IP checks and allowlists before
 any server-side network retrieval. Untrusted videos/transcripts are data, never prompts
@@ -65,7 +65,7 @@ or permissions, and full copyrighted transcripts must not be copied into the led
    namespace, ACL, tenancy, deduplication and audit chain. No direct Redis write in
    this branch. Owner review before connecting any external ingestion.
 3. Implement explicit verified-learning promotion and permission-scoped retrieval.
-   Independent corroboration plus review is required before \`verified\` changes;
+   Independent corroboration plus review is required before `verified` changes;
    research text can never upgrade system or tool instructions.
 4. Prove one real source→safe knowledge entry→specialist retrieval→before/after
    evidence→isolated Draft PR→exact-head CI. Reviewers must separately approve
