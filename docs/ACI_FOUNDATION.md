@@ -165,7 +165,7 @@ block:
    `assessPublicResearchCandidate` before selecting up to five source **references**.
    It rejects unknown AMS agents, cross-agent and cross-source-SHA mixing, tampered
    claims/links, unknown fields, stale citations and unbounded input. A duplicate
-   fingerprint is returned once.
+   fingerprint is returned once. Token-bearing or signed source URLs and invalid clock input also fail closed.
 2. Selected references are `dataOnly: true`, `verified: false`,
    `trustedInstructions: false`, `mayExecute: false`, and contain only a source URL,
    reference fingerprint, retrieved time, citation URL(s), source kind and associated
