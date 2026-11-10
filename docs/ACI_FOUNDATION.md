@@ -146,6 +146,75 @@ Content Agent or the separate working Twitch→YouTube pipeline stopped. Do not 
 costly telemetry, widen access to customer records, add privileged endpoints,
 or change working operational behavior to fill this evaluation gap.
 
+## Phase 1.5: agent-scoped research retrieval and offline improvement review
+
+Research reviewed on **November 10, 2026**:
+- [LangChain: How To Build a Self-Improving Agent with LangSmith Engine and Context Hub](https://www.youtube.com/watch?v=y6WUw2_Hhrs) — demonstrates trace detection, versioned context updates and verification.
+- [LangChain: Build Agents That Never Forget](https://www.youtube.com/watch?v=3Yp-hIEcWXk) — demonstrates namespace-scoped long-term memory.
+- [LangChain: Create a Dataset from Production Traces](https://www.youtube.com/watch?v=qDWBGyqUqdI) and [Evaluation Types](https://docs.langchain.com/langsmith/evaluation-types) — separate deterministic CI tests from actual historical-run backtesting.
+- [OWASP Agent Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/AI_Agent_Security_Cheat_Sheet.html) and [RAG Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/RAG_Security_Cheat_Sheet.html) — stored/retrieved memory is an untrusted source that cannot authorize tool actions.
+
+**Decision:** Extend the repository's existing TypeScript ACI prototypes, not install a
+second managed agent platform or subscribe to an expensive autonomous-fixer service.
+
+Added `lib/aci/research-review.ts` as a **pure, offline and default-inert** next building
+block:
+
+1. `selectAciResearchReferences` re-evaluates research candidate structure, source
+   freshness, canonical URL, deduplication fingerprint and the never-trust flags using
+   `assessPublicResearchCandidate` before selecting up to five source **references**.
+   It rejects unknown AMS agents, cross-agent and cross-source-SHA mixing, tampered
+   claims/links, unknown fields, stale citations and unbounded input. A duplicate
+   fingerprint is returned once.
+2. Selected references are `dataOnly: true`, `verified: false`,
+   `trustedInstructions: false`, `mayExecute: false`, and contain only a source URL,
+   reference fingerprint, retrieved time, citation URL(s), source kind and associated
+   agent/commit. The **untrusted claim text is deliberately not returned** as agent
+   instructions or automatically injected into runtime prompts. The existing
+   `public` classification is caller-asserted, not independent privacy review.
+3. `planAciOfflineImprovement` can associate these research references with the
+   existing deterministic **synthetic** before/after evaluation, rejecting SHA mismatch,
+   unsafe actions and failed fixtures. Its best state is
+   `synthetic_candidate_for_human_review`: not measured improvement, not a code
+   patch, not verified source contents, and never permission to execute, merge, deploy
+   or publish.
+
+Run the new offline regression tests:
+
+```sh
+node --import tsx --test tests/aci-research-review.test.ts
+pnpm test
+```
+
+**This is NOT persistent agent memory, automatic source verification, dynamic
+retrieval-augmented generation, or an autonomous code-repair agent.** No network calls,
+API routes, Redis keys, agents, schedules, LLM calls, customer records, authorization
+changes, PR merges or external actions are introduced. Never present a synthetic
+evaluation score as real success or claim a source is verified simply because it has
+a second URL.
+
+**Implementation order after this gate (separately verified and approved):**
+
+- Reconcile with Draft [#280](https://github.com/Bagelwaffles/aspect-ai-webview-app/pull/280):
+  prove authorized Preview datastore identity, idempotent persisted finding replay and
+  exact-head CI. Store references in its existing authenticated, scoped namespace only
+  after explicit integration approval. Do not invent a second database.
+- Implement independent source verification and audited owner review so trusted
+  **facts** can be promoted to a versioned knowledge state without ever promoting
+  instructions or tool permissions. Bind reads to exact agent/tenant/repo version,
+  impose expiration/revalidation and log decisions without private prompts.
+- Obtain consented, properly redacted historical runs with verified version/outcome
+  provenance. Establish independent, held-out comparison fixtures (not only self-scored
+  synthetic tests). Record actual budget and cost per successful task.
+- Source-backed finding → verified knowledge → bounded agent retrieval → evaluated
+  patch in a **Draft PR** → exact-head tests/security checks → **separate owner
+  release approval** → independently measured post-release result. Unknown, stale,
+  malicious or unavailable evidence must fail closed.
+
+Preserve current owner-approved SmokyBanana03 Twitch→YouTube automatic upload and public
+publishing unchanged. The only purpose of the new tests is to prevent research-driven
+unapproved changes to the working pipeline.
+
 ## Next acceptance milestones (NOT completed here)
 
 1. Owner-review the newly added 14-case synthetic AMS policy rubric. Build a separately
