@@ -171,6 +171,9 @@ export function selectAciResearchReferences(
   if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > MAX_REFERENCES) {
     return blocked("INVALID_REFERENCE_LIMIT")
   }
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
+    return blocked("INVALID_REVIEW_CLOCK")
+  }
   if (!Array.isArray(request.records) || request.records.length > MAX_INPUT_RECORDS) {
     return blocked("INVALID_REFERENCE_COLLECTION")
   }
@@ -184,6 +187,12 @@ export function selectAciResearchReferences(
       candidate.baselineRepoSha !== request.sourceRepoSha) {
       return blocked("CROSS_AGENT_OR_VERSION_LEAK")
     }
+    // Do not surface signed URLs, accidental secrets or session tokens in
+    // references; a public classification alone is not proof that a URL is safe.
+    const sourceQuery = new URL(candidate.source.url).searchParams
+    if ([...sourceQuery.keys()].some((key) =>
+      /^(?:token|access[_-]?token|refresh[_-]?token|id[_-]?token|api[_-]?key|client[_-]?secret|secret|password|passwd|session|cookie|auth|authorization|signature|sig|otp|x-amz-.+|x-goog-.+)$/i.test(key),
+    )) return blocked("SENSITIVE_SOURCE_URL")
     cleaned.push(candidate)
   }
 
