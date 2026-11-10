@@ -135,9 +135,10 @@ export function inspectAciPrivateTraceManifest(
     }
     if (record.reviewerRole !== "owner" && record.reviewerRole !== "authorized_reviewer") reasons.push("INVALID_REVIEW_ROLE")
     if (!["completed", "failed", "blocked"].includes(record.outcome)) reasons.push("INVALID_OUTCOME")
-    if (!plainObject(record.attestations) ||
-      !exactFields(record.attestations, ATTESTATION_FIELDS) ||
-      ATTESTATION_FIELDS.some((field) => record.attestations[field] !== true)) {
+    const attestations: unknown = record.attestations
+    if (!plainObject(attestations) ||
+      !exactFields(attestations, ATTESTATION_FIELDS) ||
+      ATTESTATION_FIELDS.some((field) => attestations[field] !== true)) {
       reasons.push("MISSING_PRIVACY_OR_AUTHORIZATION_ATTESTATION")
     }
 
