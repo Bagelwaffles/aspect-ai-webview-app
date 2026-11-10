@@ -116,7 +116,14 @@ function validatedResearch(value: unknown, now: Date): AciResearchRecord | null 
     affectedAgentId: value.affectedAgentId,
     baselineRepoSha: value.baselineRepoSha,
     claim: value.claim,
-    source: source as AciResearchCandidateInput["source"],
+    source: {
+      kind: source.kind as AciSourceKind,
+      url: source.url,
+      title: source.title,
+      publisher: source.publisher,
+      retrievedAt: source.retrievedAt,
+      ...(source.publishedAt === undefined ? {} : { publishedAt: source.publishedAt }),
+    },
     corroborationUrls: value.corroborationUrls as string[],
   }
   const assessed = assessPublicResearchCandidate(input, now)
@@ -161,7 +168,7 @@ export function selectAciResearchReferences(
     return blocked("INVALID_REPO_SHA")
   }
   const limit = request.maxReferences === undefined ? 3 : request.maxReferences
-  if (!Number.isInteger(limit) || typeof limit !== "number" || limit < 1 || limit > MAX_REFERENCES) {
+  if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > MAX_REFERENCES) {
     return blocked("INVALID_REFERENCE_LIMIT")
   }
   if (!Array.isArray(request.records) || request.records.length > MAX_INPUT_RECORDS) {
