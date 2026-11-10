@@ -224,3 +224,18 @@ test("no quality gain and no meaningful cost decrease is not an improvement", ()
   input.before[0] = { ...input.after[0] }
   assert.equal(evaluateAciImprovement(input).status, "no_measured_improvement")
 })
+
+test("malformed top-level input or a null fixture fails closed instead of throwing", () => {
+  assert.equal(evaluateAciImprovement(null as unknown as AciEvaluationStudy).status, "insufficient_evidence")
+  const input = study()
+  input.fixtures[0] = null as unknown as AciEvaluationStudy["fixtures"][number]
+  assert.equal(evaluateAciImprovement(input).status, "insufficient_evidence")
+})
+
+test("a before/after comparison must identify different source-controlled versions", () => {
+  const input = study()
+  input.candidateRepoSha = input.baselineRepoSha
+  const result = evaluateAciImprovement(input)
+  assert.equal(result.status, "insufficient_evidence")
+  assert.ok(result.reasons.includes("UNVERSIONED_COMPARISON"))
+})
