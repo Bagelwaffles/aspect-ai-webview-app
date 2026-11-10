@@ -109,6 +109,41 @@ before/after results. The owner authorizes non-destructive evidence preparation 
 no live systems, integrations, prices, customer data, Google Play, or Twitch/YouTube
 publishing can be modified as a consequence.
 
+## Read-only real-trace source access matrix — November 10, 2026
+
+This is an **accessibility/coverage diagnosis**, not a finding that AMS's Live agents
+failed or did not run. Read-only tools accessed only existing dashboards, source code,
+deployment metadata and account-auth errors. No new AI calls, credits, customer records,
+credentials, logging or production writes were used.
+
+| Source | Actual non-sensitive observation | Evidence usability |
+| --- | --- | --- |
+| Vercel connected Agent Runs API | `403 forbidden` for this project/team | Cannot retrieve any run traces through the available API scope |
+| Existing owner's Vercel dashboard, Observability → Agent Runs | `Runs 0` / `No results found` for **Last 7 days**, **Production** | No run metadata from this observability surface in the checked period; this does **not** prove AMS native agents are inactive |
+| Existing Vercel production runtime logs | Narrow query returned no usable agent-run evidence; broader seven-day content/audit searches timed out | No complete trace suitable for evaluation |
+| Existing AMS production `/content-agent` UI, logged-out connected Opera | `CUSTOMER_SESSION_REQUIRED: A signed customer session is required` in Recent runs | Authenticated customer-run history unavailable with current browser session; no login or paid generation attempted |
+| Existing `app/api/content-agent/runs/route.ts` and `lib/server/content-agent-runs.ts` | GET requires authenticated customer principal, then calls `listForOwner`; run history includes input, output, provenance and financial state | This is the actual native AMS run store, but raw replies cannot be treated as safe-to-export evaluation records |
+| Existing GitHub issues/catalog/CI | Historical claims, code releases, synthetic CI and operator notes | Useful corroboration and fixture requirements, **not** two independently verified before/after agent execution outputs |
+
+**Minimum non-destructive continuation:** Use an existing, owner-authorized **test
+customer** account (not another customer's data) to examine its own prior run history
+via the existing customer interface; **do not execute a new paid generation**. Only
+if eligible existing runs are found, prepare a redacted private-only case inventory
+with agent/version, timestamps, source-quality boundaries and a separate reviewer
+rubric. Raw prompts, outputs, subjects, emails, tokens, financial/credit details and
+run identifiers remain private. One historic run is not a valid same-task
+before/after improvement comparison. If genuine distinct-version baseline and
+candidate outcomes do not exist, explicitly report the gate blocked rather than
+manufacturing or paying for a replacement. Need specific approved test budget and
+exact-action authorization before any new model call.
+
+**Further limits:** Vercel Agent Runs is an observability feature for particular
+instrumented agent frameworks, whereas AMS native Content Agent stores its own
+execution history. An empty Vercel Agent Runs table is not evidence that native
+Content Agent or the separate working Twitch→YouTube pipeline stopped. Do not enable
+costly telemetry, widen access to customer records, add privileged endpoints,
+or change working operational behavior to fill this evaluation gap.
+
 ## Next acceptance milestones (NOT completed here)
 
 1. Owner-review the newly added 14-case synthetic AMS policy rubric. Build a separately
