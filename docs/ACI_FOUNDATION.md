@@ -215,6 +215,91 @@ Preserve current owner-approved SmokyBanana03 Twitch→YouTube automatic upload 
 publishing unchanged. The only purpose of the new tests is to prevent research-driven
 unapproved changes to the working pipeline.
 
+## Phase 2: maintenance handoff + source-controlled public reference seed
+
+**Implementation checkpoint (2026-11-10):** This is still isolated Draft code. It
+does not issue authenticated network requests or write live databases. Do not equate
+the phrase "end-to-end test" with a released autonomous learning capability.
+
+- \`lib/aci/maintenance-handoff.ts\` converts already-vetted public research references
+  into the **existing** \`POST /api/internal/maintenance\` \`record_research\` body
+  schema defined by [Draft #280](https://github.com/Bagelwaffles/aspect-ai-webview-app/pull/280).
+  It crosses the **48-hour source-freshness** boundary of #280 (research itself may
+  remain readable for up to 30 days); uses only fixed explanatory text, source URL,
+  timestamp and deduplication fingerprint. A stale source cannot be submitted.
+  Result state is \`owner_submission_required\`, not \`submitted\`. An authenticated,
+  trusted-origin owner session on the *exact* Preview hostname is independently
+  required for any later real API action.
+- \`docs/aci/public-research-seed.v1.json\` preserves **three public, unattributed to
+  customers, research-only source candidates** in GitHub's existing source control:
+  LangChain's June 2026 self-improvement demonstration, OWASP AI-agent security
+  guidance, and OpenAI's trace-grading guidance. The entries are scoped to the
+  current verified AMS catalog and source commit, include citations and retrieval
+  times, and are never tagged independently verified, approved or executable.
+  These are **source-derived research summaries**, not copied video transcripts.
+- \`tests/aci-maintenance-handoff.test.ts\` runs a **synthetic offline** sequence of
+  normalized public source → agent-scoped retrieval → deterministic candidate
+  evaluation → maintenance owner-submission proposal. It checks no paid API use,
+  no database write, no automatic external action, strict freshness, scope,
+  deduplication, untrusted text exclusion and permissions.
+- \`tests/aci-public-seed.test.ts\` verifies the persisted research seed shape,
+  catalog coverage, source normalization, absence of private run fields, preview
+  handoff compatibility, and normal expiration/revalidation behavior. Tests pin
+  their clock to the capture date and do not claim sources remain fresh forever.
+
+Reproduce with existing dependencies, no external data or paid model:
+
+\`\`\`sh
+node --import tsx --test tests/aci-maintenance-handoff.test.ts tests/aci-public-seed.test.ts
+pnpm test
+\`\`\`
+
+### Live Preview validation attempted, no privileged API writes
+
+Connected owner Opera (read-only) inspected [PR #280's exact Preview deployment]
+(https://vercel.com/kimberleyaversbiz-4131s-projects/aspect-ai-overlord/3djHU4pe5hRQCXMfhVHwejugPdsr)
+at commit \`4a7bea561ee222ff688bfdc3a17feafc01c7e18d\`.
+\`GET /api/health\` reported \`ok=true\`, \`status=ready\`,
+\`environment=preview\`, and Redis \`configured=true\`, \`checked=true\`,
+\`status=ready\`. This is **connection readiness only**; it does not
+independently prove the endpoint corresponds to the authorized intended
+**Preview-only** database or its isolation from Production. The protected
+\`GET /api/internal/maintenance\` returned \`OWNER_SESSION_REQUIRED\`, as designed,
+because the owner is not authenticated on that exact Preview origin. Do not
+bypass the session or borrow a Production cookie. No POST, Redis write,
+feature switch, credential access or replay was attempted.
+
+The connected Vercel project's Storage page displays an existing **Production**
+Redis connection; its presence does not establish the identity of a separate
+Preview branch override. Verify Preview datastore name/host and owner scope
+without printing secret tokens before any controlled write, and stop if it could
+be Production.
+
+### Remaining necessary conditions for actual persistent self-improvement
+
+1. Independently verify the existing Preview Redis **identity and isolation**, then
+   owner-authenticate the exact trusted Preview origin (the existing Preview
+   OAuth/client restrictions must remain respected). Do **not** use direct
+   production URLs or credentials as a shortcut.
+2. In a separately authorized Preview-only acceptance, record one genuine
+   public research signal through #280's API, read it back, deduplicate a replay,
+   attach a real isolated Draft PR after independent GitHub verification, and
+   verify the exact-head required CI/secret scan. Record one actual lifecycle
+   outcome with no customer/private data.
+3. Extend the existing maintenance persistence and protected retrieval only
+   after that acceptance. Research references and proof hashes must remain
+   untrusted data unless independently reviewed, explicitly versioned and
+   constrained to agent and tenant scope. Never promote source text to system
+   instructions or grant new tool privileges based on memory.
+4. Obtain independently reviewed source facts and appropriate, privately
+   redacted **real** agent before/after execution evidence. Existing legacy
+   customer run history lacks sufficient exposed provenance. A synthetic
+   improvement test is **not** empirical quality improvement.
+5. Keep release gates separate: exact owner-approved merge/deploy, rollback
+   readiness and post-deploy monitoring. No production change is authorized
+   by this Draft branch, and the already working Twitch→YouTube auto-upload
+   and public promotion pipeline remains completely unchanged.
+
 ## Next acceptance milestones (NOT completed here)
 
 1. Owner-review the newly added 14-case synthetic AMS policy rubric. Build a separately
