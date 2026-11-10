@@ -112,30 +112,32 @@ publishing can be modified as a consequence.
 ## Read-only real-trace source access matrix — November 10, 2026
 
 This is an **accessibility/coverage diagnosis**, not a finding that AMS's Live agents
-failed or did not run. Read-only tools accessed only existing dashboards, source code,
-deployment metadata and account-auth errors. No new AI calls, credits, customer records,
-credentials, logging or production writes were used.
+failed or did not run. Read-only tools accessed existing dashboards, source code,
+deployment metadata and owner-authorized **on-screen run status labels** after login.
+No new AI calls, credits, customer prompts, outputs, identifying run details,
+credentials, logging or production writes were used or exported.
 
 | Source | Actual non-sensitive observation | Evidence usability |
 | --- | --- | --- |
 | Vercel connected Agent Runs API | `403 forbidden` for this project/team | Cannot retrieve any run traces through the available API scope |
 | Existing owner's Vercel dashboard, Observability → Agent Runs | `Runs 0` / `No results found` for **Last 7 days**, **Production** | No run metadata from this observability surface in the checked period; this does **not** prove AMS native agents are inactive |
 | Existing Vercel production runtime logs | Narrow query returned no usable agent-run evidence; broader seven-day content/audit searches timed out | No complete trace suitable for evaluation |
-| Existing AMS production `/content-agent` UI, logged-out connected Opera | `CUSTOMER_SESSION_REQUIRED: A signed customer session is required` in Recent runs | Authenticated customer-run history unavailable with current browser session; no login or paid generation attempted |
+| Existing AMS production `/content-agent` UI, connected Opera after owner login | Authenticated native Recent runs now visible; historical completed items display `Execution provenance unavailable for this legacy run.` | Genuine owner-accessible history exists, but on-screen status and missing provenance are **not** independently verified model outputs, source commit versions, or matched before/after evaluations |
 | Existing `app/api/content-agent/runs/route.ts` and `lib/server/content-agent-runs.ts` | GET requires authenticated customer principal, then calls `listForOwner`; run history includes input, output, provenance and financial state | This is the actual native AMS run store, but raw replies cannot be treated as safe-to-export evaluation records |
 | Existing GitHub issues/catalog/CI | Historical claims, code releases, synthetic CI and operator notes | Useful corroboration and fixture requirements, **not** two independently verified before/after agent execution outputs |
 
-**Minimum non-destructive continuation:** Use an existing, owner-authorized **test
-customer** account (not another customer's data) to examine its own prior run history
-via the existing customer interface; **do not execute a new paid generation**. Only
-if eligible existing runs are found, prepare a redacted private-only case inventory
-with agent/version, timestamps, source-quality boundaries and a separate reviewer
-rubric. Raw prompts, outputs, subjects, emails, tokens, financial/credit details and
-run identifiers remain private. One historic run is not a valid same-task
-before/after improvement comparison. If genuine distinct-version baseline and
-candidate outcomes do not exist, explicitly report the gate blocked rather than
-manufacturing or paying for a replacement. Need specific approved test budget and
-exact-action authorization before any new model call.
+**Minimum non-destructive continuation:** The owner's existing signed-in session
+has now confirmed that native run history can be displayed. **Do not repeat login or
+execute paid generation to manufacture an experiment.** A reviewer must first establish
+whether any existing owner-authorized records provide a **same-task baseline/candidate
+pair with independently verified distinct code/model versions and actual outcomes**.
+The legacy UI lacks sufficient provenance, so merely finding two completed entries is
+not proof of a valid comparison. If independently attributable evidence does become
+available, compile a separate **private-only**, reviewed/redacted case inventory and
+outcome rubric, keeping raw prompts, outputs, subjects, emails, tokens, credit and
+financial details, and run identifiers out of public GitHub. If such a pair does not
+exist, remain BLOCKED pending an exact-action, capped-cost experiment approval; do not
+invent metrics or modify live services.
 
 **Further limits:** Vercel Agent Runs is an observability feature for particular
 instrumented agent frameworks, whereas AMS native Content Agent stores its own
