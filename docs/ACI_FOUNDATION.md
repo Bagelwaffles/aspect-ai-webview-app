@@ -68,6 +68,47 @@ is not an SSRF barrier for future fetchers; add DNS/IP checks and allowlists bef
 any server-side network retrieval. Untrusted videos/transcripts are data, never prompts
 or permissions, and full copyrighted transcripts must not be copied into the ledger.
 
+## Owner-authorized private execution evidence — preparation, not acceptance
+
+The next gate is **real, reviewed, before/after agent execution records**. A recent read-only
+check found that the existing Vercel **Agent Runs** observability view denies access (403);
+a narrowly scoped runtime-log lookup did not return usable agent executions. No complete,
+owner-authorized, independently reviewable before/after examples have been obtained.
+**Do not fabricate a dataset, treat catalog status as a run trace, or label synthetic tests
+as measured learning.**
+
+The additive module \`lib/aci/private-trace-intake.ts\` provides a **private, offline,
+metadata-only intake validator**. It contains no network fetches, persistent writes,
+model calls, private run IDs, stored transcripts, training operation, or production integration.
+It requires pairs of baseline/candidate records referencing the **same existing AMS agent**
+at distinct repository commits, an opaque proof digest for each unique execution, an
+environment, observed/reviewed times, outcome category, and an owner/authorized reviewer
+privacy attestation. The accepted response is always
+\`status=metadata_only_unverified\`, \`sourceAuthenticityVerified=false\`,
+\`readyForScoring=false\`, \`productionApproved=false\`.
+
+Even a successful shape check does **not** verify the attestation, existence or quality of
+the underlying runs. The next independent stage must securely inspect the exact original
+run logs, validate the execution versions and outcomes against authorized evidence, establish
+a human-reviewed quality rubric, and *then* evaluate measured before/after results in a
+separate private workspace. Keep the private source mapping and its high-entropy HMAC-derived
+digests out of public GitHub commits; the SHA-like digest format alone does not prove
+authenticity or privacy. Store no customer/owner emails, financial records, secrets,
+prompts, output transcripts, raw request IDs, customer identifiers or customer-derived
+artifacts in this public project. Do not turn signed-off attestations into automatic trust.
+
+Run offline fixture tests with existing dependencies:
+
+\`\`\`sh
+node --import tsx --test tests/aci-private-trace-intake.test.ts
+\`\`\`
+
+**Still blocked:** authorized real execution records, independently verified redaction,
+owner-reviewed outcome labels, an accepted private proof store and genuine measured
+before/after results. The owner authorizes non-destructive evidence preparation only;
+no live systems, integrations, prices, customer data, Google Play, or Twitch/YouTube
+publishing can be modified as a consequence.
+
 ## Next acceptance milestones (NOT completed here)
 
 1. Owner-review the newly added 14-case synthetic AMS policy rubric. Build a separately
