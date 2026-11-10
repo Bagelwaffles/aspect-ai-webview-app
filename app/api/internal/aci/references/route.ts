@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { agents } from "@/app/agents/agentCatalog"
 import seed from "@/docs/aci/public-research-seed.v1.json"
 import { assessPublicResearchCandidate } from "@/lib/aci/research-evidence"
 import { selectAciResearchReferences } from "@/lib/aci/research-review"
@@ -67,6 +68,10 @@ export async function handleAciReferenceGet(
     !Number.isSafeInteger(maxReferences)
   ) {
     return json({ ok: false, code: "ACI_INVALID_QUERY" }, 400)
+  }
+
+  if (!agents.some((agent) => agent.slug === agentSlug)) {
+    return json({ ok: false, code: "ACI_UNKNOWN_AGENT" }, 400)
   }
 
   const candidates: unknown[] = seed.records.filter((item) =>
