@@ -38,17 +38,30 @@ as operating.** No new channel, retry, post, visibility change, OAuth action or 
 3. Regression tests for public/private boundaries, source freshness/deduplication,
    external prompt injection treated as untrusted data, missing/outdated evidence,
    regressed critical decisions, dangerous actions and invalid cost telemetry.
+4. `tests/aci-ams-agent-policy-fixtures.test.ts`: 14 additional, explicitly synthetic
+   AMS catalog-aligned scenarios checking content/lead-magnet draft boundaries, consent-safe
+   email/nurture/outreach behavior, TEST-versus-LIVE audit proof, CSV provenance, Shopify
+   migration failure holds, accepted-AAB-versus-release distinction, untrusted video text,
+   creator noninterference, research corroboration, support datastore identity and public
+   social-post approval. Compares synthetic before/after decisions without any LLM or
+   external action. Every accepted result is non-production and evidence-mode-labeled.
 
 Reproduce in a checked-out branch with the repository's existing dependencies:
 
 ```sh
-node --import tsx --test tests/aci-evidence-evaluation.test.ts
+node --import tsx --test tests/aci-evidence-evaluation.test.ts tests/aci-ams-agent-policy-fixtures.test.ts
 pnpm test
 ```
 
 **Interpretation:** Synthetic fixture scores are engineering checks, **not** actual agent
 quality, platform access, customer value, live profitability or authorized real-world
 safety results. The supplied cost is fixture telemetry; it is not provider-invoiced proof.
+**The new 14-case AMS suite is not a human-reviewed held-out dataset** and does not
+contain real redacted production traces or independently collected agent outputs. Its
+`billedCostUsd=0` and `durationMs=1` entries are controlled test values, NOT provider
+billing or measured production latency. The suite is a guardrail on the evaluator's
+behavior and policy classification, not a quality benchmark of running AMS agents.
+
 An accepted research candidate's `dataClassification="public"` is a caller assertion,
 not privacy inspection. Do not ingest customer/inbox/private information. URL validation
 is not an SSRF barrier for future fetchers; add DNS/IP checks and allowlists before
@@ -57,9 +70,10 @@ or permissions, and full copyrighted transcripts must not be copied into the led
 
 ## Next acceptance milestones (NOT completed here)
 
-1. Owner-review the fixture rubric, add a reviewed held-out dataset referencing current
-   AMS agent tasks and actual redacted trace evidence, and reconcile the evaluation with
-   existing #265 benchmark rather than forking a second provider evaluation.
+1. Owner-review the newly added 14-case synthetic AMS policy rubric. Build a separately
+   reviewed held-out dataset referencing actual redacted, owner-authorized agent trace
+   evidence (not fabricated results), and reconcile its scope with existing #265 model
+   benchmarking rather than adding a second provider comparison.
 2. Once #280 Preview datastore identity/ingestion/replay is proven, propose an **additive**
    persisted research record and expiry/revalidation flow, using its exact existing
    namespace, ACL, tenancy, deduplication and audit chain. No direct Redis write in
