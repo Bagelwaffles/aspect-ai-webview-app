@@ -74,11 +74,15 @@ function isValidObservation(observation: AciFixtureObservation): boolean {
 
 function validStudy(study: AciEvaluationStudy): string[] {
   const reasons: string[] = []
+  if (!study || typeof study !== "object" || Array.isArray(study)) {
+    return ["INVALID_STUDY"]
+  }
   if (
     !/^[a-f0-9]{40}$/.test(study?.baselineRepoSha ?? "") ||
     !/^[a-f0-9]{40}$/.test(study?.candidateRepoSha ?? "")
   ) reasons.push("INVALID_REPO_SHA")
   if (study?.evidenceMode !== "synthetic_fixture") reasons.push("UNVERIFIED_EVIDENCE_MODE")
+  if (study?.baselineRepoSha === study?.candidateRepoSha) reasons.push("UNVERSIONED_COMPARISON")
   if (!Array.isArray(study?.fixtures) || study.fixtures.length < 1 || study.fixtures.length > 200) {
     reasons.push("INVALID_FIXTURES")
     return reasons
@@ -91,7 +95,7 @@ function validStudy(study: AciEvaluationStudy): string[] {
       typeof fixture.critical !== "boolean" ||
       !["respond", "escalate", "abstain"].includes(fixture.expectedDecision),
     ) ||
-    new Set(fixtures.map((fixture) => fixture.id)).size !== fixtures.length
+    new Set(fixtures.map((fixture) => fixture?.id)).size !== fixtures.length
   ) reasons.push("DUPLICATE_OR_INVALID_FIXTURE_ID")
 
   const fixtureIds = new Set(fixtures.map((fixture) => fixture.id))
