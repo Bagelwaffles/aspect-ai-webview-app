@@ -96,7 +96,10 @@ function validStudy(study: AciEvaluationStudy): string[] {
       !["respond", "escalate", "abstain"].includes(fixture.expectedDecision),
     ) ||
     new Set(fixtures.map((fixture) => fixture?.id)).size !== fixtures.length
-  ) reasons.push("DUPLICATE_OR_INVALID_FIXTURE_ID")
+  ) {
+    reasons.push("DUPLICATE_OR_INVALID_FIXTURE_ID")
+    return reasons
+  }
 
   const fixtureIds = new Set(fixtures.map((fixture) => fixture.id))
   for (const [label, observations] of [["BEFORE", study.before], ["AFTER", study.after]] as const) {
