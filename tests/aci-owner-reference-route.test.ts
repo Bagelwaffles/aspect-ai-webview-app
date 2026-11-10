@@ -6,8 +6,8 @@ import { NextRequest } from "next/server"
 import { handleAciReferenceGet } from "../app/api/internal/aci/references/route"
 
 const sourceRepoSha = "d6e7f98720ef9d96ab89906e1828187b36048659"
-const preview = { VERCEL_ENV: "preview" } as NodeJS.ProcessEnv
-const production = { VERCEL_ENV: "production" } as NodeJS.ProcessEnv
+const preview = { VERCEL_ENV: "preview" } as unknown as NodeJS.ProcessEnv
+const production = { VERCEL_ENV: "production" } as unknown as NodeJS.ProcessEnv
 const today = new Date("2026-11-10T21:00:00.000Z")
 const future = new Date("2026-12-12T21:00:00.000Z")
 
