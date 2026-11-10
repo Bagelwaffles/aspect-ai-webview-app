@@ -254,6 +254,36 @@ node --import tsx --test tests/aci-maintenance-handoff.test.ts tests/aci-public-
 pnpm test
 \`\`\`
 
+### Preview-only owner reference endpoint (no autonomous learning)
+
+\`app/api/internal/aci/references/route.ts\` offers a narrowly bounded,
+**read-only** retrieval surface for the public source-controlled seed.
+It is protected by the **existing** \`authorizeOwnerApiRequest\` check and
+fails closed as **HTTP 404** outside \`VERCEL_ENV=preview\`, including Production.
+A successful exact-owner Preview GET returns only three possible scoped
+research source references by agent and source SHA, never claim text,
+customer history, provider secrets, or agent tool instructions.
+The endpoint does not create or fetch new knowledge or call external
+services. There is no POST, no customer-facing marketing feature, no
+Redis write and no model invocation.
+
+Example owner-only Preview GET, after correct Preview OAuth/session setup:
+
+\`\`\`
+/api/internal/aci/references?agentSlug=research-agent&sourceRepoSha=d6e7f98720ef9d96ab89906e1828187b36048659
+\`\`\`
+
+\`tests/aci-owner-reference-route.test.ts\` uses injected **test-only**
+authorization and date inputs to prove Production deny, Preview 401,
+known-agent and exact-version isolation, canonical reference-only output,
+invalid parameter handling and normal source expiry. Test-only injection
+does NOT establish an actual owner login or authenticated Preview GET.
+Even a successful owner GET is still \`research_only\`, with
+\`sourceVerified=false\`, \`memoryRuntimeActive=false\`, and
+\`productionApproved=false\`. The live release remains explicitly blocked.
+Do not enable the endpoint in Production without a separate exact-action
+authorization and independent compliance/security review.
+
 ### Live Preview validation attempted, no privileged API writes
 
 Connected owner Opera (read-only) inspected [PR #280's exact Preview deployment]
