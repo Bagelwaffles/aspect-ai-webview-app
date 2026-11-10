@@ -222,3 +222,20 @@ test("even owner-authored research still needs independent verification and poli
     [false,false,false,false],
   )
 })
+
+test("sensitive signed query URLs are never returned even when claimed public", () => {
+  for (const key of ["token","access_token","api_key","client_secret","signature","x-amz-signature"]) {
+    const item = research({ sourceUrl: "https://docs.example.org/reference?" + key + "=private" })
+    const result = selectAciResearchReferences(request([item]), now)
+    assert.equal(result.status, "blocked", key)
+    assert.ok(result.reasons.includes("SENSITIVE_SOURCE_URL"), key)
+    assert.deepEqual(result.references, [])
+  }
+})
+
+test("invalid evaluation clock rejects all source references", () => {
+  const result = selectAciResearchReferences(request(), new Date("invalid"))
+  assert.equal(result.status, "blocked")
+  assert.ok(result.reasons.includes("INVALID_REVIEW_CLOCK"))
+  assert.deepEqual(result.references, [])
+})
