@@ -291,26 +291,27 @@ Connected owner Opera (read-only) inspected [PR #280's exact Preview deployment]
 at commit \`4a7bea561ee222ff688bfdc3a17feafc01c7e18d\`.
 \`GET /api/health\` reported \`ok=true\`, \`status=ready\`,
 \`environment=preview\`, and Redis \`configured=true\`, \`checked=true\`,
-\`status=ready\`. This is **connection readiness only**; it does not
-independently prove the endpoint corresponds to the authorized intended
-**Preview-only** database or its isolation from Production. The protected
+\`status=ready\`. **Read-only identity reconciliation subsequently passed:** Vercel's branch-scoped
+plain Redis URL resolves to `accepted-quetzal-206056.upstash.io`, independently
+matching Upstash's active `ams-scheduled-tasks-preview` database. The separate
+sensitive Preview token variable exists but its value was **not read**. This verifies
+the configured Preview endpoint identity, not authenticated write/replay or ACL isolation. The protected
 \`GET /api/internal/maintenance\` returned \`OWNER_SESSION_REQUIRED\`, as designed,
 because the owner is not authenticated on that exact Preview origin. Do not
 bypass the session or borrow a Production cookie. No POST, Redis write,
 feature switch, credential access or replay was attempted.
 
-The connected Vercel project's Storage page displays an existing **Production**
-Redis connection; its presence does not establish the identity of a separate
-Preview branch override. Verify Preview datastore name/host and owner scope
-without printing secret tokens before any controlled write, and stop if it could
-be Production.
+The connected Vercel Storage page also lists an existing **Production** Redis
+connection, which was not used as a substitute for the independently matched
+Preview branch configuration. **No Production or Preview Redis writes occurred.**
+Verify the same exact Preview commit/origin before any controlled acceptance.
 
 ### Remaining necessary conditions for actual persistent self-improvement
 
-1. Independently verify the existing Preview Redis **identity and isolation**, then
-   owner-authenticate the exact trusted Preview origin (the existing Preview
-   OAuth/client restrictions must remain respected). Do **not** use direct
-   production URLs or credentials as a shortcut.
+1. **Preview Redis URL identity is now independently verified read-only.**
+   Owner-authenticate the exact trusted PR #280 Preview origin with its existing
+   OAuth/client safeguards, then verify the protected API. Never borrow a
+   Production cookie, rotate tokens, or bypass authentication.
 2. In a separately authorized Preview-only acceptance, record one genuine
    public research signal through #280's API, read it back, deduplicate a replay,
    attach a real isolated Draft PR after independent GitHub verification, and
@@ -336,8 +337,9 @@ be Production.
    reviewed held-out dataset referencing actual redacted, owner-authorized agent trace
    evidence (not fabricated results), and reconcile its scope with existing #265 model
    benchmarking rather than adding a second provider comparison.
-2. Once #280 Preview datastore identity/ingestion/replay is proven, propose an **additive**
-   persisted research record and expiry/revalidation flow, using its exact existing
+2. With #280 Preview URL identity verified, wait until its actual
+   owner-authenticated ingestion/replay acceptance before proposing an **additive**
+   persisted research record and expiry/revalidation flow using its exact existing
    namespace, ACL, tenancy, deduplication and audit chain. No direct Redis write in
    this branch. Owner review before connecting any external ingestion.
 3. Implement explicit verified-learning promotion and permission-scoped retrieval.
