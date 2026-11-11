@@ -422,23 +422,25 @@ without independent review of the private source mapping.
 
 ## Next acceptance milestones (NOT completed here)
 
-1. Owner-review the newly added 14-case synthetic AMS policy rubric. Build a separately
-   reviewed held-out dataset referencing actual redacted, owner-authorized agent trace
-   evidence (not fabricated results), and reconcile its scope with existing #265 model
-   benchmarking rather than adding a second provider comparison.
-2. With #280 Preview URL identity verified, wait until its actual
-   owner-authenticated ingestion/replay acceptance before proposing an **additive**
-   persisted research record and expiry/revalidation flow using its exact existing
-   namespace, ACL, tenancy, deduplication and audit chain. No direct Redis write in
-   this branch. Owner review before connecting any external ingestion.
-3. Implement explicit verified-learning promotion and permission-scoped retrieval.
-   Independent corroboration plus review is required before `verified` changes;
-   research text can never upgrade system or tool instructions.
-4. Prove one real source→safe knowledge entry→specialist retrieval→before/after
-   evidence→isolated Draft PR→exact-head CI. Reviewers must separately approve
-   production release and independently measure post-release results.
-5. Preserve current working Twitch→YouTube behavior. Prioritize revenue fulfillment
+1. On the authenticated PR #280 Preview dashboard, promote one owner-reviewed fact
+   from the existing `checks_passed` ACI research finding using two independent
+   public sources. Verify persisted readback, idempotent replay, exact
+   `content-agent/content-v1` retrieval, expiry and revocation.
+2. Keep `AMS_ACI_KNOWLEDGE_RUNTIME_ENABLED` OFF until the owner separately
+   authorizes one Preview-only content-agent context test. Confirm the facts are
+   appended as reference data only, never instructions, and measure the existing
+   run's quality/cost without creating an extra model call.
+3. Supply at least one real, privately retained, owner-authorized baseline/candidate
+   trace pair. Independently verify source-proof digests against the private source
+   mapping and have a second reviewer score a held-out sample. The new deterministic
+   grader currently scores only owner-attested metadata and cannot authenticate
+   trace exports by itself.
+4. Use the resulting real evidence to prepare a bounded Draft PR with regression
+   tests and exact-head CI. A candidate score or passing CI is not permission to
+   merge, deploy, publish, spend, or change customer data.
+5. Preserve the working Twitch→YouTube pipeline. Prioritize revenue fulfillment
    and Google Play compliance over risky creator-system enhancements.
 
-No credentials, provider calls, paid dependencies, customer data, actions, production
-flags, persistent store operations, public publishing, branch merging, or release changes.
+No Production feature flag, customer data, raw prompts/outputs, credential change,
+new paid dependency, autonomous tool permission, public publishing, PR merge or
+release change is authorized.
