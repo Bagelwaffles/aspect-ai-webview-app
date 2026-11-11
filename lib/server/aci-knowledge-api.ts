@@ -193,7 +193,9 @@ export async function handleAciKnowledgePost(
       const nowMs = (dependencies.now ?? new Date()).getTime()
       if (!researchFinding || researchFinding.origin !== "owner_research" ||
           researchFinding.area !== "aci-research" || researchFinding.state !== "checks_passed" ||
-          !Number.isFinite(observedAt) || nowMs - observedAt > 48 * 60 * 60 * 1000) {
+          !Number.isFinite(observedAt) ||
+          observedAt > nowMs + 5 * 60 * 1000 ||
+          nowMs - observedAt > 48 * 60 * 60 * 1000) {
         return json({ ok: false, code: "ACI_KNOWLEDGE_RESEARCH_FINDING_NOT_VERIFIED" }, 409)
       }
       const save = dependencies.promote ?? promoteAciVerifiedKnowledge
