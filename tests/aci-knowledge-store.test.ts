@@ -112,7 +112,7 @@ test("duplicate promotion is idempotent and index recovery repairs a partial wri
   redis.failNextIndexWrite = true
   await assert.rejects(promoteAciVerifiedKnowledge(input(), { redis, now }), /SIMULATED_ACI_INDEX_FAILURE/u)
   assert.deepEqual(await listAciVerifiedKnowledge(agentSlug, agentVersion, 20, { redis, now }), [])
-  const replay = await promoteAciVerifiedKnowledge(input(), { redis, now })
+  const replay = await promoteAciVerifiedKnowledge(input({ sources: [...input().sources].reverse() }), { redis, now })
   assert.equal(replay.new, false)
   const read = await listAciVerifiedKnowledge(agentSlug, agentVersion, 20, { redis, now })
   assert.equal(read.length, 1)
