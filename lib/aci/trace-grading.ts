@@ -151,12 +151,12 @@ function metrics(observations: AciTraceObservation[]): AciTraceMetrics {
 
 // Scores only owner-reviewed, redacted trace metadata. It does not inspect raw
 // traces, authenticate provider exports, call a model, or authorize a release.
-export function gradeAciTracePairs(input: unknown): AciTraceGradingResult {
+export function gradeAciTracePairs(input: unknown, now: Date = new Date()): AciTraceGradingResult {
   if (!object(input) || !exactFields(input, INPUT_FIELDS) ||
       input.version !== 1 || input.purpose !== "owner_attested_redacted_trace_scoring") {
     return empty(["INVALID_TRACE_GRADING_INPUT"])
   }
-  const manifestResult = inspectAciPrivateTraceManifest(input.manifest)
+  const manifestResult = inspectAciPrivateTraceManifest(input.manifest, now)
   if (!manifestResult.accepted) return empty(manifestResult.reasons)
   if (!object(input.manifest) || !Array.isArray(input.manifest.records) ||
       !Array.isArray(input.observations) || input.observations.length !== input.manifest.records.length) {
@@ -185,31 +185,25 @@ export function gradeAciTracePairs(input: unknown): AciTraceGradingResult {
     observationByKey.set(key, observation)
   }
 
-  const grouped = new Map<string, { baseline: AciTraceObservation; candidate: AciTraceObservation }>()
-  for (const ref of references) {
-    const key = [ref.caseId, ref.stage].join(":")
-    const observation = observationByKey.get(key)
-    if (!observation) return empty(["MISSING_TRACE_OBSERVATION"])
-    const pair = grouped.get(ref.caseId)
-    if (!pair) {
-      if (ref.stage !== "baseline") return empty(["UNPAIRED_TRACE_CASE"])
-      grouped.set(ref.caseId, { baseline: observation, candidate: undefined as never })
-    } else {
-      if (ref.stage !== "candidate") return empty(["DUPLICATE_BASELINE_TRACE"])
-      if (
-        pair.baseline.agentSlug !== observation.agentSlug ||
-        pair.baseline.taskClass !== observation.taskClass ||
-        pair.baseline.critical !== observation.critical ||
-        pair.baseline.repoSha === observation.repoSha
-      ) return empty(["TRACE_PAIR_NOT_COMPARABLE"])
-      pair.candidate = observation
-    }
+  const pairs: Array<{ baseline: AciTraceObservation; candidate: AciTraceObservation }> = []
+  const caseIds = [...new Set(references.map((ref) => ref.caseId))]
+  for (const caseId of caseIds) {
+    const baselineRef = references.find((ref) => ref.caseId === caseId && ref.stage === "baseline")
+    const candidateRef = references.find((ref) => ref.caseId === caseId && ref.stage === "candidate")
+    if (!baselineRef || !candidateRef) return empty(["UNPAIRED_TRACE_CASE"])
+    const baseline = observationByKey.get([caseId, "baseline"].join(":"))
+    const candidate = observationByKey.get([caseId, "candidate"].join(":"))
+    if (!baseline || !candidate) return empty(["MISSING_TRACE_OBSERVATION"])
+    if (
+      baseline.agentSlug !== candidate.agentSlug ||
+      baseline.taskClass !== candidate.taskClass ||
+      baseline.critical !== candidate.critical ||
+      baseline.repoSha === candidate.repoSha ||
+      baselineRef.sourceEnvironment !== candidateRef.sourceEnvironment
+    ) return empty(["TRACE_PAIR_NOT_COMPARABLE"])
+    pairs.push({ baseline, candidate })
   }
 
-  const pairs = [...grouped.values()]
-  if (pairs.length < 1 || pairs.some((pair) => !pair.candidate)) {
-    return empty(["UNPAIRED_TRACE_CASE"])
-  }
   const environments = new Set(references.map((ref) => ref.sourceEnvironment))
   if (environments.size !== 1) return empty(["TRACE_ENVIRONMENT_MISMATCH"])
   const agents = new Set(references.map((ref) => ref.agentSlug))
