@@ -82,10 +82,14 @@ function currentRepoSha(env: NodeJS.ProcessEnv): string | null {
 }
 
 function safeError(error: unknown, fallback: string): { code: string; status: number } {
-  const code = error instanceof Error ? error.message : fallback
-  if (code === "MAINTENANCE_STORE_UNAVAILABLE") return { code, status: 503 }
-  if (/UNAVAILABLE|TIMEOUT|CONNECTION/u.test(code)) return { code: "ACI_KNOWLEDGE_STORE_UNAVAILABLE", status: 503 }
-  return { code, status: 400 }
+  const raw = error instanceof Error ? error.message : fallback
+  if (raw === "MAINTENANCE_STORE_UNAVAILABLE" ||
+      /UNAVAILABLE|TIMEOUT|CONNECTION/u.test(raw)) {
+    return { code: "ACI_KNOWLEDGE_STORE_UNAVAILABLE", status: 503 }
+  }
+  if (/^ACI_KNOWLEDGE_[A-Z0-9_]+$/.test(raw)) return { code: raw, status: 400 }
+  // Never echo provider/database errors, URLs, tokens, or arbitrary exception text.
+  return { code: fallback, status: 503 }
 }
 
 async function authorize(
