@@ -5,6 +5,8 @@ import { redirect } from "next/navigation"
 import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie"
 import { listMaintenanceFindings } from "@/lib/server/maintenance-lifecycle"
 import AciPreviewAcceptanceClient from "./AciPreviewAcceptanceClient"
+import AciKnowledgeReviewClient from "./AciKnowledgeReviewClient"
+import { ACI_AGENT_VERSIONS } from "@/lib/aci/agent-versions"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -23,6 +25,12 @@ export default async function MaintenanceDashboard() {
   })
   const enabled = process.env.AMS_MAINTENANCE_ENABLED === "true"
   const aciAcceptancePreviewOnly =
+    process.env.VERCEL_ENV === "preview" &&
+    process.env.VERCEL_GIT_COMMIT_REF === "feat/ams-maintenance-agent-pipeline-20261015"
+  const aciKnowledgePreviewOnly = aciAcceptancePreviewOnly
+  const aciKnowledgeRepoSha = process.env.VERCEL_GIT_COMMIT_SHA ?? ""
+  const aciKnowledgeRuntimeEnabled =
+    process.env.AMS_ACI_KNOWLEDGE_RUNTIME_ENABLED === "true" &&
     process.env.VERCEL_ENV === "preview" &&
     process.env.VERCEL_GIT_COMMIT_REF === "feat/ams-maintenance-agent-pipeline-20261015"
 
@@ -59,6 +67,14 @@ export default async function MaintenanceDashboard() {
       </section>
 
       {aciAcceptancePreviewOnly ? <AciPreviewAcceptanceClient /> : null}
+      {aciKnowledgePreviewOnly ? (
+        <AciKnowledgeReviewClient
+          repoSha={aciKnowledgeRepoSha}
+          agentSlug="content-agent"
+          agentVersion={ACI_AGENT_VERSIONS["content-agent"]}
+          runtimeEnabled={aciKnowledgeRuntimeEnabled}
+        />
+      ) : null}
 
       {failed ? (
         <p role="alert" className="rounded-xl border p-4 text-sm">
