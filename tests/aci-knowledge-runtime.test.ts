@@ -57,6 +57,12 @@ test("memory runtime is disabled by default and outside the exact maintenance Pr
   } as unknown as NodeJS.ProcessEnv), false)
 })
 
+test("disabled memory runtime performs no Redis access and returns no facts", async () => {
+  const { loadAciKnowledgeForAgent } = await import("../lib/aci/knowledge-runtime")
+  const result = await loadAciKnowledgeForAgent("content-agent", "content-v1", {} as NodeJS.ProcessEnv)
+  assert.deepEqual(result, [])
+})
+
 test("memory runtime can be enabled only by explicit flag on the exact maintenance Preview branch", () => {
   assert.equal(isAciKnowledgeRuntimeEnabled({
     [ACI_KNOWLEDGE_RUNTIME_FLAG]: "true",
