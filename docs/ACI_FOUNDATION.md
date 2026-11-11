@@ -331,6 +331,95 @@ Verify the same exact Preview commit/origin before any controlled acceptance.
    by this Draft branch, and the already working Twitch→YouTube auto-upload
    and public promotion pipeline remains completely unchanged.
 
+## Phase 3: persistent owner-attested knowledge and redacted trace grading
+
+This phase is implemented across two existing Draft PRs, with separate
+acceptance gates; neither PR is merged or released.
+
+### Persistent semantic knowledge — Draft PR #280
+
+[Draft #280](https://github.com/Bagelwaffles/aspect-ai-webview-app/pull/280)
+now adds a Preview-only owner knowledge registry using the **same existing
+\`ams-scheduled-tasks-preview\` Redis database** as the maintenance finding
+store. It does not create a second database or external memory service.
+
+- Records are immutable semantic facts scoped by \`agentSlug\` and
+  \`agentVersion\`; the first connected runtime is \`content-agent\` /
+  \`content-v1\`.
+- A fact must originate from a recent ACI research finding whose native Draft
+  PR and exact-head checks are already \`checks_passed\`.
+- The owner must review 2–4 distinct public source hosts/publishers and attest
+  to their support, independence, public-only classification, absence of
+  customer/secret data, and fact-not-instruction semantics.
+- Source authenticity is **not machine-verified**. The persisted record
+  explicitly states \`sourceAuthenticityMachineVerified=false\`.
+- Facts expire within 30 days of the oldest source observation, are retained
+  up to 90 days for audit, and can be owner-revoked without deleting history.
+- The shared \`runStructuredAgent\` path can append owner-attested facts as
+  delimited reference data for the first pilot agent. The system prompt
+  explicitly prohibits treating memory as instructions or tool permissions.
+- \`AMS_ACI_KNOWLEDGE_RUNTIME_ENABLED\` is **unset/OFF**. Even if mistakenly
+  set in Production, runtime code refuses to retrieve knowledge outside the
+  exact maintenance Preview branch. No customer agent currently consumes the
+  new knowledge in Production.
+
+The Preview-only API is
+\`GET/POST /api/internal/aci/knowledge\`. The existing owner dashboard contains
+the manual review/promotion/revocation panel. It requires a signed owner
+session and trusted same-origin writes. Promotion is tied to the exact
+deployed Preview commit and an existing \`checks_passed\` research finding.
+
+### Redacted trace grading — this ACI Draft PR
+
+Added \`lib/aci/trace-grading.ts\`, a deterministic grader for paired
+baseline/candidate **metadata-only** execution traces. It reuses the existing
+private trace manifest's case pairing, agent scope, version SHA, source-proof
+digest, freshness, reviewer and privacy attestations.
+
+The grader compares task success, policy compliance, schema validity,
+grounding/evidence presence, unsafe action count, billed cost and duration.
+It rejects unsafe actions, critical failures, source mismatch, stale evidence,
+cross-agent comparisons, unversioned pairs and regressions.
+
+Its maximum result is
+\`owner_attested_candidate_for_review\`. It always reports
+\`sourceAuthenticityVerified=false\`,
+\`independentPerformanceVerified=false\`, and
+\`productionApproved=false\`. It does not inspect raw prompts or outputs,
+verify provider trace exports, call a model, or establish a real quality gain
+without independent review of the private source mapping.
+
+### Research and platform choice
+
+- [LangGraph long-term memory](https://langchain-ai.github.io/langgraph/concepts/memory/)
+  supports namespaced durable facts separate from thread state.
+- [OWASP AI Agent Security](https://cheatsheetseries.owasp.org/cheatsheets/AI_Agent_Security_Cheat_Sheet.html)
+  warns about memory poisoning, indirect prompt injection and excessive agency;
+  ACI therefore keeps facts as data and permissions outside memory.
+- [OpenAI trace grading](https://developers.openai.com/api/docs/guides/trace-grading)
+  supports structured trace-level evaluation. OpenAI has announced a
+  deprecation transition for its Evals/grader service; ACI's deterministic
+  scorer remains local and does not add a dependency on that service.
+
+### Remaining proof before any runtime enablement
+
+1. On the authenticated maintenance Preview, select the existing
+   checks-passed ACI finding, review two independent public sources, and
+   promote one factual statement. Verify persisted readback, duplicate
+   promotion, exact agent/version retrieval, expiry and revocation.
+2. Keep the runtime flag OFF until the owner explicitly approves a Preview
+   model-context test. If enabled, test only the existing content-agent with
+   non-customer test input; compare prompt context and cost to baseline.
+3. Obtain owner-authorized, privately redacted real baseline/candidate trace
+   mappings. Verify the source proof digests against the private mapping and
+   have a second reviewer independently grade a held-out sample.
+4. Require real trace metrics and no safety regressions before calling a
+   change an empirical improvement. Synthetic tests and owner attestations
+   alone do not qualify.
+5. Keep all changes in Draft PRs until separately approved. No merge,
+   Production deployment, public publishing, payments, customer-data changes,
+   or Twitch-to-YouTube modifications are authorized here.
+
 ## Next acceptance milestones (NOT completed here)
 
 1. Owner-review the newly added 14-case synthetic AMS policy rubric. Build a separately
