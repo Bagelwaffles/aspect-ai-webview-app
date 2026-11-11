@@ -1,7 +1,11 @@
 import { generateText, Output } from "ai"
 import { z } from "zod"
 
-import { formatAciKnowledgePromptBlock, loadAciKnowledgeForAgent } from "@/lib/aci/knowledge-runtime"
+import {
+  formatAciKnowledgePromptBlock,
+  isAciKnowledgeRuntimeEnabled,
+  loadAciKnowledgeForAgent,
+} from "@/lib/aci/knowledge-runtime"
 
 export const AMS_AGENT_RUNTIME_DISABLED_ENV = "AMS_AGENT_RUNTIME_DISABLED" as const
 
@@ -82,7 +86,8 @@ export async function runStructuredAgent<
 
   const parsedInput = definition.inputSchema.parse(input)
   const fallbackModels = fallbackModelsForDefinition(definition)
-  const knowledge = definition.agentSlug
+  const knowledgeEnabled = Boolean(definition.agentSlug) && isAciKnowledgeRuntimeEnabled()
+  const knowledge = knowledgeEnabled && definition.agentSlug
     ? await loadAciKnowledgeForAgent(definition.agentSlug, definition.version)
     : []
   const knowledgeBlock = formatAciKnowledgePromptBlock(knowledge)
