@@ -19,7 +19,7 @@ const sourceSchema = z.object({
   url: z.string().url().max(800),
   title: z.string().min(4).max(200),
   publisher: z.string().min(2).max(120),
-  retrievedAt: z.string().datetime(),
+  reviewedAt: z.string().datetime(),
 }).strict()
 
 const attestationsSchema = z.object({
