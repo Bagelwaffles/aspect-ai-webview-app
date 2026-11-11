@@ -30,6 +30,7 @@ function acceptanceServer(options: {
   attachedSha?: string
   finalState?: string
   authStatus?: number
+  trustedOrigin?: boolean
 } = {}) {
   let finding: Finding | null = null
   const calls: Array<{ method: string; body?: Record<string, unknown>; credentials?: RequestCredentials }> = []
@@ -39,6 +40,19 @@ function acceptanceServer(options: {
     calls.push({ method, body, credentials: init.credentials })
     if (options.authStatus) {
       return response({ ok: false, code: "OWNER_SESSION_REQUIRED" }, options.authStatus)
+    }
+    if (body?.action === "diagnose_origin") {
+      return response({
+        ok: true,
+        trustedOrigin: options.trustedOrigin ?? true,
+        originDiagnostics: {
+          requestOrigin: "https://preview.example.org",
+          originHeaderOrigin: "https://preview.example.org",
+          configuredOrigin: "https://preview.example.org",
+          originHeaderMatchesConfigured: options.trustedOrigin ?? true,
+        },
+        readOnly: true,
+      })
     }
     if (method === "GET") {
       return response({ ok: true, findings: finding ? [finding] : [] })
@@ -101,19 +115,19 @@ test("owner browser sequence records, reads, deduplicates, attaches exact Draft 
   assert.equal(result.ciVerifiedAt, ciVerifiedAt)
   assert.equal(result.productionReleaseAuthorized, false)
   assert.deepEqual(steps, [
-    "record", "readback", "replay", "dedupe_readback",
+    "origin_preflight", "record", "readback", "replay", "dedupe_readback",
     "attach_pr", "verify_checks", "final_readback",
   ])
-  assert.equal(server.calls.length, 7)
+  assert.equal(server.calls.length, 8)
   assert.deepEqual(server.calls.map((call) => call.method), [
-    "POST", "GET", "POST", "GET", "POST", "POST", "GET",
+    "POST", "POST", "GET", "POST", "GET", "POST", "POST", "GET",
   ])
   assert.equal(server.calls.every((call) => call.credentials === "same-origin"), true)
   assert.deepEqual(server.calls.filter((call) => call.method === "POST").map((call) => call.body?.action), [
-    "record_research", "record_research", "attach_draft_pr", "verify_pr_checks",
+    "diagnose_origin", "record_research", "record_research", "attach_draft_pr", "verify_pr_checks",
   ])
-  const first = server.calls[0].body!
-  const replay = server.calls[2].body!
+  const first = server.calls[1].body!
+  const replay = server.calls[3].body!
   assert.deepEqual(replay, first)
   assert.equal(first.sourceFingerprint, ACI_PREVIEW_ACCEPTANCE.findingFingerprint)
   assert.equal(first.evidenceUrl, ACI_PREVIEW_ACCEPTANCE.evidenceUrl)
@@ -127,6 +141,17 @@ test("a previously inserted finding is accepted only when replay confirms new=fa
   assert.equal(second.firstInsertNew, false)
   assert.equal(second.replayDuplicateConfirmed, true)
   assert.equal(server.getFinding()?.id, findingId)
+})
+
+test("untrusted origin diagnostic stops before the first persistence request", async () => {
+  const server = acceptanceServer({ trustedOrigin: false })
+  await assert.rejects(
+    runAciPreviewAcceptance({ fetcher: server.fetcher, now: fixedNow }),
+    /UNTRUSTED_ORIGIN:/u,
+  )
+  assert.equal(server.calls.length, 1)
+  assert.equal(server.calls[0].body?.action, "diagnose_origin")
+  assert.equal(server.getFinding(), null)
 })
 
 test("missing owner authentication stops before any persistence or later action", async () => {
