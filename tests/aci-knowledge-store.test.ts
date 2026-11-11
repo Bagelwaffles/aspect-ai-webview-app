@@ -119,6 +119,24 @@ test("duplicate promotion is idempotent and index recovery repairs a partial wri
   assert.equal(read[0].id, replay.fact.id)
 })
 
+test("an expired fact can be re-reviewed as a new immutable version", async () => {
+  const redis = new FakeRedis()
+  const first = await promoteAciVerifiedKnowledge(input(), { redis, now })
+  const later = new Date("2026-12-12T22:00:00.000Z")
+  const renewedInput = input({
+    sources: [
+      { ...input().sources[0], retrievedAt: "2026-12-12T21:00:00.000Z" },
+      { ...input().sources[1], retrievedAt: "2026-12-12T21:00:00.000Z" },
+    ],
+  })
+  const renewed = await promoteAciVerifiedKnowledge(renewedInput, { redis, now: later })
+  assert.equal(renewed.new, true)
+  assert.notEqual(renewed.fact.id, first.fact.id)
+  const read = await listAciVerifiedKnowledge(agentSlug, agentVersion, 20, { redis, now: later })
+  assert.equal(read.length, 1)
+  assert.equal(read[0].id, renewed.fact.id)
+})
+
 test("knowledge cannot cross agent or agent-version namespaces", async () => {
   const redis = new FakeRedis()
   await promoteAciVerifiedKnowledge(input(), { redis, now })
