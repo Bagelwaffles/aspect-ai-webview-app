@@ -133,7 +133,7 @@ export default function AciKnowledgeReviewClient({
           fact: fact.trim(),
           sources: sources.map((source) => ({
             ...source,
-            retrievedAt: new Date().toISOString(),
+            reviewedAt: new Date().toISOString(),
           })),
           attestations: {
             sourceContentReviewed: reviewed,
