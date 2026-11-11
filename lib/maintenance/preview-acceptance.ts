@@ -13,6 +13,7 @@ export const ACI_PREVIEW_ACCEPTANCE = {
 } as const
 
 export type AciPreviewAcceptanceStep =
+  | "origin_preflight"
   | "record"
   | "readback"
   | "replay"
@@ -88,6 +89,38 @@ function requireSingleFinding(findings: JsonObject[], findingId: string): JsonOb
   return matches[0]
 }
 
+export type AciOriginDiagnostics = {
+  requestOrigin?: string
+  originHeaderOrigin?: string | null
+  refererOrigin?: string | null
+  configuredSource?: string
+  configuredOrigin?: string | null
+  originHeaderMatchesConfigured?: boolean
+  requestOriginMatchesConfigured?: boolean
+  refererOriginMatchesConfigured?: boolean
+  secFetchSite?: string | null
+  hostHeader?: string | null
+  forwardedHost?: string | null
+  vercelEnv?: string | null
+  vercelGitCommitRef?: string | null
+  vercelUrlOrigin?: string | null
+  vercelBranchUrlOrigin?: string | null
+}
+
+export async function diagnoseAciPreviewOrigin(fetcher: Fetcher = fetch): Promise<{
+  trustedOrigin: boolean
+  diagnostics: AciOriginDiagnostics
+}> {
+  const body = await postAction(fetcher, { action: "diagnose_origin" })
+  if (typeof body.trustedOrigin !== "boolean" || !isObject(body.originDiagnostics)) {
+    throw new Error("ACI_ORIGIN_DIAGNOSTICS_INVALID")
+  }
+  return {
+    trustedOrigin: body.trustedOrigin,
+    diagnostics: body.originDiagnostics as AciOriginDiagnostics,
+  }
+}
+
 /**
  * Executes the approved, one-finding Preview acceptance sequence from the
  * owner's signed-in browser. It uses only the existing owner API and exact
@@ -112,6 +145,12 @@ export async function runAciPreviewAcceptance(options: {
     sourceObservedAt,
     evidenceUrl: ACI_PREVIEW_ACCEPTANCE.evidenceUrl,
     businessImpact: ACI_PREVIEW_ACCEPTANCE.businessImpact,
+  }
+
+  options.onStep?.("origin_preflight")
+  const origin = await diagnoseAciPreviewOrigin(fetcher)
+  if (!origin.trustedOrigin) {
+    throw new Error("UNTRUSTED_ORIGIN:" + JSON.stringify(origin.diagnostics))
   }
 
   options.onStep?.("record")
