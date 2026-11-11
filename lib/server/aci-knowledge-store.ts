@@ -158,7 +158,7 @@ function normalizeSource(value: unknown, now: Date): AciKnowledgeSourceInput {
 export function normalizeAciVerifiedKnowledge(
   input: unknown,
   reviewedAt: Date = new Date(),
-): Omit<AciVerifiedKnowledge, "id" | "status" | "createdAt" | "updatedAt" | "revokedAt" | "revocationReason"> {
+): Omit<AciVerifiedKnowledge, "id" | "status" | "revokedAt" | "revocationReason"> {
   if (!(reviewedAt instanceof Date) || !Number.isFinite(reviewedAt.getTime())) {
     throw new Error("ACI_KNOWLEDGE_REVIEW_CLOCK_INVALID")
   }
@@ -178,7 +178,10 @@ export function normalizeAciVerifiedKnowledge(
   }
   const fact = typeof value.fact === "string" ? clean(value.fact, 500) : ""
   if (fact.length < 24) throw new Error("ACI_KNOWLEDGE_FACT_INVALID")
-  if (/^(?:ignore|override|follow|run|execute|install|publish|delete|send|merge|deploy|change|set|enable|disable|create|modify|call|you must|always|never)\b/i.test(fact)) {
+  if (
+    /^(?:ignore|override|follow|run|execute|install|publish|delete|send|merge|deploy|change|set|enable|disable|create|modify|call|you must|always|never)\b/i.test(fact) ||
+    /(?:ignore previous instructions|override (?:the )?(?:system|developer|safety) prompt|execute this|run this command|publish without approval|reveal (?:the )?(?:secret|credential|token))/i.test(fact)
+  ) {
     throw new Error("ACI_KNOWLEDGE_FACT_MUST_BE_DECLARATIVE")
   }
   if (!Array.isArray(value.sources) || value.sources.length < 2 || value.sources.length > 4) {
