@@ -104,6 +104,27 @@ release controls remain OFF/unchanged. A successful run proves the
 research-to-maintenance persistence and exact-head evidence lane only; it
 does not prove real model performance improvement or authorize release.
 
+## Trusted-origin rejection diagnosis and safe retry
+
+The owner acceptance UI performs a **read-only owner-authenticated** \`diagnose_origin\`
+POST before any research write. The response contains only sanitized origins,
+Vercel environment/branch metadata and Fetch Metadata (never cookies, tokens,
+session values or private finding data). It reports the actual request origin,
+browser Origin/Referer origins, configured origin source, and whether the
+trusted-origin predicate accepts the request.
+
+The state-changing API actions continue to require the trusted-origin predicate.
+A present mismatched Origin is authoritative and is never overridden by Referer.
+For the exact maintenance Preview branch only, Vercel's system-provided immutable
+deployment URL and branch URL may also be trusted. Production and other Preview
+branches cannot use this exception. If a browser omits Origin, a matching
+configured Referer is accepted only when \`Sec-Fetch-Site: same-origin\`.
+Missing/invalid configured origins and all cross-site requests fail closed.
+
+An \`UNTRUSTED_ORIGIN\` response is returned before \`record_research\` reaches
+Redis. Refresh the owner dashboard, inspect the automatic preflight, and only
+retry once the diagnostic says the browser origin is trusted.
+
 ## Known limitations
 
 - Automatic arbitrary PR generation by a Vercel cron is **not supported**. GitHub's Dependabot and the separately configured ChatGPT scheduled coding watches provide the current draft-PR producers, with their own execution limits and permissions.
