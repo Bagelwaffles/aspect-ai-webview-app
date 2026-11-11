@@ -5,7 +5,9 @@ function parsedOrigin(value: string | null | undefined, allowBareHost = false): 
   if (!candidate) return null
   try {
     const url = new URL(allowBareHost && !candidate.includes("://") ? "https://" + candidate : candidate)
-    if (url.protocol !== "https:" || url.username || url.password) return null
+    const localHost = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname)
+    const secureProtocol = url.protocol === "https:" || (url.protocol === "http:" && localHost)
+    if (!secureProtocol || url.username || url.password) return null
     return url.origin
   } catch {
     return null
