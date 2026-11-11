@@ -93,6 +93,11 @@ function redisFrom(options: MaintenanceOptions): MaintenanceRedis {
   return new Redis({ url, token })
 }
 
+/** Reuse the exact environment-scoped Redis connection for other internal stores. */
+export function getMaintenanceRedis(options: MaintenanceOptions = {}): MaintenanceRedis {
+  return redisFrom(options)
+}
+
 function key(id: string) {
   return PREFIX + ":finding:" + id
 }
