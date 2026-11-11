@@ -43,6 +43,7 @@ export type AciVerifiedKnowledgeInput = {
   agentSlug: string
   agentVersion: string
   reviewedAgainstRepoSha: string
+  researchFindingId: string
   fact: string
   sources: AciKnowledgeSourceInput[]
   attestations: AciKnowledgeAttestations
@@ -53,6 +54,7 @@ export type AciVerifiedKnowledge = {
   agentSlug: string
   agentVersion: string
   reviewedAgainstRepoSha: string
+  researchFindingId: string
   knowledgeType: "semantic_fact"
   fact: string
   classification: "public"
@@ -168,7 +170,7 @@ export function normalizeAciVerifiedKnowledge(
     throw new Error("ACI_KNOWLEDGE_INPUT_INVALID")
   }
   const value = input as Record<string, unknown>
-  if (!exactFields(value, ["agentSlug", "agentVersion", "reviewedAgainstRepoSha", "fact", "sources", "attestations"])) {
+  if (!exactFields(value, ["agentSlug", "agentVersion", "reviewedAgainstRepoSha", "researchFindingId", "fact", "sources", "attestations"])) {
     throw new Error("ACI_KNOWLEDGE_INPUT_FIELDS_INVALID")
   }
   if (typeof value.agentSlug !== "string" || !AGENT_SLUGS.has(value.agentSlug)) {
@@ -180,6 +182,9 @@ export function normalizeAciVerifiedKnowledge(
   }
   if (typeof value.reviewedAgainstRepoSha !== "string" || !SHA40.test(value.reviewedAgainstRepoSha)) {
     throw new Error("ACI_KNOWLEDGE_REPO_SHA_INVALID")
+  }
+  if (typeof value.researchFindingId !== "string" || !SHA40.test(value.researchFindingId)) {
+    throw new Error("ACI_KNOWLEDGE_RESEARCH_FINDING_INVALID")
   }
   const fact = typeof value.fact === "string" ? clean(value.fact, 500) : ""
   if (fact.length < 24) throw new Error("ACI_KNOWLEDGE_FACT_INVALID")
@@ -211,6 +216,7 @@ export function normalizeAciVerifiedKnowledge(
     agentSlug: value.agentSlug,
     agentVersion: value.agentVersion,
     reviewedAgainstRepoSha: value.reviewedAgainstRepoSha,
+    researchFindingId: value.researchFindingId,
     knowledgeType: "semantic_fact",
     fact,
     classification: "public",
@@ -251,6 +257,7 @@ function parseFact(raw: unknown): AciVerifiedKnowledge | null {
       typeof fact.agentVersion !== "string" ||
       !/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,79}$/.test(fact.agentVersion) ||
       typeof fact.reviewedAgainstRepoSha !== "string" || !SHA40.test(fact.reviewedAgainstRepoSha) ||
+      typeof fact.researchFindingId !== "string" || !SHA40.test(fact.researchFindingId) ||
       fact.knowledgeType !== "semantic_fact" ||
       fact.classification !== "public" ||
       !["active", "revoked"].includes(fact.status) ||
@@ -285,6 +292,7 @@ function parseFact(raw: unknown): AciVerifiedKnowledge | null {
       fact.agentSlug,
       fact.agentVersion,
       fact.reviewedAgainstRepoSha,
+      fact.researchFindingId,
       fact.fact.toLowerCase(),
       sortedUrls,
     ]))
