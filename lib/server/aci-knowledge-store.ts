@@ -287,16 +287,16 @@ function parseFact(raw: unknown): AciVerifiedKnowledge | null {
     if (sources.some((source) => source === null)) return null
     if (new Set(fact.sources.map((source) => new URL(source.url).hostname)).size !== fact.sources.length ||
         new Set(fact.sources.map((source) => source.publisher.toLowerCase())).size !== fact.sources.length) return null
-    const sortedSources = [...fact.sources]
-      .map((source) => [source.url, source.reviewedAt])
-      .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+    const sortedUrls = [...fact.sources]
+      .map((source) => source.url)
+      .sort((a, b) => a.localeCompare(b))
     const expectedId = hash(JSON.stringify([
       fact.agentSlug,
       fact.agentVersion,
       fact.reviewedAgainstRepoSha,
       fact.researchFindingId,
       fact.fact.toLowerCase(),
-      sortedSources,
+      sortedUrls,
     ]))
     if (expectedId !== fact.id) return null
     const reviewedAt = Date.parse(fact.verification.reviewedAt)
@@ -322,7 +322,7 @@ export async function promoteAciVerifiedKnowledge(
     normalized.reviewedAgainstRepoSha,
     normalized.researchFindingId,
     normalized.fact.toLowerCase(),
-    sources.map((source) => [source.url, source.reviewedAt]),
+    sources.map((source) => source.url),
   ]))
   const fact: AciVerifiedKnowledge = {
     ...normalized,
