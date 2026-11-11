@@ -138,10 +138,10 @@ export default function AciPreviewAcceptanceClient() {
         <button
           type="button"
           onClick={runAcceptance}
-          disabled={running || Boolean(result)}
+          disabled={running || Boolean(result) || originCheck?.trusted !== true}
           className="rounded-lg bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {running ? "Running Preview acceptance…" : result ? "Acceptance completed" : "Run approved Preview acceptance"}
+          {running ? "Running Preview acceptance…" : result ? "Acceptance completed" : originCheck?.trusted ? "Run approved Preview acceptance" : "Waiting for trusted browser origin"}
         </button>
         <span className="text-xs text-muted-foreground">
           {running ? "Keep this tab open until the sequence finishes." : "Uses your current signed-in browser session."}
