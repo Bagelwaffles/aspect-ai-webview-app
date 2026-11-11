@@ -17,8 +17,16 @@ function configuredOrigin(env: NodeJS.ProcessEnv): {
   origin: string | null
 } {
   const publicUrl = env.PUBLIC_APP_URL?.trim()
-  if (publicUrl) return { source: "PUBLIC_APP_URL", origin: parsedOrigin(publicUrl) }
   const nextAuthUrl = env.NEXTAUTH_URL?.trim()
+  const isMaintenancePreview =
+    env.VERCEL_ENV === "preview" &&
+    env.VERCEL_GIT_COMMIT_REF === "feat/ams-maintenance-agent-pipeline-20261015"
+  // This branch has an explicit branch-scoped NEXTAUTH_URL override; prefer
+  // it over any project-wide public URL so the OAuth and CSRF origins agree.
+  if (isMaintenancePreview && nextAuthUrl) {
+    return { source: "NEXTAUTH_URL", origin: parsedOrigin(nextAuthUrl) }
+  }
+  if (publicUrl) return { source: "PUBLIC_APP_URL", origin: parsedOrigin(publicUrl) }
   if (nextAuthUrl) return { source: "NEXTAUTH_URL", origin: parsedOrigin(nextAuthUrl) }
   return { source: "missing", origin: null }
 }
