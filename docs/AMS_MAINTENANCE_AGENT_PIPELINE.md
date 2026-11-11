@@ -67,6 +67,43 @@ No action can approve or deploy production.
 - **Required next acceptance:** On the new exact-commit Preview deployment, recheck \`/api/health\` (must return HTTP 200 and Redis ready), then verify app owner-only access. Only after that should a **Preview-only** \`AMS_MAINTENANCE_ENABLED=true\` gate be considered for a controlled warning/dedup scenario. Namespace all new keys with \`ams:maintenance:v1:\`; do not read or modify any older scheduled tasks in this shared Preview database.
 - If Preview health still reports unavailable, hold release, diagnose the actual Vercel Preview variable resolution without copying Production tokens or suppressing readiness checks.
 
+## Owner-operated ACI Preview acceptance control
+
+The owner-only maintenance dashboard now exposes a **single-click acceptance
+runner only** when both conditions are true:
+- \`VERCEL_ENV=preview\`
+- \`VERCEL_GIT_COMMIT_REF=feat/ams-maintenance-agent-pipeline-20261015\`
+
+It is intentionally absent from Production and other Preview branches. The
+server-rendered dashboard still requires the existing internal-admin session;
+the submission API independently requires the signed-in Google customer
+session matching \`AMS_OWNER_EMAIL\` and a trusted same-origin POST.
+
+The client runner uses the existing \`/api/internal/maintenance\` contract and
+a fixed public OpenAI trace-grading documentation reference. It performs:
+1. \`record_research\` with a stable deduplication fingerprint and current
+   observation timestamp;
+2. owner API GET readback and source/origin/state checks;
+3. an identical replay that must return \`new=false\`;
+4. another GET readback;
+5. \`attach_draft_pr\` for the exact existing open Draft PR #328 and pinned
+   head SHA \`e4791b0546c35d4024defdbb79be9d30410f70cc\`;
+6. \`verify_pr_checks\` for the exact attached SHA; and
+7. final GET readback confirming \`checks_passed\` and the same PR/head.
+
+The sequence is idempotent and resumable after partial completion: it reuses
+the same finding fingerprint, accepts a verified existing attachment, and
+never creates a new PR. If a source, head SHA, auth response, replay result,
+or CI status does not match, it stops and displays the exact failure code.
+It never retries a failed API action in a loop.
+
+This is a **Preview acceptance test**, not a live agent, not an auto-running
+cron, and not a production learning feature. The owner must click the button
+while signed in to the exact Preview. The existing cron and all production
+release controls remain OFF/unchanged. A successful run proves the
+research-to-maintenance persistence and exact-head evidence lane only; it
+does not prove real model performance improvement or authorize release.
+
 ## Known limitations
 
 - Automatic arbitrary PR generation by a Vercel cron is **not supported**. GitHub's Dependabot and the separately configured ChatGPT scheduled coding watches provide the current draft-PR producers, with their own execution limits and permissions.
