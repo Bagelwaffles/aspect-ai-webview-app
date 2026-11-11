@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type FormEvent } from "react"
 
 import type { AciVerifiedKnowledge } from "@/lib/server/aci-knowledge-store"
 
@@ -102,7 +102,7 @@ export default function AciKnowledgeReviewClient({
     source.publisher.trim().length >= 2,
   )
 
-  async function promoteFact(event: React.FormEvent<HTMLFormElement>) {
+  async function promoteFact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (saving || !repoSha || !researchFindingId || !attestationsComplete || !sourcesComplete || fact.trim().length < 24) return
     setSaving(true)
