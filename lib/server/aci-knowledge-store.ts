@@ -280,6 +280,19 @@ function parseFact(raw: unknown): AciVerifiedKnowledge | null {
     if (sources.some((source) => source === null)) return null
     if (new Set(fact.sources.map((source) => new URL(source.url).hostname)).size !== fact.sources.length ||
         new Set(fact.sources.map((source) => source.publisher.toLowerCase())).size !== fact.sources.length) return null
+    const sortedUrls = [...fact.sources].map((source) => source.url).sort()
+    const expectedId = hash(JSON.stringify([
+      fact.agentSlug,
+      fact.agentVersion,
+      fact.reviewedAgainstRepoSha,
+      fact.fact.toLowerCase(),
+      sortedUrls,
+    ]))
+    if (expectedId !== fact.id) return null
+    const reviewedAt = Date.parse(fact.verification.reviewedAt)
+    const earliestSource = Math.min(...fact.sources.map((source) => Date.parse(source.retrievedAt)))
+    const expiry = Date.parse(fact.expiresAt)
+    if (expiry > reviewedAt + FACT_LIFETIME_MS || expiry > earliestSource + FACT_LIFETIME_MS) return null
     return fact
   } catch {
     return null
