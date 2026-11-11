@@ -12,6 +12,7 @@ import {
   maintenanceActionPolicy,
 } from "@/lib/server/maintenance-lifecycle"
 import { verifyMaintenanceChecks, verifyMaintenanceDraftPr } from "@/lib/server/maintenance-github-proof"
+import { requestHasTrustedAppOrigin, trustedOriginDiagnostics } from "@/lib/server/request-origin"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -62,7 +63,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await authorizeOwnerApiRequest(request, { requireTrustedOrigin: true })
+  // Authenticate the owner before any diagnostic output. The diagnostic action
+  // is read-only; every state-changing action still requires the trusted origin.
+  const auth = await authorizeOwnerApiRequest(request)
   if (!auth.ok) return json({ ok: false, code: auth.code }, auth.status)
   let payload: unknown
   try {
@@ -72,6 +75,23 @@ export async function POST(request: NextRequest) {
   } catch {
     return json({ ok: false, code: "MAINTENANCE_INVALID_JSON" }, 400)
   }
+  const originDiagnostic = z.object({ action: z.literal("diagnose_origin") }).strict().safeParse(payload)
+  if (originDiagnostic.success) {
+    return json({
+      ok: true,
+      trustedOrigin: requestHasTrustedAppOrigin(request),
+      originDiagnostics: trustedOriginDiagnostics(request),
+      readOnly: true,
+    })
+  }
+  if (!requestHasTrustedAppOrigin(request)) {
+    return json({
+      ok: false,
+      code: "UNTRUSTED_ORIGIN",
+      originDiagnostics: trustedOriginDiagnostics(request),
+    }, 403)
+  }
+
   const research = externalInput.safeParse(payload)
   if (research.success) {
     try {
