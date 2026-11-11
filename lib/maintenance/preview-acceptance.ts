@@ -126,8 +126,15 @@ export async function runAciPreviewAcceptance(options: {
   options.onStep?.("readback")
   const firstReadback = requireSingleFinding(await getFindings(fetcher), findingId)
   if (firstReadback.sourceFingerprint !== ACI_PREVIEW_ACCEPTANCE.findingFingerprint ||
-      firstReadback.origin !== "owner_research" || firstReadback.state !== "observed") {
+      firstReadback.origin !== "owner_research" ||
+      !["observed", "draft_pr", "checks_passed"].includes(String(firstReadback.state))) {
     throw new Error("MAINTENANCE_RECORD_READBACK_MISMATCH")
+  }
+  if (firstReadback.pr !== null && firstReadback.pr !== undefined &&
+      (!isObject(firstReadback.pr) ||
+       firstReadback.pr.url !== ACI_PREVIEW_ACCEPTANCE.prUrl ||
+       firstReadback.pr.headSha !== ACI_PREVIEW_ACCEPTANCE.prHeadSha)) {
+    throw new Error("MAINTENANCE_EXISTING_PR_CONFLICT")
   }
 
   options.onStep?.("replay")
@@ -143,16 +150,22 @@ export async function runAciPreviewAcceptance(options: {
   }
 
   options.onStep?.("attach_pr")
-  const attached = await postAction(fetcher, {
-    action: "attach_draft_pr",
-    findingId,
-    prNumber: ACI_PREVIEW_ACCEPTANCE.prNumber,
-    headSha: ACI_PREVIEW_ACCEPTANCE.prHeadSha,
-  })
-  if (!isObject(attached.finding) || !isObject(attached.finding.pr) ||
-      attached.finding.pr.url !== ACI_PREVIEW_ACCEPTANCE.prUrl ||
-      attached.finding.pr.headSha !== ACI_PREVIEW_ACCEPTANCE.prHeadSha) {
-    throw new Error("MAINTENANCE_DRAFT_PR_ATTACHMENT_FAILED")
+  if (afterReplay.state !== "checks_passed") {
+    const attached = await postAction(fetcher, {
+      action: "attach_draft_pr",
+      findingId,
+      prNumber: ACI_PREVIEW_ACCEPTANCE.prNumber,
+      headSha: ACI_PREVIEW_ACCEPTANCE.prHeadSha,
+    })
+    if (!isObject(attached.finding) || !isObject(attached.finding.pr) ||
+        attached.finding.pr.url !== ACI_PREVIEW_ACCEPTANCE.prUrl ||
+        attached.finding.pr.headSha !== ACI_PREVIEW_ACCEPTANCE.prHeadSha) {
+      throw new Error("MAINTENANCE_DRAFT_PR_ATTACHMENT_FAILED")
+    }
+  } else if (!isObject(afterReplay.pr) ||
+      afterReplay.pr.url !== ACI_PREVIEW_ACCEPTANCE.prUrl ||
+      afterReplay.pr.headSha !== ACI_PREVIEW_ACCEPTANCE.prHeadSha) {
+    throw new Error("MAINTENANCE_EXISTING_PR_CONFLICT")
   }
 
   options.onStep?.("verify_checks")
