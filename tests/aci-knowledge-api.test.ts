@@ -58,6 +58,7 @@ function promotion() {
     agentSlug: "content-agent",
     agentVersion: "content-v1",
     reviewedAgainstRepoSha: sha,
+    researchFindingId: "c".repeat(40),
     fact: "OpenAI trace grading evaluates complete agent traces with structured scores and labels.",
     sources: [
       { url: "https://developers.openai.com/api/docs/guides/trace-grading", title: "Trace grading", publisher: "OpenAI", retrievedAt: "2026-11-11T22:00:00.000Z" },
@@ -78,6 +79,7 @@ function fact(): AciVerifiedKnowledge {
     agentSlug: "content-agent",
     agentVersion: "content-v1",
     reviewedAgainstRepoSha: sha,
+    researchFindingId: "c".repeat(40),
     knowledgeType: "semantic_fact",
     fact: "OpenAI trace grading evaluates complete agent traces with structured scores and labels.",
     classification: "public",
@@ -167,14 +169,25 @@ test("POST rejects an untrusted origin before calling the persistence adapter", 
   assert.equal(called, false)
 })
 
-test("POST promotes an owner-attested fact only for the exact current Preview SHA", async () => {
+test("POST promotes an owner-attested fact only for a recent checks-passed research finding and exact Preview SHA", async () => {
   let stored: unknown = null
   const promote = async (payload: unknown) => {
     stored = payload
     return { fact: fact(), new: true }
   }
+  const getFinding = async () => ({
+    id: "c".repeat(40), origin: "owner_research", category: "update",
+    area: "aci-research", summary: "Public trace-grading research reference.",
+    evidenceUrl: "https://developers.openai.com/api/docs/guides/trace-grading",
+    sourceFingerprint: "aci-research-fingerprint", sourceObservedAt: now.toISOString(),
+    createdAt: now.toISOString(), updatedAt: now.toISOString(),
+    severity: "opportunity", confidence: "unverified",
+    businessImpact: "Research only.", estimatedCostUsd: null, policy: "escalate",
+    state: "checks_passed", pr: { url: "https://github.com/Bagelwaffles/aspect-ai-webview-app/pull/328", headSha: "d".repeat(40), verifiedAt: now.toISOString(), ciVerifiedAt: now.toISOString() },
+    history: [],
+  })
   const response = await handleAciKnowledgePost(postRequest(promotion()), {
-    env: previewEnv, authorize: ownerAuth, promote: promote as never, now,
+    env: previewEnv, authorize: ownerAuth, promote: promote as never, getFinding: getFinding as never, now,
   })
   assert.equal(response.status, 200)
   const body = await response.json()
@@ -197,6 +210,28 @@ test("POST rejects a stale code version, unknown agent, incomplete attestation a
     })
     assert.ok(response.status === 400 || response.status === 409)
   }
+})
+
+test("POST refuses to promote a fact from an unverified or missing research finding", async () => {
+  let promoted = false
+  const response = await handleAciKnowledgePost(postRequest(promotion()), {
+    env: previewEnv,
+    authorize: ownerAuth,
+    getFinding: (async () => ({
+      id: "c".repeat(40), origin: "owner_research", category: "update",
+      area: "aci-research", summary: "Unverified source record.",
+      evidenceUrl: null, sourceFingerprint: "source", sourceObservedAt: now.toISOString(),
+      createdAt: now.toISOString(), updatedAt: now.toISOString(),
+      severity: "opportunity", confidence: "unverified",
+      businessImpact: "Research only.", estimatedCostUsd: null, policy: "escalate",
+      state: "observed", pr: null, history: [],
+    })) as never,
+    promote: (async () => { promoted = true; return { fact: fact(), new: true } }) as never,
+    now,
+  })
+  assert.equal(response.status, 409)
+  assert.equal((await response.json()).code, "ACI_KNOWLEDGE_RESEARCH_FINDING_NOT_VERIFIED")
+  assert.equal(promoted, false)
 })
 
 test("POST can revoke an existing fact without deleting its audit record", async () => {
