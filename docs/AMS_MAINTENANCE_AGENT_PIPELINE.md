@@ -125,6 +125,89 @@ An \`UNTRUSTED_ORIGIN\` response is returned before \`record_research\` reaches
 Redis. Refresh the owner dashboard, inspect the automatic preflight, and only
 retry once the diagnostic says the browser origin is trusted.
 
+## Owner-attested persistent semantic memory (Preview-only; runtime OFF)
+
+This increment adds a first persistent knowledge lane for the existing shared
+\`content-agent\` runtime. It uses the **same already-verified maintenance Preview
+Redis database and environment-scoped Redis adapter**. It creates no database,
+vendor account, paid embedding service, cron, or external memory platform.
+
+### Storage and governance
+
+- Store namespace: \`ams:maintenance:v1:aci-knowledge:v1\`; keys are scoped by
+  \`agentSlug\` and \`agentVersion\`. The first wired pilot is
+  \`content-agent\` / \`content-v1\`.
+- Each record is a **semantic fact**, never a prompt, policy, procedure, tool
+  permission, or instruction. It is bound to the exact maintenance Preview
+  repository SHA and to an existing recent ACI research finding in
+  \`checks_passed\` state.
+- Promotion requires the owner to select that research finding, enter a concise
+  declarative fact, cite 2–4 public sources from distinct hosts and publishers,
+  and attest that both source pages were reviewed, the publishers are
+  independent, the content is public, no customer data/secrets are present,
+  and the record contains no instructions.
+- The server records reviewer role as \`owner\`, not an email address. It does
+  **not** claim machine verification of source contents or publisher
+  independence: \`sourceAuthenticityMachineVerified=false\` remains explicit.
+- Fact identity is deterministic and immutable. Repeated promotion is
+  idempotent; index repair handles a partial write. Facts expire no later than
+  30 days after the oldest source review and are retained for up to 90 days for
+  audit. Owner revocation removes a fact from retrieval but preserves its
+  audit record.
+- Retrieval requires the exact agent slug and version. Cross-agent or
+  cross-version reads return no facts. Invalid, expired, revoked, or tampered
+  records are not returned.
+
+### API and dashboard
+
+- \`GET /api/internal/aci/knowledge?agentSlug=content-agent&agentVersion=content-v1\`
+  is owner-authenticated and Preview-branch-only.
+- \`POST /api/internal/aci/knowledge\` supports only
+  \`promote_verified_fact\` and \`revoke_verified_fact\`, requires owner session
+  and trusted same-origin request, and refuses a reviewed SHA that does not
+  match the exact running Preview commit.
+- The existing owner maintenance dashboard includes a **Persistent agent
+  knowledge** panel only on the exact maintenance Preview branch. It lists
+  recent checks-passed ACI research findings as promotion candidates, requires
+  explicit owner attestations, shows citations/expiry, and supports revocation.
+- The shared \`runStructuredAgent\` runtime can append these facts as clearly
+  delimited **reference data** for \`content-agent\` only. The memory policy
+  states that facts are never instructions and cannot override system policy,
+  customer consent, safety rules, or tool permissions.
+- Runtime retrieval is gated by
+  \`AMS_ACI_KNOWLEDGE_RUNTIME_ENABLED=true\` **and** the exact maintenance
+  Preview branch. The flag is currently **unset/OFF**. Production always
+  refuses this feature even if the flag is accidentally set. No model calls
+  were triggered by the promotion/retrieval API or dashboard.
+
+### Research basis and limitations
+
+- [LangGraph memory overview](https://langchain-ai.github.io/langgraph/concepts/memory/)
+  distinguishes thread-scoped state from long-term namespaced memory and
+  semantic facts from episodic experiences and procedural instructions.
+- [OpenAI trace grading](https://developers.openai.com/api/docs/guides/trace-grading)
+  supports structured, reproducible evaluation of full agent traces.
+- [OWASP AI Agent Security](https://cheatsheetseries.owasp.org/cheatsheets/AI_Agent_Security_Cheat_Sheet.html)
+  identifies memory poisoning, prompt injection and excessive agency as
+  concrete risks; retrieved memory must remain scoped data, not permissions.
+- OpenAI's [datasets getting-started guide](https://developers.openai.com/api/docs/guides/evaluation-getting-started)
+  documents the announced Evals/grader transition and deprecation timeline.
+  ACI therefore keeps its deterministic CI grader independent of the
+  deprecated Evals service rather than adding a new paid dependency.
+
+The memory runtime remains **OFF** until separate Preview-only acceptance
+proves an owner-reviewed fact is retrievable for the correct agent version
+and ignored for other agents/versions, with prompt-injection tests. Even after
+that acceptance, it does not grant an agent permission to edit code, merge,
+deploy, publish, spend money, send messages, or alter customer data.
+
+Reproduce the offline store and runtime tests:
+
+\`\`\`sh
+node --import tsx --test tests/aci-knowledge-store.test.ts tests/aci-knowledge-api.test.ts tests/aci-knowledge-runtime.test.ts
+pnpm test
+\`\`\`
+
 ## Known limitations
 
 - Automatic arbitrary PR generation by a Vercel cron is **not supported**. GitHub's Dependabot and the separately configured ChatGPT scheduled coding watches provide the current draft-PR producers, with their own execution limits and permissions.
