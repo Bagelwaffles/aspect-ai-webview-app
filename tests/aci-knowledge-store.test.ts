@@ -25,13 +25,13 @@ function input(overrides: Record<string, unknown> = {}) {
         url: "https://developers.openai.com/api/docs/guides/trace-grading?utm_source=review",
         title: "Trace grading",
         publisher: "OpenAI",
-        retrievedAt: "2026-11-11T21:00:00.000Z",
+        reviewedAt: "2026-11-11T21:00:00.000Z",
       },
       {
         url: "https://langchain-ai.github.io/langgraph/concepts/memory/",
         title: "Memory overview",
         publisher: "LangChain",
-        retrievedAt: "2026-11-11T21:00:00.000Z",
+        reviewedAt: "2026-11-11T21:00:00.000Z",
       },
     ],
     attestations: {
@@ -125,8 +125,8 @@ test("an expired fact can be re-reviewed as a new immutable version", async () =
   const later = new Date("2026-12-12T22:00:00.000Z")
   const renewedInput = input({
     sources: [
-      { ...input().sources[0], retrievedAt: "2026-12-12T21:00:00.000Z" },
-      { ...input().sources[1], retrievedAt: "2026-12-12T21:00:00.000Z" },
+      { ...input().sources[0], reviewedAt: "2026-12-12T21:00:00.000Z" },
+      { ...input().sources[1], reviewedAt: "2026-12-12T21:00:00.000Z" },
     ],
   })
   const renewed = await promoteAciVerifiedKnowledge(renewedInput, { redis, now: later })
@@ -147,16 +147,16 @@ test("knowledge cannot cross agent or agent-version namespaces", async () => {
 test("two sources must be distinct by publisher and hostname", () => {
   const sameHost = input({
     sources: [
-      { url: "https://docs.example.com/a", title: "First source", publisher: "Publisher A", retrievedAt: "2026-11-11T21:00:00.000Z" },
-      { url: "https://docs.example.com/b", title: "Second source", publisher: "Publisher B", retrievedAt: "2026-11-11T21:00:00.000Z" },
+      { url: "https://docs.example.com/a", title: "First source", publisher: "Publisher A", reviewedAt: "2026-11-11T21:00:00.000Z" },
+      { url: "https://docs.example.com/b", title: "Second source", publisher: "Publisher B", reviewedAt: "2026-11-11T21:00:00.000Z" },
     ],
   })
   assert.throws(() => normalizeAciVerifiedKnowledge(sameHost, now), /ACI_KNOWLEDGE_SOURCES_NOT_DISTINCT/u)
 
   const samePublisher = input({
     sources: [
-      { url: "https://docs.example.com/a", title: "First source", publisher: "Same publisher", retrievedAt: "2026-11-11T21:00:00.000Z" },
-      { url: "https://research.example.org/b", title: "Second source", publisher: "same PUBLISHER", retrievedAt: "2026-11-11T21:00:00.000Z" },
+      { url: "https://docs.example.com/a", title: "First source", publisher: "Same publisher", reviewedAt: "2026-11-11T21:00:00.000Z" },
+      { url: "https://research.example.org/b", title: "Second source", publisher: "same PUBLISHER", reviewedAt: "2026-11-11T21:00:00.000Z" },
     ],
   })
   assert.throws(() => normalizeAciVerifiedKnowledge(samePublisher, now), /ACI_KNOWLEDGE_SOURCES_NOT_DISTINCT/u)
@@ -194,10 +194,10 @@ test("signed, token-bearing and non-HTTPS source URLs are rejected", () => {
 })
 
 test("stale and future source observations are rejected", () => {
-  for (const retrievedAt of ["2026-10-01T21:00:00.000Z", "2026-11-12T21:00:00.000Z"]) {
+  for (const reviewedAt of ["2026-10-01T21:00:00.000Z", "2026-11-12T21:00:00.000Z"]) {
     const candidate = input({
       sources: [
-        { ...input().sources[0], retrievedAt },
+        { ...input().sources[0], reviewedAt },
         input().sources[1],
       ],
     })
