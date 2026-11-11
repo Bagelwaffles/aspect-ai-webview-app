@@ -1,15 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import {
+  diagnoseAciPreviewOrigin,
   runAciPreviewAcceptance,
+  type AciOriginDiagnostics,
   type AciPreviewAcceptanceResult,
   type AciPreviewAcceptanceStep,
 } from "@/lib/maintenance/preview-acceptance"
 
 const labels: Record<AciPreviewAcceptanceStep, string> = {
+  origin_preflight: "Check authenticated browser origin before any write",
   record: "Record one public research finding",
   readback: "Read persisted finding from Preview Redis",
   replay: "Replay identical finding and confirm deduplication",
@@ -20,6 +23,7 @@ const labels: Record<AciPreviewAcceptanceStep, string> = {
 }
 
 const orderedSteps: AciPreviewAcceptanceStep[] = [
+  "origin_preflight",
   "record",
   "readback",
   "replay",
@@ -36,6 +40,18 @@ export default function AciPreviewAcceptanceClient() {
   const [completedSteps, setCompletedSteps] = useState<AciPreviewAcceptanceStep[]>([])
   const [result, setResult] = useState<AciPreviewAcceptanceResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [originCheck, setOriginCheck] = useState<{ trusted: boolean; diagnostics: AciOriginDiagnostics } | null>(null)
+  const [originCheckError, setOriginCheckError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    diagnoseAciPreviewOrigin().then((result) => {
+      if (active) setOriginCheck({ trusted: result.trustedOrigin, diagnostics: result.diagnostics })
+    }).catch((cause) => {
+      if (active) setOriginCheckError(cause instanceof Error ? cause.message : "ACI_ORIGIN_DIAGNOSTICS_FAILED")
+    })
+    return () => { active = false }
+  }, [])
 
   async function runAcceptance() {
     if (running) return
@@ -75,6 +91,22 @@ export default function AciPreviewAcceptanceClient() {
           </p>
         </div>
         <span className="rounded-md border px-2 py-1 text-xs font-semibold">Preview only</span>
+      </div>
+
+      <div className="rounded-lg border bg-background/70 p-3 text-sm">
+        <p className="font-medium">Trusted-origin preflight</p>
+        {originCheck ? (
+          <>
+            <p className={originCheck.trusted ? "mt-1 text-green-700" : "mt-1 text-red-700"}>
+              {originCheck.trusted ? "Browser origin accepted; safe to submit." : "Browser origin rejected; no finding was written."}
+            </p>
+            <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all text-xs text-muted-foreground">{JSON.stringify(originCheck.diagnostics, null, 2)}</pre>
+          </>
+        ) : originCheckError ? (
+          <p className="mt-1 text-red-700">{originCheckError}</p>
+        ) : (
+          <p className="mt-1 text-muted-foreground">Checking the owner session and browser origin…</p>
+        )}
       </div>
 
       <div className="rounded-lg border bg-background/70 p-3 text-sm">
