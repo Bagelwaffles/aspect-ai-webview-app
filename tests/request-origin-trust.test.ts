@@ -14,7 +14,7 @@ function request(url: string, headers: Record<string, string> = {}) {
 
 test("configured stable Preview origin is accepted exactly", () => {
   const req = request(stable + "/api/internal/maintenance", { origin: stable })
-  assert.equal(requestHasTrustedAppOrigin(req, { NEXTAUTH_URL: stable } as NodeJS.ProcessEnv), true)
+  assert.equal(requestHasTrustedAppOrigin(req, { NEXTAUTH_URL: stable } as unknown as NodeJS.ProcessEnv), true)
 })
 
 test("empty PUBLIC_APP_URL does not shadow the valid Preview NEXTAUTH_URL", () => {
@@ -22,11 +22,11 @@ test("empty PUBLIC_APP_URL does not shadow the valid Preview NEXTAUTH_URL", () =
   assert.equal(requestHasTrustedAppOrigin(req, {
     PUBLIC_APP_URL: "  ",
     NEXTAUTH_URL: stable,
-  } as NodeJS.ProcessEnv), true)
+  } as unknown as NodeJS.ProcessEnv), true)
   const diagnostics = trustedOriginDiagnostics(req, {
     PUBLIC_APP_URL: "  ",
     NEXTAUTH_URL: stable,
-  } as NodeJS.ProcessEnv)
+  } as unknown as NodeJS.ProcessEnv)
   assert.equal(diagnostics.configuredSource, "NEXTAUTH_URL")
   assert.equal(diagnostics.originHeaderMatchesConfigured, true)
 })
@@ -38,7 +38,7 @@ test("exact maintenance Preview prefers its branch-scoped NEXTAUTH_URL over a pr
     NEXTAUTH_URL: stable,
     VERCEL_ENV: "preview",
     VERCEL_GIT_COMMIT_REF: branch,
-  } as NodeJS.ProcessEnv)
+  } as unknown as NodeJS.ProcessEnv)
   assert.equal(diagnostics.configuredSource, "NEXTAUTH_URL")
   assert.equal(diagnostics.configuredOrigin, stable)
   assert.equal(requestHasTrustedAppOrigin(req, {
@@ -46,7 +46,7 @@ test("exact maintenance Preview prefers its branch-scoped NEXTAUTH_URL over a pr
     NEXTAUTH_URL: stable,
     VERCEL_ENV: "preview",
     VERCEL_GIT_COMMIT_REF: branch,
-  } as NodeJS.ProcessEnv), true)
+  } as unknown as NodeJS.ProcessEnv), true)
 })
 
 test("Vercel immutable deployment origin is accepted only on the exact maintenance Preview branch", () => {
@@ -57,16 +57,16 @@ test("Vercel immutable deployment origin is accepted only on the exact maintenan
     VERCEL_GIT_COMMIT_REF: branch,
     VERCEL_URL: deployment.replace("https://", ""),
     VERCEL_BRANCH_URL: stable.replace("https://", ""),
-  } as NodeJS.ProcessEnv
+  } as unknown as NodeJS.ProcessEnv
   assert.equal(requestHasTrustedAppOrigin(req, allowedEnv), true)
   assert.equal(requestHasTrustedAppOrigin(req, {
     ...allowedEnv,
     VERCEL_GIT_COMMIT_REF: "feat/another-branch",
-  } as NodeJS.ProcessEnv), false)
+  } as unknown as NodeJS.ProcessEnv), false)
   assert.equal(requestHasTrustedAppOrigin(req, {
     ...allowedEnv,
     VERCEL_ENV: "production",
-  } as NodeJS.ProcessEnv), false)
+  } as unknown as NodeJS.ProcessEnv), false)
 })
 
 test("missing Origin can use a matching Referer only with same-origin Fetch Metadata", () => {
@@ -74,7 +74,7 @@ test("missing Origin can use a matching Referer only with same-origin Fetch Meta
     referer: stable + "/dashboard/maintenance?utm_source=chatgpt.com",
     "sec-fetch-site": "same-origin",
   })
-  assert.equal(requestHasTrustedAppOrigin(req, { NEXTAUTH_URL: stable } as NodeJS.ProcessEnv), true)
+  assert.equal(requestHasTrustedAppOrigin(req, { NEXTAUTH_URL: stable } as unknown as NodeJS.ProcessEnv), true)
 })
 
 test("missing Origin without same-origin Fetch Metadata fails closed", () => {
@@ -82,7 +82,7 @@ test("missing Origin without same-origin Fetch Metadata fails closed", () => {
     referer: stable + "/dashboard/maintenance",
     "sec-fetch-site": "cross-site",
   })
-  assert.equal(requestHasTrustedAppOrigin(req, { NEXTAUTH_URL: stable } as NodeJS.ProcessEnv), false)
+  assert.equal(requestHasTrustedAppOrigin(req, { NEXTAUTH_URL: stable } as unknown as NodeJS.ProcessEnv), false)
 })
 
 test("a present mismatched Origin is never overridden by a matching Referer", () => {
@@ -98,7 +98,7 @@ test("a present mismatched Origin is never overridden by a matching Referer", ()
     VERCEL_GIT_COMMIT_REF: branch,
     VERCEL_URL: deployment.replace("https://", ""),
     VERCEL_BRANCH_URL: stable.replace("https://", ""),
-  } as NodeJS.ProcessEnv), false)
+  } as unknown as NodeJS.ProcessEnv), false)
 })
 
 test("Production trusts only its configured canonical origin, never Vercel Preview hosts", () => {
@@ -109,12 +109,12 @@ test("Production trusts only its configured canonical origin, never Vercel Previ
     VERCEL_ENV: "production",
     VERCEL_URL: deployment.replace("https://", ""),
     VERCEL_BRANCH_URL: stable.replace("https://", ""),
-  } as NodeJS.ProcessEnv), false)
+  } as unknown as NodeJS.ProcessEnv), false)
 })
 
 test("unparseable, insecure or missing configured origins fail closed", () => {
   const req = request(stable + "/api/internal/maintenance", { origin: stable })
-  assert.equal(requestHasTrustedAppOrigin(req, { NEXTAUTH_URL: "not a URL" } as NodeJS.ProcessEnv), false)
-  assert.equal(requestHasTrustedAppOrigin(req, { NEXTAUTH_URL: "http://preview.example.org" } as NodeJS.ProcessEnv), false)
-  assert.equal(requestHasTrustedAppOrigin(req, {} as NodeJS.ProcessEnv), false)
+  assert.equal(requestHasTrustedAppOrigin(req, { NEXTAUTH_URL: "not a URL" } as unknown as NodeJS.ProcessEnv), false)
+  assert.equal(requestHasTrustedAppOrigin(req, { NEXTAUTH_URL: "http://preview.example.org" } as unknown as NodeJS.ProcessEnv), false)
+  assert.equal(requestHasTrustedAppOrigin(req, {} as unknown as NodeJS.ProcessEnv), false)
 })
