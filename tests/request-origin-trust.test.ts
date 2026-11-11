@@ -31,6 +31,24 @@ test("empty PUBLIC_APP_URL does not shadow the valid Preview NEXTAUTH_URL", () =
   assert.equal(diagnostics.originHeaderMatchesConfigured, true)
 })
 
+test("exact maintenance Preview prefers its branch-scoped NEXTAUTH_URL over a project public URL", () => {
+  const req = request(stable + "/api/internal/maintenance", { origin: stable })
+  const diagnostics = trustedOriginDiagnostics(req, {
+    PUBLIC_APP_URL: "https://www.aspectmarketingsolutions.app",
+    NEXTAUTH_URL: stable,
+    VERCEL_ENV: "preview",
+    VERCEL_GIT_COMMIT_REF: branch,
+  } as NodeJS.ProcessEnv)
+  assert.equal(diagnostics.configuredSource, "NEXTAUTH_URL")
+  assert.equal(diagnostics.configuredOrigin, stable)
+  assert.equal(requestHasTrustedAppOrigin(req, {
+    PUBLIC_APP_URL: "https://www.aspectmarketingsolutions.app",
+    NEXTAUTH_URL: stable,
+    VERCEL_ENV: "preview",
+    VERCEL_GIT_COMMIT_REF: branch,
+  } as NodeJS.ProcessEnv), true)
+})
+
 test("Vercel immutable deployment origin is accepted only on the exact maintenance Preview branch", () => {
   const req = request(deployment + "/api/internal/maintenance", { origin: deployment })
   const allowedEnv = {
