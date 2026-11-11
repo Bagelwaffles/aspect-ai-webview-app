@@ -3,6 +3,7 @@ import { z } from "zod"
 
 import { agents } from "@/app/agents/agentCatalog"
 import { authorizeOwnerApiRequest, type OwnerAuthorizationResult } from "@/lib/server/owner-api-auth"
+import { getMaintenanceFinding } from "@/lib/server/maintenance-lifecycle"
 import {
   listAciVerifiedKnowledge,
   promoteAciVerifiedKnowledge,
@@ -34,6 +35,7 @@ const promoteSchema = z.object({
   agentSlug: z.string().min(2).max(80),
   agentVersion: z.string().min(2).max(80),
   reviewedAgainstRepoSha: z.string().regex(SHA40),
+  researchFindingId: z.string().regex(SHA40),
   fact: z.string().min(24).max(500),
   sources: z.array(sourceSchema).min(2).max(4),
   attestations: attestationsSchema,
@@ -51,6 +53,7 @@ type Authorize = typeof authorizeOwnerApiRequest
 type ListKnowledge = typeof listAciVerifiedKnowledge
 type PromoteKnowledge = typeof promoteAciVerifiedKnowledge
 type RevokeKnowledge = typeof revokeAciVerifiedKnowledge
+type GetFinding = typeof getMaintenanceFinding
 
 export type AciKnowledgeApiDependencies = {
   env?: NodeJS.ProcessEnv
@@ -59,6 +62,7 @@ export type AciKnowledgeApiDependencies = {
   list?: ListKnowledge
   promote?: PromoteKnowledge
   revoke?: RevokeKnowledge
+  getFinding?: GetFinding
   options?: AciKnowledgeOptions
 }
 
@@ -179,6 +183,19 @@ export async function handleAciKnowledgePost(
       return json({ ok: false, code: "ACI_KNOWLEDGE_AGENT_UNKNOWN" }, 400)
     }
     try {
+      const find = dependencies.getFinding ?? getMaintenanceFinding
+      const researchFinding = await find(promote.data.researchFindingId, {
+        ...(dependencies.options ?? {}),
+        ...(dependencies.now ? { now: dependencies.now } : {}),
+        ...(dependencies.env ? { env: dependencies.env } : {}),
+      })
+      const observedAt = researchFinding ? Date.parse(researchFinding.sourceObservedAt) : Number.NaN
+      const nowMs = (dependencies.now ?? new Date()).getTime()
+      if (!researchFinding || researchFinding.origin !== "owner_research" ||
+          researchFinding.area !== "aci-research" || researchFinding.state !== "checks_passed" ||
+          !Number.isFinite(observedAt) || nowMs - observedAt > 48 * 60 * 60 * 1000) {
+        return json({ ok: false, code: "ACI_KNOWLEDGE_RESEARCH_FINDING_NOT_VERIFIED" }, 409)
+      }
       const save = dependencies.promote ?? promoteAciVerifiedKnowledge
       const { action: _action, ...knowledgeInput } = promote.data
       const result = await save(knowledgeInput, {
