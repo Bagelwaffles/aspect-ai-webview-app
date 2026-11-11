@@ -44,11 +44,21 @@ export default function AciKnowledgeReviewClient({
   runtimeEnabled,
   researchFindings,
 }: Props) {
-  const [fact, setFact] = useState("")
+  const [fact, setFact] = useState(
+    "Agent trace grading uses structured scores or labels to assess end-to-end decisions, tool calls, and policy adherence; repeated evaluations can reveal regressions and guide improvements.",
+  )
   const [researchFindingId, setResearchFindingId] = useState(researchFindings[0]?.id ?? "")
   const [sources, setSources] = useState<[SourceForm, SourceForm]>([
-    { ...emptySource },
-    { ...emptySource },
+    {
+      url: "https://developers.openai.com/api/docs/guides/trace-grading",
+      title: "Trace grading",
+      publisher: "OpenAI",
+    },
+    {
+      url: "https://docs.langchain.com/langsmith/evaluation-types",
+      title: "Evaluation types",
+      publisher: "LangChain",
+    },
   ])
   const [reviewed, setReviewed] = useState(false)
   const [independent, setIndependent] = useState(false)
