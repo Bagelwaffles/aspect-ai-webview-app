@@ -198,12 +198,14 @@ export function gradeAciTracePairs(input: unknown, now: Date = new Date()): AciT
     const baseline = observationByKey.get([caseId, "baseline"].join(":"))
     const candidate = observationByKey.get([caseId, "candidate"].join(":"))
     if (!baseline || !candidate) return empty(["MISSING_TRACE_OBSERVATION"])
+    if (baselineRef.sourceEnvironment !== candidateRef.sourceEnvironment) {
+      return empty(["TRACE_ENVIRONMENT_MISMATCH"])
+    }
     if (
       baseline.agentSlug !== candidate.agentSlug ||
       baseline.taskClass !== candidate.taskClass ||
       baseline.critical !== candidate.critical ||
-      baseline.repoSha === candidate.repoSha ||
-      baselineRef.sourceEnvironment !== candidateRef.sourceEnvironment
+      baseline.repoSha === candidate.repoSha
     ) return empty(["TRACE_PAIR_NOT_COMPARABLE"])
     pairs.push({ baseline, candidate })
   }
