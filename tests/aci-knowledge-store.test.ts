@@ -18,6 +18,7 @@ function input(overrides: Record<string, unknown> = {}) {
     agentSlug,
     agentVersion,
     reviewedAgainstRepoSha: "a".repeat(40),
+    researchFindingId: "c".repeat(40),
     fact: "OpenAI trace grading evaluates complete agent traces with structured scores and labels.",
     sources: [
       {
