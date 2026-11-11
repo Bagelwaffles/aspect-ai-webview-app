@@ -181,6 +181,7 @@ test("POST promotes an owner-attested fact only for the exact current Preview SH
   assert.equal(body.executionPerformed, false)
   assert.equal(body.productionReleaseAuthorized, false)
   assert.equal((stored as Record<string, unknown>).reviewedAgainstRepoSha, sha)
+  assert.equal(Object.hasOwn(stored as Record<string, unknown>, "action"), false)
 })
 
 test("POST rejects a stale code version, unknown agent, incomplete attestation and extra fields", async () => {
