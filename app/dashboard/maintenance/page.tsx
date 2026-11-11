@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 
 import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie"
 import { listMaintenanceFindings } from "@/lib/server/maintenance-lifecycle"
+import AciPreviewAcceptanceClient from "./AciPreviewAcceptanceClient"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -21,6 +22,9 @@ export default async function MaintenanceDashboard() {
     return []
   })
   const enabled = process.env.AMS_MAINTENANCE_ENABLED === "true"
+  const aciAcceptancePreviewOnly =
+    process.env.VERCEL_ENV === "preview" &&
+    process.env.VERCEL_GIT_COMMIT_REF === "feat/ams-maintenance-agent-pipeline-20261015"
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl space-y-6 bg-background px-4 py-10 text-foreground">
@@ -53,6 +57,8 @@ export default async function MaintenanceDashboard() {
           <p className="mt-1 text-xs text-muted-foreground">Merges, billing and publishing remain gated</p>
         </div>
       </section>
+
+      {aciAcceptancePreviewOnly ? <AciPreviewAcceptanceClient /> : null}
 
       {failed ? (
         <p role="alert" className="rounded-xl border p-4 text-sm">
