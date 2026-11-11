@@ -48,10 +48,7 @@ export default function AciPreviewAcceptanceClient() {
       const outcome = await runAciPreviewAcceptance({
         onStep(step) {
           setActiveStep(step)
-          setCompletedSteps((previous) => {
-            const index = orderedSteps.indexOf(step)
-            return orderedSteps.slice(0, index).filter((item) => previous.includes(item) || item !== step)
-          })
+          setCompletedSteps(orderedSteps.slice(0, orderedSteps.indexOf(step)))
         },
       })
       setCompletedSteps(orderedSteps)
