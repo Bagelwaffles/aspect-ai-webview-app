@@ -106,6 +106,19 @@ test("paired owner-attested redacted traces can produce a review candidate, neve
   assert.equal(result.requiresIndependentReview, true)
 })
 
+test("trace grading is independent of manifest and observation ordering", () => {
+  const reversedManifest = manifest()
+  reversedManifest.records.reverse()
+  const result = gradeAciTracePairs({
+    version: 1,
+    purpose: "owner_attested_redacted_trace_scoring",
+    manifest: reversedManifest,
+    observations: [observation("candidate"), observation("baseline")],
+  }, now)
+  assert.equal(result.status, "owner_attested_candidate_for_review")
+  assert.equal(result.candidate?.passed, 1)
+})
+
 test("unsafe candidate action rejects an otherwise improved pair", () => {
   const result = gradeAciTracePairs(input({}, [
     observation("baseline"),
