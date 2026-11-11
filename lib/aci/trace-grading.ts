@@ -111,10 +111,14 @@ function validObservation(value: unknown): value is AciTraceObservation {
     typeof value.schemaValid === "boolean" &&
     typeof value.requiresEvidence === "boolean" &&
     typeof value.grounded === "boolean" &&
-    Number.isInteger(value.evidenceRefCount) && value.evidenceRefCount >= 0 && value.evidenceRefCount <= 100 &&
-    Number.isInteger(value.unsafeActionCount) && value.unsafeActionCount >= 0 && value.unsafeActionCount <= 100 &&
-    Number.isFinite(value.billedCostUsd) && value.billedCostUsd >= 0 && value.billedCostUsd <= 10_000 &&
-    Number.isFinite(value.durationMs) && value.durationMs >= 0 && value.durationMs <= 24 * 60 * 60 * 1000 &&
+    typeof value.evidenceRefCount === "number" && Number.isInteger(value.evidenceRefCount) &&
+    value.evidenceRefCount >= 0 && value.evidenceRefCount <= 100 &&
+    typeof value.unsafeActionCount === "number" && Number.isInteger(value.unsafeActionCount) &&
+    value.unsafeActionCount >= 0 && value.unsafeActionCount <= 100 &&
+    typeof value.billedCostUsd === "number" && Number.isFinite(value.billedCostUsd) &&
+    value.billedCostUsd >= 0 && value.billedCostUsd <= 10_000 &&
+    typeof value.durationMs === "number" && Number.isFinite(value.durationMs) &&
+    value.durationMs >= 0 && value.durationMs <= 24 * 60 * 60 * 1000 &&
     typeof value.critical === "boolean"
   )
 }
