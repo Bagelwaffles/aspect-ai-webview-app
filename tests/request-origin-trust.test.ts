@@ -112,6 +112,15 @@ test("Production trusts only its configured canonical origin, never Vercel Previ
   } as unknown as NodeJS.ProcessEnv), false)
 })
 
+test("HTTP is accepted only for explicit localhost development origins", () => {
+  const local = "http://127.0.0.1:3000"
+  const req = request(local + "/api/internal/maintenance", { origin: local })
+  assert.equal(requestHasTrustedAppOrigin(req, { NEXTAUTH_URL: local } as unknown as NodeJS.ProcessEnv), true)
+  const remote = "http://preview.example.org"
+  const remoteReq = request(remote + "/api/internal/maintenance", { origin: remote })
+  assert.equal(requestHasTrustedAppOrigin(remoteReq, { NEXTAUTH_URL: remote } as unknown as NodeJS.ProcessEnv), false)
+})
+
 test("unparseable, insecure or missing configured origins fail closed", () => {
   const req = request(stable + "/api/internal/maintenance", { origin: stable })
   assert.equal(requestHasTrustedAppOrigin(req, { NEXTAUTH_URL: "not a URL" } as unknown as NodeJS.ProcessEnv), false)
