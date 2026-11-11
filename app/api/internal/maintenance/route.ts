@@ -63,10 +63,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  // Authenticate the owner before any diagnostic output. The diagnostic action
-  // is read-only; every state-changing action still requires the trusted origin.
-  const auth = await authorizeOwnerApiRequest(request)
-  if (!auth.ok) return json({ ok: false, code: auth.code }, auth.status)
   let payload: unknown
   try {
     const text = await request.text()
@@ -77,6 +73,10 @@ export async function POST(request: NextRequest) {
   }
   const originDiagnostic = z.object({ action: z.literal("diagnose_origin") }).strict().safeParse(payload)
   if (originDiagnostic.success) {
+    // This action is read-only. It still requires the signed owner session,
+    // but deliberately reports the origin mismatch instead of blocking it.
+    const diagnosticAuth = await authorizeOwnerApiRequest(request)
+    if (!diagnosticAuth.ok) return json({ ok: false, code: diagnosticAuth.code }, diagnosticAuth.status)
     return json({
       ok: true,
       trustedOrigin: requestHasTrustedAppOrigin(request),
@@ -84,13 +84,11 @@ export async function POST(request: NextRequest) {
       readOnly: true,
     })
   }
-  if (!requestHasTrustedAppOrigin(request)) {
-    return json({
-      ok: false,
-      code: "UNTRUSTED_ORIGIN",
-      originDiagnostics: trustedOriginDiagnostics(request),
-    }, 403)
-  }
+
+  // Preserve the original fail-closed ordering for every state-changing action:
+  // untrusted origins are rejected before owner-session validation or any write.
+  const auth = await authorizeOwnerApiRequest(request, { requireTrustedOrigin: true })
+  if (!auth.ok) return json({ ok: false, code: auth.code }, auth.status)
 
   const research = externalInput.safeParse(payload)
   if (research.success) {
