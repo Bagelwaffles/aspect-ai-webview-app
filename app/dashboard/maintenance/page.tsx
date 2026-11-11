@@ -73,6 +73,18 @@ export default async function MaintenanceDashboard() {
           agentSlug="content-agent"
           agentVersion={ACI_AGENT_VERSIONS["content-agent"]}
           runtimeEnabled={aciKnowledgeRuntimeEnabled}
+          researchFindings={findings
+            .filter((finding) =>
+              finding.origin === "owner_research" &&
+              finding.area === "aci-research" &&
+              finding.state === "checks_passed" &&
+              Date.now() - Date.parse(finding.sourceObservedAt) <= 48 * 60 * 60 * 1000,
+            )
+            .map((finding) => ({
+              id: finding.id,
+              summary: finding.summary,
+              sourceObservedAt: finding.sourceObservedAt,
+            }))}
         />
       ) : null}
 
