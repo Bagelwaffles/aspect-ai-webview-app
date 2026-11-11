@@ -9,6 +9,7 @@ type Props = {
   agentSlug: "content-agent"
   agentVersion: "content-v1"
   runtimeEnabled: boolean
+  researchFindings: Array<{ id: string; summary: string; sourceObservedAt: string }>
 }
 
 type SourceForm = {
@@ -41,8 +42,10 @@ export default function AciKnowledgeReviewClient({
   agentSlug,
   agentVersion,
   runtimeEnabled,
+  researchFindings,
 }: Props) {
   const [fact, setFact] = useState("")
+  const [researchFindingId, setResearchFindingId] = useState(researchFindings[0]?.id ?? "")
   const [sources, setSources] = useState<[SourceForm, SourceForm]>([
     { ...emptySource },
     { ...emptySource },
@@ -101,7 +104,7 @@ export default function AciKnowledgeReviewClient({
 
   async function promoteFact(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (saving || !repoSha || !attestationsComplete || !sourcesComplete || fact.trim().length < 24) return
+    if (saving || !repoSha || !researchFindingId || !attestationsComplete || !sourcesComplete || fact.trim().length < 24) return
     setSaving(true)
     setError(null)
     setNotice(null)
@@ -116,6 +119,7 @@ export default function AciKnowledgeReviewClient({
           agentSlug,
           agentVersion,
           reviewedAgainstRepoSha: repoSha,
+          researchFindingId,
           fact: fact.trim(),
           sources: sources.map((source) => ({
             ...source,
@@ -203,6 +207,18 @@ export default function AciKnowledgeReviewClient({
       <form onSubmit={promoteFact} className="space-y-3 rounded-lg border bg-background/70 p-4">
         <h3 className="font-semibold">Review and promote one factual statement</h3>
         <label className="block space-y-1 text-sm">
+          <span className="font-medium">Verified ACI research finding</span>
+          <select value={researchFindingId} onChange={(event) => setResearchFindingId(event.target.value)} required className="w-full rounded-md border bg-background p-2">
+            <option value="">Select a checks-passed research finding</option>
+            {researchFindings.map((finding) => (
+              <option key={finding.id} value={finding.id}>{finding.summary} · {finding.id.slice(0, 10)}</option>
+            ))}
+          </select>
+          {researchFindings.length === 0 ? (
+            <span className="text-xs text-muted-foreground">No recent checks-passed ACI research findings are available. Record and verify a research finding first.</span>
+          ) : null}
+        </label>
+        <label className="block space-y-1 text-sm">
           <span className="font-medium">Factual statement</span>
           <textarea
             value={fact}
@@ -246,7 +262,7 @@ export default function AciKnowledgeReviewClient({
           <label className="flex items-start gap-2"><input type="checkbox" checked={factOnly} onChange={(event) => setFactOnly(event.target.checked)} className="mt-1"/> This is a factual statement, not an instruction, policy override, or tool permission.</label>
         </div>
 
-        <button type="submit" disabled={saving || !repoSha || !attestationsComplete || !sourcesComplete || fact.trim().length < 24} className="rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+        <button type="submit" disabled={saving || !repoSha || !researchFindingId || !attestationsComplete || !sourcesComplete || fact.trim().length < 24} className="rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
           {saving ? "Saving owner-reviewed fact…" : "Promote owner-reviewed fact"}
         </button>
       </form>
