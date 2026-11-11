@@ -112,7 +112,13 @@ test("duplicate promotion is idempotent and index recovery repairs a partial wri
   redis.failNextIndexWrite = true
   await assert.rejects(promoteAciVerifiedKnowledge(input(), { redis, now }), /SIMULATED_ACI_INDEX_FAILURE/u)
   assert.deepEqual(await listAciVerifiedKnowledge(agentSlug, agentVersion, 20, { redis, now }), [])
-  const replay = await promoteAciVerifiedKnowledge(input({ sources: [...input().sources].reverse() }), { redis, now })
+  const replayInput = input({
+    sources: [
+      { ...input().sources[0], reviewedAt: "2026-11-11T21:30:00.000Z" },
+      { ...input().sources[1], reviewedAt: "2026-11-11T21:30:00.000Z" },
+    ].reverse(),
+  })
+  const replay = await promoteAciVerifiedKnowledge(replayInput, { redis, now })
   assert.equal(replay.new, false)
   const read = await listAciVerifiedKnowledge(agentSlug, agentVersion, 20, { redis, now })
   assert.equal(read.length, 1)
@@ -124,6 +130,7 @@ test("an expired fact can be re-reviewed as a new immutable version", async () =
   const first = await promoteAciVerifiedKnowledge(input(), { redis, now })
   const later = new Date("2026-12-12T22:00:00.000Z")
   const renewedInput = input({
+    researchFindingId: "d".repeat(40),
     sources: [
       { ...input().sources[0], reviewedAt: "2026-12-12T21:00:00.000Z" },
       { ...input().sources[1], reviewedAt: "2026-12-12T21:00:00.000Z" },
