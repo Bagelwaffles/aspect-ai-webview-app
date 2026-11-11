@@ -15,7 +15,7 @@ const CLOCK_SKEW_MS = 5 * 60 * 1000
 
 const AGENT_SLUGS = new Set(agents.map((agent) => agent.slug))
 const SHA40 = /^[a-f0-9]{40}$/
-const SOURCE_FIELDS = ["url", "title", "publisher", "retrievedAt"] as const
+const SOURCE_FIELDS = ["url", "title", "publisher", "reviewedAt"] as const
 const ATTESTATION_FIELDS = [
   "sourceContentReviewed",
   "sourcesIndependent",
@@ -28,7 +28,7 @@ export type AciKnowledgeSourceInput = {
   url: string
   title: string
   publisher: string
-  retrievedAt: string
+  reviewedAt: string
 }
 
 export type AciKnowledgeAttestations = {
@@ -144,7 +144,7 @@ function normalizeSource(value: unknown, now: Date): AciKnowledgeSourceInput {
   const url = canonicalPublicUrl(source.url)
   const title = typeof source.title === "string" ? clean(source.title, 200) : ""
   const publisher = typeof source.publisher === "string" ? clean(source.publisher, 120) : ""
-  const retrieved = parseTimestamp(source.retrievedAt)
+  const retrieved = parseTimestamp(source.reviewedAt)
   if (!url) throw new Error("ACI_KNOWLEDGE_SOURCE_URL_INVALID")
   if (title.length < 4 || publisher.length < 2) throw new Error("ACI_KNOWLEDGE_SOURCE_METADATA_INVALID")
   if (retrieved === null || retrieved > now.getTime() + CLOCK_SKEW_MS ||
@@ -155,7 +155,7 @@ function normalizeSource(value: unknown, now: Date): AciKnowledgeSourceInput {
     url,
     title,
     publisher,
-    retrievedAt: new Date(retrieved).toISOString(),
+    reviewedAt: new Date(retrieved).toISOString(),
   }
 }
 
@@ -210,7 +210,7 @@ export function normalizeAciVerifiedKnowledge(
   }
 
   const reviewed = reviewedAt.toISOString()
-  const earliestSource = Math.min(...sources.map((source) => Date.parse(source.retrievedAt)))
+  const earliestSource = Math.min(...sources.map((source) => Date.parse(source.reviewedAt)))
   const expiresAt = new Date(Math.min(reviewedAt.getTime() + FACT_LIFETIME_MS, earliestSource + FACT_LIFETIME_MS)).toISOString()
   return {
     agentSlug: value.agentSlug,
@@ -281,14 +281,14 @@ function parseFact(raw: unknown): AciVerifiedKnowledge | null {
       }
       const url = canonicalPublicUrl(source.url)
       if (url !== source.url || typeof source.title !== "string" ||
-          typeof source.publisher !== "string" || !validTime(source.retrievedAt)) return null
+          typeof source.publisher !== "string" || !validTime(source.reviewedAt)) return null
       return source
     })
     if (sources.some((source) => source === null)) return null
     if (new Set(fact.sources.map((source) => new URL(source.url).hostname)).size !== fact.sources.length ||
         new Set(fact.sources.map((source) => source.publisher.toLowerCase())).size !== fact.sources.length) return null
     const sortedSources = [...fact.sources]
-      .map((source) => [source.url, source.retrievedAt])
+      .map((source) => [source.url, source.reviewedAt])
       .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
     const expectedId = hash(JSON.stringify([
       fact.agentSlug,
@@ -300,7 +300,7 @@ function parseFact(raw: unknown): AciVerifiedKnowledge | null {
     ]))
     if (expectedId !== fact.id) return null
     const reviewedAt = Date.parse(fact.verification.reviewedAt)
-    const earliestSource = Math.min(...fact.sources.map((source) => Date.parse(source.retrievedAt)))
+    const earliestSource = Math.min(...fact.sources.map((source) => Date.parse(source.reviewedAt)))
     const expiry = Date.parse(fact.expiresAt)
     if (expiry > reviewedAt + FACT_LIFETIME_MS || expiry > earliestSource + FACT_LIFETIME_MS) return null
     return fact
@@ -322,7 +322,7 @@ export async function promoteAciVerifiedKnowledge(
     normalized.reviewedAgainstRepoSha,
     normalized.researchFindingId,
     normalized.fact.toLowerCase(),
-    sources.map((source) => [source.url, source.retrievedAt]),
+    sources.map((source) => [source.url, source.reviewedAt]),
   ]))
   const fact: AciVerifiedKnowledge = {
     ...normalized,
