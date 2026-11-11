@@ -238,18 +238,41 @@ function parseFact(raw: unknown): AciVerifiedKnowledge | null {
     const value = typeof raw === "string" ? JSON.parse(raw) : raw
     if (!value || typeof value !== "object" || Array.isArray(value)) return null
     const fact = value as AciVerifiedKnowledge
+    const validTime = (value: unknown) => typeof value === "string" && Number.isFinite(Date.parse(value))
     if (
       !/^[a-f0-9]{40}$/.test(fact.id) ||
       !AGENT_SLUGS.has(fact.agentSlug) ||
       typeof fact.agentVersion !== "string" ||
+      !/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,79}$/.test(fact.agentVersion) ||
       fact.knowledgeType !== "semantic_fact" ||
       fact.classification !== "public" ||
       !["active", "revoked"].includes(fact.status) ||
       typeof fact.fact !== "string" ||
-      !Array.isArray(fact.sources) ||
+      fact.fact.length < 24 || fact.fact.length > 500 ||
+      !Array.isArray(fact.sources) || fact.sources.length < 2 || fact.sources.length > 4 ||
+      !validTime(fact.createdAt) || !validTime(fact.updatedAt) || !validTime(fact.expiresAt) ||
+      (fact.status === "revoked" && (!validTime(fact.revokedAt) || typeof fact.revocationReason !== "string")) ||
+      fact.verification?.level !== "owner_attested_two_source_review" ||
+      fact.verification?.reviewedBy !== "owner" ||
+      !validTime(fact.verification?.reviewedAt) ||
+      fact.verification?.sourceContentReviewedByOwner !== true ||
+      fact.verification?.sourceIndependenceAttestedByOwner !== true ||
+      fact.verification?.sourceAuthenticityMachineVerified !== false ||
       fact.verification?.trustedInstructions !== false ||
       fact.verification?.mayExecute !== false
     ) return null
+    const sources = fact.sources.map((source) => {
+      if (!source || typeof source !== "object" || !exactFields(source as unknown as Record<string, unknown>, SOURCE_FIELDS)) {
+        return null
+      }
+      const url = canonicalPublicUrl(source.url)
+      if (url !== source.url || typeof source.title !== "string" ||
+          typeof source.publisher !== "string" || !validTime(source.retrievedAt)) return null
+      return source
+    })
+    if (sources.some((source) => source === null)) return null
+    if (new Set(fact.sources.map((source) => new URL(source.url).hostname)).size !== fact.sources.length ||
+        new Set(fact.sources.map((source) => source.publisher.toLowerCase())).size !== fact.sources.length) return null
     return fact
   } catch {
     return null
