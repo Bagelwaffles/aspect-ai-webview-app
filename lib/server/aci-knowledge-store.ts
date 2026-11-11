@@ -42,6 +42,7 @@ export type AciKnowledgeAttestations = {
 export type AciVerifiedKnowledgeInput = {
   agentSlug: string
   agentVersion: string
+  reviewedAgainstRepoSha: string
   fact: string
   sources: AciKnowledgeSourceInput[]
   attestations: AciKnowledgeAttestations
@@ -51,6 +52,7 @@ export type AciVerifiedKnowledge = {
   id: string
   agentSlug: string
   agentVersion: string
+  reviewedAgainstRepoSha: string
   knowledgeType: "semantic_fact"
   fact: string
   classification: "public"
@@ -166,7 +168,7 @@ export function normalizeAciVerifiedKnowledge(
     throw new Error("ACI_KNOWLEDGE_INPUT_INVALID")
   }
   const value = input as Record<string, unknown>
-  if (!exactFields(value, ["agentSlug", "agentVersion", "fact", "sources", "attestations"])) {
+  if (!exactFields(value, ["agentSlug", "agentVersion", "reviewedAgainstRepoSha", "fact", "sources", "attestations"])) {
     throw new Error("ACI_KNOWLEDGE_INPUT_FIELDS_INVALID")
   }
   if (typeof value.agentSlug !== "string" || !AGENT_SLUGS.has(value.agentSlug)) {
@@ -175,6 +177,9 @@ export function normalizeAciVerifiedKnowledge(
   if (typeof value.agentVersion !== "string" ||
       !/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,79}$/.test(value.agentVersion)) {
     throw new Error("ACI_KNOWLEDGE_AGENT_VERSION_INVALID")
+  }
+  if (typeof value.reviewedAgainstRepoSha !== "string" || !SHA40.test(value.reviewedAgainstRepoSha)) {
+    throw new Error("ACI_KNOWLEDGE_REPO_SHA_INVALID")
   }
   const fact = typeof value.fact === "string" ? clean(value.fact, 500) : ""
   if (fact.length < 24) throw new Error("ACI_KNOWLEDGE_FACT_INVALID")
@@ -205,6 +210,7 @@ export function normalizeAciVerifiedKnowledge(
   return {
     agentSlug: value.agentSlug,
     agentVersion: value.agentVersion,
+    reviewedAgainstRepoSha: value.reviewedAgainstRepoSha,
     knowledgeType: "semantic_fact",
     fact,
     classification: "public",
@@ -244,6 +250,7 @@ function parseFact(raw: unknown): AciVerifiedKnowledge | null {
       !AGENT_SLUGS.has(fact.agentSlug) ||
       typeof fact.agentVersion !== "string" ||
       !/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,79}$/.test(fact.agentVersion) ||
+      typeof fact.reviewedAgainstRepoSha !== "string" || !SHA40.test(fact.reviewedAgainstRepoSha) ||
       fact.knowledgeType !== "semantic_fact" ||
       fact.classification !== "public" ||
       !["active", "revoked"].includes(fact.status) ||
