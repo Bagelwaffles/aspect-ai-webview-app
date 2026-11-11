@@ -176,7 +176,8 @@ export async function handleAciKnowledgePost(
     }
     try {
       const save = dependencies.promote ?? promoteAciVerifiedKnowledge
-      const result = await save(promote.data, {
+      const { action: _action, ...knowledgeInput } = promote.data
+      const result = await save(knowledgeInput, {
         ...(dependencies.options ?? {}),
         ...(dependencies.now ? { now: dependencies.now } : {}),
         ...(dependencies.env ? { env: dependencies.env } : {}),
