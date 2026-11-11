@@ -317,6 +317,8 @@ export async function promoteAciVerifiedKnowledge(
   const id = hash(JSON.stringify([
     normalized.agentSlug,
     normalized.agentVersion,
+    normalized.reviewedAgainstRepoSha,
+    normalized.researchFindingId,
     normalized.fact.toLowerCase(),
     sources.map((source) => source.url),
   ]))
