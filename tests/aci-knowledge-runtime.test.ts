@@ -16,6 +16,7 @@ function knowledge(): AciVerifiedKnowledge {
     agentSlug: "content-agent",
     agentVersion: "content-v1",
     reviewedAgainstRepoSha: "b".repeat(40),
+    researchFindingId: "c".repeat(40),
     knowledgeType: "semantic_fact",
     fact: "OpenAI trace grading evaluates complete agent traces with structured scores and labels.",
     classification: "public",
