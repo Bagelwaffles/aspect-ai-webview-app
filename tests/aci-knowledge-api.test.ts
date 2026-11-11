@@ -120,7 +120,7 @@ test("Production and unrelated Preview branches return 404 before owner auth", a
 })
 
 test("GET requires owner auth and returns only exact agent/version facts", async () => {
-  const denied = await handleAciKnowledgeGet(getRequest(), { env: previewEnv, authorize: async () => ({ ok: false, status: 401, code: "OWNER_SESSION_REQUIRED" }) })
+  const denied = await handleAciKnowledgeGet(getRequest(), { env: previewEnv, authorize: async () => ({ ok: false as const, status: 401 as const, code: "OWNER_SESSION_REQUIRED" as const }) })
   assert.equal(denied.status, 401)
 
   let scope: string[] = []
@@ -159,7 +159,7 @@ test("POST rejects an untrusted origin before calling the persistence adapter", 
   const response = await handleAciKnowledgePost(postRequest(promotion()), {
     env: previewEnv,
     authorize: deniedAuth,
-    promote: async () => { called = true; throw new Error("should not run") } as never,
+    promote: (async () => { called = true; throw new Error("should not run") }) as never,
     now,
   })
   assert.equal(response.status, 403)
@@ -177,8 +177,9 @@ test("POST promotes an owner-attested fact only for the exact current Preview SH
     env: previewEnv, authorize: ownerAuth, promote: promote as never, now,
   })
   assert.equal(response.status, 200)
-  assert.equal((await response.json()).executionPerformed, false)
-  assert.equal((await response.json().catch(() => ({}))).productionReleaseAuthorized, undefined)
+  const body = await response.json()
+  assert.equal(body.executionPerformed, false)
+  assert.equal(body.productionReleaseAuthorized, false)
   assert.equal((stored as Record<string, unknown>).reviewedAgainstRepoSha, sha)
 })
 
@@ -191,7 +192,7 @@ test("POST rejects a stale code version, unknown agent, incomplete attestation a
   ]
   for (const payload of cases) {
     const response = await handleAciKnowledgePost(postRequest(payload), {
-      env: previewEnv, authorize: ownerAuth, promote: async () => { throw new Error("must not run") } as never, now,
+      env: previewEnv, authorize: ownerAuth, promote: (async () => { throw new Error("must not run") }) as never, now,
     })
     assert.ok(response.status === 400 || response.status === 409)
   }
@@ -208,7 +209,7 @@ test("POST can revoke an existing fact without deleting its audit record", async
   }), {
     env: previewEnv,
     authorize: ownerAuth,
-    revoke: async (input) => { revokedId = input.id; return { ...fact(), status: "revoked", revokedAt: now.toISOString(), revocationReason: input.reason } } as never,
+    revoke: (async (input: { id: string; agentSlug: string; agentVersion: string; reason: string }) => { revokedId = input.id; return { ...fact(), status: "revoked" as const, revokedAt: now.toISOString(), revocationReason: input.reason } }) as never,
     now,
   })
   assert.equal(response.status, 200)
