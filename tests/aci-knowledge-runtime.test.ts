@@ -22,8 +22,8 @@ function knowledge(): AciVerifiedKnowledge {
     classification: "public",
     status: "active",
     sources: [
-      { url: "https://developers.openai.com/api/docs/guides/trace-grading", title: "Trace grading", publisher: "OpenAI", retrievedAt: "2026-11-11T21:00:00.000Z" },
-      { url: "https://langchain-ai.github.io/langgraph/concepts/memory/", title: "Memory overview", publisher: "LangChain", retrievedAt: "2026-11-11T21:00:00.000Z" },
+      { url: "https://developers.openai.com/api/docs/guides/trace-grading", title: "Trace grading", publisher: "OpenAI", reviewedAt: "2026-11-11T21:00:00.000Z" },
+      { url: "https://langchain-ai.github.io/langgraph/concepts/memory/", title: "Memory overview", publisher: "LangChain", reviewedAt: "2026-11-11T21:00:00.000Z" },
     ],
     verification: {
       level: "owner_attested_two_source_review",
