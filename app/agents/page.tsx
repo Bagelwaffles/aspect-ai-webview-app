@@ -42,15 +42,17 @@ const operatingSteps = [
 export default function AgentsPage() {
   const [category, setCategory] = useState<CategoryFilter>("All")
   const [status, setStatus] = useState<StatusFilter>("All")
+  const [showRoadmap, setShowRoadmap] = useState(false)
 
   const filteredAgents = useMemo(
     () =>
       agents.filter((agent) => {
         const categoryMatch = category === "All" || agent.category === category
         const statusMatch = status === "All" || agent.status === status
-        return categoryMatch && statusMatch
+        const visibilityMatch = showRoadmap || status !== "All" || agent.status === "live"
+        return categoryMatch && statusMatch && visibilityMatch
       }),
-    [category, status],
+    [category, status, showRoadmap],
   )
 
   const counts = agentStatusCounts
@@ -99,7 +101,7 @@ export default function AgentsPage() {
               {subscriptionCheckoutLive ? "Content, lead magnets, email campaigns, nurture, outreach, SEO, and product creation are already included in AMS subscriptions. Explore every Live agent below or compare plans to put the full team to work." : "Content, lead magnets, email campaigns, nurture, outreach, SEO, and product creation have production-verified paths. Subscription checkout is temporarily paused; explore the agents now and keep pricing visible for reactivation."}
             </p>
             <div className={styles.heroActions}>
-              <a className={styles.primary} href="#catalog">Explore all 33 agents <span>↓</span></a>
+              <a className={styles.primary} href="#catalog">Explore the catalog <span>↓</span></a>
               <Link className={styles.secondary} href="/pricing#plans">{subscriptionCheckoutLive ? "Get 7 Live agents" : "View pricing + pause status"} <span>↗</span></Link>
             </div>
           </div>
@@ -148,10 +150,26 @@ export default function AgentsPage() {
           </div>
         </div>
 
+        <div className={styles.catalogScope}>
+          <p>
+            {showRoadmap
+              ? "Full roadmap view: Live, Beta, Setup Required, Planned, and Blocked capabilities."
+              : "Showing production-verified Live agents first. The full roadmap remains available whenever you want it."}
+          </p>
+          <button
+            className={`${styles.filter} ${showRoadmap ? styles.filterActive : ""}`}
+            type="button"
+            aria-expanded={showRoadmap}
+            onClick={() => setShowRoadmap((current) => !current)}
+          >
+            {showRoadmap ? "Show Live agents only" : `Show full ${agents.length}-agent roadmap`}
+          </button>
+        </div>
+
         <div className={styles.catalogHeading}>
           <div>
-            <p className={styles.kicker}>Sales catalog</p>
-            <h2>{filteredAgents.length} agents in view.</h2>
+            <p className={styles.kicker}>{showRoadmap ? "Full catalog" : "Available now"}</p>
+            <h2>{filteredAgents.length} {showRoadmap ? "agents in view." : "Live agents in view."}</h2>
           </div>
           <p>
             Every card shows the real commercial state. “Available now” routes to an existing purchase path. Beta and roadmap agents stay visible for comparison,
