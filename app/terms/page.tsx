@@ -69,7 +69,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-foreground">6. Refunds and failed fulfillment</h2>
+          <h2 id="refunds" className="text-xl font-semibold text-foreground">6. Refunds and failed fulfillment</h2>
           <p className="mt-2">
             Refund eligibility depends on the purchased service and applicable law. If an automated
             fulfillment attempt fails before the purchased service is delivered, AMS may retry,
