@@ -26,7 +26,7 @@ test("marketing audit remains Beta and accurately states checkout is paused pend
   assert.equal(agent.launchHref, "/quick-marketing-audit")
   assert.match(agent.statusReason, /\$49 Quick Marketing Audit offer/i)
   assert.match(agent.statusReason, /native fulfillment path/i)
-  assert.match(agent.statusReason, /fresh real paid production fulfillment has not yet been re-verified/i)
+  assert.match(agent.statusReason, /fresh real paid production fulfillment is re-verified/i)
   assert.match(agent.nextMilestone, /first fresh real paid production audit/i)
   assert.match(agent.statusReason, /checkout is currently paused/i)
 })
