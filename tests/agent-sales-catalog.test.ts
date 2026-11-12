@@ -63,14 +63,18 @@ test("the Agent Store prominently presents the seven-agent Live showcase", () =>
   assert.match(agentStoreSource, /Meet the Live AMS team\./)
 })
 
-test("Marketing Audit preserves the existing $49 one-time purchase route", () => {
+test("Marketing Audit preserves the $49 offer route without implying checkout is open", () => {
   const audit = agents.find((agent) => agent.slug === "marketing-audit-agent")
   assert.ok(audit)
 
   const offer = getAgentSalesOffer(audit)
   assert.equal(offer.mode, "one-time")
-  assert.equal(offer.price, "$49 one-time")
+  assert.equal(offer.label, "Availability check")
+  assert.equal(offer.price, "$49 one-time offer")
+  assert.equal(offer.primaryLabel, "Check current availability")
   assert.equal(offer.primaryHref, "/quick-marketing-audit")
+  assert.match(offer.detail, /checkout is currently paused/i)
+  assert.doesNotMatch(offer.primaryLabel, /buy|purchase|checkout/i)
 })
 
 test("unfinished agents never receive a fabricated standalone checkout", () => {
