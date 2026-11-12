@@ -104,3 +104,15 @@ test("paused Quick Marketing Audit availability is stated consistently across pu
   assert.doesNotMatch(salesLayout, /verified AMS purchase path/)
   assert.match(auditPage, /Checkout is temporarily paused\./)
 })
+
+
+test("refund page does not claim a complete published billing policy exists", () => {
+  const refundPage = readFileSync(join(process.cwd(), "app/refund/page.tsx"), "utf8")
+  const termsPage = readFileSync(join(process.cwd(), "app/terms/page.tsx"), "utf8")
+
+  assert.match(refundPage, /complete customer-facing refund policy is still being finalized/i)
+  assert.match(refundPage, /\/terms#refunds/)
+  assert.match(refundPage, /\/contact/)
+  assert.doesNotMatch(refundPage, /governed by the published AMS billing policy/i)
+  assert.match(termsPage, /id="refunds"/)
+})
