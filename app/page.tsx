@@ -1,6 +1,8 @@
 import Link from "next/link"
 import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
 import styles from "./marketing.module.css"
+import { AmsPublicHeader } from "@/components/ams-public-header"
+import { AmsPublicFooter } from "@/components/ams-public-footer"
 
 const outcomes = [
   {
@@ -76,31 +78,12 @@ export default function HomePage() {
   const subscriptionCheckoutLive = isContentAgentLaunchEnabled()
 
   return (
-    <main className={styles.site}>
+    <main className={`${styles.site} ams-public-page`}>
       <div className={cx("orb", "orb-one")} aria-hidden="true" />
       <div className={cx("orb", "orb-two")} aria-hidden="true" />
       <div className={cx("orb", "orb-three")} aria-hidden="true" />
 
-      <header className={styles.header}>
-        <a className={styles.brand} href="#top" aria-label="Aspect Marketing Solutions home">
-          <span className={styles.brandMark}>A</span>
-          <span>
-            Aspect <strong>Marketing Solutions</strong>
-          </span>
-        </a>
-
-        <nav className={styles.nav} aria-label="Primary navigation">
-          <Link href="/agents">Agents</Link>
-          <Link href="/creators">Creators</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/quick-marketing-audit">Marketing Audit</Link>
-          <Link href="/contact">Contact</Link>
-        </nav>
-
-        <Link className={styles.signIn} href="/login?next=/dashboard">
-          Sign in
-        </Link>
-      </header>
+      <AmsPublicHeader />
 
       <section className={styles.hero} id="top">
         <div className={styles.heroCopy}>
@@ -383,24 +366,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className={styles.footer}>
-        <div className={styles.brand}>
-          <span className={styles.brandMark}>A</span>
-          <span>
-            Aspect <strong>Marketing Solutions</strong>
-          </span>
-        </div>
-        <nav aria-label="Footer navigation">
-          <Link href="/agents">Agents</Link>
-          <Link href="/creators">Creators</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/quick-marketing-audit">$49 Audit</Link>
-          <Link href="/contact">Contact</Link>
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-        </nav>
-        <p>© 2026 Aspect Marketing Solutions</p>
-      </footer>
+      <AmsPublicFooter />
     </main>
   )
 }

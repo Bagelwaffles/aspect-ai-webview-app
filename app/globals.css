@@ -256,10 +256,11 @@
 }
 
 .ams-public-header {
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 50;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(6, 10, 18, 0.84);
+  border-bottom: 1px solid var(--ams-public-line, rgba(255,255,255,.1));
+  background: rgba(6, 10, 18, .88);
   backdrop-filter: blur(18px);
 }
 
@@ -273,32 +274,36 @@
 
 .ams-public-header__inner {
   min-height: 76px;
-  grid-template-columns: auto 1fr auto;
-  gap: 32px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: clamp(18px, 2.6vw, 34px);
 }
 
 .ams-public-brand {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: 11px;
   color: #f6f8fb;
   font-size: 14px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  letter-spacing: -.025em;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .ams-public-brand__mark {
   display: grid;
-  width: 34px;
-  height: 34px;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
   place-items: center;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #c9ff3d, #95e8ff);
+  border: 1px solid rgba(201,255,61,.3);
+  border-radius: 11px;
+  background: linear-gradient(135deg, #c9ff3d, #a7f0ff);
   color: #061018;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 900;
-  box-shadow: 0 8px 28px rgba(201, 255, 61, 0.14);
+  box-shadow: 0 8px 28px rgba(201,255,61,.13);
 }
 
 .ams-public-brand__name strong {
@@ -308,17 +313,20 @@
 
 .ams-public-nav {
   display: flex;
+  min-width: 0;
+  align-items: center;
   justify-content: center;
-  gap: clamp(20px, 2.6vw, 38px);
+  gap: clamp(14px, 2vw, 28px);
   color: #a9b2c3;
   font-size: 13px;
+  font-weight: 550;
 }
 
 .ams-public-nav a,
 .ams-public-footer__nav a {
   color: inherit;
   text-decoration: none;
-  transition: color .2s ease;
+  transition: color .18s ease;
 }
 
 .ams-public-nav a:hover,
@@ -328,25 +336,103 @@
   color: #f6f8fb;
 }
 
+.ams-public-nav a:focus-visible,
+.ams-public-mobile-nav a:focus-visible,
+.ams-public-mobile-nav summary:focus-visible,
+.ams-public-signin:focus-visible,
+.ams-public-brand:focus-visible {
+  outline: 2px solid #c9ff3d;
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
 .ams-public-signin {
   display: inline-flex;
-  min-height: 40px;
-  padding: 0 16px;
+  min-height: 42px;
+  padding: 0 17px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.17);
+  border: 1px solid rgba(201,255,61,.38);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(201,255,61,.08);
   color: #f6f8fb;
   font-size: 12px;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .18s ease, border-color .18s ease, transform .18s ease;
+}
+
+.ams-public-signin:hover {
+  transform: translateY(-1px);
+  border-color: rgba(201,255,61,.7);
+  background: rgba(201,255,61,.14);
+}
+
+.ams-public-mobile-nav {
+  display: none;
+  position: relative;
+}
+
+.ams-public-mobile-nav summary {
+  display: inline-flex;
+  min-height: 42px;
+  padding: 0 13px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--ams-public-line-strong, rgba(255,255,255,.17));
+  border-radius: 999px;
+  color: #f6f8fb;
+  cursor: pointer;
+  font-size: 12px;
   font-weight: 700;
+  list-style: none;
+}
+
+.ams-public-mobile-nav summary::-webkit-details-marker { display: none; }
+
+.ams-public-mobile-nav summary::after {
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  content: "";
+  transform: rotate(45deg) translateY(-2px);
+}
+
+.ams-public-mobile-nav[open] summary::after {
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.ams-public-mobile-nav__panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 60;
+  display: grid;
+  width: min(290px, calc(100vw - 28px));
+  padding: 10px;
+  gap: 3px;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 18px;
+  background: rgba(10,16,27,.98);
+  box-shadow: 0 24px 70px rgba(0,0,0,.42);
+}
+
+.ams-public-mobile-nav__panel a {
+  display: flex;
+  min-height: 44px;
+  padding: 0 12px;
+  align-items: center;
+  border-radius: 10px;
+  color: #dce5f2;
+  font-size: 14px;
   text-decoration: none;
 }
 
-.ams-public-signin:hover,
-.ams-public-signin:focus-visible {
-  border-color: rgba(201, 255, 61, 0.45);
-  background: rgba(201, 255, 61, 0.07);
+.ams-public-mobile-nav__panel a:hover {
+  background: rgba(201,255,61,.08);
+  color: #fff;
 }
 
 .ams-public-footer {
@@ -356,41 +442,55 @@
 }
 
 .ams-public-footer__inner {
-  min-height: 112px;
-  grid-template-columns: auto 1fr auto;
-  gap: 34px;
-  border-top: 1px solid rgba(255, 255, 255, 0.10);
-  color: #6f7a8d;
-  font-size: 11px;
+  min-height: 116px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 28px;
+  border-top: 1px solid rgba(255,255,255,.10);
+  color: #8792a5;
+  font-size: 12px;
 }
 
 .ams-public-footer__nav {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 22px;
+  gap: 12px 22px;
 }
 
-.ams-public-footer p {
-  margin: 0;
-}
+.ams-public-footer p { margin: 0; white-space: nowrap; }
 
-@media (max-width: 900px) {
+@media (max-width: 980px) {
+  .ams-public-header__inner {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 12px;
+  }
   .ams-public-nav { display: none; }
-  .ams-public-header__inner { grid-template-columns: 1fr auto; }
+  .ams-public-mobile-nav { display: block; }
 }
 
 @media (max-width: 720px) {
   .ams-public-header__inner,
   .ams-public-footer__inner { width: min(100% - 28px, 1180px); }
-  .ams-public-header__inner { min-height: 66px; }
+  .ams-public-header__inner { min-height: 68px; }
   .ams-public-brand__name strong { display: none; }
+  .ams-public-brand { font-size: 13px; }
+  .ams-public-signin { min-height: 40px; padding: 0 12px; }
+  .ams-public-mobile-nav summary { min-height: 40px; padding: 0 11px; }
   .ams-public-footer__inner {
     padding: 28px 0;
     grid-template-columns: 1fr;
     justify-items: start;
+    gap: 20px;
   }
-  .ams-public-footer__nav {
-    flex-wrap: wrap;
-    justify-content: flex-start;
+  .ams-public-footer__nav { justify-content: flex-start; }
+  .ams-public-footer p { white-space: normal; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ams-public-header *,
+  .ams-public-footer * {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
   }
 }
