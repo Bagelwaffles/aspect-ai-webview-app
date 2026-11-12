@@ -21,7 +21,7 @@ export function academyProgressKey(subject: string): string {
 }
 
 export function resolveAcademyRedisConfig(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
 ): { url: string; token: string } | null {
   // Dedicated Academy credentials only: never inherit generic AMS Preview/Production
   // Redis, buyer-link, Stripe, Gmail monitoring, or other agents' data stores.
