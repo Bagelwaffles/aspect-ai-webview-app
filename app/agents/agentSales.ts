@@ -49,10 +49,10 @@ export function getAgentSalesOffer(agent: Agent): AgentSalesOffer {
   if (agent.slug === "marketing-audit-agent") {
     return {
       mode: "one-time",
-      label: "Public paid service",
-      price: "$49 one-time",
-      detail: "Buy the existing Quick Marketing Audit through the verified AMS Stripe checkout and native fulfillment path.",
-      primaryLabel: "Buy the $49 audit",
+      label: "Availability check",
+      price: "$49 one-time offer",
+      detail: "The $49 Quick Marketing Audit is an existing one-time offer. Checkout is currently paused while the fulfillment path is re-verified. Review the offer details and current availability before attempting to purchase.",
+      primaryLabel: "Check current availability",
       primaryHref: "/quick-marketing-audit",
       secondaryLabel: "See all pricing",
       secondaryHref: "/pricing",
