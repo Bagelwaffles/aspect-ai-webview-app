@@ -38,3 +38,13 @@ Proposed future measurement (not activated):
 | repeat_generation_succeeded | agent slug, relative cohort window | independently deduplicated durable runs |
 
 No emails, prompts, outputs, full referrers, arbitrary URL queries, tokens or payment details in analytics. Define retention, consent and access policy before new collection. Establish baseline unique visits and each transition before any controlled comparison; no invented baseline or conversion lift. Keep operational and customer analytics separate.
+
+
+## November 12 launch-readiness copy and policy correction
+
+- Agent Store, Marketing Audit sales detail, and metadata no longer describe the $49 Quick Marketing Audit as currently purchasable or direct buyers to a verified checkout while its runtime launch gate is paused.
+- The offer remains identified as a $49 one-time offer; the primary CTA now directs visitors to check current availability. The detail page explains that checkout is paused pending fulfillment re-verification. No price, SKU, checkout, Stripe, entitlement, or fulfillment behavior changed.
+- The Marketing Audit catalog status remains Beta pending a fresh real paid production fulfillment.
+- The refund page no longer claims a complete published billing policy exists. It identifies the policy as still being finalized, links to the general refund/failed-fulfillment language in Terms section 6, and directs existing-order questions to the existing contact route. It does not invent eligibility windows or guarantees.
+- Regression tests cover the offer CTA, the Agent Store/detail/audit copy consistency, and the refund-policy disclosure and Terms anchor.
+- This is source/automated-test evidence only until exact-head CI, Secret Scan and the matching Preview deployment complete. No browser visual QA is claimed by this note.
