@@ -4,14 +4,17 @@ import path from "node:path"
 import test from "node:test"
 
 const homepage = fs.readFileSync(path.join(process.cwd(), "app/page.tsx"), "utf8")
+const publicHeader = fs.readFileSync(path.join(process.cwd(), "components/ams-public-header.tsx"), "utf8")
 
 test("homepage puts the Agent Store, pricing, audit, contact, and sign-in paths in primary navigation", () => {
-  assert.match(homepage, /href="\/agents"/)
+  assert.match(publicHeader, /href="\/agents"/)
   assert.match(homepage, /Agent Store/)
-  assert.match(homepage, /href="\/pricing"/)
-  assert.match(homepage, /href="\/quick-marketing-audit"/)
-  assert.match(homepage, /href="\/contact"/)
-  assert.match(homepage, /href="\/login\?next=\/dashboard"/)
+  assert.match(publicHeader, /href="\/pricing"/)
+  assert.match(publicHeader, /href="\/quick-marketing-audit"/)
+  assert.match(publicHeader, /href="\/contact"/)
+  assert.match(publicHeader, /href="\/login\?next=\/dashboard"/)
+  assert.match(publicHeader, /How it works/)
+  assert.match(publicHeader, /ams-public-mobile-nav/)
 })
 
 test("homepage states the verified offer choices clearly above the fold", () => {
