@@ -20,17 +20,24 @@ export function academyProgressKey(subject: string): string {
   return `${PREFIX}:${createHash("sha256").update(subject).digest("hex")}`
 }
 
+export function resolveAcademyRedisConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): { url: string; token: string } | null {
+  // Dedicated Academy credentials only: never inherit generic AMS Preview/Production
+  // Redis, buyer-link, Stripe, Gmail monitoring, or other agents' data stores.
+  const url = env.AMS_ACADEMY_REDIS_REST_URL?.trim()
+  const token = env.AMS_ACADEMY_REDIS_REST_TOKEN?.trim()
+  return url && token ? { url, token } : null
+}
+
 function progressStore(options: AcademyProgressOptions): AcademyRedisStore {
   if (Object.prototype.hasOwnProperty.call(options, "redis")) {
     if (!options.redis) throw new Error("ACADEMY_PROGRESS_STORE_UNAVAILABLE")
     return options.redis
   }
-  // Dedicated Academy credentials only: never inherit generic AMS Preview/Production
-  // Redis, buyer-link, Stripe, Gmail monitoring, or other agents' data stores.
-  const url = process.env.AMS_ACADEMY_REDIS_REST_URL?.trim()
-  const token = process.env.AMS_ACADEMY_REDIS_REST_TOKEN?.trim()
-  if (!url || !token) throw new Error("ACADEMY_PROGRESS_STORE_UNAVAILABLE")
-  return new Redis({ url, token })
+  const config = resolveAcademyRedisConfig()
+  if (!config) throw new Error("ACADEMY_PROGRESS_STORE_UNAVAILABLE")
+  return new Redis(config)
 }
 
 /** Server-only, owner-scoped and never inferred from browser-local data. */
