@@ -60,3 +60,19 @@ The deployed frontend stores training state using browser `localStorage` (`smoky
 5. Owner-approved Public/Google Play launch and measured customer activation.
 
 Never label course completion as certified mastery; students self-mark progress in Phase 1.
+
+
+## November 12 — owner-approved isolated pay-as-you-go Preview database
+
+Owner specifically approved **one new Academy-only Upstash Redis pay-as-you-go database** with a **$20 monthly spending cap**, configured solely on the Academy Preview branch. No Production rollout was authorized.
+
+- Created new database `amsacademypreview` in `us-east-1` (a separate database; no existing AMS datastore reused).
+- Independent readback confirmed database **active**, **Pay as You Go**, and **budget 20**.
+- Real datastore verification on the new database: `PING=PONG`, `SET=OK`, matching `GET`, `DEL=1`, final `GET=null`. Synthetic key fully cleaned up.
+- Applied only three **branch-specific Preview** Vercel environment variables: `AMS_ACADEMY_REDIS_REST_URL`, `AMS_ACADEMY_REDIS_REST_TOKEN`, and `AMS_ACADEMY_PREVIEW_ENABLED=false`. Dedicated Redis token is marked sensitive; never put credentials in this repository, comments, or log output.
+- Verified all three variables target Preview and the Academy branch, not Production or other PRs. General AMS Redis environment variables are never accepted by Academy code.
+- The exact-head GitHub reconciliation CI and secret scan were successful before environment configuration. New Vercel builds are required to incorporate new environment settings.
+- Attempt to redeploy directly with Vercel's deployment API received HTTP 403. Do not repeat this API call without revised authorization. Use the existing GitHub→Vercel Preview build integration when this documentation commit is pushed to the existing draft branch.
+- **Important:** The Academy gate remains OFF. Direct Upstash connectivity does not prove the Preview app's authenticated progress reads and writes. Owner-only OAuth sign-in, session origin, per-customer persistent progress and Production 404 still require separately verified Preview acceptance before activation.
+- No merge, Production change, public enrollment, live student activity, paid AI calls, Stripe changes, credentials rotation or customer communication.
+
