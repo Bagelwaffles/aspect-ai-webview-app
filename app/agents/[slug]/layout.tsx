@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   const offer = getAgentSalesOffer(agent)
   const title = `${agent.name} | Aspect Marketing Solutions`
-  const description = `${agent.description} ${offer.price}. Review current availability and the verified AMS purchase path.`
+  const description = `${agent.description} ${offer.price}. Review current availability and verified capabilities.`
   const url = `https://www.aspectmarketingsolutions.app/agents/${agent.slug}`
 
   return {
