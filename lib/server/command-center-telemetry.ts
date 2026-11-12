@@ -1,6 +1,6 @@
 import Stripe from "stripe"
 
-import { listRecentFiverrOperations } from "@/lib/server/fiverr-operations"
+import { readRecentFiverrOperations } from "@/lib/server/fiverr-operations"
 import { checkRedisReadiness } from "@/lib/server/redis-readiness"
 
 const N8N_TIMEOUT_MS = 4_000
@@ -180,7 +180,7 @@ export async function getCommandCenterTelemetry() {
     checkRedisReadiness(),
     probeN8nTelemetry(),
     getStripeTelemetry(),
-    listRecentFiverrOperations(8),
+    readRecentFiverrOperations(8),
   ])
 
   return {
@@ -190,7 +190,8 @@ export async function getCommandCenterTelemetry() {
     stripe,
     fiverr: {
       intakeConfigured: Boolean(process.env.AMS_N8N_INTERNAL_KEY?.trim()),
-      recentOperations: fiverrOperations,
+      ...fiverrOperations,
+      recentOperations: fiverrOperations.records,
     },
   }
 }
