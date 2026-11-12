@@ -523,3 +523,12 @@
 .ams-public-page :where(.grid > *, .flex > *) { min-width: 0; }
 .ams-public-page :where(p, li, h1, h2, h3) { overflow-wrap: anywhere; }
 .ams-public-page :where(input, textarea, select) { font-size: 1rem; }
+
+/* Public footer targets: preserve header sizing and narrow-screen wrapping. */
+.ams-public-footer__nav a {
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+  padding-inline: 6px;
+}
+.ams-public-footer .ams-public-brand { min-height: 44px; }

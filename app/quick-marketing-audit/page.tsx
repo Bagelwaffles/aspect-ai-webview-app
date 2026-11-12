@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic"
 export const metadata = {
   title: "AMS Quick Marketing Audit | Aspect Marketing Solutions",
   description:
-    "Get a focused $49 marketing audit with specific fixes, an improved headline and offer, a promotional post, and a 7-day action plan delivered within 48 hours.",
+    "Review the $49 Quick Marketing Audit offer. Checkout is currently paused while fulfillment is re-verified; no payment is accepted until verification is complete.",
 }
 
 const idealFor = [
@@ -35,7 +35,7 @@ export default async function QuickMarketingAuditPage() {
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm text-muted-foreground">
               <Sparkles className="h-4 w-4 text-primary" />
-              First live AMS revenue offer
+              AMS Quick Marketing Audit offer
             </div>
 
             <div className="space-y-4">
@@ -43,7 +43,7 @@ export default async function QuickMarketingAuditPage() {
                 Find what is costing your marketing attention, leads, and sales.
               </h1>
               <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">
-                The AMS Quick Marketing Audit gives you a focused outside review of your current marketing and a practical plan for what to fix next.
+                The $49 AMS Quick Marketing Audit is intended to provide a focused outside review of your marketing and a practical plan for what to fix next when available.
               </p>
             </div>
 
@@ -68,7 +68,7 @@ export default async function QuickMarketingAuditPage() {
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-2">
                 <Clock3 className="h-4 w-4 text-primary" />
-                Delivered {QUICK_MARKETING_AUDIT.deliveryWindow}
+                Delivery target when available: {QUICK_MARKETING_AUDIT.deliveryWindow}
               </span>
               <span className="inline-flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-primary" />
@@ -84,7 +84,7 @@ export default async function QuickMarketingAuditPage() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
-                <p className="mb-3 text-sm font-medium">You receive:</p>
+                <p className="mb-3 text-sm font-medium">Intended deliverables when available:</p>
                 <ul className="space-y-3">
                   {QUICK_MARKETING_AUDIT.deliverables.map((item) => (
                     <li className="flex gap-3 text-sm text-muted-foreground" key={item}>
@@ -103,12 +103,12 @@ export default async function QuickMarketingAuditPage() {
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
                   <p className="font-medium">Checkout is temporarily paused.</p>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    AMS is upgrading the fulfillment path for this offer. We are not accepting payment until the delivery system is verified again.
+                    Checkout is currently paused while fulfillment is re-verified. No payment is accepted until verification is complete.
                   </p>
                 </div>
               )}
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Secure checkout is handled by Stripe. At checkout we collect the business details needed to begin the review. AMS does not promise specific revenue or ranking outcomes.
+                When checkout is available, Stripe handles payment and the checkout form collects the business details needed to begin the review. AMS does not promise specific revenue or ranking outcomes.
               </p>
             </CardContent>
           </Card>
@@ -128,30 +128,30 @@ export default async function QuickMarketingAuditPage() {
         <section className="grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>What happens after you buy</CardTitle>
-              <CardDescription>A simple delivery process with no fake automation claims.</CardDescription>
+              <CardTitle>Intended process when the offer is available</CardTitle>
+              <CardDescription>This describes the intended service; it does not mean checkout is open.</CardDescription>
             </CardHeader>
             <CardContent>
               <ol className="space-y-4 text-sm text-muted-foreground">
                 <li><strong className="text-foreground">1. Checkout.</strong> Stripe collects payment and the core business details we need to start.</li>
                 <li><strong className="text-foreground">2. Review.</strong> AMS reviews your positioning, offer, website or social presence, and the challenge you identified.</li>
                 <li><strong className="text-foreground">3. Build.</strong> We turn the findings into specific fixes, stronger copy, and a 7-day action plan.</li>
-                <li><strong className="text-foreground">4. Deliver.</strong> Your completed audit is delivered within 48 hours.</li>
+                <li><strong className="text-foreground">4. Deliver.</strong> When the offer is available, delivery is targeted within 48 hours.</li>
               </ol>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Why this is the first AMS offer</CardTitle>
-              <CardDescription>Useful now, automatable later.</CardDescription>
+              <CardTitle>About this AMS offer</CardTitle>
+              <CardDescription>A focused review with a defined scope.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-muted-foreground">
               <p>
-                AMS is bringing its agent platform online in controlled stages. This audit is deliberately simple: buyers get a real deliverable now while the deeper autonomous workflows continue through production verification.
+                AMS is bringing its agent platform online in controlled stages. This audit is intended to provide the listed deliverables when available; fulfillment must be re-verified before checkout resumes.
               </p>
               <p>
-                That means you are buying the outcome described on this page—not a claim that every historical AMS agent is already autonomous or production-ready.
+                The offer scope does not imply that every AMS agent is autonomous or production-ready. Review the availability notice above before planning a purchase.
               </p>
             </CardContent>
           </Card>
