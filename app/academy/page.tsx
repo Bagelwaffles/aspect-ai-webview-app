@@ -12,6 +12,7 @@ import {
   type AcademyLessonId,
 } from "@/lib/academy/catalog"
 import { authOptions, isCustomerAuthConfigured } from "@/lib/auth"
+import { isAcademyPreviewEnabled } from "@/lib/academy/preview-gate"
 import { customerPrincipalFromSession } from "@/lib/server/customer-api-auth"
 import {
   getAcademyCompletedLessons,
@@ -22,14 +23,6 @@ export const dynamic = "force-dynamic"
 export const metadata: Metadata = {
   title: "AMS Academy | Controlled Pilot",
   robots: { index: false, follow: false },
-}
-
-function isAcademyPreviewEnabled(): boolean {
-  // Protect both the incomplete product and existing AMS production.
-  return (
-    process.env.AMS_ACADEMY_PREVIEW_ENABLED === "true" &&
-    (process.env.VERCEL_ENV === "preview" || process.env.NODE_ENV === "development")
-  )
 }
 
 async function completeAcademyLesson(formData: FormData) {
