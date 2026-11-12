@@ -9,9 +9,9 @@ import { Badge } from "@/components/ui/badge"
 
 export default function DeleteAccountPage() {
   return (
-    <>
+    <div className="ams-public-page">
       <AmsPublicHeader />
-      <main className="ams-public-page min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8">
+      <main id="main-content" tabIndex={-1} className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
@@ -87,6 +87,6 @@ export default function DeleteAccountPage() {
       </div>
     </main>
       <AmsPublicFooter />
-    </>
+    </div>
   )
 }

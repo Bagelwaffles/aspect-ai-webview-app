@@ -106,9 +106,9 @@ export default function PricingPage() {
   const contentAgentLive = isContentAgentLaunchEnabled()
 
   return (
-    <>
+    <div className="ams-public-page">
       <AmsPublicHeader />
-      <main className="ams-public-page ams-public-page min-h-screen bg-background px-4 py-8 sm:px-6 lg:py-12">
+      <main id="main-content" tabIndex={-1} className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:py-12">
       <div className="mx-auto max-w-6xl space-y-12">
         <header className="space-y-5">
           <div className="max-w-3xl space-y-4">
@@ -338,6 +338,6 @@ export default function PricingPage() {
       </div>
     </main>
       <AmsPublicFooter />
-    </>
+    </div>
   )
 }

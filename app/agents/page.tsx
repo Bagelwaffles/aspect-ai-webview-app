@@ -10,6 +10,7 @@ import styles from "./agents.module.css"
 
 import { agents, agentStatusCounts, statusMeta, type AgentStatus } from "./agentCatalog"
 import { getAgentSalesOffer } from "./agentSales"
+import { selectCatalogAgents } from "./catalog-view"
 
 const categoryOptions = [
   "All",
@@ -45,21 +46,16 @@ export default function AgentsPage() {
   const [showRoadmap, setShowRoadmap] = useState(false)
 
   const filteredAgents = useMemo(
-    () =>
-      agents.filter((agent) => {
-        const categoryMatch = category === "All" || agent.category === category
-        const statusMatch = status === "All" || agent.status === status
-        const visibilityMatch = showRoadmap || status !== "All" || agent.status === "live"
-        return categoryMatch && statusMatch && visibilityMatch
-      }),
+    () => selectCatalogAgents(category, status, showRoadmap),
     [category, status, showRoadmap],
   )
 
   const counts = agentStatusCounts
 
   return (
-    <main className={`${styles.network} ams-public-page`}>
+    <div className={`${styles.network} ams-public-page`}>
       <AmsPublicHeader />
+      <main id="main-content" tabIndex={-1}>
       
 
       <section className={styles.hero}>
@@ -126,6 +122,7 @@ export default function AgentsPage() {
                   className={`${styles.filter} ${category === option ? styles.filterActive : ""}`}
                   key={option}
                   type="button"
+                  aria-pressed={category === option}
                   onClick={() => setCategory(option)}
                 >
                   {option}
@@ -141,6 +138,7 @@ export default function AgentsPage() {
                   className={`${styles.filter} ${status === option ? styles.filterActive : ""}`}
                   key={option}
                   type="button"
+                  aria-pressed={status === option}
                   onClick={() => setStatus(option)}
                 >
                   {option === "All" ? "All statuses" : statusMeta[option].label}
@@ -152,7 +150,7 @@ export default function AgentsPage() {
 
         <div className={styles.catalogScope}>
           <p>
-            {showRoadmap
+            {status !== "All" ? `Filtered to ${statusMeta[status].label} capabilities.` : showRoadmap
               ? "Full roadmap view: Live, Beta, Setup Required, Planned, and Blocked capabilities."
               : "Showing production-verified Live agents first. The full roadmap remains available whenever you want it."}
           </p>
@@ -160,16 +158,16 @@ export default function AgentsPage() {
             className={`${styles.filter} ${showRoadmap ? styles.filterActive : ""}`}
             type="button"
             aria-expanded={showRoadmap}
-            onClick={() => setShowRoadmap((current) => !current)}
+            onClick={() => { setShowRoadmap((current) => !current); setStatus("All"); setCategory("All") }}
           >
             {showRoadmap ? "Show Live agents only" : `Show full ${agents.length}-agent roadmap`}
           </button>
         </div>
 
-        <div className={styles.catalogHeading}>
+        <div className={styles.catalogHeading} aria-live="polite" aria-atomic="true">
           <div>
-            <p className={styles.kicker}>{showRoadmap ? "Full catalog" : "Available now"}</p>
-            <h2>{filteredAgents.length} {showRoadmap ? "agents in view." : "Live agents in view."}</h2>
+            <p className={styles.kicker}>{status !== "All" ? statusMeta[status].label : showRoadmap ? "Full catalog" : "Available now"}</p>
+            <h2>{filteredAgents.length} {status !== "All" ? `${statusMeta[status].label} agents in view.` : showRoadmap ? "agents in view." : "Live agents in view."}</h2>
           </div>
           <p>
             Every card shows the real commercial state. “Available now” routes to an existing purchase path. Beta and roadmap agents stay visible for comparison,
@@ -301,7 +299,8 @@ export default function AgentsPage() {
       </section>
 
       
-          <AmsPublicFooter />
-</main>
+          </main>
+      <AmsPublicFooter />
+</div>
   )
 }

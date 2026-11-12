@@ -143,8 +143,9 @@ export default function CollaboratePage() {
   ].join("\n")
 
   return (
-    <main className={`${styles.page} ams-public-page`}>
+    <div className={`${styles.page} ams-public-page`}>
       <AmsPublicHeader />
+      <main id="main-content" tabIndex={-1}>
       <div className={styles.gridGlow} aria-hidden="true" />
 
       
@@ -395,7 +396,8 @@ export default function CollaboratePage() {
       </section>
 
       
-          <AmsPublicFooter />
-</main>
+          </main>
+      <AmsPublicFooter />
+</div>
   )
 }

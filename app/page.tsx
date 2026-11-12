@@ -78,12 +78,13 @@ export default function HomePage() {
   const subscriptionCheckoutLive = isContentAgentLaunchEnabled()
 
   return (
-    <main className={`${styles.site} ams-public-page`}>
+    <div className={`${styles.site} ams-public-page`}>
       <div className={cx("orb", "orb-one")} aria-hidden="true" />
       <div className={cx("orb", "orb-two")} aria-hidden="true" />
       <div className={cx("orb", "orb-three")} aria-hidden="true" />
 
       <AmsPublicHeader />
+      <main id="main-content" tabIndex={-1}>
 
       <section className={styles.hero} id="top">
         <div className={styles.heroCopy}>
@@ -366,7 +367,8 @@ export default function HomePage() {
         </div>
       </section>
 
+      </main>
       <AmsPublicFooter />
-    </main>
+    </div>
   )
 }

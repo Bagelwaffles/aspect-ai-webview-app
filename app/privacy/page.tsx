@@ -9,9 +9,9 @@ const updated = "October 9, 2026"
 
 export default function PrivacyPolicyPage() {
   return (
-    <>
+    <div className="ams-public-page">
       <AmsPublicHeader />
-      <main className="ams-public-page ams-public-page min-h-screen bg-background px-5 py-12 sm:px-8 lg:py-16">
+      <main id="main-content" tabIndex={-1} className="min-h-screen bg-background px-5 py-12 sm:px-8 lg:py-16">
       <article className="mx-auto max-w-4xl space-y-8 text-foreground">
         <header className="space-y-3 border-b border-border pb-8">
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-primary">Aspect Marketing Solutions</p>
@@ -140,6 +140,6 @@ export default function PrivacyPolicyPage() {
       </article>
     </main>
       <AmsPublicFooter />
-    </>
+    </div>
   )
 }

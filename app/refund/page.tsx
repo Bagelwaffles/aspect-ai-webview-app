@@ -2,9 +2,9 @@ import { AmsPublicHeader } from "@/components/ams-public-header"
 import { AmsPublicFooter } from "@/components/ams-public-footer"
 export default function RefundPage() {
   return (
-    <>
+    <div className="ams-public-page">
       <AmsPublicHeader />
-      <main className="ams-public-page mx-auto min-h-screen max-w-3xl px-6 py-10">
+      <main id="main-content" tabIndex={-1} className="mx-auto min-h-screen max-w-3xl px-6 py-10">
       <h1 className="text-3xl font-bold">Refund Policy</h1>
       <p className="mt-4 text-muted-foreground">
         Refund handling is governed by the published AMS billing policy. This route is live so customers do not hit a
@@ -12,6 +12,6 @@ export default function RefundPage() {
       </p>
     </main>
       <AmsPublicFooter />
-    </>
+    </div>
   )
 }

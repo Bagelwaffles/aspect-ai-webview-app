@@ -27,9 +27,9 @@ export default async function QuickMarketingAuditPage() {
   const checkoutReady = await isQuickAuditRuntimeLaunchEnabled()
 
   return (
-    <>
+    <div className="ams-public-page">
       <AmsPublicHeader />
-      <main className="ams-public-page ams-public-page min-h-screen bg-background px-4 py-10 sm:px-6 lg:py-16">
+      <main id="main-content" tabIndex={-1} className="min-h-screen bg-background px-4 py-10 sm:px-6 lg:py-16">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
         <section className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
           <div className="space-y-6">
@@ -159,6 +159,6 @@ export default async function QuickMarketingAuditPage() {
       </div>
     </main>
       <AmsPublicFooter />
-    </>
+    </div>
   )
 }

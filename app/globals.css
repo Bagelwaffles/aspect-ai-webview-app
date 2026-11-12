@@ -179,7 +179,7 @@
   --ams-public-line-strong: rgba(255, 255, 255, 0.17);
   --ams-public-text: #f6f8fb;
   --ams-public-muted: #a9b2c3;
-  --ams-public-subtle: #6f7a8d;
+  --ams-public-subtle: #a0abbe;
   --ams-public-lime: #c9ff3d;
   --ams-public-cyan: #63dcff;
   --ams-public-violet: #8f7cff;
@@ -218,7 +218,7 @@
   font-weight: 700;
 }
 
-.ams-public-page [data-slot="button"]:not([class*="border"]) {
+.ams-public-page [data-slot="button"].bg-primary {
   background: linear-gradient(135deg, var(--ams-public-lime), #a7f0ff);
   color: #061018;
 }
@@ -375,7 +375,7 @@
 
 .ams-public-mobile-nav {
   display: none;
-  position: relative;
+  position: static;
 }
 
 .ams-public-mobile-nav summary {
@@ -410,8 +410,8 @@
 
 .ams-public-mobile-nav__panel {
   position: absolute;
-  top: calc(100% + 12px);
-  right: 0;
+  top: calc(100% + 8px);
+  right: 14px;
   z-index: 60;
   display: grid;
   width: min(290px, calc(100vw - 28px));
@@ -478,8 +478,8 @@
   .ams-public-header__inner { min-height: 68px; }
   .ams-public-brand__name strong { display: none; }
   .ams-public-brand { font-size: 13px; }
-  .ams-public-signin { min-height: 40px; padding: 0 12px; }
-  .ams-public-mobile-nav summary { min-height: 40px; padding: 0 11px; }
+  .ams-public-signin { min-height: 44px; padding: 0 12px; }
+  .ams-public-mobile-nav summary { min-height: 44px; padding: 0 11px; }
   .ams-public-footer__inner {
     padding: 28px 0;
     grid-template-columns: 1fr;
@@ -504,9 +504,22 @@
 .ams-public-page :where(h1, h2, h3) { text-wrap: balance; }
 .ams-public-page :where(p, li) { text-wrap: pretty; }
 .ams-public-page :where(a, button, input, select, textarea, summary):focus-visible { outline: 2px solid var(--ams-public-focus); outline-offset: 4px; }
-.ams-public-page :where(section, [id]) { scroll-margin-top: 1.5rem; }
+.ams-public-page :where(section, [id]) { scroll-margin-top: 6rem; }
 @media (prefers-reduced-motion: reduce) {
   .ams-public-page *, .ams-public-page *::before, .ams-public-page *::after {
     scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important;
   }
 }
+
+/* Public routes share one backdrop; customer tools and operator consoles are out of scope. */
+.ams-public-page > main { min-height: calc(100svh - 192px); background: transparent; }
+.ams-public-header__inner { position: relative; }
+.ams-public-mobile-nav__panel { max-height: calc(100dvh - 100px); overflow-y: auto; }
+.ams-public-page .ams-public-skip { position: absolute; top: 8px; left: 14px; z-index: 100; transform: translateY(-160%); padding: 12px 18px; background: #c9ff3d; color: #061018; border-radius: 8px; font-weight: 700; }
+.ams-public-page .ams-public-skip:focus { transform: none; outline: 2px solid white; outline-offset: 2px; }
+.ams-public-footer__nav a:focus-visible { outline: 2px solid #c9ff3d; outline-offset: 4px; }
+.ams-public-nav a, .ams-public-footer__nav a { display: inline-flex; align-items: center; min-height: 44px; }
+.ams-public-page [data-slot="button"] { height: auto; white-space: normal; text-align: center; padding-block: .65rem; max-width: 100%; }
+.ams-public-page :where(.grid > *, .flex > *) { min-width: 0; }
+.ams-public-page :where(p, li, h1, h2, h3) { overflow-wrap: anywhere; }
+.ams-public-page :where(input, textarea, select) { font-size: 1rem; }

@@ -7,7 +7,7 @@ import { ShieldCheck } from "lucide-react"
 
 import { safeRelativeCallbackPath } from "@/app/lib/safe-relative-callback"
 import { CustomerLoginButton } from "@/components/customer-login-button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { authOptions, isCustomerAuthConfigured } from "@/lib/auth"
 import { authOriginState } from "@/lib/auth-origin"
 
@@ -42,15 +42,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const originMismatch = Boolean(authOrigin.configuredOrigin && !authOrigin.matches)
 
   return (
-    <>
+    <div className="ams-public-page">
       <AmsPublicHeader />
-      <main className="ams-public-page ams-public-page flex min-h-screen items-center justify-center bg-background px-6 py-12">
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
       <Card className="w-full max-w-md border-border/70 bg-card/90 shadow-2xl">
         <CardHeader>
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
             <ShieldCheck className="h-6 w-6" />
           </div>
-          <CardTitle className="text-2xl">Sign in to AMS</CardTitle>
+          <h1 className="text-2xl font-semibold tracking-tight">Sign in to AMS</h1>
           <CardDescription>
             Customer tools and paid AI routes require a verified account. AMS does not grant access from a checkout return URL alone.
           </CardDescription>
@@ -62,7 +62,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
               <p className="font-semibold">Google sign-in is disabled on this preview deployment.</p>
               <p className="mt-2 text-amber-100/80">
-                This preview is configured to return OAuth callbacks to the production AMS site, so starting sign-in here would lose the OAuth state cookie.
+                Please use the main AMS website to sign in securely. Your account and access remain unchanged.
               </p>
               {authOrigin.configuredOrigin ? (
                 <a
@@ -75,19 +75,19 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </div>
           ) : (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
-              Customer sign-in is not configured yet. Google OAuth credentials and a NextAuth secret must be added to the staging environment before this page is enabled.
+              Sign-in is temporarily unavailable. Please try again later.
             </div>
           )}
           {params.error && (
             <p className="text-sm text-destructive">Sign-in failed. No access was granted.</p>
           )}
           <p className="text-xs text-muted-foreground">
-            Required staging variables: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, NEXTAUTH_SECRET, and NEXTAUTH_URL.
+            Sign in with your Google account to access your AMS tools.
           </p>
         </CardContent>
       </Card>
     </main>
       <AmsPublicFooter />
-    </>
+    </div>
   )
 }
