@@ -19,16 +19,16 @@ test("n8n automation is blocked while the former cloud worker is unavailable", (
   assert.doesNotMatch(agent.statusReason, /instance and orchestrator are online/i)
 })
 
-test("marketing audit reflects the open production checkout without overstating paid proof", () => {
+test("marketing audit remains Beta and accurately states checkout is paused pending fresh paid proof", () => {
   const agent = getAgent("marketing-audit-agent")
   assert.ok(agent)
   assert.equal(agent.status, "beta")
   assert.equal(agent.launchHref, "/quick-marketing-audit")
-  assert.match(agent.statusReason, /\$49 public checkout/i)
-  assert.match(agent.statusReason, /native AMS fulfillment/i)
+  assert.match(agent.statusReason, /\$49 Quick Marketing Audit offer/i)
+  assert.match(agent.statusReason, /native fulfillment path/i)
   assert.match(agent.statusReason, /fresh real paid production fulfillment has not yet been re-verified/i)
   assert.match(agent.nextMilestone, /first fresh real paid production audit/i)
-  assert.doesNotMatch(agent.statusReason, /checkout remains intentionally paused/i)
+  assert.match(agent.statusReason, /checkout is currently paused/i)
 })
 
 test("agent sales pages use lifecycle-aware commercial language", () => {
