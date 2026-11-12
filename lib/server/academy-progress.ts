@@ -4,7 +4,6 @@ import { Redis } from "@upstash/redis"
 
 import { isStableCustomerSubject } from "@/lib/auth"
 import { isAcademyLessonId, type AcademyLessonId } from "@/lib/academy/catalog"
-import { resolveWorkspaceRedisConfig } from "@/lib/server/customer-workspace"
 
 const PREFIX = "ams:academy:progress:v1"
 
@@ -26,9 +25,12 @@ function progressStore(options: AcademyProgressOptions): AcademyRedisStore {
     if (!options.redis) throw new Error("ACADEMY_PROGRESS_STORE_UNAVAILABLE")
     return options.redis
   }
-  const config = resolveWorkspaceRedisConfig()
-  if (!config) throw new Error("ACADEMY_PROGRESS_STORE_UNAVAILABLE")
-  return new Redis(config)
+  // Dedicated Academy credentials only: never inherit generic AMS Preview/Production
+  // Redis, buyer-link, Stripe, Gmail monitoring, or other agents' data stores.
+  const url = process.env.AMS_ACADEMY_REDIS_REST_URL?.trim()
+  const token = process.env.AMS_ACADEMY_REDIS_REST_TOKEN?.trim()
+  if (!url || !token) throw new Error("ACADEMY_PROGRESS_STORE_UNAVAILABLE")
+  return new Redis({ url, token })
 }
 
 /** Server-only, owner-scoped and never inferred from browser-local data. */
