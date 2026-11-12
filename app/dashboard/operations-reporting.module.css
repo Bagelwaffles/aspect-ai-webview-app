@@ -3,7 +3,7 @@
 .root h2 { font-size: 1.6rem; margin: .4rem 0; }
 .root h3 { font-size: 1.2rem; margin: 0 0 .75rem; }
 .root h4 { font-size: 1.05rem; margin: 0 0 .5rem; }
-.root p { line-height: 1.6; margin: .65rem 0; color: #d1d5db; }
+.root p { line-height: 1.6; margin: .65rem 0; color: #d1d5db; overflow-wrap: anywhere; }
 .root a { color: #93c5fd; text-decoration: underline; overflow-wrap: anywhere; }
 .root ul { padding-left: 1.25rem; line-height: 1.7; }
 .root li { margin: .5rem 0; overflow-wrap: anywhere; }

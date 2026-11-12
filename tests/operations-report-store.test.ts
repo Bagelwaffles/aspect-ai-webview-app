@@ -8,6 +8,14 @@ import type { ReportInput, SpecialistId } from "../lib/operations/reporting"
 
 const now = new Date("2026-11-12T12:00:00.000Z")
 const env = { VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: REPORTING_PREVIEW_BRANCH, UPSTASH_REDIS_REST_URL: "https://accepted-quetzal-206056.upstash.io", UPSTASH_REDIS_REST_TOKEN: "dummy-test-token" } as unknown as NodeJS.ProcessEnv
+
+test("unrecognized storage replies stay uncertain instead of claiming a confirmed identity conflict", async () => {
+  for (const result of [null, {}, [], ["unexpected"], ["created"], ["duplicate"], ["conflict", "unexpected"]]) {
+    const redis: ReportingRedis = { get: async () => null, lrange: async () => [], eval: async () => result }
+    await assert.rejects(saveSpecialistReport("engineering", input(), { env, now, redis }), /REPORTING_STORE_RESPONSE_INVALID/)
+  }
+})
+
 function input(overrides: Partial<ReportInput> = {}): ReportInput {
   return { schemaVersion: 1, reportId: "test-report", dedupeKey: "test-dedupe", specialistId: "engineering", sourceSystem: { id: "owner-reviewed-specialist:engineering", version: "1" }, observedAt: "2026-11-12T10:00:00.000Z", sourceLastRunAt: "2026-11-12T11:00:00.000Z", status: "healthy", summary: "Preview checks passed.", currentWork: "Review reporting", blocker: "", nextAction: "Owner review", evidence: [], confidence: "high", verification: "owner_attested", approvalState: "none", ...overrides }
 }

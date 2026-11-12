@@ -3,6 +3,7 @@
 import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { SPECIALISTS, parseReport, parseStoredReport, reportContentKey, type SpecialistId } from "@/lib/operations/reporting"
+import { reportingFailureMessage } from "@/lib/operations/reporting-feedback"
 import styles from "./operations-reporting.module.css"
 
 export default function OperationsReportingClient({ repoSha }: { repoSha: string }) {
@@ -44,8 +45,7 @@ export default function OperationsReportingClient({ repoSha }: { repoSha: string
       setMessage(`${result.created ? "Report saved" : "Duplicate suppressed"}; one matching immutable report read back. Observation time unchanged. No action or approval executed.`)
       router.refresh()
     } catch (error) {
-      const code = error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : "REPORTING_OUTCOME_UNCONFIRMED"
-      setMessage(`${code}. No automatic retry. The write may have succeeded; keep the same report ID and payload for readback or an identical replay. An owner Google session is required for this API.`)
+      setMessage(reportingFailureMessage(error))
     } finally { inFlight.current = false; setBusy(false) }
   }
   return (

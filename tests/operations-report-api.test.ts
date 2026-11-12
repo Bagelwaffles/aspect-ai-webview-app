@@ -72,6 +72,14 @@ test("store validation/conflict map to 400/409; uncertain errors return replay g
     assert.ok(!JSON.stringify(result).includes("private dependency details"))
   }
 })
+test("an unrecognized storage response returns 503 with unknown-outcome guidance rather than 409", async () => {
+  const response = await handleReportingPost(request(), { env, authorize, save: async () => { throw new Error("REPORTING_STORE_RESPONSE_INVALID") } })
+  assert.equal(response.status, 503)
+  const result = await response.json()
+  assert.equal(result.code, "REPORTING_STORE_UNAVAILABLE")
+  assert.match(result.outcome, /unknown; read back or replay the identical report/)
+})
+
 test("successful creation and replay remain inert, owner-only and uncached", async () => {
   for (const created of [true, false]) {
     const response = await handleReportingPost(request(), { env, authorize, save: async (lane, report, options) => {

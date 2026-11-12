@@ -120,8 +120,11 @@ export async function saveSpecialistReport(specialistId: SpecialistId, input: un
     `${scope(specialistId)}:latest`,
   ], [hash(reportContentKey(report)), stored, String(REPORT_RETENTION_SECONDS), String(REPORT_HISTORY_LIMIT)])
   if (Array.isArray(result) && result[0] === "invalid") throw new Error("REPORTING_STORED_REPORT_INVALID")
-  if (!Array.isArray(result) || !["created", "duplicate"].includes(String(result[0]))) {
+  if (Array.isArray(result) && result.length === 1 && result[0] === "conflict") {
     throw new Error("REPORTING_IDENTITY_CONFLICT")
+  }
+  if (!Array.isArray(result) || result.length !== 2 || !["created", "duplicate"].includes(String(result[0]))) {
+    throw new Error("REPORTING_STORE_RESPONSE_INVALID")
   }
   const saved = parseStoredReport(unwrap(result[1]), binding(specialistId), now)
   if (!saved.ok) throw new Error("REPORTING_STORED_REPORT_INVALID")
