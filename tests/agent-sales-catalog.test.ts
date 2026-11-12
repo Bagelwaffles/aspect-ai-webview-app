@@ -89,3 +89,18 @@ test("unfinished agents never receive a fabricated standalone checkout", () => {
     assert.equal(offer.price.includes("$"), false, `${agent.slug} must not invent a sale price`)
   }
 })
+
+
+test("paused Quick Marketing Audit availability is stated consistently across public sales surfaces", () => {
+  const agentStore = readFileSync(join(process.cwd(), "app/agents/page.tsx"), "utf8")
+  const salesPage = readFileSync(join(process.cwd(), "app/agents/[slug]/page.tsx"), "utf8")
+  const salesLayout = readFileSync(join(process.cwd(), "app/agents/[slug]/layout.tsx"), "utf8")
+  const auditPage = readFileSync(join(process.cwd(), "app/quick-marketing-audit/page.tsx"), "utf8")
+
+  assert.match(agentStore, /Quick Marketing Audit[^.]*checkout is currently paused/i)
+  assert.match(salesPage, /Review current availability/)
+  assert.match(salesPage, /Purchase when available/)
+  assert.doesNotMatch(salesPage, /Start the \$49 order|Use the existing secure Quick Marketing Audit checkout/)
+  assert.doesNotMatch(salesLayout, /verified AMS purchase path/)
+  assert.match(auditPage, /Checkout is temporarily paused\./)
+})
