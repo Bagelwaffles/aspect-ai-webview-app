@@ -58,7 +58,7 @@ export default function OperationsReportingClient({ repoSha }: { repoSha: string
         </select>
       </label>
       <label>Minimized report JSON
-        <textarea rows={10} maxLength={16000} value={text} disabled={busy} onChange={event => { setText(event.target.value); setAttested(false) }} placeholder="Paste a version 1 report. Preserve its actual observation and source-run times. Do not include receivedAt." />
+        <textarea rows={10} maxLength={16000} value={text} disabled={busy} onChange={event => { setText(event.target.value); setAttested(false) }} placeholder="Paste a version 1 report or version 2 activity update. Preserve actual source times. Do not include receivedAt or host confirmation." />
       </label>
       <p>Source identity must be owner-reviewed-specialist:{specialistId}. Evidence URLs must be public HTTPS with no query (only recognized GitHub evidence anchors are accepted). No prompts, private outputs, task IDs, customer details, financial identifiers or credentials.</p>
       <label className={styles.attestation}><input type="checkbox" checked={attested} disabled={busy} onChange={event => setAttested(event.target.checked)} />I reviewed this source. The minimized report and links are public-only and contain no sensitive or customer data. This is a report, not authorization.</label>

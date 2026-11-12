@@ -4,25 +4,21 @@ import { MONITOR_DEFINITIONS, type getOperationsTelemetry } from "@/lib/server/o
 import OperationsReportingClient from "./OperationsReportingClient"
 import styles from "./operations-reporting.module.css"
 import Status from "./ReportingStatus"
+import OwnerActivityCenter from "./OwnerActivityCenter"
+import { projectOwnerActivity } from "@/lib/operations/owner-activity"
 
 type Operations = Awaited<ReturnType<typeof getOperationsTelemetry>>
 function time(value: string | null) { return value ? `${value.replace("T", " ").replace(".000Z", " UTC")}` : "Unknown" }
 export default function OperationsReporting({ data, repoSha }: { data: Operations; repoSha: string }) {
   const { snapshot, events } = data.monitoring
   const monitorRows = snapshot.data?.rows ?? MONITOR_DEFINITIONS.map(([key, name]) => ({ key, name, status: snapshot.state, observedAt: null, reportedStatus: null }))
-  const requests = data.specialists.filter(lane => lane.report?.approvalState === "requested")
-  const concerns = monitorRows.filter(row => ["attention", "blocked", "stale", "unavailable", "not_configured"].includes(row.status))
   return (
     <section className={styles.root} aria-labelledby="operations-heading">
       <header><p>PREVIEW · OWNER ONLY</p><h2 id="operations-heading">Operations reporting</h2>
         <p>Partially connected. Saved monitor evidence and owner-reviewed reports only. Automatic specialist transport and repair execution are not verified.</p>
         <p>Read attempted {time(data.checkedAt)} · No monitor run or outbound alert is triggered by this page.</p>
       </header>
-      <section aria-labelledby="attention-heading"><h3 id="attention-heading">Owner decisions and attention</h3>
-        {data.reports.state !== "available" ? <p>Decision source {data.reports.state}. Pending requests are unknown.</p> : null}
-        {requests.length ? <ul>{requests.map(lane => <li key={lane.specialistId}><a href={`#lane-${lane.specialistId}`}>{SPECIALISTS.find(source => source.id === lane.specialistId)?.name}</a>: {lane.report?.nextAction || "Owner review requested"}. {lane.freshness === "fresh" ? "Explicit request in latest imported report at this read; confirm before acting." : "Historical request; current need unconfirmed."} No approval granted.</li>)}</ul> : data.reports.state === "available" ? <p>No explicit requests in the successfully read report history. This is not proof that external approval queues are empty.</p> : null}
-        {concerns.length ? <p>{concerns.length} saved monitor sources need attention or freshness review below. A monitor warning is not an approval request.</p> : <p>Current incident absence is not established by this limited source set.</p>}
-      </section>
+      <OwnerActivityCenter model={projectOwnerActivity(data)} />
       <section aria-labelledby="specialists-heading"><h3 id="specialists-heading">Eight specialist reporting lanes</h3>
         <p>Report store: <Status value={data.reports.state} /> · Last read {time(data.reports.checkedAt)}. Receiving an old report never makes its evidence fresh. Costs are unknown unless separately measured; no zero-cost claim is inferred.</p>
         <div className={styles.grid}>{data.specialists.map(lane => {

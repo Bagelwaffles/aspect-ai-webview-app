@@ -1,0 +1,24 @@
+.center { display: grid; gap: 1.25rem; min-width: 0; overflow-wrap: anywhere; }
+.center h3, .center h4, .center h5, .center h6 { margin: 0 0 .75rem; }
+.center > section { min-width: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 1rem; }
+.card { min-width: 0; border: 1px solid #475569; border-radius: .75rem; padding: 1rem; background: #0b1220; }
+.card header { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem; justify-content: space-between; }
+.card h5 { min-width: 0; font-size: 1rem; }
+.permission h6 { font-size: .95rem; }
+.facts { display: grid; grid-template-columns: minmax(0, 1fr); gap: .25rem; margin: .75rem 0; }
+.facts dt { margin-top: .5rem; color: #aab7ca; font-size: .85rem; }
+.facts dd { margin: 0; min-width: 0; line-height: 1.5; }
+.badge { display: inline-block; max-width: 100%; border: 1px solid #64748b; border-radius: .5rem; padding: .25rem .5rem; font-size: .8rem; background: #1e293b; color: #e2e8f0; }
+.badge[data-state="COMPLETED"], .badge[data-state="NO_CHANGE"] { border-color: #34d399; }
+.badge[data-state="BLOCKED"], .badge[data-state="FAILED"], .badge[data-state="UNAVAILABLE"] { border-color: #f87171; }
+.badge[data-state="APPROVAL_UNKNOWN"], .badge[data-state="UNKNOWN"], .badge[data-state="STALE"] { border-color: #fbbf24; }
+.permission { margin: 1rem 0; padding: .75rem; border: 1px solid #64748b; border-radius: .5rem; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; min-width: 0; }
+.controls select, .center button { max-width: 100%; min-width: 0; min-height: 44px; border: 1px solid #64748b; border-radius: .5rem; background: #172554; color: #e5e7eb; padding: .65rem .8rem; font: inherit; white-space: normal; }
+.center button { cursor: pointer; }
+.timeline { margin: 1rem 0; padding-left: 1.25rem; }
+.timeline li { padding: .75rem 0; border-bottom: 1px solid #374151; }
+.center summary { min-height: 44px; cursor: pointer; }
+.center :focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
+@media (max-width: 480px) { .controls { align-items: stretch; flex-direction: column; } .controls select, .center button { width: 100%; } }

@@ -14,8 +14,45 @@ export const SPECIALISTS = [
 export type SpecialistId = typeof SPECIALISTS[number]["id"]
 export type ReportStatus = "healthy" | "attention" | "blocked" | "unknown" | "stale"
 export type ReportEvidence = { url: string; label: string; provenance: string }
+export const ACTIVITY_STATUSES = ["IN_PROGRESS", "COMPLETED", "BLOCKED", "AWAITING_OWNER", "APPROVAL_PENDING", "APPROVAL_UNKNOWN", "FAILED", "NO_CHANGE", "STALE", "UNAVAILABLE"] as const
+export type ActivityStatus = typeof ACTIVITY_STATUSES[number]
+export type ApprovalRequestReport = {
+  requestKey: string
+  requestedAt: string
+  requestedAction: string
+  capability: string
+  tool: string
+  site: string | null
+  targetEnvironment: "preview" | "production" | "external" | "unknown"
+  reason: string
+  riskImpact: string
+  dataExposure: string
+  duration: string
+  permissionType: "one_time" | "recurring"
+  /** An imported claim, never a confirmed host result or permission grant. */
+  reportedOutcome: "pending" | "unknown" | "approved" | "denied"
+}
+export type ActivityUpdate = {
+  /** Public-safe correlation label, not a private platform task or request ID. */
+  activityId: string
+  title: string
+  actor: string
+  taskStatus: ActivityStatus
+  startedAt: string | null
+  updatedAt: string
+  completedAt: string | null
+  nextCheckpoint: string
+  lastSuccessfulStep: string
+  result: string
+  blocker: string
+  recovery: string
+  changeSummary: string
+  ownerActionRequired: boolean
+  toolStatus: "NOT_REPORTED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "UNKNOWN"
+  approval: ApprovalRequestReport | null
+}
 export type ReportEnvelope = {
-  schemaVersion: 1
+  schemaVersion: 1 | 2
   reportId: string
   dedupeKey: string
   specialistId: SpecialistId
@@ -32,6 +69,8 @@ export type ReportEnvelope = {
   confidence: "low" | "medium" | "high"
   verification: "owner_attested" | "unverified"
   approvalState: "none" | "requested"
+  /** Version 2 only; validated as part of the same immutable report and store. */
+  activity?: ActivityUpdate
 }
 export type ReportInput = Omit<ReportEnvelope, "receivedAt">
 /** Supplied by trusted adapter configuration, never copied out of a report payload. */
@@ -90,11 +129,33 @@ function timestamp(value: unknown, now: number): value is string {
   const time = Date.parse(value)
   return Number.isFinite(time) && time <= now && new Date(time).toISOString() === value
 }
+const ACTIVITY_KEYS = ["activityId", "title", "actor", "taskStatus", "startedAt", "updatedAt", "completedAt", "nextCheckpoint", "lastSuccessfulStep", "result", "blocker", "recovery", "changeSummary", "ownerActionRequired", "toolStatus", "approval"]
+const APPROVAL_KEYS = ["requestKey", "requestedAt", "requestedAction", "capability", "tool", "site", "targetEnvironment", "reason", "riskImpact", "dataExposure", "duration", "permissionType", "reportedOutcome"]
+function validActivity(value: unknown, report: Record<string, unknown>, now: number): value is ActivityUpdate {
+  if (!object(value) || !exactKeys(value, ACTIVITY_KEYS) || !safeId(value.activityId) || !safeText(value.title, 120, true) || !safeText(value.actor, 80, true)) return false
+  if (!ACTIVITY_STATUSES.includes(value.taskStatus as ActivityStatus) || !timestamp(value.updatedAt, now) || Date.parse(value.updatedAt) > Date.parse(report.observedAt as string)) return false
+  for (const key of ["startedAt", "completedAt"]) if (value[key] !== null && (!timestamp(value[key], now) || Date.parse(value[key] as string) > Date.parse(value.updatedAt))) return false
+  if (value.startedAt && value.completedAt && Date.parse(value.startedAt as string) > Date.parse(value.completedAt as string)) return false
+  for (const key of ["nextCheckpoint", "lastSuccessfulStep", "result", "blocker", "recovery", "changeSummary"]) if (!safeText(value[key], 500)) return false
+  if (typeof value.ownerActionRequired !== "boolean" || !["NOT_REPORTED", "RUNNING", "SUCCEEDED", "FAILED", "UNKNOWN"].includes(value.toolStatus as string)) return false
+  const terminal = value.taskStatus === "COMPLETED" || value.taskStatus === "NO_CHANGE"
+  if (terminal && (!value.completedAt || !value.result || !value.changeSummary || report.verification !== "owner_attested" || !Array.isArray(report.evidence) || report.evidence.length === 0 || ["RUNNING", "FAILED", "UNKNOWN"].includes(value.toolStatus as string))) return false
+  if (!terminal && value.taskStatus !== "FAILED" && value.completedAt !== null) return false
+  if (value.taskStatus === "IN_PROGRESS" && !value.nextCheckpoint) return false
+  if (["BLOCKED", "FAILED"].includes(value.taskStatus as string) && (!value.blocker || !value.recovery)) return false
+  if (value.taskStatus === "AWAITING_OWNER" && (!value.ownerActionRequired || !value.nextCheckpoint)) return false
+  if (value.approval === null) return !["APPROVAL_PENDING", "APPROVAL_UNKNOWN"].includes(value.taskStatus as string)
+  const approval = value.approval
+  if (!object(approval) || !exactKeys(approval, APPROVAL_KEYS) || !safeId(approval.requestKey) || !timestamp(approval.requestedAt, now) || Date.parse(approval.requestedAt) > Date.parse(value.updatedAt)) return false
+  for (const key of ["requestedAction", "capability", "tool", "reason", "riskImpact", "dataExposure", "duration"]) if (!safeText(approval[key], 280, true)) return false
+  if (approval.site !== null && !isPublicEvidenceUrl(approval.site)) return false
+  return ["preview", "production", "external", "unknown"].includes(approval.targetEnvironment as string) && ["one_time", "recurring"].includes(approval.permissionType as string) && ["pending", "unknown", "approved", "denied"].includes(approval.reportedOutcome as string) && report.approvalState === "requested"
+}
 export function parseReport(input: unknown, binding: SourceBinding, now = new Date()): { ok: true; report: ReportEnvelope } | { ok: false; error: string } {
   const fail = (error: string) => ({ ok: false as const, error })
   if (!Number.isFinite(now.getTime())) return fail("Invalid server time")
-  if (!object(input) || !exactKeys(input, INPUT_KEYS)) return fail("Invalid report fields")
-  if (input.schemaVersion !== 1) return fail("Unsupported report version")
+  if (!object(input) || !exactKeys(input, input.schemaVersion === 2 ? [...INPUT_KEYS, "activity"] : INPUT_KEYS)) return fail("Invalid report fields")
+  if (input.schemaVersion !== 1 && input.schemaVersion !== 2) return fail("Unsupported report version")
   if (!SPECIALISTS.some(item => item.id === binding.specialistId) || input.specialistId !== binding.specialistId) return fail("Specialist binding mismatch")
   if (!object(input.sourceSystem) || !exactKeys(input.sourceSystem, ["id", "version"]) || !safeId(input.sourceSystem.id) || input.sourceSystem.id !== binding.sourceSystemId || !safeId(input.sourceSystem.version)) return fail("Source binding mismatch")
   if (!safeId(input.reportId) || !safeId(input.dedupeKey)) return fail("Invalid report identity")
@@ -102,12 +163,13 @@ export function parseReport(input: unknown, binding: SourceBinding, now = new Da
   if (typeof input.status !== "string" || !STATUSES.includes(input.status) || !["low", "medium", "high"].includes(input.confidence as string) || !["owner_attested", "unverified"].includes(input.verification as string) || !["none", "requested"].includes(input.approvalState as string)) return fail("Invalid reporting state")
   if (!safeText(input.summary, 500, true) || !safeText(input.currentWork, 500) || !safeText(input.blocker, 500) || !safeText(input.nextAction, 500)) return fail("Unsafe or oversized report text")
   if (!Array.isArray(input.evidence) || input.evidence.length > 5 || !input.evidence.every(item => object(item) && exactKeys(item, ["url", "label", "provenance"]) && isPublicEvidenceUrl(item.url) && safeText(item.label, 120, true) && safeText(item.provenance, 160, true))) return fail("Invalid public evidence")
+  if (input.schemaVersion === 2 && !validActivity(input.activity, input, now.getTime())) return fail("Invalid activity report")
   // Copy through serialization so callers cannot mutate a validated nested object afterward.
   return { ok: true, report: { ...JSON.parse(JSON.stringify(input)), receivedAt: now.toISOString() } as ReportEnvelope }
 }
 /** Stored receipt time remains immutable. Malformed storage must fail the entire read. */
 export function parseStoredReport(input: unknown, binding: SourceBinding, now = new Date()): { ok: true; report: ReportEnvelope } | { ok: false; error: string } {
-  if (!object(input) || !exactKeys(input, [...INPUT_KEYS, "receivedAt"]) || !timestamp(input.receivedAt, now.getTime())) return { ok: false, error: "Invalid stored receipt" }
+  if (!object(input) || !exactKeys(input, [...INPUT_KEYS, ...(input.schemaVersion === 2 ? ["activity"] : []), "receivedAt"]) || !timestamp(input.receivedAt, now.getTime())) return { ok: false, error: "Invalid stored receipt" }
   const { receivedAt, ...payload } = input
   return parseReport(payload, binding, new Date(receivedAt))
 }
