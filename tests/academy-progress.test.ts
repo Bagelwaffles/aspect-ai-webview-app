@@ -105,7 +105,7 @@ test("Academy never falls back to shared AMS or Production Redis configuration",
     }),
     null,
   )
-  assert.equal(
+  assert.deepEqual(
     resolveAcademyRedisConfig({
       AMS_ACADEMY_REDIS_REST_URL: "https://academy-preview.example.com",
       AMS_ACADEMY_REDIS_REST_TOKEN: "preview-only-placeholder",
