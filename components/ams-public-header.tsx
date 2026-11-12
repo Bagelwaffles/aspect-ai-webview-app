@@ -11,6 +11,7 @@ export function AmsPublicHeader() {
 
         <nav className="ams-public-nav" aria-label="Primary navigation">
           <Link href="/agents">Agents</Link>
+          <Link href="/#how-it-works">How it works</Link>
           <Link href="/creators">Creators</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/quick-marketing-audit">Marketing Audit</Link>
@@ -21,6 +22,7 @@ export function AmsPublicHeader() {
           <summary aria-label="Open site navigation">Menu</summary>
           <nav className="ams-public-mobile-nav__panel" aria-label="Mobile navigation">
             <Link href="/agents">Explore agents</Link>
+            <Link href="/#how-it-works">How it works</Link>
             <Link href="/creators">Creator OS</Link>
             <Link href="/pricing">Pricing and plans</Link>
             <Link href="/quick-marketing-audit">Quick Marketing Audit</Link>

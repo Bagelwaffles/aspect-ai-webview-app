@@ -183,6 +183,10 @@
   --ams-public-lime: #c9ff3d;
   --ams-public-cyan: #63dcff;
   --ams-public-violet: #8f7cff;
+  --ams-public-content-width: 1180px;
+  --ams-public-radius-card: 1.5rem;
+  --ams-public-radius-control: 999px;
+  --ams-public-focus: #c9ff3d;
   min-height: 100vh;
   color: var(--ams-public-text);
   background:
@@ -492,5 +496,17 @@
     scroll-behavior: auto !important;
     transition-duration: .01ms !important;
     animation-duration: .01ms !important;
+  }
+}
+
+
+/* Shared public-site interaction and reading rhythm. */
+.ams-public-page :where(h1, h2, h3) { text-wrap: balance; }
+.ams-public-page :where(p, li) { text-wrap: pretty; }
+.ams-public-page :where(a, button, input, select, textarea, summary):focus-visible { outline: 2px solid var(--ams-public-focus); outline-offset: 4px; }
+.ams-public-page :where(section, [id]) { scroll-margin-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  .ams-public-page *, .ams-public-page *::before, .ams-public-page *::after {
+    scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important;
   }
 }

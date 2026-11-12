@@ -10,7 +10,7 @@
   --blue: var(--ams-public-cyan, #63dcff);
   --orange: #ff9a72;
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow-x: clip;
   background:
     linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px),
