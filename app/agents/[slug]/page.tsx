@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const offer = getAgentSalesOffer(agent)
   return {
     title: `${agent.name} | Aspect Marketing Solutions`,
-    description: `${agent.description} ${offer.price}. Review availability, current capabilities, and the verified AMS purchase path.`,
+    description: `${agent.description} ${offer.price}. Review current availability and verified capabilities.`,
   }
 }
 
@@ -41,9 +41,9 @@ function salesSteps(mode: ReturnType<typeof getAgentSalesOffer>["mode"]) {
 
   if (mode === "one-time") {
     return [
-      ["1", "Start the $49 order", "Use the existing secure Quick Marketing Audit checkout."],
-      ["2", "Submit business context", "AMS uses the supplied business inputs to create the focused audit and action plan."],
-      ["3", "Receive the result", "The native AMS fulfillment path stores and serves the customer result without changing subscription credits."],
+      ["1", "Review current availability", "The $49 one-time offer is listed, but checkout is currently paused while fulfillment is re-verified."],
+      ["2", "Review the deliverables", "See the five marketing problems, five fixes, improved headline and offer, promotional post, and seven-day action plan included in the offer."],
+      ["3", "Purchase when available", "A purchase path will be presented only after the checkout and fulfillment launch gate is reopened and verified."],
     ]
   }
 
@@ -161,7 +161,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
             </p>
             <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Understand this AMS agent.</h2>
             <p className="leading-7 text-muted-foreground">
-              Review its capabilities, current release status, and verified-first purchase path before choosing a product.
+              Review its capabilities, current release status, and current availability before choosing a product.
             </p>
           </div>
           {offer.videoEmbedUrl ? (
@@ -299,7 +299,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
       <section className="border-t border-border/70 bg-primary/5 px-5 py-14 sm:px-8 lg:py-20">
         <div className="mx-auto flex max-w-6xl flex-col justify-between gap-6 lg:flex-row lg:items-center">
           <div className="max-w-3xl space-y-2">
-            <h2 className="text-3xl font-black tracking-tight sm:text-4xl">{offer.mode === "roadmap" ? "Buy what is ready today." : `Ready for ${agent.name}?`}</h2>
+            <h2 className="text-3xl font-black tracking-tight sm:text-4xl">{offer.mode === "roadmap" ? "Buy what is ready today." : offer.mode === "one-time" ? "Review the Quick Marketing Audit." : `Ready for ${agent.name}?`}</h2>
             <p className="leading-7 text-muted-foreground">{offer.detail}</p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-3">
