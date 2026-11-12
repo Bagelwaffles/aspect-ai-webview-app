@@ -1,14 +1,14 @@
 .network {
-  --ink: #090a0b;
-  --panel: #111315;
-  --panel-2: #15181b;
-  --line: rgba(255, 255, 255, 0.13);
-  --muted: #9ca0a5;
-  --paper: #f2f0e8;
-  --lime: #c9ff3d;
-  --violet: #8d63ff;
-  --blue: #64b5ff;
-  --orange: #ff7048;
+  --ink: var(--ams-public-bg, #060a12);
+  --panel: var(--ams-public-surface, #111827);
+  --panel-2: rgba(255,255,255,.055);
+  --line: var(--ams-public-line, rgba(255, 255, 255, 0.13));
+  --muted: var(--ams-public-muted, #a9b2c3);
+  --paper: var(--ams-public-text, #f6f8fb);
+  --lime: var(--ams-public-lime, #c9ff3d);
+  --violet: var(--ams-public-violet, #8f7cff);
+  --blue: var(--ams-public-cyan, #63dcff);
+  --orange: #ff9a72;
   min-height: 100vh;
   overflow-x: hidden;
   background:

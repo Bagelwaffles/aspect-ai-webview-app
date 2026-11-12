@@ -1,16 +1,16 @@
 .site {
-  --bg: #060a12;
-  --surface: rgba(14, 21, 34, 0.78);
+  --bg: var(--ams-public-bg, #060a12);
+  --surface: var(--ams-public-surface, rgba(14, 21, 34, 0.78));
   --surface-strong: rgba(14, 21, 34, 0.96);
-  --surface-soft: rgba(255, 255, 255, 0.045);
-  --line: rgba(255, 255, 255, 0.1);
-  --line-strong: rgba(255, 255, 255, 0.17);
-  --text: #f6f8fb;
-  --muted: #a9b2c3;
-  --subtle: #6f7a8d;
-  --lime: #c9ff3d;
-  --cyan: #63dcff;
-  --violet: #8f7cff;
+  --surface-soft: var(--ams-public-surface-soft, rgba(255, 255, 255, 0.045));
+  --line: var(--ams-public-line, rgba(255, 255, 255, 0.1));
+  --line-strong: var(--ams-public-line-strong, rgba(255, 255, 255, 0.17));
+  --text: var(--ams-public-text, #f6f8fb);
+  --muted: var(--ams-public-muted, #a9b2c3);
+  --subtle: var(--ams-public-subtle, #6f7a8d);
+  --lime: var(--ams-public-lime, #c9ff3d);
+  --cyan: var(--ams-public-cyan, #63dcff);
+  --violet: var(--ams-public-violet, #8f7cff);
   --shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
 
   position: relative;
