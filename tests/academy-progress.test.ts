@@ -5,6 +5,7 @@ import { academyLessons, isAcademyLessonId } from "../lib/academy/catalog"
 import { customerSubjectFromProviderSubject } from "../lib/auth"
 import {
   academyProgressKey,
+  resolveAcademyRedisConfig,
   getAcademyCompletedLessons,
   markAcademyLessonComplete,
 } from "../lib/server/academy-progress"
@@ -90,5 +91,36 @@ test("missing persistence fails closed rather than faking a successful lesson", 
   await assert.rejects(
     () => markAcademyLessonComplete(subject, academyLessons[0].id, { redis: null }),
     /ACADEMY_PROGRESS_STORE_UNAVAILABLE/,
+  )
+})
+
+test("Academy never falls back to shared AMS or Production Redis configuration", () => {
+  assert.equal(resolveAcademyRedisConfig({}), null)
+  assert.equal(
+    resolveAcademyRedisConfig({
+      UPSTASH_REDIS_REST_URL: "https://production-redis.example.com",
+      UPSTASH_REDIS_REST_TOKEN: "production-token-placeholder",
+      KV_REST_API_URL: "https://other-app.example.com",
+      KV_REST_API_TOKEN: "other-token-placeholder",
+    }),
+    null,
+  )
+  assert.equal(
+    resolveAcademyRedisConfig({
+      AMS_ACADEMY_REDIS_REST_URL: "https://academy-preview.example.com",
+      AMS_ACADEMY_REDIS_REST_TOKEN: "preview-only-placeholder",
+      UPSTASH_REDIS_REST_URL: "https://production-redis.example.com",
+      UPSTASH_REDIS_REST_TOKEN: "production-token-placeholder",
+    }),
+    {
+      url: "https://academy-preview.example.com",
+      token: "preview-only-placeholder",
+    },
+  )
+  assert.equal(
+    resolveAcademyRedisConfig({
+      AMS_ACADEMY_REDIS_REST_URL: "https://academy-preview.example.com",
+    }),
+    null,
   )
 })
