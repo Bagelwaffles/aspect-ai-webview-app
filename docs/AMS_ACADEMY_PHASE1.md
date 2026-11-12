@@ -20,7 +20,7 @@ The deployed frontend stores training state using browser `localStorage` (`smoky
 - `lib/server/academy-progress.ts`: idempotent Redis set of completed curriculum IDs, keyed by a SHA-256 hash of the stable Google customer subject, not email; no shared student reads.
 - `app/academy/page.tsx`: signed-in, no-index learning interface with server actions and explicit self-reported completion.
 - `tests/academy-progress.test.ts`: isolated unit tests for valid lessons, per-customer separation, idempotence, stale-data filtering, and fail-closed missing Redis.
-- Reuses existing NextAuth and existing `UPSTASH_REDIS_REST_*` / `KV_REST_API_*` configuration conventions. No schema, external database, dependencies, billing, or AI usage added.
+- Reuses existing NextAuth. Progress requires **dedicated** `AMS_ACADEMY_REDIS_REST_URL` / `AMS_ACADEMY_REDIS_REST_TOKEN` configuration; explicitly refuses shared `UPSTASH_REDIS_REST_*` and `KV_REST_API_*` fallback. No schema, external database, dependencies, billing, or AI usage added.
 
 ## Safety gates
 
@@ -30,6 +30,15 @@ The deployed frontend stores training state using browser `localStorage` (`smoky
 4. Do not enable the Preview flag until Preview OAuth origin/callback and a **positively identified Preview-only datastore** are verified. Never point at AMS Production Redis or a datastore reserved for unrelated previews.
 5. Do not introduce unannounced monitoring of Stream Lab. Future student activity reporting must be transparent, permission-scoped, and based on authenticated server records.
 6. Never merge or expose paid enrollment, public student accounts, live prices, invoices, emails, AI model calls, or publishing as part of this draft.
+
+## November 12 no-cost datastore approval / provider findings
+
+- Owner approved a separate Academy Preview datastore, while retaining no-billing/no-Production boundaries.
+- Attempted explicit **Upstash Free** creation (`plan=free`) in the authorized account. Provider returned **HTTP 400: "free plan is not available for this account"**. No new Upstash database was created, no pay-as-you-go fallback was attempted and no billing terms changed.
+- Read-only Upstash inventory confirms four **paid / assigned** preview databases, all for other held work. Do not reuse them.
+- Aiven Free Valkey is advertised at $0 but restricted to one free service of a given type per organization. The existing AMS Gmail-monitoring Valkey is reserved; Aiven connector inventory attempts returned internal errors, so separate no-cost entitlement cannot be proven. Do not repurpose that service.
+- Remaining blocker: identify a **newly approved, nonbillable, distinct Academy database** before setting Preview secrets or enabling real progress.
+- Academy code now cannot silently use the existing generic AMS Redis/KV variables. Feature flag stays OFF, and no Preview environment values have been set by this work.
 
 ## Acceptance checklist (NOT yet completed)
 
