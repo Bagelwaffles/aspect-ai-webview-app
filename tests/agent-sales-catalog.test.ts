@@ -44,6 +44,24 @@ test("the seven verified shared-credit agents sell only through existing subscri
   }
 })
 
+test("subscription offers distinguish verified capability from ability to buy today", () => {
+  for (const included of SUBSCRIPTION_INCLUDED_AGENTS) {
+    const agent = agents.find((candidate) => candidate.slug === included.slug)
+    assert.ok(agent)
+    const paused = getAgentSalesOffer(agent, false)
+    assert.equal(paused.label, "Production-verified; checkout paused")
+    assert.equal(paused.primaryLabel, "View plan availability")
+    assert.match(paused.detail, /no new subscription payment can start/i)
+    assert.doesNotMatch(paused.primaryLabel, /buy|choose|checkout/i)
+    const live = getAgentSalesOffer(agent, true)
+    assert.equal(live.label, "Available now")
+    assert.equal(live.primaryLabel, "Choose an AMS plan")
+    assert.equal(live.primaryHref, paused.primaryHref)
+    assert.equal(live.price, paused.price)
+    assert.equal(live.secondaryHref, paused.secondaryHref)
+  }
+})
+
 test("the seven verified Live agents use matching accessible WebP artwork", () => {
   for (const included of SUBSCRIPTION_INCLUDED_AGENTS) {
     const agent = agents.find((candidate) => candidate.slug === included.slug)

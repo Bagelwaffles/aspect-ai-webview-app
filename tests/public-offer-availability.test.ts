@@ -5,6 +5,7 @@ import test from "node:test"
 const read = (file: string) => readFileSync(file, "utf8")
 const audit = read("app/quick-marketing-audit/page.tsx")
 const contact = read("app/contact/page.tsx")
+const pricing = read("app/pricing/page.tsx")
 
 test("audit and contact describe a paused offer without immediate-purchase claims", () => {
   for (const page of [audit, contact]) {
@@ -26,6 +27,22 @@ test("presentation retains runtime-gated checkout and canonical offer facts", ()
   assert.match(audit, /QUICK_MARKETING_AUDIT\.priceLabel/)
   assert.match(audit, /QUICK_MARKETING_AUDIT\.deliveryWindow/)
   assert.match(contact, /\$49 Quick Marketing Audit/)
+})
+
+test("Pricing matches audit checkout readiness rather than promising a paused purchase", () => {
+  assert.match(pricing, /const auditCheckoutReady = await isQuickAuditRuntimeLaunchEnabled\(\)/)
+  assert.match(pricing, /export const dynamic = "force-dynamic"/)
+  assert.match(pricing, /auditCheckoutReady \? "Get the \$49 Audit" : "Check audit availability"/)
+  assert.match(pricing, /auditCheckoutReady \? "Buy the \$49 Audit" : "Check audit availability"/)
+  assert.match(pricing, /checkout is currently paused while fulfillment is re-verified/i)
+  assert.match(pricing, /no payment is accepted until verification is complete/i)
+  assert.doesNotMatch(pricing, /Quick Marketing Audit remains available|Not ready for a subscription\? Start with the \$49 Audit/)
+  const meta = pricing.slice(pricing.indexOf("export const metadata"), pricing.indexOf("export default"))
+  assert.match(meta, /review current checkout availability before purchase/i)
+  assert.doesNotMatch(meta, /buy now|available today|checkout open/i)
+  assert.match(pricing, /QUICK_MARKETING_AUDIT\.priceLabel/)
+  assert.match(pricing, /QUICK_MARKETING_AUDIT\.deliveryWindow/)
+  assert.match(pricing, /QUICK_MARKETING_AUDIT\.deliverables\.join/)
 })
 
 test("shared footer retains scoped 44 by 44 targets and wrapping", () => {

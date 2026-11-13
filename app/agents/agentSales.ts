@@ -26,7 +26,10 @@ export function isSubscriptionAgent(agent: Agent) {
   return subscriptionSlugs.has(agent.slug as (typeof SUBSCRIPTION_INCLUDED_AGENTS)[number]["slug"])
 }
 
-export function getAgentSalesOffer(agent: Agent): AgentSalesOffer {
+export function getAgentSalesOffer(
+  agent: Agent,
+  subscriptionCheckoutLive = process.env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE?.trim().toLowerCase() === "true",
+): AgentSalesOffer {
   const video = {
     videoEmbedUrl: AMS_AGENT_SALES_VIDEO_EMBED_URL,
     videoTitle: `AMS sales overview on the ${agent.name} sales page`,
@@ -35,10 +38,12 @@ export function getAgentSalesOffer(agent: Agent): AgentSalesOffer {
   if (isSubscriptionAgent(agent)) {
     return {
       mode: "subscription",
-      label: "Available now",
+      label: subscriptionCheckoutLive ? "Available now" : "Production-verified; checkout paused",
       price: "From $29/month",
-      detail: "Included in every AMS shared-credit subscription plan. One completed generation uses one shared plan credit.",
-      primaryLabel: "Choose an AMS plan",
+      detail: subscriptionCheckoutLive
+        ? "Included in every AMS shared-credit subscription plan. One completed generation uses one shared plan credit."
+        : "This agent is production-verified, but subscription checkout is currently paused. Plan pricing is shown for reference; no new subscription payment can start here.",
+      primaryLabel: subscriptionCheckoutLive ? "Choose an AMS plan" : "View plan availability",
       primaryHref: "/pricing#plans",
       secondaryLabel: "Open this agent",
       secondaryHref: agent.launchHref,
