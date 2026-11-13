@@ -10,6 +10,7 @@ import styles from "./agents.module.css"
 
 import { agents, agentStatusCounts, statusMeta, type AgentStatus } from "./agentCatalog"
 import { getAgentSalesOffer } from "./agentSales"
+import { selectCatalogAgents } from "./catalog-view"
 
 const categoryOptions = [
   "All",
@@ -34,7 +35,7 @@ const subscriptionCheckoutLive =
 
 const operatingSteps = [
   ["01", "Choose the business job", "Start with the outcome you need: content, lead generation support, email sequences, SEO, product packaging, analytics, or another scoped workflow."],
-  ["02", "Check availability before buying", subscriptionCheckoutLive ? "Live agents can be purchased through the existing AMS subscription. The $49 Marketing Audit uses its existing one-time checkout. Beta and roadmap agents are clearly labeled and are not sold as finished products." : "Seven agents remain production-verified Live, but subscription checkout is temporarily paused in zero-cost mode. The $49 Marketing Audit remains the active paid starting point. Beta and roadmap agents are clearly labeled and are not sold as finished products."],
+  ["02", "Check availability before buying", subscriptionCheckoutLive ? "Live agents are included in the existing AMS subscription offer when subscription checkout is available. The $49 Quick Marketing Audit is a separate one-time offer; its checkout is currently paused while fulfillment is re-verified. Beta and roadmap agents are clearly labeled and are not sold as finished products." : "Seven agents remain production-verified Live, but subscription checkout is temporarily paused in zero-cost mode. The $49 Quick Marketing Audit is a separate one-time offer, but its checkout is also currently paused while fulfillment is re-verified. Beta and roadmap agents are clearly labeled and are not sold as finished products."],
   ["03", "Keep humans in control", "Sensitive actions, publishing, credentials, payments, and privileged system changes stay behind explicit authorization and verification boundaries."],
   ["04", "Expand as agents graduate", "AMS can add newly verified agents to the commercial catalog only after their production path, controls, and customer experience are proven."],
 ]
@@ -42,22 +43,19 @@ const operatingSteps = [
 export default function AgentsPage() {
   const [category, setCategory] = useState<CategoryFilter>("All")
   const [status, setStatus] = useState<StatusFilter>("All")
+  const [showRoadmap, setShowRoadmap] = useState(false)
 
   const filteredAgents = useMemo(
-    () =>
-      agents.filter((agent) => {
-        const categoryMatch = category === "All" || agent.category === category
-        const statusMatch = status === "All" || agent.status === status
-        return categoryMatch && statusMatch
-      }),
-    [category, status],
+    () => selectCatalogAgents(category, status, showRoadmap),
+    [category, status, showRoadmap],
   )
 
   const counts = agentStatusCounts
 
   return (
-    <main className={`${styles.network} ams-public-page`}>
+    <div className={`${styles.network} ams-public-page`}>
       <AmsPublicHeader />
+      <main id="main-content" tabIndex={-1}>
       
 
       <section className={styles.hero}>
@@ -67,9 +65,9 @@ export default function AgentsPage() {
           <div className={styles.heroCopy}>
             <p>
               {subscriptionCheckoutLive ? (
-                <>Browse the complete AMS catalog, open a dedicated sales page for every agent, and buy the capabilities that are actually available today. Seven verified Live agents are included in AMS subscriptions starting at $29/month. The Quick Marketing Audit remains a separate $49 one-time service. Everything else stays visible as Beta, Setup Required, Planned, or Blocked so you can see what is coming without being sold vaporware.</>
+                <>Browse the complete AMS catalog, open a dedicated sales page for every agent, and buy the capabilities that are actually available today. Seven verified Live agents are included in AMS subscriptions starting at $29/month. The Quick Marketing Audit is a separate $49 one-time offer; its checkout is currently paused while fulfillment is re-verified. Everything else stays visible as Beta, Setup Required, Planned, or Blocked so you can see what is coming without being sold vaporware.</>
               ) : (
-                <>Browse the complete AMS catalog and review the capabilities already proven in production. Seven agents remain verified Live, but subscription checkout and paid AI execution are temporarily paused in zero-cost mode. The Quick Marketing Audit remains the active $49 paid starting point. Everything else stays visible as Beta, Setup Required, Planned, or Blocked.</>
+                <>Browse the complete AMS catalog and review the capabilities already proven in production. Seven agents remain verified Live, but subscription checkout and paid AI execution are temporarily paused in zero-cost mode. The Quick Marketing Audit is a separate $49 one-time offer, but checkout is currently paused while fulfillment is re-verified. Everything else stays visible as Beta, Setup Required, Planned, or Blocked.</>
               )}
             </p>
             <div className={styles.heroActions}>
@@ -99,7 +97,7 @@ export default function AgentsPage() {
               {subscriptionCheckoutLive ? "Content, lead magnets, email campaigns, nurture, outreach, SEO, and product creation are already included in AMS subscriptions. Explore every Live agent below or compare plans to put the full team to work." : "Content, lead magnets, email campaigns, nurture, outreach, SEO, and product creation have production-verified paths. Subscription checkout is temporarily paused; explore the agents now and keep pricing visible for reactivation."}
             </p>
             <div className={styles.heroActions}>
-              <a className={styles.primary} href="#catalog">Explore all 33 agents <span>↓</span></a>
+              <a className={styles.primary} href="#catalog">Explore the catalog <span>↓</span></a>
               <Link className={styles.secondary} href="/pricing#plans">{subscriptionCheckoutLive ? "Get 7 Live agents" : "View pricing + pause status"} <span>↗</span></Link>
             </div>
           </div>
@@ -124,6 +122,7 @@ export default function AgentsPage() {
                   className={`${styles.filter} ${category === option ? styles.filterActive : ""}`}
                   key={option}
                   type="button"
+                  aria-pressed={category === option}
                   onClick={() => setCategory(option)}
                 >
                   {option}
@@ -139,6 +138,7 @@ export default function AgentsPage() {
                   className={`${styles.filter} ${status === option ? styles.filterActive : ""}`}
                   key={option}
                   type="button"
+                  aria-pressed={status === option}
                   onClick={() => setStatus(option)}
                 >
                   {option === "All" ? "All statuses" : statusMeta[option].label}
@@ -148,10 +148,26 @@ export default function AgentsPage() {
           </div>
         </div>
 
-        <div className={styles.catalogHeading}>
+        <div className={styles.catalogScope}>
+          <p>
+            {status !== "All" ? `Filtered to ${statusMeta[status].label} capabilities.` : showRoadmap
+              ? "Full roadmap view: Live, Beta, Setup Required, Planned, and Blocked capabilities."
+              : "Showing production-verified Live agents first. The full roadmap remains available whenever you want it."}
+          </p>
+          <button
+            className={`${styles.filter} ${showRoadmap ? styles.filterActive : ""}`}
+            type="button"
+            aria-expanded={showRoadmap}
+            onClick={() => { setShowRoadmap((current) => !current); setStatus("All"); setCategory("All") }}
+          >
+            {showRoadmap ? "Show Live agents only" : `Show full ${agents.length}-agent roadmap`}
+          </button>
+        </div>
+
+        <div className={styles.catalogHeading} aria-live="polite" aria-atomic="true">
           <div>
-            <p className={styles.kicker}>Sales catalog</p>
-            <h2>{filteredAgents.length} agents in view.</h2>
+            <p className={styles.kicker}>{status !== "All" ? statusMeta[status].label : showRoadmap ? "Full catalog" : "Available now"}</p>
+            <h2>{filteredAgents.length} {status !== "All" ? `${statusMeta[status].label} agents in view.` : showRoadmap ? "agents in view." : "Live agents in view."}</h2>
           </div>
           <p>
             Every card shows the real commercial state. “Available now” routes to an existing purchase path. Beta and roadmap agents stay visible for comparison,
@@ -283,7 +299,8 @@ export default function AgentsPage() {
       </section>
 
       
-          <AmsPublicFooter />
-</main>
+          </main>
+      <AmsPublicFooter />
+</div>
   )
 }

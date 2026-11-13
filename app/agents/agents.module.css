@@ -1,16 +1,16 @@
 .network {
-  --ink: #090a0b;
-  --panel: #111315;
-  --panel-2: #15181b;
-  --line: rgba(255, 255, 255, 0.13);
-  --muted: #9ca0a5;
-  --paper: #f2f0e8;
-  --lime: #c9ff3d;
-  --violet: #8d63ff;
-  --blue: #64b5ff;
-  --orange: #ff7048;
+  --ink: var(--ams-public-bg, #060a12);
+  --panel: var(--ams-public-surface, #111827);
+  --panel-2: rgba(255,255,255,.055);
+  --line: var(--ams-public-line, rgba(255, 255, 255, 0.13));
+  --muted: var(--ams-public-muted, #a9b2c3);
+  --paper: var(--ams-public-text, #f6f8fb);
+  --lime: var(--ams-public-lime, #c9ff3d);
+  --violet: var(--ams-public-violet, #8f7cff);
+  --blue: var(--ams-public-cyan, #63dcff);
+  --orange: #ff9a72;
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow-x: clip;
   background:
     linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px),
@@ -99,7 +99,8 @@
 .lifeCard[data-status="live"] .lifePill { color: #9bf8ba; }
 .lifeCard[data-status="beta"] .lifePill { color: var(--blue); }
 .lifeCard[data-status="development"] .lifePill { color: #b19aff; }
-.lifeCard[data-status="soon"] .lifePill { color: #ffb66b; }\n.lifeCard[data-status="blocked"] .lifePill { color: #ff6b6b; }
+.lifeCard[data-status="soon"] .lifePill { color: #ffb66b; }
+.lifeCard[data-status="blocked"] .lifePill { color: #ff6b6b; }
 .lifeCard h3 { margin: 42px 0 12px; font-size: 23px; letter-spacing: -.035em; }
 .lifeCard p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.68; }
 
@@ -125,7 +126,8 @@
 .badge[data-status="live"] { color: #9bf8ba; }
 .badge[data-status="beta"] { color: var(--blue); }
 .badge[data-status="development"] { color: #b19aff; }
-.badge[data-status="soon"] { color: #ffb66b; }\n.badge[data-status="blocked"] { color: #ff6b6b; }
+.badge[data-status="soon"] { color: #ffb66b; }
+.badge[data-status="blocked"] { color: #ff6b6b; }
 .internal { color: #9ca0a5; }
 .glyph { position: relative; display: grid; width: 82px; height: 82px; margin: 48px auto 42px; place-items: center; transform: rotate(45deg); color: var(--lime); }
 .glyph i { position: absolute; border: 1px solid currentColor; }
@@ -136,7 +138,8 @@
 .cardArtwork img { object-fit: cover; }
 .card[data-status="beta"] .glyph { color: var(--blue); }
 .card[data-status="development"] .glyph { color: var(--violet); }
-.card[data-status="soon"] .glyph { color: var(--orange); }\n.card[data-status="blocked"] .glyph { color: #ff6b6b; }
+.card[data-status="soon"] .glyph { color: var(--orange); }
+.card[data-status="blocked"] .glyph { color: #ff6b6b; }
 .card h3 { margin: 0; font-size: 24px; line-height: 1.08; letter-spacing: -.04em; }
 .category { margin: 10px 0 13px; color: var(--lime); font: 800 9px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing: .14em; text-transform: uppercase; }
 .description { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
@@ -147,7 +150,8 @@
 .statusDot { width: 7px; height: 7px; margin-top: 4px; flex: 0 0 auto; border-radius: 50%; background: var(--lime); }
 .card[data-status="beta"] .statusDot { background: var(--blue); }
 .card[data-status="development"] .statusDot { background: var(--violet); }
-.card[data-status="soon"] .statusDot { background: var(--orange); }\n.card[data-status="blocked"] .statusDot { background: #ff6b6b; }
+.card[data-status="soon"] .statusDot { background: var(--orange); }
+.card[data-status="blocked"] .statusDot { background: #ff6b6b; }
 .cardLink { display: flex; align-items: center; justify-content: space-between; margin-top: 13px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,.08); font: 800 9px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing: .09em; text-transform: uppercase; }
 .cardLink:hover { color: var(--lime); }
 .empty { padding: 65px 24px; border: 1px dashed var(--line); color: var(--muted); text-align: center; }
@@ -310,4 +314,29 @@
   background:
     radial-gradient(circle at 16% 0%,rgba(201,255,61,.08),transparent 28rem),
     rgba(14,21,34,.86);
+}
+
+/* Progressive disclosure keeps purchasable agents easy to find without hiding the roadmap. */
+.catalogScope {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 24px 0 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(14, 21, 34, .62);
+}
+.catalogScope p {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.catalogScope button { flex: 0 0 auto; }
+@media (max-width: 680px) {
+  .catalogScope { align-items: stretch; flex-direction: column; }
+  .catalogScope button { width: 100%; }
 }

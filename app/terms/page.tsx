@@ -11,9 +11,9 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <>
+    <div className="ams-public-page">
       <AmsPublicHeader />
-      <main className="ams-public-page mx-auto min-h-screen max-w-3xl px-6 py-10">
+      <main id="main-content" tabIndex={-1} className="mx-auto min-h-screen max-w-3xl px-6 py-10">
       <h1 className="text-3xl font-bold">Terms of Service</h1>
       <p className="mt-3 text-sm text-muted-foreground">Effective September 3, 2026</p>
 
@@ -69,7 +69,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-foreground">6. Refunds and failed fulfillment</h2>
+          <h2 id="refunds" className="text-xl font-semibold text-foreground">6. Refunds and failed fulfillment</h2>
           <p className="mt-2">
             Refund eligibility depends on the purchased service and applicable law. If an automated
             fulfillment attempt fails before the purchased service is delivered, AMS may retry,
@@ -131,6 +131,6 @@ export default function TermsPage() {
       </div>
     </main>
       <AmsPublicFooter />
-    </>
+    </div>
   )
 }

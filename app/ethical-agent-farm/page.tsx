@@ -20,9 +20,9 @@ const requestOnlyOffers = ETHICAL_OFFERS.filter((offer) => offer.billingLabel ==
 
 export default function EthicalAgentFarmPage() {
   return (
-    <>
+    <div className="ams-public-page">
       <AmsPublicHeader />
-      <main className="ams-public-page min-h-screen bg-background px-6 py-10">
+      <main id="main-content" tabIndex={-1} className="min-h-screen bg-background px-6 py-10">
       <div className="mx-auto max-w-6xl space-y-10">
         <section className="grid gap-6 lg:grid-cols-[1.4fr_0.9fr]">
           <div className="space-y-4">
@@ -203,6 +203,6 @@ export default function EthicalAgentFarmPage() {
       </div>
     </main>
       <AmsPublicFooter />
-    </>
+    </div>
   )
 }

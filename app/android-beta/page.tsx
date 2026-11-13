@@ -29,9 +29,9 @@ export default function AndroidBetaPage() {
   const closedTestUrl = process.env.AMS_ANDROID_CLOSED_TEST_URL?.trim() || null
 
   return (
-    <>
+    <div className="ams-public-page">
       <AmsPublicHeader />
-      <main className="ams-public-page ams-public-page min-h-screen bg-background px-5 py-10 sm:px-8 lg:py-16">
+      <main id="main-content" tabIndex={-1} className="min-h-screen bg-background px-5 py-10 sm:px-8 lg:py-16">
       <div className="mx-auto max-w-6xl space-y-12">
         <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div className="space-y-5">
@@ -139,6 +139,6 @@ export default function AndroidBetaPage() {
       </div>
     </main>
       <AmsPublicFooter />
-    </>
+    </div>
   )
 }

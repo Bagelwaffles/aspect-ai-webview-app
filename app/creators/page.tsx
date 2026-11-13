@@ -227,9 +227,9 @@ const pilotPrinciples = [
 
 export default function CreatorsPage() {
   return (
-    <>
+    <div className="ams-public-page">
       <AmsPublicHeader />
-      <main className="ams-public-page ams-public-page min-h-screen bg-background text-foreground">
+      <main id="main-content" tabIndex={-1} className="min-h-screen bg-background text-foreground">
       
 
       <section className="border-b border-border/70 px-5 py-16 sm:px-8 lg:py-24">
@@ -417,6 +417,6 @@ export default function CreatorsPage() {
       </section>
     </main>
       <AmsPublicFooter />
-    </>
+    </div>
   )
 }

@@ -11,23 +11,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 export const metadata: Metadata = {
   title: "Start with AMS | Aspect Marketing Solutions",
   description:
-    "Choose the fastest verified way to start with Aspect Marketing Solutions: the $49 Quick Marketing Audit, seven Live AI agents, or the AMS Agent Store.",
+    "Review AMS offers and availability. The $49 Quick Marketing Audit checkout is currently paused while fulfillment is re-verified; no payment is accepted until verification is complete.",
 }
 
 export default function ContactPage() {
   return (
-    <>
+    <div className="ams-public-page">
       <AmsPublicHeader />
-      <main className="ams-public-page ams-public-page min-h-screen bg-background px-5 py-12 sm:px-8 lg:py-20">
+      <main id="main-content" tabIndex={-1} className="min-h-screen bg-background px-5 py-12 sm:px-8 lg:py-20">
       <div className="mx-auto max-w-5xl space-y-8">
         <div className="max-w-3xl space-y-4">
           <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
             <Sparkles className="mr-2 h-3.5 w-3.5" />
             Start with AMS
           </Badge>
-          <h1 className="text-4xl font-black tracking-tight sm:text-6xl">Choose the fastest way to put AMS to work.</h1>
+          <h1 className="text-4xl font-black tracking-tight sm:text-6xl">Explore AMS offers and availability.</h1>
           <p className="text-base leading-7 text-muted-foreground sm:text-lg">
-            AMS already has verified products you can use today. Start with a focused $49 marketing audit, compare the seven Live subscription agents, or browse the full Agent Store before choosing a plan.
+            Review the $49 Quick Marketing Audit, compare the seven Live agents, or browse the full Agent Store. Audit checkout is currently paused while fulfillment is re-verified; no payment is accepted until verification is complete.
           </p>
         </div>
 
@@ -40,13 +40,13 @@ export default function ContactPage() {
               <CardDescription>One-time service</CardDescription>
               <CardTitle>$49 Quick Marketing Audit</CardTitle>
               <CardDescription className="leading-6">
-                Get five marketing problems, five specific fixes, a stronger headline and offer, one promotional post, and a practical 7-day action plan. Delivery is targeted within 48 hours.
+                When available, the offer is intended to include five marketing problems, five specific fixes, a stronger headline and offer, one promotional post, and a practical 7-day action plan. Delivery is targeted within 48 hours when the offer is available.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild className="w-full">
                 <Link href="/quick-marketing-audit">
-                  Get the $49 audit <ArrowRight className="ml-2 h-4 w-4" />
+                  Check audit availability <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
             </CardContent>
@@ -80,7 +80,7 @@ export default function ContactPage() {
               <CardDescription>Explore first</CardDescription>
               <CardTitle>Browse the Agent Store</CardTitle>
               <CardDescription className="leading-6">
-                Compare Live, Beta, Setup Required, Blocked, and Planned capabilities before you buy. AMS keeps unfinished work clearly separated from products that are available now.
+                Compare Live, Beta, Setup Required, Blocked, and Planned capabilities. Review each product page for its current access and checkout status.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -95,9 +95,9 @@ export default function ContactPage() {
 
         <Card className="border-emerald-500/20 bg-emerald-500/5">
           <CardHeader>
-            <CardTitle>Verified paths instead of a dead contact form</CardTitle>
+            <CardTitle>Start with a clear next step</CardTitle>
             <CardDescription className="leading-6">
-              AMS routes new buyers through product paths that are already connected to a real next step. A generic contact form will not be presented as working until its storage and follow-up path is verified end to end.
+              Check audit availability, review plan details, or explore the catalog to see what each agent can do. The audit offer remains $49, but checkout is paused while fulfillment is re-verified.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -113,6 +113,6 @@ export default function ContactPage() {
       </div>
     </main>
       <AmsPublicFooter />
-    </>
+    </div>
   )
 }

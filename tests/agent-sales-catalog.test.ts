@@ -44,6 +44,24 @@ test("the seven verified shared-credit agents sell only through existing subscri
   }
 })
 
+test("subscription offers distinguish verified capability from ability to buy today", () => {
+  for (const included of SUBSCRIPTION_INCLUDED_AGENTS) {
+    const agent = agents.find((candidate) => candidate.slug === included.slug)
+    assert.ok(agent)
+    const paused = getAgentSalesOffer(agent, false)
+    assert.equal(paused.label, "Production-verified; checkout paused")
+    assert.equal(paused.primaryLabel, "View plan availability")
+    assert.match(paused.detail, /no new subscription payment can start/i)
+    assert.doesNotMatch(paused.primaryLabel, /buy|choose|checkout/i)
+    const live = getAgentSalesOffer(agent, true)
+    assert.equal(live.label, "Available now")
+    assert.equal(live.primaryLabel, "Choose an AMS plan")
+    assert.equal(live.primaryHref, paused.primaryHref)
+    assert.equal(live.price, paused.price)
+    assert.equal(live.secondaryHref, paused.secondaryHref)
+  }
+})
+
 test("the seven verified Live agents use matching accessible WebP artwork", () => {
   for (const included of SUBSCRIPTION_INCLUDED_AGENTS) {
     const agent = agents.find((candidate) => candidate.slug === included.slug)
@@ -63,14 +81,18 @@ test("the Agent Store prominently presents the seven-agent Live showcase", () =>
   assert.match(agentStoreSource, /Meet the Live AMS team\./)
 })
 
-test("Marketing Audit preserves the existing $49 one-time purchase route", () => {
+test("Marketing Audit preserves the $49 offer route without implying checkout is open", () => {
   const audit = agents.find((agent) => agent.slug === "marketing-audit-agent")
   assert.ok(audit)
 
   const offer = getAgentSalesOffer(audit)
   assert.equal(offer.mode, "one-time")
-  assert.equal(offer.price, "$49 one-time")
+  assert.equal(offer.label, "Availability check")
+  assert.equal(offer.price, "$49 one-time offer")
+  assert.equal(offer.primaryLabel, "Check current availability")
   assert.equal(offer.primaryHref, "/quick-marketing-audit")
+  assert.match(offer.detail, /checkout is currently paused/i)
+  assert.doesNotMatch(offer.primaryLabel, /buy|purchase|checkout/i)
 })
 
 test("unfinished agents never receive a fabricated standalone checkout", () => {
@@ -84,4 +106,31 @@ test("unfinished agents never receive a fabricated standalone checkout", () => {
     assert.notEqual(offer.primaryHref, "/api/billing/checkout")
     assert.equal(offer.price.includes("$"), false, `${agent.slug} must not invent a sale price`)
   }
+})
+
+
+test("paused Quick Marketing Audit availability is stated consistently across public sales surfaces", () => {
+  const agentStore = readFileSync(join(process.cwd(), "app/agents/page.tsx"), "utf8")
+  const salesPage = readFileSync(join(process.cwd(), "app/agents/[slug]/page.tsx"), "utf8")
+  const salesLayout = readFileSync(join(process.cwd(), "app/agents/[slug]/layout.tsx"), "utf8")
+  const auditPage = readFileSync(join(process.cwd(), "app/quick-marketing-audit/page.tsx"), "utf8")
+
+  assert.match(agentStore, /Quick Marketing Audit[^.]*checkout is currently paused/i)
+  assert.match(salesPage, /Review current availability/)
+  assert.match(salesPage, /Purchase when available/)
+  assert.doesNotMatch(salesPage, /Start the \$49 order|Use the existing secure Quick Marketing Audit checkout/)
+  assert.doesNotMatch(salesLayout, /verified AMS purchase path/)
+  assert.match(auditPage, /Checkout is temporarily paused\./)
+})
+
+
+test("refund page does not claim a complete published billing policy exists", () => {
+  const refundPage = readFileSync(join(process.cwd(), "app/refund/page.tsx"), "utf8")
+  const termsPage = readFileSync(join(process.cwd(), "app/terms/page.tsx"), "utf8")
+
+  assert.match(refundPage, /complete customer-facing refund policy is still being finalized/i)
+  assert.match(refundPage, /\/terms#refunds/)
+  assert.match(refundPage, /\/contact/)
+  assert.doesNotMatch(refundPage, /governed by the published AMS billing policy/i)
+  assert.match(termsPage, /id="refunds"/)
 })
