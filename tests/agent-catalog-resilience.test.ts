@@ -37,7 +37,7 @@ test("agent sales pages use lifecycle-aware commercial language", () => {
 
   const live = getAgent("content-agent")
   assert.ok(live)
-  const liveOffer = getAgentSalesOffer(live)
+  const liveOffer = getAgentSalesOffer(live, true)
   assert.equal(liveOffer.mode, "subscription")
   assert.equal(liveOffer.label, "Available now")
   assert.equal(liveOffer.secondaryLabel, "Open this agent")
