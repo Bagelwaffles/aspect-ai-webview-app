@@ -17,7 +17,7 @@ export function isContentAgentLaunchEnabled(env: NodeJS.ProcessEnv = {
 
 /** New subscription sales are separate from production capability and fail closed. */
 export function isSubscriptionCheckoutEnabled(
-  env: Pick<NodeJS.ProcessEnv, "NEXT_PUBLIC_AMS_SUBSCRIPTION_CHECKOUT_ENABLED"> = {
+  env: { NEXT_PUBLIC_AMS_SUBSCRIPTION_CHECKOUT_ENABLED?: string } = {
     NEXT_PUBLIC_AMS_SUBSCRIPTION_CHECKOUT_ENABLED: process.env.NEXT_PUBLIC_AMS_SUBSCRIPTION_CHECKOUT_ENABLED,
   },
 ): boolean {
