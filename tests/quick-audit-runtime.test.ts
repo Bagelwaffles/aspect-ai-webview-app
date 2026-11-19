@@ -12,6 +12,7 @@ import {
 function env(overrides: Partial<NodeJS.ProcessEnv> = {}): NodeJS.ProcessEnv {
   return {
     NODE_ENV: "test",
+    NEXT_PUBLIC_AMS_QUICK_AUDIT_CHECKOUT_ENABLED: "true",
     AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: ["sk", "live", "fixture"].join("_"),
     AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: "price_fixture",
     AMS_STRIPE_QUICK_AUDIT_LIVE_WEBHOOK_SECRET: ["whsec", "fixture"].join("_"),
@@ -63,6 +64,21 @@ test("Quick Audit infrastructure rejects cross-provider partial Redis config", (
 
   assert.equal(resolveQuickAuditRedisConfig(input), null)
   assert.equal(quickAuditInfrastructureReady(input), false)
+})
+
+test("Quick Audit sales gate fails closed even when Redis and Stripe infrastructure are ready", async () => {
+  const input = env({
+    NEXT_PUBLIC_AMS_QUICK_AUDIT_CHECKOUT_ENABLED: "false",
+    AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED: "true",
+    AMS_QUICK_AUDIT_FULFILLMENT_READY: "true",
+  })
+  const redis = fakeRedis("enabled")
+
+  assert.equal(await isQuickAuditRuntimeLaunchEnabled(input, { redis: redis.client }), false)
+  assert.equal(await ensureQuickAuditRuntimeLaunchState(input, { redis: redis.client }), false)
+  assert.equal(input.AMS_QUICK_AUDIT_PUBLIC_SALES_ENABLED, "false")
+  assert.equal(input.AMS_QUICK_AUDIT_FULFILLMENT_READY, "false")
+  assert.equal(redis.writes.length, 0)
 })
 
 test("durable Redis launch state overrides stale enabled process flags", async () => {

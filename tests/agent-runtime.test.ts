@@ -1,7 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { isContentAgentLaunchEnabled } from "../lib/content-agent-launch"
+import {
+  isContentAgentLaunchEnabled,
+  isSubscriptionCheckoutEnabled,
+} from "../lib/content-agent-launch"
 import {
   isAgentRuntimeConfigured,
   isAgentRuntimeEnabled,
@@ -17,6 +20,22 @@ test("Content Agent is enabled by a production release", () => {
   assert.equal(
     isContentAgentLaunchEnabled(
       env({ NODE_ENV: "production", NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE: "false" }),
+    ),
+    true,
+  )
+})
+
+test("new subscription checkout fails closed unless its dedicated flag is explicitly enabled", () => {
+  assert.equal(isSubscriptionCheckoutEnabled(env({ NODE_ENV: "production" })), false)
+  assert.equal(
+    isSubscriptionCheckoutEnabled(
+      env({ NEXT_PUBLIC_AMS_SUBSCRIPTION_CHECKOUT_ENABLED: "false" }),
+    ),
+    false,
+  )
+  assert.equal(
+    isSubscriptionCheckoutEnabled(
+      env({ NEXT_PUBLIC_AMS_SUBSCRIPTION_CHECKOUT_ENABLED: "true" }),
     ),
     true,
   )

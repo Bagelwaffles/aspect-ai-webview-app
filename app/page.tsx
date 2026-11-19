@@ -1,5 +1,6 @@
 import Link from "next/link"
-import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
+import { isSubscriptionCheckoutEnabled } from "@/lib/content-agent-launch"
+import { isQuickAuditRuntimeLaunchEnabled } from "@/lib/server/quick-audit-runtime"
 import styles from "./marketing.module.css"
 
 const outcomes = [
@@ -72,8 +73,11 @@ function cx(...names: string[]) {
   return names.map((name) => styles[name]).filter(Boolean).join(" ")
 }
 
-export default function HomePage() {
-  const subscriptionCheckoutLive = isContentAgentLaunchEnabled()
+export const dynamic = "force-dynamic"
+
+export default async function HomePage() {
+  const subscriptionCheckoutLive = isSubscriptionCheckoutEnabled()
+  const auditCheckoutLive = await isQuickAuditRuntimeLaunchEnabled()
 
   return (
     <main className={styles.site}>
@@ -115,20 +119,7 @@ export default function HomePage() {
           </h1>
 
           <p className={styles.heroText}>
-            {subscriptionCheckoutLive ? (
-              <>
-                Start with seven production-verified AI agents from $29/month, or choose the
-                $49 Quick Marketing Audit for a focused one-time review. AMS also supports content,
-                lead generation, follow-up, visibility, creator workflows, and day-to-day operations —
-                with human control where it matters.
-              </>
-            ) : (
-              <>
-                Seven AMS AI agents have production verification, but subscription checkout and paid AI
-                execution are temporarily paused while AMS runs in zero-cost mode. The $49 Quick Marketing
-                Audit remains the active paid starting point, and the full agent catalog stays visible for review.
-              </>
-            )}
+            Seven AMS AI agents are production-verified. {subscriptionCheckoutLive ? "New subscription checkout is available." : "New subscription checkout is paused."} {auditCheckoutLive ? "The $49 Quick Marketing Audit checkout is available." : "The $49 Quick Marketing Audit remains an offer to review, but checkout is paused and no payment is accepted."} AMS also supports content, lead generation, follow-up, visibility, creator workflows, and day-to-day operations — with human control where it matters.
           </p>
 
           <div className={styles.heroActions}>
@@ -136,7 +127,7 @@ export default function HomePage() {
               Explore AI agents <span aria-hidden="true">→</span>
             </Link>
             <Link className={styles.secondaryButton} href="/quick-marketing-audit">
-              Get the $49 audit
+              {auditCheckoutLive ? "Get the $49 audit" : "Review the $49 audit offer"}
             </Link>
           </div>
 
@@ -154,8 +145,8 @@ export default function HomePage() {
               <span>{subscriptionCheckoutLive ? "Plans from / month" : "Subscription checkout"}</span>
             </div>
             <div>
-              <strong>$49</strong>
-              <span>One-time audit</span>
+              <strong>{auditCheckoutLive ? "$49" : "PAUSED"}</strong>
+              <span>{auditCheckoutLive ? "One-time audit" : "Audit checkout"}</span>
             </div>
           </div>
         </div>
@@ -351,14 +342,14 @@ export default function HomePage() {
       <section className={styles.auditBand}>
         <div>
           <p className={styles.kicker}>Need a fast answer before a subscription?</p>
-          <h2>Start with the $49 Quick Marketing Audit.</h2>
+          <h2>{auditCheckoutLive ? "Start with the $49 Quick Marketing Audit." : "Review the $49 Quick Marketing Audit offer."}</h2>
           <p>
-            Get a focused review of your marketing, prioritized fixes, stronger messaging,
-            and a practical 7-day action plan.
+            The offer is intended to include a focused marketing review, prioritized fixes, stronger messaging,
+            and a practical 7-day action plan. {auditCheckoutLive ? "Checkout is available." : "Checkout is paused; no payment is accepted."}
           </p>
         </div>
         <Link className={styles.auditButton} href="/quick-marketing-audit">
-          Get my marketing audit <span aria-hidden="true">→</span>
+          {auditCheckoutLive ? "Get my marketing audit" : "Check audit availability"} <span aria-hidden="true">→</span>
         </Link>
       </section>
 
@@ -370,8 +361,7 @@ export default function HomePage() {
           <span>More useful momentum.</span>
         </h2>
         <p>
-          Explore the agent catalog, compare plans, or start with the one-time audit.
-          You choose the pace.
+          Explore the agent catalog and review current offer availability. New paid checkout remains closed wherever the launch gate is off.
         </p>
         <div className={styles.heroActions}>
           <Link className={styles.primaryButton} href="/agents#catalog">

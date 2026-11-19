@@ -14,3 +14,10 @@ export function isContentAgentLaunchEnabled(env: NodeJS.ProcessEnv = {
   if (env.NODE_ENV === "production") return true
   return env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE?.trim().toLowerCase() === "true"
 }
+
+/** New subscription sales are separate from production capability and fail closed. */
+export function isSubscriptionCheckoutEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return env.NEXT_PUBLIC_AMS_SUBSCRIPTION_CHECKOUT_ENABLED?.trim().toLowerCase() === "true"
+}

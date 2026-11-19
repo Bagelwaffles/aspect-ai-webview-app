@@ -30,11 +30,19 @@ type CategoryFilter = (typeof categoryOptions)[number]
 type StatusFilter = (typeof statusOptions)[number]
 
 const subscriptionCheckoutLive =
-  process.env.NEXT_PUBLIC_AMS_CONTENT_AGENT_LIVE?.trim().toLowerCase() === "true"
+  process.env.NEXT_PUBLIC_AMS_SUBSCRIPTION_CHECKOUT_ENABLED?.trim().toLowerCase() === "true"
+const auditCheckoutLive =
+  process.env.NEXT_PUBLIC_AMS_QUICK_AUDIT_CHECKOUT_ENABLED?.trim().toLowerCase() === "true"
 
 const operatingSteps = [
   ["01", "Choose the business job", "Start with the outcome you need: content, lead generation support, email sequences, SEO, product packaging, analytics, or another scoped workflow."],
-  ["02", "Check availability before buying", subscriptionCheckoutLive ? "Live agents can be purchased through the existing AMS subscription. The $49 Marketing Audit uses its existing one-time checkout. Beta and roadmap agents are clearly labeled and are not sold as finished products." : "Seven agents remain production-verified Live, but subscription checkout is temporarily paused in zero-cost mode. The $49 Marketing Audit remains the active paid starting point. Beta and roadmap agents are clearly labeled and are not sold as finished products."],
+  ["02", "Check availability before buying", subscriptionCheckoutLive && auditCheckoutLive
+    ? "The seven Live agents and the $49 Quick Marketing Audit are available through their separate checkout paths. Beta and roadmap agents remain clearly labeled."
+    : !subscriptionCheckoutLive && !auditCheckoutLive
+      ? "The seven Live agents remain production-verified, but both subscription and Quick Marketing Audit checkout are paused. No new payments are accepted."
+      : !subscriptionCheckoutLive
+        ? "The seven Live agents remain production-verified, but subscription checkout is paused. The Quick Marketing Audit has a separate available checkout."
+        : "Subscription checkout is available, but the $49 Quick Marketing Audit checkout is paused. No audit payment is accepted."],
   ["03", "Keep humans in control", "Sensitive actions, publishing, credentials, payments, and privileged system changes stay behind explicit authorization and verification boundaries."],
   ["04", "Expand as agents graduate", "AMS can add newly verified agents to the commercial catalog only after their production path, controls, and customer experience are proven."],
 ]
@@ -69,7 +77,7 @@ export default function AgentsPage() {
               {subscriptionCheckoutLive ? (
                 <>Browse the complete AMS catalog, open a dedicated sales page for every agent, and buy the capabilities that are actually available today. Seven verified Live agents are included in AMS subscriptions starting at $29/month. The Quick Marketing Audit remains a separate $49 one-time service. Everything else stays visible as Beta, Setup Required, Planned, or Blocked so you can see what is coming without being sold vaporware.</>
               ) : (
-                <>Browse the complete AMS catalog and review the capabilities already proven in production. Seven agents remain verified Live, but subscription checkout and paid AI execution are temporarily paused in zero-cost mode. The Quick Marketing Audit remains the active $49 paid starting point. Everything else stays visible as Beta, Setup Required, Planned, or Blocked.</>
+                <>Browse the complete AMS catalog and review the capabilities already proven in production. {subscriptionCheckoutLive ? "Subscription checkout is available." : "Subscription checkout is paused."} {auditCheckoutLive ? "The $49 Quick Marketing Audit checkout is available." : "The $49 audit offer remains visible for review, but checkout is paused and no payment is accepted."} Everything else stays visible as Beta, Setup Required, Planned, or Blocked.</>
               )}
             </p>
             <div className={styles.heroActions}>
@@ -163,7 +171,7 @@ export default function AgentsPage() {
           <div className={styles.catalog}>
             {filteredAgents.map((agent, index) => {
               const meta = statusMeta[agent.status]
-              const offer = getAgentSalesOffer(agent)
+              const offer = getAgentSalesOffer(agent, subscriptionCheckoutLive, auditCheckoutLive)
               return (
                 <article className={styles.card} data-status={meta.visual} key={agent.name}>
                   <div className={styles.cardTop}>

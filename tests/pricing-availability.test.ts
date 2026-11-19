@@ -9,7 +9,10 @@ test("pricing leads with the two real customer choices", () => {
   assert.ok(page.includes(`${SUBSCRIPTION_MARKER}`))
   assert.ok(page.includes("Quick Marketing Audit — $49"))
   assert.ok(page.includes("Compare plans"))
-  assert.ok(page.includes("Get the $49 Audit"))
+  assert.ok(page.includes("isSubscriptionCheckoutEnabled"))
+  assert.ok(page.includes("isQuickAuditRuntimeLaunchEnabled"))
+  assert.ok(page.includes('auditCheckoutLive ? "Get the $49 Audit" : "Check audit availability"'))
+  assert.ok(page.includes("No audit payment is accepted."))
 })
 
 test("standalone reference rates remain non-purchasable", () => {

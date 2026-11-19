@@ -14,10 +14,12 @@ test("homepage puts the Agent Store, pricing, audit, contact, and sign-in paths 
   assert.match(homepage, /href="\/login\?next=\/dashboard"/)
 })
 
-test("homepage states the verified offer choices clearly above the fold", () => {
-  assert.match(homepage, /seven production-verified AI agents/)
-  assert.match(homepage, /from \$29\/month/)
-  assert.match(homepage, /\$49 Quick Marketing Audit/)
+test("homepage distinguishes verified capability from paid checkout availability", () => {
+  assert.match(homepage, /Seven AMS AI agents are production-verified/)
+  assert.match(homepage, /isSubscriptionCheckoutEnabled/)
+  assert.match(homepage, /isQuickAuditRuntimeLaunchEnabled/)
+  assert.match(homepage, /New subscription checkout is paused/)
+  assert.match(homepage, /Quick Marketing Audit remains an offer to review/)
 })
 
 test("homepage links featured agents directly to their dedicated sales pages", () => {

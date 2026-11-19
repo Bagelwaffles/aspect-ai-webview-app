@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic"
 export const metadata = {
   title: "AMS Quick Marketing Audit | Aspect Marketing Solutions",
   description:
-    "Get a focused $49 marketing audit with specific fixes, an improved headline and offer, a promotional post, and a 7-day action plan delivered within 48 hours.",
+    "Review the $49 Quick Marketing Audit offer, intended deliverables, and current checkout availability.",
 }
 
 const idealFor = [
