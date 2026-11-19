@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 
 import { getAgent } from "../agentCatalog"
 import { getAgentSalesOffer } from "../agentSales"
+import { isSubscriptionCheckoutEnabled } from "@/lib/content-agent-launch"
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
@@ -10,7 +11,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   if (!agent) return {}
 
-  const offer = getAgentSalesOffer(agent)
+  const offer = getAgentSalesOffer(
+    agent,
+    isSubscriptionCheckoutEnabled(),
+    process.env.NEXT_PUBLIC_AMS_QUICK_AUDIT_CHECKOUT_ENABLED?.trim().toLowerCase() === "true",
+  )
   const title = `${agent.name} | Aspect Marketing Solutions`
   const description = `${agent.description} ${offer.price}. Review current availability and the verified AMS purchase path.`
   const url = `https://www.aspectmarketingsolutions.app/agents/${agent.slug}`

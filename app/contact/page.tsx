@@ -7,14 +7,21 @@ import { ArrowRight, Bot, ClipboardCheck, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { isSubscriptionCheckoutEnabled } from "@/lib/content-agent-launch"
+import { isQuickAuditRuntimeLaunchEnabled } from "@/lib/server/quick-audit-runtime"
 
 export const metadata: Metadata = {
   title: "Start with AMS | Aspect Marketing Solutions",
   description:
-    "Choose the fastest verified way to start with Aspect Marketing Solutions: the $49 Quick Marketing Audit, seven Live AI agents, or the AMS Agent Store.",
+    "Review Aspect Marketing Solutions agent capabilities, current offer details, and paid checkout availability.",
 }
 
-export default function ContactPage() {
+export const dynamic = "force-dynamic"
+
+export default async function ContactPage() {
+  const subscriptionCheckoutLive = isSubscriptionCheckoutEnabled()
+  const auditCheckoutLive = await isQuickAuditRuntimeLaunchEnabled()
+
   return (
     <>
       <AmsPublicHeader />
@@ -27,7 +34,7 @@ export default function ContactPage() {
           </Badge>
           <h1 className="text-4xl font-black tracking-tight sm:text-6xl">Choose the fastest way to put AMS to work.</h1>
           <p className="text-base leading-7 text-muted-foreground sm:text-lg">
-            AMS already has verified products you can use today. Start with a focused $49 marketing audit, compare the seven Live subscription agents, or browse the full Agent Store before choosing a plan.
+            Seven AMS agents are production-verified. {subscriptionCheckoutLive ? "New subscription checkout is available." : "New subscription checkout is paused."} {auditCheckoutLive ? "The $49 Quick Marketing Audit is available." : "The $49 audit offer can be reviewed, but checkout is paused and no payment is accepted."} Browse the full Agent Store to compare current capabilities.
           </p>
         </div>
 
@@ -40,13 +47,13 @@ export default function ContactPage() {
               <CardDescription>One-time service</CardDescription>
               <CardTitle>$49 Quick Marketing Audit</CardTitle>
               <CardDescription className="leading-6">
-                Get five marketing problems, five specific fixes, a stronger headline and offer, one promotional post, and a practical 7-day action plan. Delivery is targeted within 48 hours.
+                The intended offer includes five marketing problems, five specific fixes, a stronger headline and offer, one promotional post, and a practical 7-day action plan. {auditCheckoutLive ? "Delivery is targeted within 48 hours." : "Checkout is paused; no payment is accepted."}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild className="w-full">
                 <Link href="/quick-marketing-audit">
-                  Get the $49 audit <ArrowRight className="ml-2 h-4 w-4" />
+                  {auditCheckoutLive ? "Get the $49 audit" : "Review the $49 audit offer"} <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
             </CardContent>
@@ -60,7 +67,7 @@ export default function ContactPage() {
               <CardDescription>Subscription</CardDescription>
               <CardTitle>7 Live AI agents</CardTitle>
               <CardDescription className="leading-6">
-                Content, Lead Magnet, Email Campaign, Nurture, Outreach, SEO, and Product Creator are included in AMS shared-credit plans starting at $29/month.
+                Content, Lead Magnet, Email Campaign, Nurture, Outreach, SEO, and Product Creator are production-verified. {subscriptionCheckoutLive ? "New subscriptions are available from $29/month." : "New subscription checkout is paused."}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -97,7 +104,7 @@ export default function ContactPage() {
           <CardHeader>
             <CardTitle>Verified paths instead of a dead contact form</CardTitle>
             <CardDescription className="leading-6">
-              AMS routes new buyers through product paths that are already connected to a real next step. A generic contact form will not be presented as working until its storage and follow-up path is verified end to end.
+              Paid checkout is currently paused wherever its launch gate is closed. Existing account billing remains available to current subscribers; no new payment is accepted through a paused offer.
             </CardDescription>
           </CardHeader>
         </Card>

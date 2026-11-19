@@ -12,6 +12,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 import { agents, getAgent, statusMeta } from "../agentCatalog"
 import { getAgentSalesOffer, getCategoryOutcome } from "../agentSales"
+import { isSubscriptionCheckoutEnabled } from "@/lib/content-agent-launch"
+import { isQuickAuditRuntimeLaunchEnabled } from "@/lib/server/quick-audit-runtime"
+
+export const dynamic = "force-dynamic"
 
 export function generateStaticParams() {
   return agents.map((agent) => ({ slug: agent.slug }))
@@ -23,14 +27,35 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   if (!agent) return {}
 
-  const offer = getAgentSalesOffer(agent)
+  const subscriptionCheckoutLive = isSubscriptionCheckoutEnabled()
+  const auditCheckoutLive = await isQuickAuditRuntimeLaunchEnabled()
+  const offer = getAgentSalesOffer(agent, subscriptionCheckoutLive, auditCheckoutLive)
   return {
     title: `${agent.name} | Aspect Marketing Solutions`,
-    description: `${agent.description} ${offer.price}. Review availability, current capabilities, and the verified AMS purchase path.`,
+    description: `${agent.description} ${offer.price}. ${offer.detail} Review current availability before purchase.`,
   }
 }
 
-function salesSteps(mode: ReturnType<typeof getAgentSalesOffer>["mode"]) {
+function salesSteps(
+  mode: ReturnType<typeof getAgentSalesOffer>["mode"],
+  checkoutAvailable: boolean,
+) {
+  if (mode === "subscription" && !checkoutAvailable) {
+    return [
+      ["1", "Review the Live capability", "This agent is production-verified and remains available for existing entitled customers."],
+      ["2", "Check plan availability", "New AMS subscription checkout is currently paused."],
+      ["3", "Return when checkout opens", "No new subscription payment can be started while the sales gate is closed."],
+    ]
+  }
+
+  if (mode === "one-time" && !checkoutAvailable) {
+    return [
+      ["1", "Review the audit offer", "See the intended scope and deliverables for the $49 Quick Marketing Audit."],
+      ["2", "Check availability", "Checkout is paused and no payment is accepted."],
+      ["3", "Order when available", "AMS will reopen checkout only after the required launch checks are complete."],
+    ]
+  }
+
   if (mode === "subscription") {
     return [
       ["1", "Choose a plan", "Pick Starter, Growth, or Pro based on the shared monthly credit pool you need."],
@@ -68,9 +93,14 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
   if (!agent) notFound()
 
   const meta = statusMeta[agent.status]
-  const offer = getAgentSalesOffer(agent)
+  const subscriptionCheckoutLive = isSubscriptionCheckoutEnabled()
+  const auditCheckoutLive = await isQuickAuditRuntimeLaunchEnabled()
+  const offer = getAgentSalesOffer(agent, subscriptionCheckoutLive, auditCheckoutLive)
   const outcome = getCategoryOutcome(agent.category)
-  const steps = salesSteps(offer.mode)
+  const checkoutAvailable =
+    offer.mode === "subscription" ? subscriptionCheckoutLive :
+    offer.mode === "one-time" ? auditCheckoutLive : true
+  const steps = salesSteps(offer.mode, checkoutAvailable)
   const related = agents
     .filter((candidate) => candidate.slug !== agent.slug && candidate.category === agent.category)
     .slice(0, 3)
@@ -271,7 +301,7 @@ export default async function AgentSalesPage({ params }: { params: Promise<{ slu
             </div>
             <div className="grid gap-5 md:grid-cols-3">
               {related.map((candidate) => {
-                const candidateOffer = getAgentSalesOffer(candidate)
+                const candidateOffer = getAgentSalesOffer(candidate, subscriptionCheckoutLive, auditCheckoutLive)
                 return (
                   <Card key={candidate.slug}>
                     <CardHeader>

@@ -6,7 +6,8 @@ import { ArrowRight, Bot, CreditCard, Sparkles } from "lucide-react"
 import { BillingActionButton } from "@/components/billing-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
+import { isSubscriptionCheckoutEnabled } from "@/lib/content-agent-launch"
+import { isQuickAuditRuntimeLaunchEnabled } from "@/lib/server/quick-audit-runtime"
 import { CREDIT_TOPUP_PACKS } from "@/lib/credit-topups"
 import { QUICK_MARKETING_AUDIT } from "@/lib/quick-marketing-audit"
 import { monthlyCreditsForPlan } from "@/lib/server/entitlements"
@@ -102,8 +103,11 @@ const REQUEST_OFFERS = [
   },
 ]
 
-export default function PricingPage() {
-  const contentAgentLive = isContentAgentLaunchEnabled()
+export const dynamic = "force-dynamic"
+
+export default async function PricingPage() {
+  const subscriptionCheckoutLive = isSubscriptionCheckoutEnabled()
+  const auditCheckoutLive = await isQuickAuditRuntimeLaunchEnabled()
 
   return (
     <>
@@ -115,7 +119,7 @@ export default function PricingPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Simple pricing</p>
             <h1 className="text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">Choose the simplest way to start.</h1>
             <p className="text-lg leading-8 text-muted-foreground">
-              Use the AMS subscription when you want ongoing access to the {SUBSCRIPTION_INCLUDED_AGENT_COUNT} Live agents. Choose the $49 Quick Marketing Audit when you want one focused marketing review without a subscription.
+              The {SUBSCRIPTION_INCLUDED_AGENT_COUNT} Live agents are production-verified. Subscription checkout is {subscriptionCheckoutLive ? "available" : "paused"}. The $49 Quick Marketing Audit is a separate offer; its checkout is {auditCheckoutLive ? "available" : "paused, and no payment is accepted"}.
             </p>
           </div>
 
@@ -145,11 +149,11 @@ export default function PricingPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Get a focused marketing review, specific fixes, stronger copy, and a practical 7-day action plan. No subscription required.
+                  Review the intended $49 marketing audit deliverables: specific fixes, stronger copy, and a practical 7-day action plan. {auditCheckoutLive ? "Checkout is available." : "Checkout is paused; no payment is accepted."}
                 </p>
                 <Button asChild variant="outline">
                   <Link href={QUICK_MARKETING_AUDIT.landingPath}>
-                    Get the $49 Audit
+                    {auditCheckoutLive ? "Get the $49 Audit" : "Check audit availability"}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
@@ -168,18 +172,21 @@ export default function PricingPage() {
           </div>
         </header>
 
-        {!contentAgentLive ? (
+        {!subscriptionCheckoutLive || !auditCheckoutLive ? (
           <Card className="border-amber-500/40 bg-amber-500/10">
             <CardHeader>
-              <CardTitle>Subscription checkout is currently paused</CardTitle>
+              <CardTitle>New paid checkout is currently paused</CardTitle>
               <CardDescription>
-                No subscription payment can start while the shared AI execution gate is disabled. The $49 Quick Marketing Audit remains available.
+                {!subscriptionCheckoutLive && !auditCheckoutLive
+                  ? "New subscription and Quick Marketing Audit checkout are paused. No new payments are accepted."
+                  : !subscriptionCheckoutLive
+                    ? "New subscription checkout is paused. Existing customers can still manage their accounts."
+                    : "Quick Marketing Audit checkout is paused. No audit payment is accepted."}
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button asChild>
-                <Link href={QUICK_MARKETING_AUDIT.landingPath}>Get the $49 Audit</Link>
-              </Button>
+            <CardContent className="flex flex-wrap gap-3">
+              {!subscriptionCheckoutLive ? <Button asChild variant="outline"><Link href="#plans">Review plan availability</Link></Button> : null}
+              {!auditCheckoutLive ? <Button asChild><Link href={QUICK_MARKETING_AUDIT.landingPath}>Check audit availability</Link></Button> : null}
             </CardContent>
           </Card>
         ) : null}
@@ -220,7 +227,7 @@ export default function PricingPage() {
                     <li>• Human review and agent guardrails remain in effect</li>
                     <li>• Stripe billing portal access</li>
                   </ul>
-                  {contentAgentLive ? (
+                  {subscriptionCheckoutLive ? (
                     <BillingActionButton label={`Choose ${plan.name}`} endpoint="/api/billing/checkout" plan={plan.slug} />
                   ) : (
                     <div className="space-y-2">
@@ -249,19 +256,19 @@ export default function PricingPage() {
         <section className="space-y-5">
           <div className="space-y-2">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">One-time option</p>
-            <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Not ready for a subscription? Start with the $49 Audit.</h2>
+            <h2 className="text-3xl font-black tracking-tight sm:text-4xl">{auditCheckoutLive ? "Not ready for a subscription? Start with the $49 Audit." : "Review the $49 Quick Marketing Audit offer."}</h2>
           </div>
           <Card className="border-primary/40 bg-primary/5">
             <CardContent className="grid gap-6 p-6 lg:grid-cols-[1fr_auto] lg:items-center">
               <div className="space-y-3">
                 <div className="text-3xl font-black">{QUICK_MARKETING_AUDIT.priceLabel}</div>
                 <p className="max-w-3xl leading-7 text-muted-foreground">
-                  Delivered {QUICK_MARKETING_AUDIT.deliveryWindow}. You receive {QUICK_MARKETING_AUDIT.deliverables.join(", ")}.
+                  Intended delivery target: {QUICK_MARKETING_AUDIT.deliveryWindow}. Intended deliverables: {QUICK_MARKETING_AUDIT.deliverables.join(", ")}. {auditCheckoutLive ? "Checkout is available." : "Checkout is paused; no payment is accepted."}
                 </p>
               </div>
               <Button asChild size="lg">
                 <Link href={QUICK_MARKETING_AUDIT.landingPath}>
-                  Buy the $49 Audit
+                  {auditCheckoutLive ? "Buy the $49 Audit" : "Check audit availability"}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { authOptions, isCustomerAuthConfigured } from "@/lib/auth"
-import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
+import { isSubscriptionCheckoutEnabled } from "@/lib/content-agent-launch"
 import { getEntitlementSnapshot, monthlyCreditsForPlan } from "@/lib/server/entitlements"
 
 export const dynamic = "force-dynamic"
@@ -38,7 +38,7 @@ export default async function BillingPage() {
   const snapshot = await getEntitlementSnapshot(subject).catch(() => null)
   const configured = Boolean(snapshot?.configured)
   const status = snapshot?.subscriptionStatus ?? "inactive"
-  const contentAgentLive = isContentAgentLaunchEnabled()
+  const subscriptionCheckoutLive = isSubscriptionCheckoutEnabled()
   const subscriptionActive = status === "active" || status === "trialing"
   const monthlyAllowance = snapshot?.plan ? monthlyCreditsForPlan(snapshot.plan) : 0
   const creditsRemaining = snapshot?.totalCredits ?? 0
@@ -60,12 +60,12 @@ export default async function BillingPage() {
           </Button>
         </div>
 
-        {!contentAgentLive ? (
+        {!subscriptionCheckoutLive ? (
           <Card className="border-amber-500/40 bg-amber-500/10">
             <CardHeader>
-              <CardTitle>New paid AI subscriptions are paused</CardTitle>
+              <CardTitle>New paid subscriptions are paused</CardTitle>
               <CardDescription>
-                Content Agent has passed controlled provider testing but remains behind the production launch gate. Existing subscribers can still manage their subscription, and no new paid checkout opens while the gate is disabled.
+                AMS is not accepting new subscription orders right now. Existing subscribers can still view their account and manage their current subscription.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -144,7 +144,7 @@ export default async function BillingPage() {
                 <p className="text-sm text-muted-foreground">
                   Includes {LIVE_MARKETING_AGENTS}. New agents join the subscription only after production verification.
                 </p>
-                {contentAgentLive ? (
+                {subscriptionCheckoutLive ? (
                   subscriptionActive ? (
                     <div className="space-y-2">
                       <Button type="button" disabled>

@@ -78,6 +78,7 @@ export async function isQuickAuditRuntimeLaunchEnabled(
   env: NodeJS.ProcessEnv = process.env,
   options: RuntimeOptions = {},
 ) {
+  if (env.NEXT_PUBLIC_AMS_QUICK_AUDIT_CHECKOUT_ENABLED?.trim().toLowerCase() !== "true") return false
   if (!quickAuditInfrastructureReady(env)) return false
 
   const redis = runtimeRedis(env, options)

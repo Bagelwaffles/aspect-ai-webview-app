@@ -14,7 +14,7 @@ test("unverified shared video is hidden while every agent keeps its verified sal
   assert.equal(AMS_AGENT_SALES_VIDEO_EMBED_URL, null)
 
   for (const agent of agents) {
-    const offer = getAgentSalesOffer(agent)
+    const offer = getAgentSalesOffer(agent, true, true)
     assert.ok(offer.primaryHref, `${agent.slug} needs a primary sales route`)
     assert.ok(offer.primaryLabel, `${agent.slug} needs a primary sales label`)
     assert.equal(offer.videoEmbedUrl, AMS_AGENT_SALES_VIDEO_EMBED_URL)
@@ -36,7 +36,7 @@ test("the seven verified shared-credit agents sell only through existing subscri
     const agent = agents.find((candidate) => candidate.slug === included.slug)
     assert.ok(agent, `${included.slug} must remain in the agent catalog`)
 
-    const offer = getAgentSalesOffer(agent)
+    const offer = getAgentSalesOffer(agent, true, true)
     assert.equal(offer.mode, "subscription")
     assert.equal(offer.price, "From $29/month")
     assert.equal(offer.primaryHref, "/pricing#plans")
@@ -67,10 +67,25 @@ test("Marketing Audit preserves the existing $49 one-time purchase route", () =>
   const audit = agents.find((agent) => agent.slug === "marketing-audit-agent")
   assert.ok(audit)
 
-  const offer = getAgentSalesOffer(audit)
+  const offer = getAgentSalesOffer(audit, true, true)
   assert.equal(offer.mode, "one-time")
   assert.equal(offer.price, "$49 one-time")
   assert.equal(offer.primaryHref, "/quick-marketing-audit")
+})
+
+test("new paid offers are visibly paused by default until both checkout gates are explicitly enabled", () => {
+  const subscriptionAgent = agents.find((agent) => agent.slug === "content-agent")
+  const auditAgent = agents.find((agent) => agent.slug === "marketing-audit-agent")
+  assert.ok(subscriptionAgent)
+  assert.ok(auditAgent)
+
+  const subscription = getAgentSalesOffer(subscriptionAgent)
+  assert.equal(subscription.label, "Production-verified; checkout paused")
+  assert.equal(subscription.primaryLabel, "View plan availability")
+
+  const audit = getAgentSalesOffer(auditAgent)
+  assert.equal(audit.label, "Checkout paused")
+  assert.equal(audit.primaryLabel, "Review the $49 audit offer")
 })
 
 test("unfinished agents never receive a fabricated standalone checkout", () => {

@@ -26,7 +26,11 @@ export function isSubscriptionAgent(agent: Agent) {
   return subscriptionSlugs.has(agent.slug as (typeof SUBSCRIPTION_INCLUDED_AGENTS)[number]["slug"])
 }
 
-export function getAgentSalesOffer(agent: Agent): AgentSalesOffer {
+export function getAgentSalesOffer(
+  agent: Agent,
+  subscriptionCheckoutLive = false,
+  auditCheckoutLive = false,
+): AgentSalesOffer {
   const video = {
     videoEmbedUrl: AMS_AGENT_SALES_VIDEO_EMBED_URL,
     videoTitle: `AMS sales overview on the ${agent.name} sales page`,
@@ -35,10 +39,12 @@ export function getAgentSalesOffer(agent: Agent): AgentSalesOffer {
   if (isSubscriptionAgent(agent)) {
     return {
       mode: "subscription",
-      label: "Available now",
+      label: subscriptionCheckoutLive ? "Available now" : "Production-verified; checkout paused",
       price: "From $29/month",
-      detail: "Included in every AMS shared-credit subscription plan. One completed generation uses one shared plan credit.",
-      primaryLabel: "Choose an AMS plan",
+      detail: subscriptionCheckoutLive
+        ? "Included in every AMS shared-credit subscription plan. One completed generation uses one shared plan credit."
+        : "This agent is production-verified, but AMS is not accepting new subscription payments right now. Existing customers can still manage billing.",
+      primaryLabel: subscriptionCheckoutLive ? "Choose an AMS plan" : "View plan availability",
       primaryHref: "/pricing#plans",
       secondaryLabel: "Open this agent",
       secondaryHref: agent.launchHref,
@@ -49,10 +55,12 @@ export function getAgentSalesOffer(agent: Agent): AgentSalesOffer {
   if (agent.slug === "marketing-audit-agent") {
     return {
       mode: "one-time",
-      label: "Public paid service",
+      label: auditCheckoutLive ? "Public paid service" : "Checkout paused",
       price: "$49 one-time",
-      detail: "Buy the existing Quick Marketing Audit through the verified AMS Stripe checkout and native fulfillment path.",
-      primaryLabel: "Buy the $49 audit",
+      detail: auditCheckoutLive
+        ? "The existing Quick Marketing Audit offer is available through the AMS checkout and fulfillment path."
+        : "The $49 Quick Marketing Audit is an existing offer, but checkout is paused and no payment is accepted.",
+      primaryLabel: auditCheckoutLive ? "Buy the $49 audit" : "Review the $49 audit offer",
       primaryHref: "/quick-marketing-audit",
       secondaryLabel: "See all pricing",
       secondaryHref: "/pricing",

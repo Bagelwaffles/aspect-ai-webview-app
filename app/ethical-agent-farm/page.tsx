@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ETHICAL_OFFERS, FARM_OPERATING_RULES } from "@/lib/ethical-agent-farm"
 import { SUBSCRIPTION_INCLUDED_AGENTS } from "@/lib/subscription-agent-catalog"
+import { isSubscriptionCheckoutEnabled } from "@/lib/content-agent-launch"
+import { isQuickAuditRuntimeLaunchEnabled } from "@/lib/server/quick-audit-runtime"
 
 export const metadata: Metadata = {
   title: "AMS Services | Aspect Marketing Solutions",
@@ -18,7 +20,12 @@ export const metadata: Metadata = {
 
 const requestOnlyOffers = ETHICAL_OFFERS.filter((offer) => offer.billingLabel === "Request only")
 
-export default function EthicalAgentFarmPage() {
+export const dynamic = "force-dynamic"
+
+export default async function EthicalAgentFarmPage() {
+  const subscriptionCheckoutLive = isSubscriptionCheckoutEnabled()
+  const auditCheckoutLive = await isQuickAuditRuntimeLaunchEnabled()
+
   return (
     <>
       <AmsPublicHeader />
@@ -30,10 +37,10 @@ export default function EthicalAgentFarmPage() {
               Verified AMS services
             </Badge>
             <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
-              Buy what is live. Request what still needs human scoping.
+              Review verified capabilities and current checkout availability.
             </h1>
             <p className="max-w-2xl text-lg text-muted-foreground">
-              AMS currently offers seven production-verified subscription agents plus the $49 Quick Marketing Audit. Additional service packages remain request-only until scope, price, and delivery are reviewed by a person.
+              AMS has seven production-verified subscription agents and a $49 Quick Marketing Audit offer. New subscription checkout is {subscriptionCheckoutLive ? "available" : "paused"}; Quick Audit checkout is {auditCheckoutLive ? "available" : "paused, with no payment accepted"}. Additional service packages remain request-only until scope, price, and delivery are reviewed by a person.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button asChild>
@@ -43,7 +50,7 @@ export default function EthicalAgentFarmPage() {
                 </Link>
               </Button>
               <Button asChild variant="outline">
-                <Link href="/quick-marketing-audit">Get the $49 audit</Link>
+                <Link href="/quick-marketing-audit">{auditCheckoutLive ? "Get the $49 audit" : "Review the $49 audit offer"}</Link>
               </Button>
               <Button asChild variant="ghost">
                 <Link href="/agents#catalog">Browse the Agent Store</Link>
@@ -80,10 +87,10 @@ export default function EthicalAgentFarmPage() {
                   <CardDescription>Subscription</CardDescription>
                   <CardTitle>7 Live AI agents</CardTitle>
                 </div>
-                <Badge>Available now</Badge>
+                <Badge>{subscriptionCheckoutLive ? "Available now" : "Checkout paused"}</Badge>
               </div>
               <CardDescription className="leading-6">
-                Included in AMS shared-credit subscription plans starting at $29/month. One completed generation uses one shared plan credit.
+                Production-verified agents included in AMS shared-credit plans starting at $29/month when new subscription checkout is available. One completed generation uses one shared plan credit.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -101,7 +108,7 @@ export default function EthicalAgentFarmPage() {
               </div>
               <Button asChild className="w-full">
                 <Link href="/pricing#plans">
-                  Choose an AMS plan <ArrowRight className="ml-2 h-4 w-4" />
+                  {subscriptionCheckoutLive ? "Choose an AMS plan" : "Review plan availability"} <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
             </CardContent>
@@ -114,16 +121,16 @@ export default function EthicalAgentFarmPage() {
                   <CardDescription>One-time service</CardDescription>
                   <CardTitle>Quick Marketing Audit</CardTitle>
                 </div>
-                <Badge>Public paid service</Badge>
+                <Badge>{auditCheckoutLive ? "Public paid service" : "Checkout paused"}</Badge>
               </div>
               <CardDescription className="leading-6">
-                A focused $49 audit with five problems, five fixes, stronger messaging, one promotional post, and a practical 7-day action plan. Delivery is targeted within 48 hours.
+                The intended $49 audit includes five problems, five fixes, stronger messaging, one promotional post, and a practical 7-day action plan. {auditCheckoutLive ? "Delivery is targeted within 48 hours." : "Checkout is paused; no payment is accepted."}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild className="w-full">
                 <Link href="/quick-marketing-audit">
-                  Get my audit — $49 <ArrowRight className="ml-2 h-4 w-4" />
+                  {auditCheckoutLive ? "Get my audit — $49" : "Review the $49 audit offer"} <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
             </CardContent>
@@ -176,8 +183,8 @@ export default function EthicalAgentFarmPage() {
               <CardDescription>No roadmap theater mixed into the checkout path.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>Subscription buyers get access to the seven agents currently marked Live in the canonical AMS catalog.</p>
-              <p>The Quick Marketing Audit remains a separate $49 one-time service.</p>
+              <p>Existing entitled subscribers can access the seven agents currently marked Live in the canonical AMS catalog. New subscription checkout is {subscriptionCheckoutLive ? "available" : "paused"}.</p>
+              <p>The Quick Marketing Audit remains a separate $49 offer. Its checkout is {auditCheckoutLive ? "available" : "paused"}.</p>
               <p>Request-only services require human review and do not collect payment on the request page.</p>
               <p>Beta, Setup Required, Blocked, and Planned agents remain visible in the Agent Store without being sold as finished products.</p>
             </CardContent>
