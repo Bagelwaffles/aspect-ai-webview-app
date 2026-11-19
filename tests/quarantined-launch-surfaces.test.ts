@@ -50,7 +50,7 @@ test("launch pages contain no fabricated operational claims or controls", async 
   assert.match(analytics, /Do not upload sensitive data/i)
   assert.match(analytics, /no AI generation and no credits charged/i)
   assert.match(deployments, /deployment is not connected/i)
-  assert.match(billing, /New paid AI subscriptions are paused/i)
+  assert.match(billing, /New paid subscriptions are paused/i)
   assert.match(billing, /No payment can be started for this plan/i)
   assert.match(billing, /Content, Lead Magnet, Outreach, SEO, and Email Campaign/i)
   assert.doesNotMatch(billing, /Outreach and Analytics are not available/i)
