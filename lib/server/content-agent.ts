@@ -3,6 +3,7 @@ import { z } from "zod"
 
 import { authOptions } from "@/lib/auth"
 import { isContentAgentLaunchEnabled } from "@/lib/content-agent-launch"
+import { ACI_AGENT_VERSIONS } from "@/lib/aci/agent-versions"
 import {
   isAgentRuntimeConfigured,
   isVercelAiGatewayAuthAvailable,
@@ -15,7 +16,7 @@ import {
   type CustomerWorkspaceProfile,
 } from "@/lib/server/customer-workspace"
 
-export const CONTENT_AGENT_VERSION = "content-v1" as const
+export const CONTENT_AGENT_VERSION = ACI_AGENT_VERSIONS["content-agent"]
 export const DEFAULT_CONTENT_AGENT_MODEL = "openai/gpt-5.4-mini" as const
 
 export const contentAgentInputSchema = z
@@ -128,6 +129,7 @@ export async function runContentAgentProvider(input: ContentAgentInput): Promise
   return runStructuredAgent(
     {
       id: "content-agent",
+      agentSlug: "content-agent",
       version: CONTENT_AGENT_VERSION,
       model: getContentAgentModel(),
       inputSchema: contentAgentInputSchema,

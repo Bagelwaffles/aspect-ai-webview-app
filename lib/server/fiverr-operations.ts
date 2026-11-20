@@ -119,22 +119,45 @@ function parseRecord(value: unknown): FiverrOperationRecord | null {
   }
 }
 
-export async function listRecentFiverrOperations(limit = 8): Promise<FiverrOperationRecord[]> {
-  const redis = createClient()
-  if (!redis) return []
+export type FiverrOperationsReadResult = {
+  state: "ready" | "not_configured" | "unavailable"
+  records: FiverrOperationRecord[]
+  source: "Redis Fiverr Bridge records"
+  checkedAt: string
+  error: string | null
+}
 
-  const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 25)
+type FiverrReadClient = Pick<Redis, "lrange" | "get">
 
+export async function readRecentFiverrOperations(
+  limit = 8,
+  client?: FiverrReadClient | null,
+): Promise<FiverrOperationsReadResult> {
+  const metadata = { source: "Redis Fiverr Bridge records" as const }
   try {
+    const redis = client === undefined ? createClient() : client
+    if (!redis) return {
+      ...metadata, checkedAt: new Date().toISOString(), state: "not_configured", records: [],
+      error: "Fiverr operation storage is not configured; queue state is unknown.",
+    }
+    const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 25)
     const ids = await redis.lrange<string>(INDEX_KEY, 0, safeLimit - 1)
-    if (!ids.length) return []
-
     const values = await Promise.all(
       ids.map((eventId) => redis.get<FiverrOperationRecord>(`${RECORD_PREFIX}${eventId}`)),
     )
-
-    return values.map(parseRecord).filter((record): record is FiverrOperationRecord => Boolean(record))
+    const records = values.map(parseRecord).filter((record): record is FiverrOperationRecord => Boolean(record))
+    // Missing/invalid indexed records must not masquerade as an empty, healthy queue.
+    if (records.length !== ids.length) throw new Error("Incomplete operation records")
+    return { ...metadata, checkedAt: new Date().toISOString(), state: "ready", records, error: null }
   } catch {
-    return []
+    return {
+      ...metadata, checkedAt: new Date().toISOString(), state: "unavailable", records: [],
+      error: "Fiverr operation storage could not be read; queue state is unknown.",
+    }
   }
+}
+
+// Compatibility for callers that still expect only a list.
+export async function listRecentFiverrOperations(limit = 8): Promise<FiverrOperationRecord[]> {
+  return (await readRecentFiverrOperations(limit)).records
 }

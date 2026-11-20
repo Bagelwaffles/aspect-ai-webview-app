@@ -6,7 +6,7 @@ import Stripe from "stripe"
 import { agents } from "@/app/agents/agentCatalog"
 import { listAgentContracts } from "@/lib/agent-contract-registry"
 import { listOvermindTasks } from "@/lib/server/overmind-task-store"
-import { listRecentFiverrOperations } from "@/lib/server/fiverr-operations"
+import { readRecentFiverrOperations } from "@/lib/server/fiverr-operations"
 import { listSocialCampaignRecords } from "@/lib/server/social-campaign-store"
 import {
   getLatestTwitchMediaQueue,
@@ -546,7 +546,17 @@ async function monitorTwitchMedia(context: MonitorContext) {
 
 async function monitorFiverr(context: MonitorContext) {
   const checkedAt = context.now.toISOString()
-  const operations = await listRecentFiverrOperations(25)
+  const read = await readRecentFiverrOperations(25)
+  if (read.state !== "ready") {
+    return result(
+      "fiverr-operations", "Fiverr Operations",
+      read.state === "not_configured" ? "not_configured" : "warning",
+      read.error ?? "Fiverr queue state is unknown.", checkedAt,
+      [`Source: ${read.source}; checked ${read.checkedAt}`],
+      { readState: read.state, recentOperations: null, urgent: null, nearDeadline: null },
+    )
+  }
+  const operations = read.records
   const urgent = operations.filter((operation) => operation.priority === "urgent")
   const nearDeadline = operations.filter((operation) => {
     if (!operation.deadline_at) return false

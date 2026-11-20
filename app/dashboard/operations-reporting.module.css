@@ -1,0 +1,28 @@
+.root { display: grid; gap: 1.5rem; color: #e5e7eb; margin-top: 1.5rem; }
+.root > section, .root > header, .importer { background: #111827; border: 1px solid #374151; border-radius: 1rem; padding: 1.25rem; min-width: 0; }
+.root h2 { font-size: 1.6rem; margin: .4rem 0; }
+.root h3 { font-size: 1.2rem; margin: 0 0 .75rem; }
+.root h4 { font-size: 1.05rem; margin: 0 0 .5rem; }
+.root p { line-height: 1.6; margin: .65rem 0; color: #d1d5db; overflow-wrap: anywhere; }
+.root a { color: #93c5fd; text-decoration: underline; overflow-wrap: anywhere; }
+.root ul { padding-left: 1.25rem; line-height: 1.7; }
+.root li { margin: .5rem 0; overflow-wrap: anywhere; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 1rem; margin: 1rem 0; }
+.card { background: #0b1220; border: 1px solid #334155; border-radius: .75rem; padding: 1rem; min-width: 0; scroll-margin-top: 1rem; }
+.card dl { margin: .5rem 0; }
+.card dt { color: #9ca3af; margin-top: .6rem; font-size: .8rem; }
+.card dd { margin: 0; overflow-wrap: anywhere; line-height: 1.5; font-size: .9rem; }
+.card small { display: block; color: #aab7ca; overflow-wrap: anywhere; line-height: 1.6; }
+.status { display: inline-block; border: 1px solid #64748b; background: #1e293b; color: #e2e8f0; border-radius: 1rem; padding: .15rem .65rem; font-size: .8rem; text-transform: capitalize; }
+.status[data-status="healthy"] { border-color: #34d399; color: #a7f3d0; }
+.status[data-status="blocked"], .status[data-status="unavailable"] { border-color: #f87171; color: #fecaca; }
+.status[data-status="attention"], .status[data-status="stale"] { border-color: #fbbf24; color: #fde68a; }
+.root summary { cursor: pointer; padding: .5rem 0; font-weight: 600; }
+.importer label { display: grid; gap: .5rem; margin: 1rem 0; line-height: 1.5; }
+.importer select, .importer textarea { width: 100%; min-width: 0; background: #0b1220; color: #e5e7eb; border: 1px solid #64748b; padding: .75rem; border-radius: .5rem; font: inherit; }
+.importer textarea { font-family: monospace; resize: vertical; font-size: .85rem; }
+.importer .attestation { display: flex; align-items: flex-start; }
+.attestation input { margin-top: .3rem; flex: 0 0 auto; }
+.importer button { background: #1d4ed8; color: white; border: 0; border-radius: .5rem; padding: .8rem 1rem; font: inherit; cursor: pointer; }
+.importer button:disabled { background: #374151; color: #cbd5e1; cursor: not-allowed; }
+.root :focus-visible { outline: 2px solid #93c5fd; outline-offset: 3px; }

@@ -17,7 +17,11 @@ import {
 } from "lucide-react"
 
 import { verifyInternalAdminCookie } from "@/app/lib/internal-admin-cookie"
+import { telemetryStatus } from "@/lib/operations/telemetry-status"
 import { getCommandCenterTelemetry } from "@/lib/server/command-center-telemetry"
+import { getOperationsTelemetry } from "@/lib/server/operations-telemetry"
+import { reportingPreviewEnabled, isReportingOwnerEmail } from "@/lib/server/operations-report-store"
+import OperationsReporting from "./OperationsReporting"
 
 import { agentStatusCounts, agents } from "@/app/agents/agentCatalog"
 
@@ -31,18 +35,11 @@ function configured(...names: string[]) {
 }
 
 function stateLabel(state: boolean | string) {
-  if (state === true || state === "ready" || state === "configured") return "Connected"
-  if (state === "not_required") return "Not required"
-  if (state === "not_approved") return "Not approved"
-  if (state === "unavailable") return "Unavailable"
-  if (state === "missing") return "Needs setup"
-  return "Needs setup"
+  return telemetryStatus(state).label
 }
 
 function stateClass(state: boolean | string) {
-  if (state === true || state === "ready" || state === "configured") return styles.good
-  if (state === "not_required") return styles.neutral
-  return styles.warn
+  return styles[telemetryStatus(state).tone]
 }
 
 function priorityClass(priority: "normal" | "high" | "urgent") {
@@ -96,6 +93,8 @@ export default async function DashboardPage() {
   }
 
   const telemetry = await getCommandCenterTelemetry()
+  const reportingOwner = isReportingOwnerEmail(adminEmail)
+  const operations = reportingPreviewEnabled() && reportingOwner ? await getOperationsTelemetry() : null
   const customerAuth = configured(
     "GOOGLE_CLIENT_ID",
     "GOOGLE_CLIENT_SECRET",
@@ -139,7 +138,7 @@ export default async function DashboardPage() {
       ? "unavailable"
       : "missing"
 
-  const coreOperational = [true, telemetry.redis.state === "ready", telemetry.n8n.online, telemetry.stripe.connected]
+  const coreOperational = [telemetry.redis.state === "ready", telemetry.n8n.online, telemetry.stripe.connected]
   const coreConnectedCount = coreOperational.filter(Boolean).length
   const environment = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown"
   const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ?? "unknown"
@@ -220,7 +219,7 @@ export default async function DashboardPage() {
               <p>AMS COMMAND CENTER</p>
               <h1>Control what is real. Build what is next.</h1>
               <span>
-                Live operational signals now come from the running AMS application, Redis, n8n,
+                Request-time signals come from the running AMS application, Redis, n8n,
                 Stripe, and the Fiverr Bridge. Configuration-only signals remain labeled as such.
               </span>
             </div>
@@ -232,9 +231,9 @@ export default async function DashboardPage() {
 
           <section className={styles.metrics}>
             <article>
-              <span>CORE SYSTEMS ONLINE</span>
-              <strong>{coreConnectedCount}/4</strong>
-              <small>Web · Redis · n8n · Stripe reporting checked at request time.</small>
+              <span>SUCCESSFUL DEPENDENCY CHECKS</span>
+              <strong>{coreConnectedCount}/3</strong>
+              <small>Redis readiness · n8n health endpoint · Stripe reporting API. Not an end-to-end workflow verification.</small>
             </article>
             <article>
               <span>STRIPE CAPTURED LESS REFUNDS · 30D</span>
@@ -247,7 +246,7 @@ export default async function DashboardPage() {
             </article>
             <article>
               <span>N8N INSTANCE</span>
-              <strong className={stateClass(n8nState)}>{telemetry.n8n.online ? "ONLINE" : "OFFLINE"}</strong>
+              <strong className={stateClass(n8nState)}>{telemetry.n8n.online ? "ONLINE" : "UNAVAILABLE"}</strong>
               <small>
                 {telemetry.n8n.online
                   ? `${telemetry.n8n.latencyMs ?? "—"} ms · ${telemetry.n8n.host ?? "configured host"}`
@@ -280,23 +279,23 @@ export default async function DashboardPage() {
                   {[
                     ["Admin", true, "Authenticated"],
                     ["Redis", telemetry.redis.state === "ready", telemetry.redis.state],
-                    ["n8n", telemetry.n8n.online, telemetry.n8n.online ? `${telemetry.n8n.latencyMs ?? "—"} ms` : "Offline"],
+                    ["n8n", telemetry.n8n.online, telemetry.n8n.online ? `${telemetry.n8n.latencyMs ?? "—"} ms` : "Unavailable"],
                     ["Stripe", telemetry.stripe.connected, telemetry.stripe.connected ? telemetry.stripe.mode : "Unavailable"],
-                    ["Fiverr", telemetry.fiverr.intakeConfigured, telemetry.fiverr.intakeConfigured ? "Intake configured" : "Needs setup"],
+                    ["Fiverr", null, telemetry.fiverr.intakeConfigured ? "Configured; not verified" : "Needs setup"],
                     [
                       "AI Gateway",
-                      !contentAgentLaunchEnabled || aiGatewayAuth,
+                      null,
                       contentAgentLaunchEnabled
                         ? aiGatewayAuth
-                          ? "Configured"
+                          ? "Configured; not verified"
                           : "Needs setup"
                         : "Execution paused",
                     ],
-                    ["Relevance", relevance, relevance ? "Configured" : "Needs setup"],
-                    ["Customer Auth", customerAuth, customerAuth ? "Configured" : "Needs setup"],
+                    ["Relevance", null, relevance ? "Configured; not verified" : "Needs setup"],
+                    ["Customer Auth", null, customerAuth ? "Configured; not verified" : "Needs setup"],
                   ].map(([label, state, detail]) => (
                     <div key={String(label)} className={styles.connectionNode}>
-                      <span className={state ? styles.dotGood : styles.dotWarn} />
+                      <span className={state === null ? `${styles.dotWarn} ${styles.neutral}` : state ? styles.dotGood : styles.dotWarn} />
                       <strong>{String(label)}</strong>
                       <small>{String(detail)}</small>
                     </div>
@@ -369,7 +368,13 @@ export default async function DashboardPage() {
                 <FileText size={22} />
               </div>
 
-              {telemetry.fiverr.recentOperations.length ? (
+              <p>Source: {telemetry.fiverr.source} · Checked {formatTimestamp(telemetry.fiverr.checkedAt)} · Latest recorded event: {formatTimestamp(telemetry.fiverr.recentOperations[0]?.recorded_at ?? null)}</p>
+              {telemetry.fiverr.state !== "ready" ? (
+                <div className={styles.emptyState} role="status">
+                  <Activity size={30} />
+                  <div><strong>Fiverr operations unavailable. Queue state unknown.</strong><p>{telemetry.fiverr.error}</p></div>
+                </div>
+              ) : telemetry.fiverr.recentOperations.length ? (
                 <div className={opsStyles.operationsList}>
                   {telemetry.fiverr.recentOperations.map((operation) => (
                     <article className={opsStyles.operation} key={operation.event_id}>
@@ -394,9 +399,9 @@ export default async function DashboardPage() {
                 <div className={styles.emptyState}>
                   <Activity size={30} />
                   <div>
-                    <strong>No persisted Fiverr operations yet.</strong>
+                    <strong>No records returned by this successful storage query.</strong>
                     <p>
-                      New accepted Fiverr Bridge events will appear here after the intake receives them.
+                      This checks up to eight persisted Bridge records, not the Fiverr inbox or completeness of intake. New accepted events appear after intake records them.
                       The Bridge classifies and records events, but it does not send Fiverr messages,
                       accept orders, cancel orders, click links, or submit deliveries automatically.
                     </p>
@@ -414,14 +419,15 @@ export default async function DashboardPage() {
                 <Activity size={22} />
               </div>
               <div className={opsStyles.telemetrySummary}>
-                <span>Checked {formatTimestamp(telemetry.checkedAt)}</span>
-                <span>Redis: {telemetry.redis.state}</span>
-                <span>n8n: {telemetry.n8n.online ? "online" : "offline"}</span>
-                <span>Stripe: {telemetry.stripe.connected ? `${telemetry.stripe.mode} connected` : "unavailable"}</span>
-                <span>Fiverr intake: {telemetry.fiverr.intakeConfigured ? "configured" : "missing"}</span>
+                <span>Request checks completed {formatTimestamp(telemetry.checkedAt)}; not a continuous monitor. Refresh to recheck.</span>
+                <span>Source: Redis readiness probe · {telemetry.redis.state}</span>
+                <span>Source: n8n /healthz · {telemetry.n8n.online ? "online" : "unavailable"}</span>
+                <span>Source: Stripe charges API · {telemetry.stripe.connected ? `${telemetry.stripe.mode} connected` : "unavailable"}</span>
+                <span>Fiverr intake: {telemetry.fiverr.intakeConfigured ? "Configured; not verified" : "missing"}</span>
               </div>
             </article>
           </section>
+          {operations ? <OperationsReporting data={operations} repoSha={process.env.VERCEL_GIT_COMMIT_SHA ?? ""} /> : null}
         </div>
       </section>
     </main>
