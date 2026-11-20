@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "status": "research_only_unverified",
+  "purpose": "source_controlled_reference_seed_no_execution",
+  "records": [
+    {
+      "dataClassification": "public",
+      "affectedAgentId": "research-agent",
+      "baselineRepoSha": "d6e7f98720ef9d96ab89906e1828187b36048659",
+      "claim": "Versioned context updates can help agents reuse corrected behavior, but independent evaluation is required before release.",
+      "source": {
+        "kind": "official_video",
+        "url": "https://www.youtube.com/watch?v=y6WUw2_Hhrs",
+        "title": "How To Build a Self-Improving Agent with LangSmith Engine and Context Hub",
+        "publisher": "LangChain",
+        "retrievedAt": "2026-11-10T19:00:00.000Z",
+        "publishedAt": "2026-06-24T00:00:00.000Z"
+      },
+      "corroborationUrls": [
+        "https://www.langchain.com/blog/introducing-context-hub"
+      ]
+    },
+    {
+      "dataClassification": "public",
+      "affectedAgentId": "aspect-overmind",
+      "baselineRepoSha": "d6e7f98720ef9d96ab89906e1828187b36048659",
+      "claim": "Untrusted retrieved content and stored memory may contain adversarial instructions, so they cannot grant additional tool permissions.",
+      "source": {
+        "kind": "official_docs",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/AI_Agent_Security_Cheat_Sheet.html",
+        "title": "AI Agent Security Cheat Sheet",
+        "publisher": "OWASP Cheat Sheet Series",
+        "retrievedAt": "2026-11-10T19:00:00.000Z"
+      },
+      "corroborationUrls": [
+        "https://owasp.github.io/DevSecOpsGuideline/2-Process/2-2-Develop/2-2-5-AI-Agent-and-MCP-Security/"
+      ]
+    },
+    {
+      "dataClassification": "public",
+      "affectedAgentId": "technical-support-agent",
+      "baselineRepoSha": "d6e7f98720ef9d96ab89906e1828187b36048659",
+      "claim": "Structured trace grading and repeatable test datasets can identify tool-selection and policy regressions for human-reviewed repairs.",
+      "source": {
+        "kind": "official_docs",
+        "url": "https://developers.openai.com/api/docs/guides/trace-grading",
+        "title": "Trace grading",
+        "publisher": "OpenAI Developers",
+        "retrievedAt": "2026-11-10T19:00:00.000Z"
+      },
+      "corroborationUrls": [
+        "https://developers.openai.com/api/docs/guides/agent-evals"
+      ]
+    }
+  ],
+  "productionApproved": false
+}
