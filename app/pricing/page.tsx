@@ -108,6 +108,8 @@ export const dynamic = "force-dynamic"
 export default async function PricingPage() {
   const subscriptionCheckoutLive = isSubscriptionCheckoutEnabled()
   const auditCheckoutLive = await isQuickAuditRuntimeLaunchEnabled()
+  const topupCheckoutLive =
+    process.env.NEXT_PUBLIC_AMS_CREDIT_TOPUP_CHECKOUT_ENABLED?.trim().toLowerCase() === "true"
 
   return (
     <>
@@ -336,7 +338,9 @@ export default async function PricingPage() {
                   ))}
                 </div>
                 <p>
-                  Monthly plan credits are used first. Top-ups are available from web billing and are not offered inside the Android app while Google Play billing requirements remain separate.
+                  Monthly plan credits are used first. {topupCheckoutLive
+                    ? "New credit top-ups are available for eligible subscribers through web billing."
+                    : "New credit top-up purchases are paused during AMS prelaunch. No top-up payment is accepted."} Credit purchases are not offered inside the Android app.
                 </p>
               </div>
             </div>
