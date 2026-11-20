@@ -35,7 +35,7 @@ export default async function QuickMarketingAuditPage() {
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm text-muted-foreground">
               <Sparkles className="h-4 w-4 text-primary" />
-              First live AMS revenue offer
+              {checkoutReady ? "Quick Marketing Audit — checkout available" : "Prelaunch offer — checkout paused"}
             </div>
 
             <div className="space-y-4">
@@ -43,7 +43,9 @@ export default async function QuickMarketingAuditPage() {
                 Find what is costing your marketing attention, leads, and sales.
               </h1>
               <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">
-                The AMS Quick Marketing Audit gives you a focused outside review of your current marketing and a practical plan for what to fix next.
+                {checkoutReady
+                  ? "The AMS Quick Marketing Audit provides a focused outside review of your current marketing and a practical plan for what to fix next."
+                  : "This planned offer will provide a focused marketing review and practical next steps. AMS is not accepting orders or payments while business readiness is being completed."}
               </p>
             </div>
 
@@ -68,23 +70,23 @@ export default async function QuickMarketingAuditPage() {
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-2">
                 <Clock3 className="h-4 w-4 text-primary" />
-                Delivered {QUICK_MARKETING_AUDIT.deliveryWindow}
+                {checkoutReady ? "Delivery target" : "Planned delivery target"}: {QUICK_MARKETING_AUDIT.deliveryWindow}
               </span>
               <span className="inline-flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-primary" />
-                One-time purchase. No subscription.
+                {checkoutReady ? "One-time purchase. No subscription." : "No payments accepted during prelaunch."}
               </span>
             </div>
           </div>
 
           <Card className="border-primary/30" id="quick-audit-status">
             <CardHeader>
-              <CardDescription>Launch price</CardDescription>
+              <CardDescription>{checkoutReady ? "Launch price" : "Planned launch price"}</CardDescription>
               <CardTitle className="text-4xl">{QUICK_MARKETING_AUDIT.priceLabel}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
-                <p className="mb-3 text-sm font-medium">You receive:</p>
+                <p className="mb-3 text-sm font-medium">{checkoutReady ? "You receive:" : "Planned deliverables:"}</p>
                 <ul className="space-y-3">
                   {QUICK_MARKETING_AUDIT.deliverables.map((item) => (
                     <li className="flex gap-3 text-sm text-muted-foreground" key={item}>
@@ -103,12 +105,14 @@ export default async function QuickMarketingAuditPage() {
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
                   <p className="font-medium">Checkout is temporarily paused.</p>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    AMS is upgrading the fulfillment path for this offer. We are not accepting payment until the delivery system is verified again.
+                    AMS is in prelaunch mode. Orders and payments remain closed while required business licensing and fulfillment readiness are being completed.
                   </p>
                 </div>
               )}
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Secure checkout is handled by Stripe. At checkout we collect the business details needed to begin the review. AMS does not promise specific revenue or ranking outcomes.
+                {checkoutReady
+                  ? "Secure checkout is handled by Stripe. At checkout we collect the business details needed to begin the review. AMS does not promise specific revenue or ranking outcomes."
+                  : "Checkout is unavailable. No payment or order is accepted on this page until a separately approved launch."}
               </p>
             </CardContent>
           </Card>
@@ -128,7 +132,7 @@ export default async function QuickMarketingAuditPage() {
         <section className="grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>What happens after you buy</CardTitle>
+              <CardTitle>{checkoutReady ? "What happens after you buy" : "Planned fulfillment process"}</CardTitle>
               <CardDescription>A simple delivery process with no fake automation claims.</CardDescription>
             </CardHeader>
             <CardContent>
@@ -148,10 +152,14 @@ export default async function QuickMarketingAuditPage() {
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-muted-foreground">
               <p>
-                AMS is bringing its agent platform online in controlled stages. This audit is deliberately simple: buyers get a real deliverable now while the deeper autonomous workflows continue through production verification.
+                {checkoutReady
+                  ? "AMS is bringing its agent platform online in controlled stages. This audit is deliberately simple: buyers receive the deliverable described while deeper workflows continue through production verification."
+                  : "AMS is preparing the audit service while its broader agent platform progresses through controlled verification. No public sale is open."}
               </p>
               <p>
-                That means you are buying the outcome described on this page—not a claim that every historical AMS agent is already autonomous or production-ready.
+                {checkoutReady
+                  ? "This purchase covers the outcome described on this page, not a promise that every historical AMS agent is fully autonomous."
+                  : "The offer details are a preview, not an invitation to purchase. A separate approved launch will be required before sales resume."}
               </p>
             </CardContent>
           </Card>
