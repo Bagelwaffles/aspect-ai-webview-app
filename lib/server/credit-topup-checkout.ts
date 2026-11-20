@@ -192,6 +192,18 @@ export function createCreditTopupCheckoutHandler(
       )
     }
 
+    // Prelaunch sales gate fails closed before entitlement reads or Stripe calls.
+    if (dependencies.env.NEXT_PUBLIC_AMS_CREDIT_TOPUP_CHECKOUT_ENABLED?.trim().toLowerCase() !== "true") {
+      return noStoreJson(
+        {
+          ok: false,
+          error: "New AMS credit purchases are paused. No charge was created.",
+          code: "CREDIT_TOPUP_CHECKOUT_PAUSED",
+        },
+        503,
+      )
+    }
+
     const snapshot = await dependencies.getEntitlements(principal.subject).catch(() => null)
     if (!snapshot?.configured) {
       return noStoreJson(

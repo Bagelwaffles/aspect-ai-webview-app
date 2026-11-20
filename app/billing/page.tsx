@@ -39,6 +39,8 @@ export default async function BillingPage() {
   const configured = Boolean(snapshot?.configured)
   const status = snapshot?.subscriptionStatus ?? "inactive"
   const subscriptionCheckoutLive = isSubscriptionCheckoutEnabled()
+  const topupCheckoutLive =
+    process.env.NEXT_PUBLIC_AMS_CREDIT_TOPUP_CHECKOUT_ENABLED?.trim().toLowerCase() === "true"
   const subscriptionActive = status === "active" || status === "trialing"
   const monthlyAllowance = snapshot?.plan ? monthlyCreditsForPlan(snapshot.plan) : 0
   const creditsRemaining = snapshot?.totalCredits ?? 0
@@ -165,7 +167,17 @@ export default async function BillingPage() {
           ))}
         </div>
 
-        {configured && subscriptionActive ? (
+        {!topupCheckoutLive ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Extra credits</CardTitle>
+              <CardDescription>
+                New credit purchases are paused; no payment is accepted. Existing credit balances,
+                current subscriptions, and access to subscription management are unchanged.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : configured && subscriptionActive ? (
           <CreditTopupPurchasePanel />
         ) : (
           <Card>

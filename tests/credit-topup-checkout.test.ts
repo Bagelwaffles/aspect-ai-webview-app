@@ -70,6 +70,32 @@ function request(
   })
 }
 
+test("prelaunch credit top-ups fail closed before entitlement, rate-limit, or Stripe calls", async () => {
+  for (const flag of [undefined, "false", "yes"]) {
+    const touched: string[] = []
+    const handler = createCreditTopupCheckoutHandler({
+      env: { NODE_ENV: "test", NEXT_PUBLIC_AMS_CREDIT_TOPUP_CHECKOUT_ENABLED: flag },
+      authorize: async () => { touched.push("authorize"); return principal },
+      getEntitlements: async () => { touched.push("entitlements"); return snapshot("active") },
+      checkRateLimit: async () => {
+        touched.push("rate_limit")
+        return { allowed: true, retryAfterSeconds: 0 }
+      },
+      resolvePrice: async () => { touched.push("stripe_price"); return price("100") },
+      createSession: async () => {
+        touched.push("stripe_session")
+        return { id: "unexpected", url: "https://example.test/unexpected" }
+      },
+    })
+    const response = await handler(request({ pack: "100", requestId: "request_1234567890abcdef" }))
+    const payload = await response.json()
+    assert.equal(response.status, 503)
+    assert.equal(payload.code, "CREDIT_TOPUP_CHECKOUT_PAUSED")
+    assert.match(payload.error, /No charge was created/i)
+    assert.deepEqual(touched, ["authorize"])
+  }
+})
+
 test("active subscriber receives a one-time Checkout Session for the exact approved pack", async () => {
   const pack = creditTopupPack("300")
   const captured: {
@@ -84,6 +110,7 @@ test("active subscriber receives a one-time Checkout Session for the exact appro
     checkRateLimit: async () => ({ allowed: true, retryAfterSeconds: 0 }),
     env: {
       NODE_ENV: "test",
+      NEXT_PUBLIC_AMS_CREDIT_TOPUP_CHECKOUT_ENABLED: "true",
       STRIPE_SECRET_KEY: "sk_test_credit_topup_fixture",
       AMS_STRIPE_WEBHOOK_MODE: "test",
       PUBLIC_APP_URL: "https://www.aspectmarketingsolutions.app",
@@ -137,6 +164,7 @@ test("inactive accounts cannot buy subscriber-only top-up credits", async () => 
     getEntitlements: async () => snapshot("inactive"),
     env: {
       NODE_ENV: "test",
+      NEXT_PUBLIC_AMS_CREDIT_TOPUP_CHECKOUT_ENABLED: "true",
       STRIPE_SECRET_KEY: "sk_test_credit_topup_fixture",
       AMS_STRIPE_WEBHOOK_MODE: "test",
       PUBLIC_APP_URL: "https://www.aspectmarketingsolutions.app",
@@ -164,6 +192,7 @@ test("distributed rate limit stops checkout before Stripe is touched", async () 
   const handler = createCreditTopupCheckoutHandler({
     authorize: async () => principal,
     getEntitlements: async () => snapshot("active"),
+    env: { NODE_ENV: "test", NEXT_PUBLIC_AMS_CREDIT_TOPUP_CHECKOUT_ENABLED: "true" },
     checkRateLimit: async () => ({ allowed: false, retryAfterSeconds: 123 }),
     resolvePrice: async () => {
       stripeTouched = true
