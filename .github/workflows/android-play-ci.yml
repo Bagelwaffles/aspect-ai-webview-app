@@ -44,15 +44,15 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Install Gradle 9.5.0
+      - name: Install Gradle 9.6.0
         shell: bash
         run: |
           set -euo pipefail
           curl --fail --location --retry 3 \
-            https://services.gradle.org/distributions/gradle-9.5.0-bin.zip \
+            https://services.gradle.org/distributions/gradle-9.6.0-bin.zip \
             --output /tmp/gradle.zip
           unzip -q /tmp/gradle.zip -d /tmp
-          /tmp/gradle-9.5.0/bin/gradle --version
+          /tmp/gradle-9.6.0/bin/gradle --version
 
       - name: Policy guardrails
         shell: bash
@@ -77,7 +77,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          /tmp/gradle-9.5.0/bin/gradle -p android \
+          /tmp/gradle-9.6.0/bin/gradle -p android \
             --no-daemon \
             clean lintRelease assembleDebug assembleRelease bundleRelease
 
