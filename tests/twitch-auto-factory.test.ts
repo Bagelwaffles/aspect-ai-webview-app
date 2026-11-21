@@ -4,6 +4,8 @@ import test from "node:test"
 import {
   selectAutomaticVodClipCandidates,
   selectDailyVodSampleCandidates,
+  selectAdaptiveTwitchSourceDuration,
+  TWITCH_AUTO_FACTORY_MAX_SOURCE_SECONDS,
   TWITCH_AUTO_FACTORY_LOOKBACK_HOURS,
   TWITCH_AUTO_FACTORY_MAX_CANDIDATES_PER_VOD,
   handledTwitchShortClipIds,
@@ -213,4 +215,15 @@ test("Shorts render jobs dedupe by actual clip across day-specific queue IDs", (
   assert.equal(handled.has("already-public"), true)
   assert.equal(handled.has("in-flight"), true)
   assert.equal(handled.has("recoverable-failure"), false)
+})
+
+
+test("adaptive Twitch sampler reserves the maximum available context, not a fixed finished-Short duration", () => {
+  assert.equal(TWITCH_AUTO_FACTORY_MAX_SOURCE_SECONDS, 60)
+  assert.equal(selectAdaptiveTwitchSourceDuration(900, 3600), 60)
+  assert.equal(selectAdaptiveTwitchSourceDuration(12, 3600), 12)
+  assert.equal(selectAdaptiveTwitchSourceDuration(3600, 3600), 60)
+  assert.equal(selectAdaptiveTwitchSourceDuration(50, 45), 45)
+  assert.equal(selectAdaptiveTwitchSourceDuration(4, 3600), 0)
+  assert.equal(selectAdaptiveTwitchSourceDuration(Number.NaN, 3600), 0)
 })

@@ -38,6 +38,24 @@ export const TWITCH_AUTO_FACTORY_MAX_ANALYSES = 30
 export const TWITCH_AUTO_FACTORY_MAX_RENDERS_PER_STREAM = 3
 export const TWITCH_AUTO_FACTORY_THIRD_CLIP_SCORE_MIN = 75
 
+/**
+ * Twitch's Create Clip From VOD endpoint accepts 5–60 seconds. Give the video
+ * analyst the full 60-second context when the VOD position permits, then let
+ * evidence-backed analysis choose the final (possibly much shorter) window.
+ * This is a source-window bound, NOT a fixed output duration.
+ */
+export const TWITCH_AUTO_FACTORY_MAX_SOURCE_SECONDS = 60
+
+export function selectAdaptiveTwitchSourceDuration(
+  vodOffset: number,
+  vodDurationSeconds: number,
+) {
+  if (!Number.isFinite(vodOffset) || !Number.isFinite(vodDurationSeconds)) return 0
+  const end = Math.min(Math.trunc(vodOffset), Math.trunc(vodDurationSeconds))
+  if (end < 5) return 0
+  return Math.min(TWITCH_AUTO_FACTORY_MAX_SOURCE_SECONDS, end)
+}
+
 type RankedAnalyzedClip = {
   clipId: string
   sourceVideoId: string
@@ -285,7 +303,8 @@ async function runTwitchAutomaticPrivateShortsLocked(input: { vodId?: string; wi
     )
     for (let index = 0; index < candidates.length; index += 1) {
       const candidate = candidates[index]
-      const duration = Math.min(30, Math.max(15, Math.round(Math.min(30, vod.durationSeconds / 6))))
+      const duration = selectAdaptiveTwitchSourceDuration(candidate.positionSeconds, vod.durationSeconds)
+      if (duration < 5) continue
       try {
         const clip = await createTwitchClipFromVod({
           vodId: vod.id,

@@ -5,6 +5,9 @@ import {
   buildTwitchPublishMetadata,
   isTwitchVideoAnalysisRenderEligible,
   parseTwitchVideoEvidenceText,
+  resolveAdaptiveTwitchHighlightWindow,
+  TWITCH_ADAPTIVE_MIN_HIGHLIGHT_SECONDS,
+  TWITCH_ADAPTIVE_MAX_HIGHLIGHT_SECONDS,
   TWITCH_VIDEO_RENDER_SCORE_MIN,
 } from "../lib/server/twitch-video-analysis"
 import { twitchVideoAnalysisRecordSchema } from "../lib/server/twitch-media-factory"
@@ -146,4 +149,29 @@ test("long content-first headlines retain complete creator branding on each plat
   }
   assert.ok(metadata.youtube.title.length <= 100)
   assert.ok(metadata.twitchClipTitle.length <= 100)
+})
+
+
+test("adaptive highlight windows retain a whole short action or longer squad exchange", () => {
+  assert.equal(TWITCH_ADAPTIVE_MIN_HIGHLIGHT_SECONDS, 5)
+  assert.equal(TWITCH_ADAPTIVE_MAX_HIGHLIGHT_SECONDS, 60)
+  assert.deepEqual(resolveAdaptiveTwitchHighlightWindow(17, 27, 60), {
+    start: 17, end: 27, durationSeconds: 10,
+  })
+  assert.deepEqual(resolveAdaptiveTwitchHighlightWindow(3, 51, 60), {
+    start: 3, end: 51, durationSeconds: 48,
+  })
+  assert.deepEqual(resolveAdaptiveTwitchHighlightWindow(0, 60, 60), {
+    start: 0, end: 60, durationSeconds: 60,
+  })
+})
+
+test("adaptive highlight rejects missing, too short, and out-of-source timestamps instead of padding raw footage", () => {
+  assert.equal(resolveAdaptiveTwitchHighlightWindow(null, null, 60), null)
+  assert.equal(resolveAdaptiveTwitchHighlightWindow(20, 22, 60), null)
+  assert.equal(resolveAdaptiveTwitchHighlightWindow(52, 64, 60), null)
+  assert.equal(resolveAdaptiveTwitchHighlightWindow(-1, 9, 60), null)
+  assert.equal(resolveAdaptiveTwitchHighlightWindow(7, 20, 12), null)
+  assert.equal(resolveAdaptiveTwitchHighlightWindow(0, 4, 4), null)
+  assert.equal(resolveAdaptiveTwitchHighlightWindow(Number.NaN, 15, 60), null)
 })
