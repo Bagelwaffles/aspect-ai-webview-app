@@ -18,6 +18,7 @@ export default async function handler(request, response) {
     const status = await cloudBrowserSandboxStatus(sandbox)
     return response.status(200).json({
       ok: true,
+      nodeVersion: process.version,
       sandbox: sandbox.name ?? sandbox.sandboxId ?? "ams-browser-worker",
       ...status,
     })
