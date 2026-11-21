@@ -13,6 +13,10 @@ export type NativeQuickAuditFinding = {
   title: string
   observation: string
   fix: string
+  /** Optional for backward compatibility with already purchased native-v1 results. */
+  basis?: "automated-signal" | "strategic-recommendation"
+  sourceUrl?: string
+  reviewedAt?: string
 }
 
 export type NativeQuickAuditPlanDay = {
@@ -284,12 +288,25 @@ export function buildNativeQuickAuditResult(input: {
   const goal = cleanSentence(input.goals, 140)
   const auditId = `audit_${createHash("sha256").update(input.requestId).digest("hex").slice(0, 24)}`
 
-  const selected = evidenceCandidates(input.evidence).map(({ key: _key, priority: _priority, ...finding }) => finding)
-  const usedTitles = new Set(selected.map((finding) => finding.title))
+  const reviewedAt = (input.now ?? (() => new Date()))().toISOString()
+  // A missing HTML signal is not proof that a site feature is absent.
+  // Unknown signals are not promoted into customer-facing verified problems.
+  const localBusiness = /local|plumb|roof|electrician|hvac|landscap|restaurant|salon|barbershop|contractor|home\\s+(?:repair|service)|repair\\s+service|brick.and.mortar/i.test(industry)
+  const selected: NativeQuickAuditFinding[] = evidenceCandidates(input.evidence)
+    .filter(candidate => input.evidence[candidate.key] === false)
+    .filter(candidate => candidate.key !== "hasLocalBusinessSchema" || localBusiness)
+    .slice(0, 5)
+    .map(({ key: _key, priority: _priority, ...finding }) => ({
+      ...finding,
+      basis: "automated-signal",
+      sourceUrl: input.websiteUrl,
+      reviewedAt,
+    }))
+  const usedTitles = new Set(selected.map(finding => finding.title))
   for (const { key: _key, ...fallback } of strategicFallbacks({ businessName, industry, goals: input.goals })) {
     if (selected.length >= 5) break
     if (!usedTitles.has(fallback.title)) {
-      selected.push(fallback)
+      selected.push({ ...fallback, basis: "strategic-recommendation" })
       usedTitles.add(fallback.title)
     }
   }
@@ -306,7 +323,7 @@ export function buildNativeQuickAuditResult(input: {
     websiteUrl: input.websiteUrl,
     industry,
     goal,
-    generatedAt: (input.now ?? (() => new Date()))().toISOString(),
+    generatedAt: reviewedAt,
     strengths: strengthsFromEvidence(input.evidence),
     findings: selected.slice(0, 5),
     improvedHeadline,
