@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import { z } from "zod"
 
 import { getAgentContract, listAgentContracts } from "@/lib/agent-contract-registry"
+import { AMS_ACTION_LIFECYCLE } from "@/lib/server/action-governance"
 import type { AgentContract } from "@/lib/agent-contract"
 
 export const overmindPlanInputSchema = z
@@ -33,6 +34,7 @@ export type OvermindPlan = {
   mode: "planning-only"
   executionPerformed: false
   ownerApprovalRequired: boolean
+  governanceLifecycle: (typeof AMS_ACTION_LIFECYCLE)[number][]
   steps: OvermindPlanStep[]
   blockers: string[]
   notes: string[]
@@ -195,6 +197,7 @@ export function createOvermindPlan(
     ownerApprovalRequired: steps.some(
       (step) => step.approval === "owner-only" || step.readiness === "approval-required",
     ),
+    governanceLifecycle: [...AMS_ACTION_LIFECYCLE],
     steps,
     blockers: [...new Set(blockers)],
     notes,
