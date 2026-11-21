@@ -379,6 +379,44 @@ export default function CreatorsPage() {
         </div>
       </section>
 
+      <section aria-labelledby="creator-ypp-2027" className="border-y border-border/70 px-5 py-12 sm:px-8">
+        <div className="mx-auto max-w-7xl">
+          <Card className="border-amber-500/30">
+            <CardHeader>
+              <Badge variant="outline" className="w-fit border-amber-500/30 text-amber-300">YouTube policy update · creator action</Badge>
+              <CardTitle id="creator-ypp-2027">YouTube Partner Program changes for 2027</CardTitle>
+              <CardDescription>Official policy guidance, not a promise of monetization or an automated channel action.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
+              <p>
+                YouTube asks eligible Partner Program creators to review and accept updated monetization modules
+                in YouTube Studio by January 31, 2027. The terms take effect February 1, 2027.
+                AMS cannot accept channel terms on a creator&apos;s behalf.
+              </p>
+              <p>
+                From February 1, 2027, Shorts ad/Premium revenue sharing requires 10 million qualified Shorts
+                views in the preceding 90 days. New applicants seeking ads/Premium revenue sharing need
+                20 million qualified Shorts views in 90 days or 8,000 qualified watch hours in 365 days.
+                YouTube says the new entry thresholds do not remove existing partners from YPP.
+              </p>
+              <p>
+                YouTube announced an invite-only Shorts bonus pilot on October 15, 2026, beginning in six markets,
+                including the US. Invitations and bonus conditions are channel-specific; Creator Autopilot
+                does not guarantee invitations, eligibility, views, earnings, or publishing outcomes.
+              </p>
+              <a
+                className="inline-flex font-semibold text-primary underline underline-offset-4"
+                href="https://support.google.com/youtube/blog/451804019/updates-to-the-youtube-partner-program-new-earning-opportunities-changes-to-eligibility"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Review YouTube&apos;s official policy and bonus announcement
+              </a>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
       <section className="border-y border-border/70 bg-muted/20 px-5 py-14 sm:px-8 lg:py-20">
         <div className="mx-auto max-w-7xl space-y-8">
           <div className="max-w-3xl space-y-3">
