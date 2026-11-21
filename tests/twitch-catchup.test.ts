@@ -239,6 +239,40 @@ test("pre-upload vault failures can resume but upload ambiguity cannot", async (
   assert.equal(await claimTwitchVod(options), null)
 })
 
+test("November 2026 YouTube public-default change cannot silently publish new VOD uploads", async () => {
+  const options = await publisher()
+  const key = "ams:twitch-catchup:v1:vod:123"
+  const original = JSON.parse(options.data.get(key) as string)
+  options.data.set(key, JSON.stringify({ ...original, status: "pending", youtubeVideoId: null }))
+  const claimed = (await claimTwitchVod(options))!
+  let sessions = 0
+  const fetcher: typeof fetch = async (input, init) => {
+    const url = new URL(String(input))
+    if (url.pathname === "/upload/youtube/v3/videos") {
+      sessions++
+      assert.equal(init?.method, "POST")
+      assert.equal(url.searchParams.get("uploadType"), "resumable")
+      assert.equal(url.searchParams.get("notifySubscribers"), "false")
+      assert.ok(url.searchParams.get("part")?.split(",").includes("status"))
+      const payload = JSON.parse(String(init?.body))
+      assert.equal(payload.status?.privacyStatus, "private")
+      assert.equal(payload.status?.selfDeclaredMadeForKids, false)
+      assert.equal(payload.status?.publishAt, undefined)
+      return new Response(null, { status: 200, headers: {
+        location: "https://www.googleapis.com/upload/youtube/v3/videos?upload_id=privacy-proof",
+      } })
+    }
+    return options.fetcher(input, init)
+  }
+  const result = await beginTwitchVodUpload({ vodId: "123", lease: claimed.lease!, bytes: 1234 }, {
+    ...options, fetcher,
+  })
+  assert.match(result.uploadUrl, /upload_id=privacy-proof/)
+  assert.equal(sessions, 1)
+  assert.equal((await getTwitchCatchupStatus(options)).jobs[0].status, "uploading")
+  assert.equal(options.updates(), 0)
+})
+
 test("production upload initiation resolves the configured Redis vault when no store is injected", async () => {
   const options = await publisher()
   options.allowLong()

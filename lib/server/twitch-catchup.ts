@@ -293,6 +293,8 @@ export async function beginTwitchVodUpload(input: { vodId: string; lease: string
   const response = await (options.fetcher ?? fetch)("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet%2Cstatus&notifySubscribers=false", {
     method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json",
       "X-Upload-Content-Length": String(input.bytes), "X-Upload-Content-Type": "video/mp4" },
+    // YouTube Data API (2026-11-02) defaults uploads to PUBLIC if privacyStatus is omitted.
+    // Keep Private explicit; publication remains a separate, verified/owner-gated operation.
     body: JSON.stringify({ snippet: { ...job.metadata, categoryId: "20", tags: ["SmokyBanana03", "Twitch VOD", "Gaming", "AMS"] },
       status: { privacyStatus: "private", embeddable: true, selfDeclaredMadeForKids: false } }),
     signal: AbortSignal.timeout(20_000),
