@@ -123,7 +123,7 @@ function parseStored(raw: unknown): StoredConnection | null {
   return parsed.success ? parsed.data : null
 }
 
-function encryptPayload(payload: z.infer<typeof encryptedPayloadSchema>, key: KeyObject) {
+export function encryptConnectionPayload(payload: z.infer<typeof encryptedPayloadSchema>, key: KeyObject) {
   const iv = Uint8Array.from(randomBytes(12))
   const cipher = createCipheriv("aes-256-gcm", key, iv)
   const plain = JSON.stringify(encryptedPayloadSchema.parse(payload))
@@ -135,7 +135,7 @@ function encryptPayload(payload: z.infer<typeof encryptedPayloadSchema>, key: Ke
   }
 }
 
-function decryptPayload(record: StoredConnection, key: KeyObject) {
+export function decryptConnectionPayload(record: Pick<StoredConnection, "iv" | "authTag" | "cipherText">, key: KeyObject) {
   const iv = Uint8Array.from(Buffer.from(record.iv, "base64"))
   const authTag = Uint8Array.from(Buffer.from(record.authTag, "base64"))
   const decipher = createDecipheriv("aes-256-gcm", key, iv)
@@ -166,7 +166,7 @@ export async function saveCustomerConnection(
   const provider = customerConnectionProviderSchema.parse(input.provider)
   const now = (options.now ?? (() => new Date()))().toISOString()
   const existing = parseStored(await redis.get<unknown>(connectionKey(subject, provider)))
-  const encrypted = encryptPayload(
+  const encrypted = encryptConnectionPayload(
     {
       accessToken: input.accessToken,
       refreshToken: input.refreshToken ?? null,
@@ -201,7 +201,7 @@ export async function getCustomerConnectionSecret(
 
   const record = parseStored(await redis.get<unknown>(connectionKey(subject, provider)))
   if (!record) return null
-  return { connection: toPublic(record), secret: decryptPayload(record, key) }
+  return { connection: toPublic(record), secret: decryptConnectionPayload(record, key) }
 }
 
 export async function listCustomerConnections(subject: string, options: Options = {}) {

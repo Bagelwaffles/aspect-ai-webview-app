@@ -19,6 +19,7 @@ import { isR2AssetStorageConfigured } from "@/lib/server/r2-presign"
 import { checkRedisReadiness } from "@/lib/server/redis-readiness"
 import { isInternalApiConfigured } from "@/lib/server/internal-api-auth"
 import { getCloudBrowserConfiguration } from "@/lib/server/cloud-browser-dispatch"
+import { createScheduledTaskStore, scheduledTaskDefinitions, type TaskState } from "@/lib/server/scheduled-task-engine"
 
 export type BackendMonitorStatus =
   | "ok"
@@ -779,6 +780,32 @@ function isAlertStatus(status: BackendMonitorStatus) {
   return status === "warning" || status === "critical"
 }
 
+export function scheduledTaskHealth(states: Array<TaskState | null>, now: Date) {
+  const enabled = states.filter((state): state is TaskState => Boolean(state?.enabled))
+  const issues: string[] = []
+  for (const state of enabled) {
+    if (state.error) issues.push(`${state.id}: ${state.error}`)
+    if (!state.lastScheduledSuccess) issues.push(`${state.id}: independent scheduled execution is not proven.`)
+    if (Date.parse(state.retryAt ?? state.nextExecution) < now.getTime() - 2 * 60 * 60_000) issues.push(`${state.id}: scheduled trigger is overdue.`)
+    if (state.history.some(run => run.notification === "exhausted")) issues.push(`${state.id}: notification retries exhausted.`)
+    if (state.history[0]?.notification === "pending") issues.push(`${state.id}: owner notification delivery is unverified.`)
+    if (state.history[0]?.result?.dataQuality === "partial") issues.push(`${state.id}: latest source coverage is partial.`)
+  }
+  return { enabled: enabled.length, issues }
+}
+
+async function monitorScheduledTasks(context: MonitorContext) {
+  if (context.env.AMS_SCHEDULED_TASKS_ENABLED !== "true") return result("scheduled-tasks", "Scheduled Tasks", "info", "Replacement scheduler remains disabled pending production verification.", context.now.toISOString())
+  try {
+    const store = createScheduledTaskStore(context.env)
+    const states = await Promise.all(scheduledTaskDefinitions.map(definition => store.read(definition.id)))
+    const health = scheduledTaskHealth(states, context.now)
+    return result("scheduled-tasks", "Scheduled Tasks", health.issues.length ? "warning" : health.enabled ? "ok" : "info", health.issues[0] ?? (health.enabled ? "Enabled scheduled tasks have durable scheduled proof and no recorded failure." : "All replacements remain paused."), context.now.toISOString(), health.issues, { enabled: health.enabled })
+  } catch {
+    return result("scheduled-tasks", "Scheduled Tasks", "critical", "Scheduled task persistence is unavailable.", context.now.toISOString())
+  }
+}
+
 function stateKey(monitorKey: string) {
   return `${MONITORING_PREFIX}:state:${monitorKey}`
 }
@@ -931,6 +958,7 @@ export async function runBackendMonitoring(
     runMonitorSafely("visibility-catalog", "Visibility & Catalog Truth", checkedAt, () => monitorVisibility(context)),
     runMonitorSafely("execution-transparency", "Trust & Execution Transparency", checkedAt, () => monitorExecutionTransparency(context)),
     runMonitorSafely("agent-lifecycle", "Agent Lifecycle", checkedAt, () => monitorAgentLifecycle(context)),
+    runMonitorSafely("scheduled-tasks", "Scheduled Tasks", checkedAt, () => monitorScheduledTasks(context)),
   ])
 
   const base: Omit<BackendMonitoringSnapshot, "newEvents"> = {

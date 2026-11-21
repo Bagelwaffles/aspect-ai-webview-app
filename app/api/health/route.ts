@@ -75,6 +75,13 @@ export async function GET() {
         n8n: n8nExplicitlyEnabled ? "optional_enabled" : "disabled_optional",
         n8nApiKey: "not_required",
         internalApiAuth: isInternalApiConfigured() ? "configured" : "missing",
+        scheduledTasks: {
+          enabled: process.env.AMS_SCHEDULED_TASKS_ENABLED === "true",
+          modelConfigured: configured("AMS_SCHEDULED_TASK_MODEL"),
+          ownerConfigured: configured("AMS_OWNER_EMAIL"),
+          notificationConfigured: configured("AMS_MONITOR_ALERT_WEBHOOK_URL", "AMS_MONITOR_ALERT_WEBHOOK_SECRET"),
+          deliveryTested: false,
+        },
       },
       dependencyConnectionsTested: {
         redis: redis.checked,
