@@ -13,6 +13,7 @@ import { QuickAuditResultClient } from "./QuickAuditResultClient"
 export const metadata = {
   title: "Payment received | AMS Quick Marketing Audit",
   description: "Verified result delivery after purchasing the AMS Quick Marketing Audit.",
+  robots: { index: false, follow: false, nocache: true },
 }
 
 export default function QuickMarketingAuditThanksPage() {

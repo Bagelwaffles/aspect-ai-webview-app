@@ -11,6 +11,7 @@ import {
   type QuickAuditResultStore,
 } from "../lib/server/quick-audit-native"
 import { createQuickAuditResultHandler } from "../lib/server/quick-audit-result"
+import { createBuyerReportAccessToken } from "../lib/server/quick-audit-report-access"
 
 class MemoryResultStore implements QuickAuditResultStore {
   records = new Map<string, NativeQuickAuditResult>()
@@ -130,6 +131,8 @@ test("paid live Quick Audit session can retrieve only its durable native result"
   assert.equal(body.status, "completed")
   assert.equal(body.result.auditId, result.auditId)
   assert.equal(response.headers.get("cache-control"), "no-store")
+  assert.equal(response.headers.get("referrer-policy"), "no-referrer")
+  assert.match(response.headers.get("x-robots-tag") ?? "", /noindex/)
   assert.equal(JSON.stringify(body).includes("rk_live_fixture"), false)
 })
 
@@ -173,4 +176,99 @@ test("verified paid order returns processing without inventing a result", async 
   const body = await response.json()
   assert.equal(response.status, 202)
   assert.equal(body.status, "processing")
+})
+
+test("result endpoint fails closed if Stripe request ID disagrees with stored audit", async () => {
+  const store = new MemoryResultStore()
+  await store.save({
+    ...buildNativeQuickAuditResult(nativeInput),
+    requestId: "incorrect-other-order",
+  })
+
+  // Simulate a bad key / retrieval anomaly that returned an unrelated audit.
+  const handler = createQuickAuditResultHandler({
+    env: {
+      NODE_ENV: "test",
+      AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: "rk_live_fixture",
+      AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: "price_native",
+    },
+    createStripe: () => stripeFixture(),
+    store: {
+      getByRequestId: async () => buildNativeQuickAuditResult({
+        ...nativeInput, requestId: "incorrect-other-order",
+      }),
+      save: async () => undefined,
+    },
+  })
+  const response = await handler(new NextRequest("https://ams.example/api/quick-marketing-audit/result?session_id=cs_live_native123"))
+  const body = await response.json()
+  assert.equal(response.status, 403)
+  assert.equal(body.code, "QUICK_AUDIT_RESULT_MISMATCH")
+  assert.equal(body.result, undefined)
+  assert.equal(response.headers.get("cache-control"), "no-store")
+  assert.equal(response.headers.get("referrer-policy"), "no-referrer")
+})
+
+test("optional buyer-email proof gate blocks session-ID-only access and allows signed buyer", async () => {
+  const store = new MemoryResultStore()
+  const result = buildNativeQuickAuditResult(nativeInput)
+  await store.save(result)
+  const secret = "test-only-report-access-secret-with-at-least-32-characters"
+  const session = paidSession()
+  session.customer_details = { email: "buyer@example.com" } as NonNullable<Stripe.Checkout.Session["customer_details"]>
+  const handler = createQuickAuditResultHandler({
+    env: {
+      NODE_ENV: "test",
+      AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: "rk_live_fixture",
+      AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: "price_native",
+      AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED: "true",
+      AMS_QUICK_AUDIT_REPORT_ACCESS_SECRET: secret,
+    },
+    createStripe: () => stripeFixture(session),
+    store,
+  })
+  const url = "https://ams.example/api/quick-marketing-audit/result?session_id=cs_live_native123"
+  const sessionIdAlone = await handler(new NextRequest(url))
+  assert.equal(sessionIdAlone.status, 403)
+  assert.equal((await sessionIdAlone.json()).code, "QUICK_AUDIT_REPORT_ACCESS_REQUIRED")
+
+  const token = createBuyerReportAccessToken({
+    checkoutSessionId: session.id,
+    requestId: nativeInput.requestId,
+    buyerEmail: "buyer@example.com",
+  }, secret)
+  const verified = await handler(new NextRequest(url, { headers: { authorization: "Bearer " + token } }))
+  assert.equal(verified.status, 200)
+  assert.equal((await verified.json()).result.auditId, result.auditId)
+
+  const otherEmail = paidSession()
+  otherEmail.customer_details = { email: "different@example.com" } as NonNullable<Stripe.Checkout.Session["customer_details"]>
+  const wrongBuyerHandler = createQuickAuditResultHandler({
+    env: {
+      NODE_ENV: "test",
+      AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: "rk_live_fixture",
+      AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: "price_native",
+      AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED: "true",
+      AMS_QUICK_AUDIT_REPORT_ACCESS_SECRET: secret,
+    },
+    createStripe: () => stripeFixture(otherEmail),
+    store,
+  })
+  assert.equal((await wrongBuyerHandler(new NextRequest(url, { headers: { authorization: "Bearer " + token } }))).status, 403)
+})
+
+test("enabled buyer report proof fails closed without a configured secret", async () => {
+  const handler = createQuickAuditResultHandler({
+    env: {
+      NODE_ENV: "test",
+      AMS_STRIPE_QUICK_AUDIT_LIVE_SECRET_KEY: "rk_live_fixture",
+      AMS_STRIPE_QUICK_AUDIT_LIVE_PRICE_ID: "price_native",
+      AMS_QUICK_AUDIT_REPORT_ACCESS_REQUIRED: "true",
+    },
+    createStripe: () => stripeFixture(),
+    store: new MemoryResultStore(),
+  })
+  const response = await handler(new NextRequest("https://ams.example/api/quick-marketing-audit/result?session_id=cs_live_native123"))
+  assert.equal(response.status, 503)
+  assert.equal((await response.json()).code, "QUICK_AUDIT_REPORT_ACCESS_UNCONFIGURED")
 })
